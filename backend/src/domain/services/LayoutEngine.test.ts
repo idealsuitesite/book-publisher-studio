@@ -3,7 +3,7 @@ import { LayoutEngine } from './LayoutEngine';
 import { ThemeEngine } from './ThemeEngine';
 import { ClassicTheme } from '../themes/ClassicTheme';
 import { createBook } from '../models/Book';
-import type { Chapter, Heading, Paragraph, Image } from '../models/Book';
+import type { Chapter, Section, Heading, Paragraph, Image, List, Table, Footnote, Block } from '../models/Book';
 import type { PageLayout } from '../models/PageLayout';
 
 const LETTER_LAYOUT: PageLayout = {
@@ -28,7 +28,19 @@ function image(id: string, height?: number): Image {
   return { type: 'image', id, url: 'https://example.com/a.png', height };
 }
 
-function chapter(content: (Heading | Paragraph | Image)[], overrides: Partial<Chapter> = {}): Chapter {
+function list(id: string, items: string[]): List {
+  return { type: 'list', id, ordered: false, items };
+}
+
+function table(id: string, rows: string[][]): Table {
+  return { type: 'table', id, headers: ['A'], rows };
+}
+
+function footnote(id: string): Footnote {
+  return { type: 'footnote', id, number: 1, content: 'See appendix.' };
+}
+
+function chapter(content: Block[], overrides: Partial<Chapter> = {}): Chapter {
   const now = new Date();
   return {
     type: 'chapter',
@@ -108,5 +120,45 @@ describe('LayoutEngine', () => {
     const result = engine.paginate(styled, LETTER_LAYOUT);
 
     expect(result.pages.map((p) => p.number)).toEqual(result.pages.map((_, i) => i + 1));
+  });
+
+  it('estimates height for list, table, and footnote blocks without throwing', () => {
+    const styled = styledBookFrom([
+      chapter([list('l-1', ['One', 'Two', 'Three']), table('t-1', [['1']]), footnote('f-1')]),
+    ]);
+
+    const result = engine.paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages[0].blocks).toEqual(['l-1', 't-1', 'f-1']);
+  });
+
+  it('paginates blocks nested in sections and subsections, in document order', () => {
+    const now = new Date();
+    const section: Section = {
+      type: 'section',
+      id: 'sec-1',
+      title: 'Section A',
+      content: [paragraph('p-sec')],
+      level: 2,
+      createdAt: now,
+      updatedAt: now,
+      subsections: [
+        {
+          type: 'section',
+          id: 'sec-2',
+          title: 'Section B',
+          content: [paragraph('p-subsec')],
+          level: 3,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    };
+    const styled = styledBookFrom([chapter([paragraph('p-1')], { sections: [section] })]);
+
+    const result = engine.paginate(styled, LETTER_LAYOUT);
+    const allBlocks = result.pages.flatMap((p) => p.blocks);
+
+    expect(allBlocks).toEqual(['p-1', 'p-sec', 'p-subsec']);
   });
 });
