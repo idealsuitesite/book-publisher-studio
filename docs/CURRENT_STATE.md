@@ -1,118 +1,67 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 16, 2026 14:30 UTC
+**Last Updated:** July 16, 2026 17:45 UTC
 **Sprint:** Sprint 1 - Import Pipeline
-**Phase:** Phase 2 (Application Layer) Complete, Phase 3 (Presentation) In Progress
+**Phase:** Phase 1 (Domain + Infrastructure) complete. Phase 2 (Application) and Phase 3 (Presentation) not started.
 
 ---
 
 ## Summary
 
-**Completed:** 110 tests passing ✅
-**In Progress:** Presentation Layer (ManuscriptController)
-**Next:** E2E endpoint testing
+**Completed:** 43 tests passing ✅ (backend/src only — see note below on prior counts)
+**Next:** Application Layer (ImportManuscriptUseCase, DTOs, mappers), then Presentation Layer (ManuscriptController)
+
+> Earlier versions of this file claimed Phase 2 (Application Layer) was complete with 69–110 tests passing. That did not match the actual `backend/src` tree: there is no `application/` directory, no `ImportManuscriptUseCase.ts`, no DTOs, no mappers, and no `BookValidator`/`BookMetricsCalculator` as separate services. The inflated counts came from vitest also running stale compiled test files left over in `backend/dist/` (gitignored build output) with no `vitest.config` to exclude them — including, at one point, orphaned `dist/application/**` files for an Application layer that no longer existed in `src/`. Both issues are now fixed: `dist/` was cleared and `backend/vitest.config.ts` now scopes test discovery to `src/**/*.test.ts`.
 
 ---
 
 ## Sprint 1: Import Pipeline
 
-### Phase 1: Domain Layer ✅ COMPLETE
+### Phase 1: Domain + Infrastructure ✅ COMPLETE
 
-**Status:** 100% Complete (8 tests)
+**Status:** 43/43 tests passing
 
-- ✅ Book domain model (immutable)
-- ✅ ASTBuilder service (Normalized → Book)
-- ✅ BookValidator service (validation logic)
-- ✅ BookMetricsCalculator service (word count, reading time)
-- ✅ Block types (heading, paragraph, image, table, list, quote, scripture, footnote)
+- ✅ Book domain model (immutable) — `src/domain/models/Book.ts` (7 tests)
+- ✅ Normalized document contract — `src/domain/models/Normalized.ts`
+- ✅ ASTBuilder service (Normalized → Book, incl. metrics calculation) — `src/domain/services/ASTBuilder.ts` (19 tests)
+- ✅ HtmlNormalizer (HTML → NormalizedDocument) — `src/infrastructure/normalizers/HtmlNormalizer.ts` (17 tests)
+- ✅ Block types: heading, paragraph, image, table, list, quote, scripture, footnote
+- ✅ Shared utils: `idGenerator.ts`, `textMetrics.ts`
+- ✅ `src/services/docxParser.ts` (DOCX → HTML via Mammoth, not yet wired into a use case)
 
-**Files:**
-src/domain/models/Book.ts
-src/domain/services/ASTBuilder.ts
-src/domain/services/BookValidator.ts
-src/domain/services/BookMetricsCalculator.ts
-src/shared/utils/textMetrics.ts
-src/shared/utils/idGenerator.ts
+**Not implemented as separate services** (contrary to earlier docs): `BookValidator`, `BookMetricsCalculator` — metrics are currently computed inline inside `ASTBuilder`.
+
 ---
 
-### Phase 2: Application Layer ✅ COMPLETE
+### Phase 2: Application Layer 🔴 NOT STARTED
 
-**Status:** 100% Complete (13 tests)
+Nothing exists yet under `src/application/`. Needed:
+- `UseCase<TRequest, TResponse>` contract
+- `ImportRequest` / `ImportResponseDTO` types
+- `DocumentParser`, `DocumentNormalizer`, `BookBuilder`, `BookMapper` port interfaces
+- DTOs: `MetadataDTO`, `BlockDTO`, `ChapterDTO`, `SectionDTO`, `BookDTO`
+- Mappers: `BlockMapper`, `ChapterMapper`, `SectionMapper`, `BookMapper`
+- `ImportManuscriptUseCase` orchestrating Parser → Normalizer → ASTBuilder → (Validator) → Mapper
 
-#### Contracts & Types
-
-- ✅ UseCase<TRequest, TResponse> interface
-- ✅ ImportRequest (buffer, filename, mimeType)
-- ✅ ImportResponseDTO (success, book, report)
-- ✅ DocumentParser interface (abstraction)
-- ✅ DocumentNormalizer interface (abstraction)
-- ✅ BookBuilder interface (abstraction)
-- ✅ BookMapper interface (abstraction)
-
-#### DTOs (5 types)
-
-- ✅ MetadataDTO
-- ✅ BlockDTO (all block types)
-- ✅ ChapterDTO
-- ✅ SectionDTO
-- ✅ BookDTO
-
-#### Mappers (4 classes)
-
-- ✅ BlockMapper (Block → BlockDTO)
-- ✅ ChapterMapper (Chapter → ChapterDTO)
-- ✅ SectionMapper (Section → SectionDTO)
-- ✅ BookMapper (Book → BookDTO)
-
-#### Use Cases
-
-- ✅ ImportManuscriptUseCase (9 tests)
-  - Pure pipeline orchestration
-  - Depends only on interfaces
-  - Sequential execution (no branching)
-  - All 11 test cases passing:
-    - Cas nominal: 4 tests (simple, complex, images, tables)
-    - Cas d'erreur: 5 tests (empty, corrupted, parser error, builder error, validation error)
-    - Cas métier: 6 tests (metadata, chapters, report, metrics, hierarchy)
-
-**Files:**
-src/application/contracts/UseCase.ts
-src/application/use-cases/types.ts
-src/application/use-cases/ImportManuscriptUseCase.ts
-src/application/use-cases/ImportManuscriptUseCase.test.ts
-src/application/dto/.ts (5 files)
-src/application/mappers/.ts (5 files)
 ---
 
-### Phase 3: Presentation Layer 🔄 IN PROGRESS
+### Phase 3: Presentation Layer 🔴 NOT STARTED
 
-**Status:** 0% Complete (0/? tests)
-
-**Next Steps:**
-1. Create ManuscriptController
-2. Create manuscript routes
-3. Integrate with Express
-4. E2E testing
-
-**Not Yet Started:**
-- ManuscriptController.ts
-- routes/manuscripts.ts
-- Middleware (validation, error handling)
+- `ManuscriptController.ts`
+- `routes/manuscripts.ts`
+- Express wiring, error-handling middleware
+- E2E HTTP tests
 
 ---
 
 ## Test Summary
 
-| Component | Unit | Integration | Total | Status |
-|-----------|------|-------------|-------|--------|
-| Domain Models | 7 | - | 7 | ✅ |
-| ASTBuilder | 19 | - | 19 | ✅ |
-| HtmlNormalizer | 17 | - | 17 | ✅ |
-| BookValidator | 4 | - | 4 | ✅ |
-| BookMetricsCalculator | 4 | - | 4 | ✅ |
-| BookMapper | 4 | - | 4 | ✅ |
-| ImportManuscriptUseCase | - | 9 | 9 | ✅ |
-| **Total** | **55** | **9** | **69** | **✅** |
+| Component | Tests | Status |
+|-----------|-------|--------|
+| Book domain model | 7 | ✅ |
+| ASTBuilder | 19 | ✅ |
+| HtmlNormalizer | 17 | ✅ |
+| **Total** | **43** | **✅** |
 
 ---
 
@@ -121,55 +70,44 @@ src/application/mappers/.ts (5 files)
 | Rule | Status |
 |------|--------|
 | Domain has zero external dependencies | ✅ |
-| Application depends only on interfaces | ✅ |
-| No Domain objects in DTOs | ✅ |
-| Dependency Inversion enforced | ✅ |
 | All tests passing | ✅ |
 | No circular dependencies | ✅ |
 | TypeScript strict mode | ✅ |
+| Application depends only on interfaces | N/A — not yet built |
+| No Domain objects in DTOs | N/A — no DTOs yet |
 
 ---
 
 ## Known Issues
 
-- None currently
+- None currently (stale-`dist/` test pollution fixed by adding `backend/vitest.config.ts`)
 
 ---
 
 ## Technical Debt
 
-- None identified
-
----
-
-## Performance Notes
-
-- Tests run in ~750ms
-- No bottlenecks identified
-- Metrics calculation is O(n) linear
+- Documentation (`CURRENT_STATE.md`, `ROADMAP.md`, `TODO.md`, `DECISIONS.md`) previously described Phase 2 as complete when it wasn't. This file has been corrected; the others may still need reconciling.
 
 ---
 
 ## Next Session Preparation
 
 **To resume work:**
-1. Read CLAUDE.md
-2. Read this file (CURRENT_STATE.md)
-3. Read docs/ARCHITECTURE.md
-4. Begin Phase 3: Presentation Layer
+1. Read `docs/START_HERE.md`
+2. Read this file (`CURRENT_STATE.md`)
+3. Read `docs/ARCHITECTURE.md`
+4. Begin Phase 2: Application Layer
 
 **Quick Start:**
 ```bash
 cd "D:\Book Publisher Studio\backend"
-npm test              # Verify all 69 tests pass
+npm test              # Verify all 43 tests pass
 npm run build         # Verify TypeScript compilation
 ```
 
 **Next Task:**
-- Create ManuscriptController
-- Create manuscript.ts route
-- Implement POST /api/manuscripts/import endpoint
-- Write E2E tests for HTTP interface
+- Build the Application layer (use case, ports, DTOs, mappers) before starting Presentation
+- Then: ManuscriptController, manuscript routes, E2E tests
 
 ---
 
@@ -188,6 +126,5 @@ npm run build         # Verify TypeScript compilation
 
 ## Git Status
 
-**Last Commit:** "Phase 2 complete: ImportManuscriptUseCase with DI"
 **Branch:** main
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
