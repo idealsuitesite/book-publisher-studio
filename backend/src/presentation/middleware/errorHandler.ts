@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { DocumentParseError } from '../../shared/errors/DocumentParseError';
+import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
 
 export function errorHandler(err: unknown, _req: Request, res: Response, next: NextFunction): void {
   if (res.headersSent) {
@@ -21,6 +22,11 @@ export function errorHandler(err: unknown, _req: Request, res: Response, next: N
 
   if (err instanceof DocumentParseError) {
     res.status(400).json({ error: 'The uploaded file could not be parsed as a DOCX document' });
+    return;
+  }
+
+  if (err instanceof UnknownThemeError) {
+    res.status(400).json({ error: err.message });
     return;
   }
 

@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 19:40 UTC
+**Last Updated:** July 17, 2026 22:25 UTC
 
 ---
 
@@ -12,32 +12,26 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-None currently — Sprint 1 is complete.
-
----
-
-## 🟢 READY (Priority Order)
-
-### High Priority (Sprint 2 — per the dictated MVP roadmap)
-
-**Design Review complete (2026-07-17).** ADR-0012, ADR-0013, ADR-0014, ADR-0016 are APPROVED (`docs/architecture/diagrams/RENDERING_PIPELINE.md` has the resolved design: `StyledBook` shape, `Renderer`-is-a-port/`ThemeEngine`+`LayoutEngine`-are-concrete-classes decision, `RenderContext`). Implementation not started yet. Per ADR-0017, this work happens on a dedicated branch (`feature/sprint-2-rendering-engine`, not created yet — create it at the first implementation commit, not before), not directly on `main`. Every merge back to `main` follows `docs/MERGE_CHECKLIST.md`.
+### Sprint 2 implementation ✅ built, on `feature/sprint-2-rendering-engine`, not yet merged
 
 1. **Theme Engine** (Domain, concrete class — not a port) — ADR-0016
-   - [ ] `Theme` interface (fonts, sizes, colors, spacing, per-block styles)
-   - [ ] `ThemeEngine.applyTheme(book, theme): StyledBook`
-   - [ ] At least one built-in theme (e.g. Classic)
+   - [x] `Theme` interface (fonts, sizes, colors, spacing) — kept proportional to what `DOCXRenderer` consumes (no per-block-type overrides beyond heading-vs-body yet)
+   - [x] `ThemeEngine.applyTheme(book, theme): StyledBook`
+   - [x] Classic built-in theme + `getTheme(name)` registry
 
 2. **Layout Engine** (Domain, concrete class — not a port) — ADR-0013
-   - [ ] `PageLayout` interface (margins, page size, headers/footers) — always explicit per export request, no theme-level defaults
-   - [ ] Heuristic pagination logic (per-block-type height estimate, not exact text shaping)
+   - [x] `PageLayout` interface (margins, page size, headers/footers) — always explicit per export request, no theme-level defaults
+   - [x] Heuristic pagination logic, returns `PaginatedBook` (not a bare `Page[]`, per the Design Review revision)
 
-3. **Professional DOCX Export** — ADR-0012
-   - [ ] `ExportDOCXUseCase` (Application, same `UseCase<TRequest,TResponse>` shape as `ImportManuscriptUseCase`)
-   - [ ] `DOCXRenderer` (Infrastructure, implements the `Renderer` port) — library choice still not decided, needs its own ADR before implementation (only remaining genuinely open item from the Design Review, besides EPUB's library spike)
+3. **Professional DOCX Export** — ADR-0012, ADR-0018
+   - [x] `ExportManuscriptUseCase` (Application, same `UseCase<TRequest,TResponse>` shape as `ImportManuscriptUseCase`) — single round trip (DOCX in, styled DOCX out), no persistence layer to look anything up from
+   - [x] `DOCXRenderer` (Infrastructure, implements the `Renderer` port) — uses the `docx` npm package (ADR-0018)
+   - [x] `POST /api/manuscripts/export` route + `ExportController`
 
 4. **Quality Sprint: 0 ESLint warnings**
-   - [ ] Currently 37 warnings, all `@typescript-eslint/no-explicit-any`, mostly in cheerio-typed `HtmlNormalizer.ts`
-   - [ ] Deliberately deferred rather than fixed during Phase 2 to avoid touching already-tested files outside that phase's scope — now explicitly scheduled
+   - [ ] Still 37 warnings, unchanged this sprint — not fixed, remains explicitly scheduled (not silently dropped)
+
+**Before merging to `main`:** run through `docs/MERGE_CHECKLIST.md` explicitly (build/test/lint/coverage all re-verified green as of this update — 118 tests, Domain 92.64%, global 88.01% — but the checklist should still be walked, not assumed).
 
 ### Medium Priority (Sprint 3)
 
@@ -117,8 +111,8 @@ None currently — Sprint 1 is complete.
 
 ## 📊 METRICS
 
-- **Test Coverage:** Domain 91.56% stmts, global 87.23% stmts (both verified via `npm run test:coverage`, not asserted)
+- **Test Coverage:** Domain 92.64% stmts, global 88.01% stmts (both verified via `npm run test:coverage`, not asserted)
 - **Code Quality:** TypeScript strict mode ✅, ESLint 0 errors / 37 warnings, Prettier applied
-- **Tests:** 88 passing, 0 failing
+- **Tests:** 118 passing, 0 failing
 - **Architecture Debt:** Legacy route duplication (see Known Issues)
-- **Documentation:** Reconciled with actual code as of 2026-07-17
+- **Documentation:** Reconciled with actual code as of 2026-07-17 (Sprint 2 implementation, pre-merge)

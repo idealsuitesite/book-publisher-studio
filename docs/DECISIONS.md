@@ -368,3 +368,22 @@ For the first implementation, pagination is heuristic, not exact: each block typ
 - `main` should only receive: merges of reviewed feature branches, and direct documentation/governance commits (ADRs, roadmap updates) of the kind this session has been making throughout — those don't need a feature branch since they carry no implementation risk
 
 **Related:** Repository Reality Check (159a49b3 incident, 2026-07-17), ADR-0012 through ADR-0016 (Sprint 2/3 design)
+
+---
+
+## ADR-0018: DOCX Renderer — `docx` npm Package
+
+**Status:** APPROVED
+**Date:** 2026-07-17
+**Decision:** `DOCXRenderer` (Infrastructure) wraps the **`docx`** npm package (by dolanmiu) to generate `.docx` output from a `PaginatedBook`. This was the one library choice `docs/TODO.md` flagged as still open after the Rendering Engine Design Review.
+
+**Rationale:**
+- Actively maintained, TypeScript-native, purpose-built for generating (not parsing) Word documents from structured content — `Paragraph`, `TextRun`, `Table`, `ImageRun` map cleanly onto the Book AST's `Heading`/`Paragraph`/`Table`/`Image` block types
+- Rejected: hand-rolling raw OOXML directly (as done for the minimal test fixtures in `test-utils/buildTestDocx.ts`). That was sufficient for a heading + a couple of plain paragraphs; "Professional DOCX Export" needs styles, tables, and images, and reimplementing what `docx` already solves correctly is wasted effort and a real correctness risk (OOXML has enough sharp edges that a mature library earns its keep here)
+- Rejected: `officegen` — older, less actively maintained, no TypeScript types of its own
+
+**Consequences:**
+- `docx` becomes a new runtime dependency (not dev-only, unlike `jszip` which is test-fixture-only)
+- `DOCXRenderer` consumes `PaginatedBook.styledBook.blockStyles` (font/size/color per block) to build styled `docx` paragraphs, and `PaginatedBook.pages` to insert explicit page breaks at the `LayoutEngine`'s estimated boundaries — Word will still reflow within those breaks, so this is a best-effort layout, not authoritative (ADR-0013)
+
+**Related:** ADR-0012, ADR-0013, ADR-0014 (same rationale pattern as the PDFKit decision), Sprint 2 (Professional DOCX Export)
