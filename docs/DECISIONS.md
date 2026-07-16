@@ -248,7 +248,7 @@ Per this ADR (satisfying BASELINE's own change-control rule): `BASELINE_v0.1.md`
 
 ## ADR-0012: Rendering Engine Architecture
 
-**Status:** PROPOSED (design only — no code written against this ADR yet)
+**Status:** APPROVED (Design Review 2026-07-17 — see `docs/architecture/diagrams/RENDERING_PIPELINE.md` for the resolved design; ready for implementation on `feature/sprint-2-rendering-engine`)
 **Date:** 2026-07-17
 **Decision:** Rendering follows the same Hexagonal pattern as import. A new `Renderer` port lives in `domain/ports/` (alongside `DocumentParser`/`DocumentNormalizer`):
 
@@ -268,6 +268,7 @@ interface Renderer<TOutput> {
 **Consequences:**
 - None of Domain/Application/Infrastructure for rendering exists yet; this ADR precedes implementation, not follows it
 - `ThemeEngine`, `LayoutEngine`, and each `Renderer` are separate, independently testable components — a `PDFRenderer` unit test should not require a real `Theme` or a real paginated book, just a `StyledBook` fixture
+- **Design Review addendum (2026-07-17):** confirmed `ThemeEngine`/`LayoutEngine` are concrete Domain classes, not ports — only `Renderer` is a port (interface with multiple swappable implementations). Reusing the same test already applied to `ASTBuilder`/`BookValidator` in Phase 2: a port makes sense where genuinely swappable adapters exist (Renderer: PDF/EPUB/DOCX/HTML/Kindle); a concrete class is correct where there's exactly one right implementation for our own Book model (ThemeEngine, LayoutEngine — same reasoning as ASTBuilder).
 
 **Related:** Sprint 2 (Theme Engine, Layout Engine, DOCX export), Sprint 3 (PDF, EPUB export), `docs/VISION.md`
 
@@ -275,7 +276,7 @@ interface Renderer<TOutput> {
 
 ## ADR-0013: Pagination Strategy
 
-**Status:** PROPOSED (design only)
+**Status:** APPROVED (confirmed unchanged by Design Review 2026-07-17; `PageLayout` defaults resolved — see `docs/architecture/diagrams/RENDERING_PIPELINE.md`)
 **Date:** 2026-07-17
 **Decision:** Pagination is a **Layout Engine** responsibility (`LayoutEngine.paginate(content: Block[]): Page[]`), and it only applies to fixed-layout output formats (PDF, DOCX). EPUB is reflowable — the e-reader paginates it, not us — so `EPUBRenderer` never calls `paginate()`.
 
@@ -296,7 +297,7 @@ For the first implementation, pagination is heuristic, not exact: each block typ
 
 ## ADR-0014: PDF Renderer — PDFKit
 
-**Status:** PROPOSED (design only)
+**Status:** APPROVED (confirmed unchanged by Design Review 2026-07-17)
 **Date:** 2026-07-17
 **Decision:** `PDFRenderer` (Infrastructure) wraps **PDFKit** (already named in `PROJECT.md`'s tech stack), a pure-JavaScript PDF generation library with no native/browser dependencies. It consumes a paginated, styled `Book` (see ADR-0012/0013) and emits a `Buffer`.
 
@@ -324,7 +325,7 @@ For the first implementation, pagination is heuristic, not exact: each block typ
 - Committing to a specific third-party package now, without having evaluated its EPUB3 compliance, maintenance status, or fit with the existing `BlockDTO`/mapper structure, would be a guess dressed up as a decision — exactly the kind of unverified claim this project has been correcting all session
 
 **Consequences:**
-- This ADR is intentionally incomplete; it should be updated (not silently replaced — see ADR-0007/ADR-0010's precedent on correcting rather than rewriting) once the spike concludes, with a follow-up ADR-0017 or an explicit amendment noted here
+- This ADR is intentionally incomplete; it should be updated (not silently replaced — see ADR-0007/ADR-0010's precedent on correcting rather than rewriting) once the spike concludes, with the next available ADR number (ADR-0017 was taken by the branching-policy decision before this spike concluded — use ADR-0018) or an explicit amendment noted here
 - No pagination needed for this renderer (ADR-0013) — EPUB is reflowable
 
 **Related:** ADR-0012, ADR-0013, Sprint 3 (EPUB export)
@@ -333,7 +334,7 @@ For the first implementation, pagination is heuristic, not exact: each block typ
 
 ## ADR-0016: Theme Engine
 
-**Status:** PROPOSED (design only)
+**Status:** APPROVED (Design Review 2026-07-17 — `StyledBook` shape resolved, `ThemeEngine` confirmed as a concrete class not a port — see `docs/architecture/diagrams/RENDERING_PIPELINE.md`)
 **Date:** 2026-07-17
 **Decision:** `Theme` is a plain data interface (fonts, sizes, colors, spacing, per-block-type styles) living in Domain — not code, not a class with behavior. `ThemeEngine.applyTheme(book: Book, theme: Theme): StyledBook` produces a new `StyledBook` (Domain type: a `Book` plus resolved style annotations per block), leaving `Book` itself untouched. First built-in theme: Classic.
 
@@ -343,7 +344,7 @@ For the first implementation, pagination is heuristic, not exact: each block typ
 - Keeps `ThemeEngine` swappable/testable independent of rendering: a `ThemeEngine` unit test needs a `Book` and a `Theme`, nothing else
 
 **Consequences:**
-- `StyledBook`'s exact shape (how style annotations attach to blocks) isn't decided yet — that's implementation work for Sprint 2, not this ADR
+- `StyledBook`'s exact shape (how style annotations attach to blocks) — **resolved by Design Review 2026-07-17**: `{ book: Book, theme: Theme, blockStyles: Record<blockId, ResolvedBlockStyle> }`, keyed lookup rather than a deep-cloned tree, to avoid an O(n) clone on every export of a large book. See `docs/architecture/diagrams/RENDERING_PIPELINE.md`.
 - Theme marketplace (free vs. premium themes) is a Commercial-stage concern (`VISION.md`) layered on top of this later; this ADR only covers the mechanism, not distribution/licensing
 
 **Related:** ADR-0012, Sprint 2 (Theme Engine), `docs/VISION.md` (Theme Marketplace)

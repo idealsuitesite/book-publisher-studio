@@ -20,21 +20,20 @@ None currently — Sprint 1 is complete.
 
 ### High Priority (Sprint 2 — per the dictated MVP roadmap)
 
-Design complete (ADR-0012 through ADR-0016, `docs/architecture/diagrams/RENDERING_PIPELINE.md`) — implementation not started. Per ADR-0017, this work happens on a dedicated branch (e.g. `feature/sprint-2-rendering-engine`), not directly on `main`.
+**Design Review complete (2026-07-17).** ADR-0012, ADR-0013, ADR-0014, ADR-0016 are APPROVED (`docs/architecture/diagrams/RENDERING_PIPELINE.md` has the resolved design: `StyledBook` shape, `Renderer`-is-a-port/`ThemeEngine`+`LayoutEngine`-are-concrete-classes decision, `RenderContext`). Implementation not started yet. Per ADR-0017, this work happens on a dedicated branch (`feature/sprint-2-rendering-engine`, not created yet — create it at the first implementation commit, not before), not directly on `main`. Every merge back to `main` follows `docs/MERGE_CHECKLIST.md`.
 
-1. **Theme Engine** (Domain) — ADR-0016
+1. **Theme Engine** (Domain, concrete class — not a port) — ADR-0016
    - [ ] `Theme` interface (fonts, sizes, colors, spacing, per-block styles)
    - [ ] `ThemeEngine.applyTheme(book, theme): StyledBook`
    - [ ] At least one built-in theme (e.g. Classic)
-   - [ ] Resolve `StyledBook`'s exact shape (open question in ADR-0016/`RENDERING_PIPELINE.md`)
 
-2. **Layout Engine** (Domain) — ADR-0013
-   - [ ] `PageLayout` interface (margins, page size, headers/footers)
+2. **Layout Engine** (Domain, concrete class — not a port) — ADR-0013
+   - [ ] `PageLayout` interface (margins, page size, headers/footers) — always explicit per export request, no theme-level defaults
    - [ ] Heuristic pagination logic (per-block-type height estimate, not exact text shaping)
 
-3. **Professional DOCX Export** — ADR-0012, ADR-0014-adjacent (own ADR still needed for the DOCX library choice)
+3. **Professional DOCX Export** — ADR-0012
    - [ ] `ExportDOCXUseCase` (Application, same `UseCase<TRequest,TResponse>` shape as `ImportManuscriptUseCase`)
-   - [ ] `DOCXRenderer` (Infrastructure) — library choice not yet decided, needs its own ADR before implementation
+   - [ ] `DOCXRenderer` (Infrastructure, implements the `Renderer` port) — library choice still not decided, needs its own ADR before implementation (only remaining genuinely open item from the Design Review, besides EPUB's library spike)
 
 4. **Quality Sprint: 0 ESLint warnings**
    - [ ] Currently 37 warnings, all `@typescript-eslint/no-explicit-any`, mostly in cheerio-typed `HtmlNormalizer.ts`
