@@ -68,6 +68,12 @@ export function createApp(): Express {
     res.json({ status: 'OK', message: 'Backend is running!' });
   });
 
+  /**
+   * @deprecated Legacy upload endpoint. Bypasses the Book AST pipeline entirely
+   * (no ASTBuilder/HtmlNormalizer, raw paragraph extraction, untested). Superseded
+   * by POST /api/manuscripts/import. Scheduled for removal in Sprint 3 — see
+   * ADR-0011 in docs/DECISIONS.md.
+   */
   app.post('/api/upload', upload.single('file'), async (req: Request, res: Response) => {
     try {
       if (!req.file) {

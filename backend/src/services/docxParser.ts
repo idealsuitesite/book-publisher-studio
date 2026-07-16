@@ -18,6 +18,11 @@ interface ExtractedContent {
   }>;
 }
 
+/**
+ * @deprecated Used only by the legacy POST /api/upload route. Superseded by
+ * MammothParser + HtmlNormalizer + ASTBuilder (the Book AST pipeline). Scheduled
+ * for removal alongside /api/upload in Sprint 3 — see ADR-0011 in docs/DECISIONS.md.
+ */
 export async function parseDocxFile(filePath: string): Promise<ExtractedContent> {
   try {
     // Read file as buffer FIRST, before deleting
