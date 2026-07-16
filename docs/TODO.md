@@ -20,18 +20,21 @@ None currently — Sprint 1 is complete.
 
 ### High Priority (Sprint 2 — per the dictated MVP roadmap)
 
-1. **Theme Engine** (Domain)
+Design complete (ADR-0012 through ADR-0016, `docs/architecture/diagrams/RENDERING_PIPELINE.md`) — implementation not started. Per ADR-0017, this work happens on a dedicated branch (e.g. `feature/sprint-2-rendering-engine`), not directly on `main`.
+
+1. **Theme Engine** (Domain) — ADR-0016
    - [ ] `Theme` interface (fonts, sizes, colors, spacing, per-block styles)
-   - [ ] `ThemeEngine.applyTheme(book, themeName): StyledBook`
+   - [ ] `ThemeEngine.applyTheme(book, theme): StyledBook`
    - [ ] At least one built-in theme (e.g. Classic)
+   - [ ] Resolve `StyledBook`'s exact shape (open question in ADR-0016/`RENDERING_PIPELINE.md`)
 
-2. **Layout Engine** (Domain)
+2. **Layout Engine** (Domain) — ADR-0013
    - [ ] `PageLayout` interface (margins, page size, headers/footers)
-   - [ ] Pagination logic
+   - [ ] Heuristic pagination logic (per-block-type height estimate, not exact text shaping)
 
-3. **Professional DOCX Export**
-   - [ ] `ExportBookUseCase` (Application, same `UseCase<TRequest,TResponse>` shape as `ImportManuscriptUseCase`)
-   - [ ] `DOCXRenderer` (Infrastructure)
+3. **Professional DOCX Export** — ADR-0012, ADR-0014-adjacent (own ADR still needed for the DOCX library choice)
+   - [ ] `ExportDOCXUseCase` (Application, same `UseCase<TRequest,TResponse>` shape as `ImportManuscriptUseCase`)
+   - [ ] `DOCXRenderer` (Infrastructure) — library choice not yet decided, needs its own ADR before implementation
 
 4. **Quality Sprint: 0 ESLint warnings**
    - [ ] Currently 37 warnings, all `@typescript-eslint/no-explicit-any`, mostly in cheerio-typed `HtmlNormalizer.ts`
@@ -39,8 +42,8 @@ None currently — Sprint 1 is complete.
 
 ### Medium Priority (Sprint 3)
 
-- [ ] PDF export (`PDFRenderer`, `ExportPDFUseCase`)
-- [ ] EPUB export (`EPUBRenderer`, `ExportEPUBUseCase`)
+- [ ] PDF export (`PDFRenderer` — PDFKit, ADR-0014; `ExportPDFUseCase`)
+- [ ] EPUB export (`EPUBRenderer` — library TBD, spike required per ADR-0015; `ExportEPUBUseCase`)
 - [ ] **Remove legacy `/api/upload` route** (`docxParser.ts`, disk-based multer) — both now marked `@deprecated`; confirm nothing depends on the raw-paragraph response shape first (ADR-0011)
 
 ### Low Priority (Sprint 4+)
