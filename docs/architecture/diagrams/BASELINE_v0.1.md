@@ -1,8 +1,10 @@
 # Architecture Baseline v0.1
 
-**Status:** Frozen (v0.1.0-alpha.1)  
-**Date:** 2026-07-16  
+**Status:** Frozen (v0.1.0-alpha.1) — **metrics superseded by ADR-0010** (see `docs/DECISIONS.md`)
+**Date:** 2026-07-16
 **Version:** 0.1.0-alpha.1
+
+> ⚠️ The "Total Tests: 86/86 passing" claim below (§3) was never accurate and is not being corrected in place, per this document's own change-control rule (§7: changes require an ADR). See ADR-0010 for the correction and `docs/CURRENT_STATE.md` for the current, verified test count. The architectural content below (layer definitions, dependency rules) remains accurate and is not affected.
 
 ---
 

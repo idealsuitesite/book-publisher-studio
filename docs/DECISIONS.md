@@ -164,3 +164,82 @@ Parser → Normalizer → Builder → Validator → Metrics → Mapper → Respo
 - Instant context on new sessions
 
 **Related:** Documentation, Knowledge Management
+
+---
+
+## ADR-0008: Metrics Ownership Moved from ASTBuilder to BookMetricsCalculator
+
+**Status:** APPROVED
+**Date:** 2026-07-16
+**Decision:** `ASTBuilder.build()` no longer computes `wordCount`/`pageCount`/`readingTime` inline. That responsibility moved entirely to a new `BookMetricsCalculator.calculate(book): Book`, called by `ImportManuscriptUseCase` after validation.
+
+**Rationale:**
+- `ASTBuilder`'s single responsibility is `NormalizedDocument → Book` structure; word counting is a distinct concern
+- Matches the Definition of Done requirement that `BookMetricsCalculator` exist as its own tested Domain service
+- Keeps `Book.wordCount`/`pageCount`/`readingTime` as the same fields on `Book` (no new parallel `QualityMetrics` object yet — see below)
+
+**Consequences:**
+- `ASTBuilder.build()` now returns a `Book` with those three fields `undefined`; callers must run it through `BookMetricsCalculator` to get them populated
+- The 3 existing metrics tests moved from `ASTBuilder.test.ts` to `BookMetricsCalculator.test.ts` (same assertions, different location)
+- `Book.ts`'s `QualityMetrics` interface (with `widowsAndOrphans`, `inconsistentSpacing`, `emptyHeadings`, etc.) remains declared but unused — those fields require the Typography Engine (Sprint 4), and computing them now would mean fabricating zeros for something not actually analyzed. `BookMetricsCalculator` also exposes `countContent(book)` for the report's `chapters`/`images`/`tables` counts, which are legitimately computable now.
+
+**Related:** Phase 2 (Application Layer), YAGNI
+
+---
+
+## ADR-0009: Legacy `/api/upload` Route Left in Place
+
+**Status:** APPROVED
+**Date:** 2026-07-16
+**Decision:** The new `POST /api/manuscripts/import` route (Book AST pipeline) was added alongside the existing `POST /api/upload` route (`services/docxParser.ts`, disk-based multer, raw paragraph extraction, no tests, no Book AST). Neither route was deleted or modified to depend on the other.
+
+**Rationale:**
+- Removing the legacy route is a separate decision with its own consequences (breaks any existing client relying on its raw-paragraph response shape) that hadn't been made yet at the time Phase 2 was built
+- Keeping both avoids blocking Phase 2 on an unrelated decision
+- New route uses memory-storage multer (buffer only, nothing written to `backend/uploads/`), so it doesn't add to the already-flagged tracked-files concern in that directory
+
+**Consequences:**
+- Two DOCX-import code paths currently exist in the same server; only one is tested and follows Clean Architecture layering
+- Follow-up decision still needed: deprecate, redirect, or remove the legacy route
+
+**Related:** Repository Reality Check (2026-07-16), Phase 2 (Application + Presentation Layers)
+
+---
+
+## ADR-0011: Legacy `/api/upload` Marked Deprecated, Removal Scheduled for Sprint 3
+
+**Status:** APPROVED
+**Date:** 2026-07-17
+**Decision:** Resolves ADR-0009's open follow-up. `POST /api/upload` (`presentation/app.ts`) and `parseDocxFile` (`services/docxParser.ts`) are marked `@deprecated` in code. Removal is scheduled for Sprint 3, after Sprint 2's rendering/export work lands — not immediately.
+
+**Rationale:**
+- `/api/manuscripts/import` now fully covers the same use case (DOCX → structured content) with a tested, Clean-Architecture-compliant pipeline
+- Waiting until Sprint 3 avoids removing a working endpoint while Sprint 2 (Theme Engine, Layout Engine, DOCX export) is in flight, in case anything still depends on it during that work
+- `@deprecated` JSDoc makes the intent visible in the IDE immediately, without requiring a doc lookup
+
+**Consequences:**
+- Both routes remain live through Sprint 2
+- Sprint 3 planning must include: confirm nothing depends on `/api/upload`'s raw-paragraph response shape, then delete the route, `parseDocxFile`, and the disk-based multer config in `app.ts`
+
+**Related:** ADR-0009, Sprint 3 (`docs/TODO.md`)
+
+---
+
+## ADR-0010: Correction of BASELINE_v0.1.md Test-Count Claims
+
+**Status:** APPROVED
+**Date:** 2026-07-17
+**Decision:** `docs/architecture/diagrams/BASELINE_v0.1.md` is marked "frozen" (§7: "This baseline is frozen unless changed via ADR + review") and states "Total Tests: 86/86 passing." That number was never accurate — even at the time it was written, its own commit table (7+19+15=41) didn't add up to 86; the 86 figure was an early instance of the same stale-`dist/`-double-counting bug found and fixed during the 2026-07-16 reality check. Current verified count is 88 tests (see `docs/CURRENT_STATE.md`).
+
+Per this ADR (satisfying BASELINE's own change-control rule): `BASELINE_v0.1.md` is annotated as superseded for metrics purposes, without rewriting its architectural content (which remains accurate — Domain/Application/Infrastructure/Presentation layer definitions and dependency rules still hold).
+
+**Rationale:**
+- BASELINE's own governance rule requires an ADR to change it — this is that ADR
+- Rewriting the whole document would lose the historical record of what v0.1.0-alpha.1 actually specified
+- `CURRENT_STATE.md` is already the living source for test counts and should stay that way, rather than duplicating maintenance across two files
+
+**Consequences:**
+- `BASELINE_v0.1.md` gets a short status annotation pointing to `CURRENT_STATE.md`, not a full rewrite
+- Future architecture-baseline corrections should follow this same pattern: new ADR + annotation, not silent edits to a "frozen" doc
+
+**Related:** Repository Reality Check (2026-07-16), ADR-0007 (Git as Source of Truth)

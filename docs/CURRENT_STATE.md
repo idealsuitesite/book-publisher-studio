@@ -1,67 +1,74 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 16, 2026 17:45 UTC
+**Last Updated:** July 17, 2026 03:30 UTC
 **Sprint:** Sprint 1 - Import Pipeline
-**Phase:** Phase 1 (Domain + Infrastructure) complete. Phase 2 (Application) and Phase 3 (Presentation) not started.
+**Phase:** Phase 1 (Domain + Infrastructure) and Phase 2 (Application + Presentation) both complete. Sprint 1 done.
 
 ---
 
 ## Summary
 
-**Completed:** 43 tests passing ✅ (backend/src only — see note below on prior counts)
-**Next:** Application Layer (ImportManuscriptUseCase, DTOs, mappers), then Presentation Layer (ManuscriptController)
+**Completed:** 88 tests passing ✅ (verified via `npm test`, `npm run build`, `npm run lint`, `npm run test:coverage`)
+**Next:** Sprint 2 — Theme Engine, Layout Engine, Professional DOCX Export (per the dictated MVP roadmap)
 
-> Earlier versions of this file claimed Phase 2 (Application Layer) was complete with 69–110 tests passing. That did not match the actual `backend/src` tree: there is no `application/` directory, no `ImportManuscriptUseCase.ts`, no DTOs, no mappers, and no `BookValidator`/`BookMetricsCalculator` as separate services. The inflated counts came from vitest also running stale compiled test files left over in `backend/dist/` (gitignored build output) with no `vitest.config` to exclude them — including, at one point, orphaned `dist/application/**` files for an Application layer that no longer existed in `src/`. Both issues are now fixed: `dist/` was cleared and `backend/vitest.config.ts` now scopes test discovery to `src/**/*.test.ts`.
+> Earlier versions of this file claimed Phase 2 (Application Layer) was complete with 69–110 tests passing, when in reality nothing existed under `src/application/`. That was corrected on 2026-07-16 (see prior revision / `docs/architecture/diagrams/BASELINE_v0.1.md` history). Phase 2 has now genuinely been built and verified end-to-end, including a real DOCX POSTed to the running server.
 
 ---
 
-## Sprint 1: Import Pipeline
+## Sprint 1: Import Pipeline ✅ COMPLETE
 
 ### Phase 1: Domain + Infrastructure ✅ COMPLETE
 
-**Status:** 43/43 tests passing
-
-- ✅ Book domain model (immutable) — `src/domain/models/Book.ts` (7 tests)
+- ✅ Book domain model (immutable) — `src/domain/models/Book.ts`
 - ✅ Normalized document contract — `src/domain/models/Normalized.ts`
-- ✅ ASTBuilder service (Normalized → Book, incl. metrics calculation) — `src/domain/services/ASTBuilder.ts` (19 tests)
-- ✅ HtmlNormalizer (HTML → NormalizedDocument) — `src/infrastructure/normalizers/HtmlNormalizer.ts` (17 tests)
+- ✅ ASTBuilder service (Normalized → Book) — `src/domain/services/ASTBuilder.ts`
+- ✅ HtmlNormalizer (HTML → NormalizedDocument, implements `DocumentNormalizer`) — `src/infrastructure/normalizers/HtmlNormalizer.ts`
 - ✅ Block types: heading, paragraph, image, table, list, quote, scripture, footnote
 - ✅ Shared utils: `idGenerator.ts`, `textMetrics.ts`
-- ✅ `src/services/docxParser.ts` (DOCX → HTML via Mammoth, not yet wired into a use case)
 
-**Not implemented as separate services** (contrary to earlier docs): `BookValidator`, `BookMetricsCalculator` — metrics are currently computed inline inside `ASTBuilder`.
+### Phase 2: Application + Presentation ✅ COMPLETE
 
----
+**Domain (new this phase):**
+- ✅ `BookValidator` — structural + metadata validation (`src/domain/services/BookValidator.ts`)
+- ✅ `BookMetricsCalculator` — word/page/reading-time metrics + content statistics, moved out of `ASTBuilder` (`src/domain/services/BookMetricsCalculator.ts`)
+- ✅ Ports: `DocumentParser`, `DocumentNormalizer` — live in `src/domain/ports/` (not `application/ports/`, to keep Infrastructure→Domain-only dependency direction)
 
-### Phase 2: Application Layer 🔴 NOT STARTED
+**Application:**
+- ✅ `UseCase<TRequest, TResponse>` contract
+- ✅ DTOs: `MetadataDTO`, `InlineDTO`, `BlockDTO`, `ChapterDTO`, `SectionDTO`, `BookDTO`, `ImportReportDTO`, `ImportResponseDTO`
+- ✅ Mappers: `BlockMapper`, `SectionMapper`, `ChapterMapper`, `BookMapper` — pure conversion, no calculation
+- ✅ `ImportManuscriptUseCase` — orchestrates Parser → Normalizer → ASTBuilder → BookValidator → BookMetricsCalculator → BookMapper
 
-Nothing exists yet under `src/application/`. Needed:
-- `UseCase<TRequest, TResponse>` contract
-- `ImportRequest` / `ImportResponseDTO` types
-- `DocumentParser`, `DocumentNormalizer`, `BookBuilder`, `BookMapper` port interfaces
-- DTOs: `MetadataDTO`, `BlockDTO`, `ChapterDTO`, `SectionDTO`, `BookDTO`
-- Mappers: `BlockMapper`, `ChapterMapper`, `SectionMapper`, `BookMapper`
-- `ImportManuscriptUseCase` orchestrating Parser → Normalizer → ASTBuilder → (Validator) → Mapper
+**Infrastructure:**
+- ✅ `MammothParser` (implements `DocumentParser`, Buffer → HTML, throws typed `DocumentParseError`)
 
----
+**Presentation (new layer):**
+- ✅ `ManuscriptController`, `POST /api/manuscripts/import` route, memory-storage multer with MIME/size validation, centralized `errorHandler`
+- ✅ Wired additively into `presentation/app.ts` (extracted from `index.ts` so the Express app is importable/testable without starting a real server)
+- ✅ Legacy `POST /api/upload` (old `docxParser.ts` pipeline) left untouched — see ADR-0009
 
-### Phase 3: Presentation Layer 🔴 NOT STARTED
-
-- `ManuscriptController.ts`
-- `routes/manuscripts.ts`
-- Express wiring, error-handling middleware
-- E2E HTTP tests
+**Tooling (also this phase):**
+- ✅ `vitest.config.ts` scopes test discovery to `src/**/*.test.ts` (fixes a stale-`dist/` double-counting bug found during the reality check)
+- ✅ ESLint (`eslint.config.mjs`) + Prettier (`.prettierrc`) — 0 lint errors, 37 warnings (all pre-existing `@typescript-eslint/no-explicit-any`, mostly in cheerio-typed `HtmlNormalizer.ts`)
+- ✅ Coverage via `@vitest/coverage-v8` — Domain 91.56% stmts (>90% target met), global 87.23% stmts (>80% target met)
+- ✅ `.github/workflows/backend-ci.yml` — build + lint + test on push/PR
 
 ---
 
 ## Test Summary
 
-| Component | Tests | Status |
-|-----------|-------|--------|
-| Book domain model | 7 | ✅ |
-| ASTBuilder | 19 | ✅ |
-| HtmlNormalizer | 17 | ✅ |
-| **Total** | **43** | **✅** |
+| Component | Tests |
+|-----------|-------|
+| Book domain model | 10 |
+| ASTBuilder | 22 |
+| BookValidator | 6 |
+| BookMetricsCalculator | 6 |
+| HtmlNormalizer | 17 |
+| MammothParser | 3 |
+| BookMapper | 6 |
+| ImportManuscriptUseCase | 13 |
+| Manuscript route (E2E, supertest) | 5 |
+| **Total** | **88** |
 
 ---
 
@@ -70,23 +77,29 @@ Nothing exists yet under `src/application/`. Needed:
 | Rule | Status |
 |------|--------|
 | Domain has zero external dependencies | ✅ |
-| All tests passing | ✅ |
+| Application depends only on interfaces (ports live in Domain) | ✅ |
+| No Domain objects in DTOs | ✅ |
+| Dependency Inversion enforced (constructor injection throughout) | ✅ |
+| All tests passing | ✅ (88/88) |
 | No circular dependencies | ✅ |
 | TypeScript strict mode | ✅ |
-| Application depends only on interfaces | N/A — not yet built |
-| No Domain objects in DTOs | N/A — no DTOs yet |
+| Controller contains no business logic | ✅ |
+| Domain coverage >90% | ✅ (91.56%) |
+| Global coverage >80% | ✅ (87.23%) |
 
 ---
 
 ## Known Issues
 
-- None currently (stale-`dist/` test pollution fixed by adding `backend/vitest.config.ts`)
+- Two DOCX-import code paths exist side by side: the new tested pipeline (`/api/manuscripts/import`) and the old untested one (`/api/upload`, `docxParser.ts`). Not a bug, but an open decision (ADR-0009).
+- `backend/uploads/` (13 real user documents) is still tracked in git, not excluded by `.gitignore` — flagged previously, not yet resolved.
 
 ---
 
 ## Technical Debt
 
-- Documentation (`CURRENT_STATE.md`, `ROADMAP.md`, `TODO.md`, `DECISIONS.md`) previously described Phase 2 as complete when it wasn't. This file has been corrected; the others may still need reconciling.
+- `QualityMetrics` interface (in `Book.ts`) is declared but unused — its typography-specific fields (`widowsAndOrphans`, `inconsistentSpacing`, `emptyHeadings`) need the Typography Engine (Sprint 4).
+- `docs/architecture/diagrams/BASELINE_v0.1.md` is marked "frozen"; it wasn't edited as part of this phase (only `IMPORT_PIPELINE.md` and `DECISIONS.md` were updated) — its "86/86 tests" claim is stale and would need an ADR to formally correct per its own rules.
 
 ---
 
@@ -96,18 +109,16 @@ Nothing exists yet under `src/application/`. Needed:
 1. Read `docs/START_HERE.md`
 2. Read this file (`CURRENT_STATE.md`)
 3. Read `docs/ARCHITECTURE.md`
-4. Begin Phase 2: Application Layer
+4. Begin Sprint 2: Theme Engine, Layout Engine, Professional DOCX Export
 
 **Quick Start:**
 ```bash
 cd "D:\Book Publisher Studio\backend"
-npm test              # Verify all 43 tests pass
+npm test              # Verify all 88 tests pass
 npm run build         # Verify TypeScript compilation
+npm run lint           # Verify 0 ESLint errors
+npm run test:coverage  # Verify coverage thresholds
 ```
-
-**Next Task:**
-- Build the Application layer (use case, ports, DTOs, mappers) before starting Presentation
-- Then: ManuscriptController, manuscript routes, E2E tests
 
 ---
 
@@ -116,11 +127,14 @@ npm run build         # Verify TypeScript compilation
 **Runtime:**
 - mammoth (DOCX parser)
 - cheerio (HTML normalizer)
-- express (not yet used)
+- express, multer, cors
 
 **Dev:**
-- vitest
+- vitest, @vitest/coverage-v8
 - typescript
+- eslint, typescript-eslint, @eslint/js, prettier
+- supertest, @types/supertest
+- jszip (test-fixture generation only)
 
 ---
 

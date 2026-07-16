@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 16, 2026 14:30 UTC
+**Last Updated:** July 17, 2026 19:40 UTC
 
 ---
 
@@ -12,78 +12,73 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-### Phase 3: Presentation Layer (Sprint 1 - Final Phase)
-
-- [ ] Create ManuscriptController
-- [ ] Create manuscript routes (POST /api/manuscripts/import)
-- [ ] Integrate with Express (if not already done)
-- [ ] Write E2E tests for HTTP endpoint
-- [ ] Test with actual DOCX file
-- [ ] Error handling middleware
-- [ ] Request validation middleware
-- [ ] Response formatting
-
-**Estimated:** 2-3 hours
+None currently — Sprint 1 is complete.
 
 ---
 
 ## 🟢 READY (Priority Order)
 
-### High Priority (This Sprint)
+### High Priority (Sprint 2 — per the dictated MVP roadmap)
 
-1. **ManuscriptController.ts**
-   - [ ] Receive ImportRequest
-   - [ ] Call ImportManuscriptUseCase
-   - [ ] Return ImportResponseDTO
-   - [ ] Handle errors → HTTP status codes
+1. **Theme Engine** (Domain)
+   - [ ] `Theme` interface (fonts, sizes, colors, spacing, per-block styles)
+   - [ ] `ThemeEngine.applyTheme(book, themeName): StyledBook`
+   - [ ] At least one built-in theme (e.g. Classic)
 
-2. **E2E Tests**
-   - [ ] POST /api/manuscripts/import with DOCX
-   - [ ] Verify 200 success response
-   - [ ] Verify 400 invalid request
-   - [ ] Verify 422 validation error
-   - [ ] Verify 500 server error
+2. **Layout Engine** (Domain)
+   - [ ] `PageLayout` interface (margins, page size, headers/footers)
+   - [ ] Pagination logic
 
-3. **Documentation**
-   - [ ] Update CURRENT_STATE.md
-   - [ ] Update TODO.md
-   - [ ] Commit to Git
+3. **Professional DOCX Export**
+   - [ ] `ExportBookUseCase` (Application, same `UseCase<TRequest,TResponse>` shape as `ImportManuscriptUseCase`)
+   - [ ] `DOCXRenderer` (Infrastructure)
 
-### Medium Priority (Sprint 2)
+4. **Quality Sprint: 0 ESLint warnings**
+   - [ ] Currently 37 warnings, all `@typescript-eslint/no-explicit-any`, mostly in cheerio-typed `HtmlNormalizer.ts`
+   - [ ] Deliberately deferred rather than fixed during Phase 2 to avoid touching already-tested files outside that phase's scope — now explicitly scheduled
 
-- [ ] PDF rendering endpoint
-- [ ] ExportBookUseCase
-- [ ] ThemeEngine service
-- [ ] PDFRenderer integration
+### Medium Priority (Sprint 3)
 
-### Low Priority (Sprint 3+)
+- [ ] PDF export (`PDFRenderer`, `ExportPDFUseCase`)
+- [ ] EPUB export (`EPUBRenderer`, `ExportEPUBUseCase`)
+- [ ] **Remove legacy `/api/upload` route** (`docxParser.ts`, disk-based multer) — both now marked `@deprecated`; confirm nothing depends on the raw-paragraph response shape first (ADR-0011)
 
-- [ ] EPUB rendering
-- [ ] Next.js frontend
-- [ ] AI integration
-- [ ] KDP integration
+### Low Priority (Sprint 4+)
+
+- [ ] `ValidatorEngine` (readability/completeness scoring, typography-issue detection — fuller than the current structural-only `BookValidator`)
+- [ ] Typography Engine (widow/orphan control, hyphenation, smart quotes, drop caps)
+- [ ] Plugin system
+- [ ] Premium UI/UX (Next.js frontend)
+- [ ] AI features (explicitly deferred — architecture should stay extensible for these, not build them now)
+- [ ] Licensing/subscription model, observability/telemetry (also explicitly deferred — no DB/auth exists yet)
+
+### Open decision (not scheduled)
+
+- [ ] `backend/uploads/` history: files are now untracked going forward (ADR — see below), but still exist in past commit history. Decide whether a history purge (`git filter-repo` or similar) is warranted, or whether "untracked going forward" is sufficient.
 
 ---
 
 ## ✅ COMPLETED
 
-### Sprint 1 - Phase 1: Domain Layer
+### Sprint 1 - Phase 1: Domain + Infrastructure
 
 - ✅ Book domain model
 - ✅ ASTBuilder service
-- ✅ BookValidator service
-- ✅ BookMetricsCalculator service
+- ✅ HtmlNormalizer
 - ✅ Block types
-- ✅ 7 tests passing
+- ✅ 43 tests passing originally (Book: 7, ASTBuilder: 19, HtmlNormalizer: 17); 6 more added during Phase 2's coverage push (Book: +3, ASTBuilder: +3) for previously-untested type guards and block/inline conversion branches
 
-### Sprint 1 - Phase 2: Application Layer
+### Sprint 1 - Phase 2: Application + Presentation
 
-- ✅ UseCase contract
-- ✅ 5 DTOs (Metadata, Block, Chapter, Section, Book)
-- ✅ 4 Mappers
-- ✅ ImportManuscriptUseCase (with Dependency Inversion)
-- ✅ 13 tests passing
-- ✅ 69 total tests passing
+- ✅ `BookValidator`, `BookMetricsCalculator` (Domain — moved out of `ASTBuilder`)
+- ✅ `UseCase<TRequest,TResponse>` contract
+- ✅ 8 DTOs (Metadata, Inline, Block, Chapter, Section, Book, ImportReport, ImportResponse)
+- ✅ 4 Mappers (Block, Section, Chapter, Book) — pure conversion
+- ✅ `ImportManuscriptUseCase` (Dependency Inversion via constructor injection)
+- ✅ `MammothParser` (Infrastructure, implements `DocumentParser`)
+- ✅ `ManuscriptController` + `POST /api/manuscripts/import` route + error handling middleware
+- ✅ ESLint, Prettier, vitest coverage, GitHub Actions CI — none of which existed before this phase
+- ✅ **88 total tests passing**, verified against a real DOCX POSTed to a running server
 
 ---
 
@@ -98,25 +93,30 @@ None currently.
 - [ ] Spell check
 - [ ] Translation assistance
 - [ ] Custom plugins system
+- [ ] Kindle / Kobo / Lulu / IngramSpark / Amazon KDP export targets
 
 ---
 
 ## 🐛 KNOWN ISSUES
 
-None currently identified.
+- Legacy `/api/upload` route and new `/api/manuscripts/import` route both exist; only the new one is tested. Legacy route now marked `@deprecated`, removal scheduled Sprint 3 (ADR-0011).
+- `backend/uploads/` no longer tracked going forward (`.gitignore` + `git rm --cached`), but still present in past commit history — see Open Decision above.
 
 ---
 
 ## 💡 TECHNICAL DEBT
 
-None identified. Architecture is clean.
+- `QualityMetrics` interface declared but unused (needs Typography Engine, Sprint 4).
+- `docs/architecture/diagrams/BASELINE_v0.1.md` staleness corrected via ADR-0010 (status annotation added, content not rewritten).
+- `errorHandler.ts` passes multer's own error message straight to the client for non-size-limit errors (low severity — multer's built-in messages are generic, not stack traces/paths — but not a hardcoded message like the size-limit case).
+- No per-module `README.md` files exist yet (Domain/Application/Presentation), despite the "every module must include a README" rule.
 
 ---
 
 ## 📊 METRICS
 
-- **Test Coverage:** 80%+ (69 tests)
-- **Code Quality:** TypeScript strict mode ✅
-- **Build Time:** ~750ms
-- **Architecture Debt:** None
-- **Documentation:** Comprehensive
+- **Test Coverage:** Domain 91.56% stmts, global 87.23% stmts (both verified via `npm run test:coverage`, not asserted)
+- **Code Quality:** TypeScript strict mode ✅, ESLint 0 errors / 37 warnings, Prettier applied
+- **Tests:** 88 passing, 0 failing
+- **Architecture Debt:** Legacy route duplication (see Known Issues)
+- **Documentation:** Reconciled with actual code as of 2026-07-17

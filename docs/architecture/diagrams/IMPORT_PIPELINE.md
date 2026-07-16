@@ -1,113 +1,98 @@
 # Import Pipeline (Manuscript → Book)
 
-## High-Level Flow
-User uploads DOCX file (Buffer)
-│
-▼
-POST /api/manuscript/import
-│
-▼
-┌──────────────────────────────────────────┐
-│ Presentation Layer                       │
-│ ManuscriptController.importFile()        │
-└──────────────────┬───────────────────────┘
-│
-▼
-┌──────────────────────────────────────────┐
-│ Application Layer                        │
-│ ImportManuscriptUseCase.execute()        │
-└──────────────────┬───────────────────────┘
-│
-┌──────────────┼──────────────────┐
-│              │                  │
-▼              ▼                  ▼
-[1. Parse]    [2. Normalize]     [3. Build]
-│              │                  │
-└──────────────┼──────────────────┘
-│
-┌──────────┼──────────┐
-│          │          │
-▼          ▼          ▼
-[4. Validate] [5. Compute] [6. Map]
-│          │          │
-└──────────┼──────────┘
-│
-▼
-HTTP Response (200 OK)
-{ book: BookDTO, report: ImportReport }
+**Status:** Implemented end-to-end (Phase 2 complete). All steps below are real, tested code — not planned.
+
+## Sequence Diagram
+
+```
+Client
+  │  POST /api/manuscripts/import (multipart, DOCX buffer)
+  ▼
+ManuscriptController (Presentation)
+  │  calls
+  ▼
+ImportManuscriptUseCase (Application)
+  ├─→ DocumentParser.parse(buffer)              [Infrastructure: MammothParser]
+  ├─→ DocumentNormalizer.normalize(html)         [Infrastructure: HtmlNormalizer]
+  ├─→ ASTBuilder.build(normalized)                [Domain]
+  ├─→ BookValidator.validate(book)                [Domain]
+  ├─→ BookMetricsCalculator.calculate(book)       [Domain]
+  ├─→ BookMetricsCalculator.countContent(book)    [Domain]
+  └─→ BookMapper.map(book)                        [Application]
+  ▼
+ImportResponseDTO { book: BookDTO, report: ImportReportDTO }
+  ▼
+HTTP 200 (success) / 422 (parsed but invalid) / 400 (bad input) / 500 (unexpected)
+```
+
+This is the reference diagram for future use cases (`ExportPDFUseCase`, `ApplyThemeUseCase`, etc.), all implementing the same `UseCase<TRequest, TResponse>` contract.
+
 ## Detailed Steps
 
 ### Step 1: Parse (Infrastructure)
-Input:  Buffer (DOCX file binary)
-Tool:   Mammoth.js
-Output: { value: "<h1>...</h1><p>...</p>", ... }
-Module: src/infrastructure/parsers/MammothParser.ts
-### Step 2: Normalize (Infrastructure)
-Input:  HTML string from Mammoth
-Tool:   cheerio (DOM parsing)
-Output: NormalizedDocument {
-metadata: { title, author, fileName, uploadedAt },
-nodes: [
-{ type: 'heading', level: 1, text: 'Chapter 1', ... },
-{ type: 'paragraph', text: '...', inlines: [...], ... },
-...
-]
-}
-Module: src/infrastructure/normalizers/HtmlNormalizer.ts
-### Step 3: Build (Domain)
-Input:  NormalizedDocument
-Logic:  Group headings into chapters/sections, build AST
-Output: Book {
-id: 'book-1',
-metadata: { title, author, ... },
-mainContent: [ Chapter { ... }, ... ],
-wordCount: 50000,
-pageCount: 250,
-readingTime: 250
-}
-Module: src/domain/services/ASTBuilder.ts
-### Step 4: Validate (Domain)
-Input:  Book
-Checks: Structure integrity, required fields, constraints
-Output: ValidationResult {
-isValid: true,
-errors: [],
-warnings: ["2 unsupported styles converted"]
-}
-Module: src/domain/services/BookValidator.ts (planned)
-### Step 5: Compute Metrics (Domain)
-Input:  Book
-Output: Enriches Book with computed properties:
+Input: `Buffer` (DOCX file binary)
+Tool: Mammoth.js
+Output: `{ html: "<h1>...</h1><p>...</p>" }`
+Module: `src/infrastructure/parsers/MammothParser.ts` (implements `DocumentParser`)
 
-wordCount (exact count)
-pageCount (heuristic: 300 words/page)
-readingTime (wordCount / 200 wpm)
-Module: src/domain/services/BookMetricsCalculator.ts (planned)
+### Step 2: Normalize (Infrastructure)
+Input: HTML string from Mammoth
+Tool: cheerio (DOM parsing)
+Output: `NormalizedDocument { metadata: { title, author, fileName, uploadedAt }, nodes: [...] }`
+Module: `src/infrastructure/normalizers/HtmlNormalizer.ts` (implements `DocumentNormalizer`)
+
+### Step 3: Build (Domain)
+Input: `NormalizedDocument`
+Logic: Group headings into chapters/sections, build AST
+Output: `Book { id, metadata, mainContent: [Chapter, ...], ... }` — `wordCount`/`pageCount`/`readingTime` are left `undefined` here; they're computed in Step 5, not Step 3.
+Module: `src/domain/services/ASTBuilder.ts`
+
+### Step 4: Validate (Domain)
+Input: `Book`
+Checks: non-empty content, chapter titles present, no duplicate chapter numbers, title/author present
+Output: `ValidationResult { isValid, errors: ValidationError[], warnings: [] }`
+Module: `src/domain/services/BookValidator.ts`
+Scope note: structural/metadata checks only. Readability scoring, completeness scoring, and typography-issue detection (the fuller "ValidatorEngine" from the architecture vision) are Sprint 4 scope, once the Typography Engine exists.
+
+### Step 5: Compute Metrics (Domain)
+Input: `Book`
+Output: `Book` enriched with `wordCount`, `pageCount` (300 words/page), `readingTime` (200 wpm) — plus a separate `countContent(book)` call returning `{ chapters, images, tables }` for the report
+Module: `src/domain/services/BookMetricsCalculator.ts`
+
 ### Step 6: Map to DTO (Application)
-Input:  Book + ValidationResult
-Output: {
-book: BookDTO (JSON-serializable),
-report: ImportReport {
-status: "success",
-statistics: { chapters: 14, images: 3, tables: 2 },
-warnings: ["2 styles converted", "1 table simplified"]
+Input: `Book` (enriched) + `ValidationResult`
+Output:
+```
+{
+  book: BookDTO,        // JSON-serializable, zero Domain-type references
+  report: ImportReportDTO {
+    status: "success" | "error",
+    statistics: { chapters, images, tables, words },
+    warnings: string[],
+    errors: string[],
+  }
 }
-}
-Module: src/application/use-cases/ImportManuscriptUseCase.ts
+```
+Modules: `src/application/mappers/{BlockMapper,ChapterMapper,SectionMapper,BookMapper}.ts` (pure conversion only), `src/application/use-cases/ImportManuscriptUseCase.ts` (orchestration + report assembly)
+
 ## Error Handling
-At each stage, errors are caught and returned in the HTTP response:
-ValidationError
-→ 400 Bad Request { error: "Book structure invalid", details: [...] }
-ParseError
-→ 400 Bad Request { error: "DOCX parsing failed", details: [...] }
-NormalizationError
-→ 400 Bad Request { error: "HTML normalization failed", details: [...] }
-InternalError
-→ 500 Internal Server Error { error: "Unexpected error" }
+
+| Source | Result |
+|---|---|
+| No file attached | 400, `{ error: "No file uploaded" }` |
+| Wrong file type / over size limit (multer) | 400 |
+| DOCX fails to parse (`DocumentParseError`) | 400 |
+| Book parses but fails validation | 422, body still includes the full `ImportResponseDTO` with `report.status: "error"` |
+| Anything else unexpected | 500, `{ error: "Internal server error" }` (no internal details leaked) |
+
 ## Commit Timeline
 
 - **Commit 1:** Parse stage (Mammoth parser) ✅
 - **Commit 2:** Normalize stage (HtmlNormalizer) ✅
 - **Commit 3:** Build stage (ASTBuilder) ✅
-- **Commit 4:** Validate + Compute + Map stages (this commit)
-- **Commit 5:** Add BookDTO serialization
+- **Commit 4:** Validate + Compute + Map + Presentation stages ✅ (BookValidator, BookMetricsCalculator, DTOs, mappers, ImportManuscriptUseCase, ManuscriptController, routes)
+- **Commit 5:** BookDTO serialization ✅ (included in Commit 4 — DTOs and mappers were built together)
+
+## Known limitation
+
+`backend/src/index.ts` (via `presentation/app.ts`) still has a separate, legacy `POST /api/upload` route using `services/docxParser.ts` that never touches this pipeline (no Book AST, no tests). Both routes exist side by side; removing/replacing the legacy one is a separate, not-yet-made decision.
