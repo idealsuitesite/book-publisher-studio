@@ -6,7 +6,7 @@ A running journal of every tagged version and where the product is headed. For e
 |---|---|---|---|---|
 | v0.1.0-alpha.1 | Prototype — Domain + Infrastructure | ✅ Released | `v0.1.0-alpha.1` | Book AST model, ASTBuilder, HtmlNormalizer. See `docs/releases/` (none written for this tag retroactively — first Release Notes doc starts at v0.2.0-alpha). |
 | v0.2.0-alpha | Import Pipeline | ✅ Released | `v0.2.0-alpha` | Full Application + Presentation layers, `POST /api/manuscripts/import`, 88 tests, CI/lint/coverage tooling. See `docs/releases/v0.2.0-alpha/ReleaseNotes.md`. |
-| v0.3.0-alpha | Rendering Engine | 🔨 Merged to `main` (PR #1, `32ac220`), not yet tagged | — | Theme Engine, Layout Engine, `Renderer` port, DOCX export — the Sprint 2 scope in `docs/TODO.md`. 118 tests passing. Design docs: ADR-0012–0018 (all APPROVED except ADR-0015, EPUB spike still open), `docs/architecture/diagrams/RENDERING_PIPELINE.md`. Tag + Release Notes still pending, per this file's own rule (§ Updating this file) that Status only moves to Released once the tag is pushed. |
+| v0.3.0-alpha | Rendering Engine | ✅ Released | `v0.3.0-alpha` | Theme Engine, Layout Engine, `Renderer` port, DOCX export (PR #1, merge commit `32ac220`). 118 tests passing (up from 88). See `docs/releases/v0.3.0-alpha/ReleaseNotes.md`. |
 | v0.4.0-alpha | Professional Export | ⏳ Planned | — | PDF export (PDFKit, ADR-0014), EPUB export (library TBD, ADR-0015) — Sprint 3 scope. |
 | v0.5.0-alpha | Typography & Validation | ⏳ Planned | — | Typography Engine (widow/orphan, hyphenation, smart quotes), fuller `ValidatorEngine` (readability/completeness scoring) — Sprint 4 scope. |
 | v0.6.0-alpha | Premium UI/UX | ⏳ Planned | — | Next.js frontend, drag-and-drop import, live preview — Sprint 5 scope. |
