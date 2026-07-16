@@ -1,5 +1,8 @@
 node_modules/
 dist/
+coverage/
 .env
 .env.local
 *.log
+uploads/*
+!uploads/.gitkeep
