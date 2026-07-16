@@ -1,15 +1,15 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 22:25 UTC
-**Sprint:** Sprint 2 - Rendering Engine (Theme Engine, Layout Engine, DOCX Export)
-**Branch:** `feature/sprint-2-rendering-engine` (not yet merged to `main` — see Git Status)
+**Last Updated:** July 17, 2026 23:40 UTC
+**Sprint:** Sprint 2 - Rendering Engine (Theme Engine, Layout Engine, DOCX Export) ✅ MERGED
+**Branch:** `main` — Sprint 2 merged via PR #1 (merge commit `32ac220`), feature branch work complete
 
 ---
 
 ## Summary
 
-**Completed:** 118 tests passing ✅ (verified via `npm test`, `npm run build`, `npm run lint`, `npm run test:coverage`, plus a real DOCX exported end-to-end against a running server)
-**Next:** Merge this branch to `main` per `docs/MERGE_CHECKLIST.md`, then Sprint 3 (PDF export, EPUB export)
+**Completed:** 118 tests passing ✅ (re-verified on merged `main`, not just the feature branch: `npm test`, `npm run build`, `npm run lint`, plus the earlier real-DOCX manual export check)
+**Next:** Sprint 3 (PDF export — ADR-0014 already decided; EPUB export — ADR-0015 spike still needed)
 
 ---
 
@@ -19,9 +19,9 @@ Domain + Infrastructure + Application + Presentation for `POST /api/manuscripts/
 
 ---
 
-## Sprint 2: Rendering Engine 🔄 IN PROGRESS (implementation, on feature branch)
+## Sprint 2: Rendering Engine ✅ COMPLETE (merged to `main` via PR #1, `32ac220`)
 
-**Design Review complete and approved** (ADR-0012, 0013, 0014, 0016, 0017 — `docs/architecture/diagrams/RENDERING_PIPELINE.md`). **Implementation now built and tested**, not yet merged to `main`.
+**Design Review complete and approved** (ADR-0012, 0013, 0014, 0016, 0017 — `docs/architecture/diagrams/RENDERING_PIPELINE.md`). **Implementation built, tested, and merged.**
 
 **Domain (new):**
 - ✅ `Theme`, `ResolvedBlockStyle`, `StyledBook` types (`domain/models/Theme.ts`)
@@ -45,9 +45,8 @@ Domain + Infrastructure + Application + Presentation for `POST /api/manuscripts/
 
 **Verified with a real file:** a real DOCX from `backend/uploads/` was exported via the running dev server — valid zip structure, correct Word parts (`word/document.xml`, `styles.xml`, `numbering.xml`), page breaks present, Classic theme's Georgia font applied.
 
-**Not yet done (still Sprint 2 scope, per `docs/TODO.md`):**
-- Quality Sprint: 37 ESLint warnings still outstanding (unchanged this phase, tracked not fixed)
-- Merge to `main` — this branch hasn't been merged yet; `docs/MERGE_CHECKLIST.md` should be run through explicitly before that happens
+**Still outstanding (carried into Sprint 3, not blocking the merge):**
+- Quality Sprint: 37 ESLint warnings still outstanding (unchanged since Phase 2, tracked not fixed)
 
 ---
 
@@ -116,13 +115,12 @@ Domain + Infrastructure + Application + Presentation for `POST /api/manuscripts/
 **To resume work:**
 1. Read `docs/START_HERE.md`
 2. Read this file (`CURRENT_STATE.md`)
-3. Read `docs/MERGE_CHECKLIST.md` before merging `feature/sprint-2-rendering-engine`
-4. After merge: begin Sprint 3 (PDF export — ADR-0014 already decided; EPUB export — ADR-0015 spike still needed)
+3. Begin Sprint 3 (PDF export — ADR-0014 already decided; EPUB export — ADR-0015 spike still needed) on a new dedicated branch per ADR-0017, e.g. `feature/sprint-3-pdf-epub-export`
 
 **Quick Start:**
 ```bash
 cd "D:\Book Publisher Studio\backend"
-git checkout feature/sprint-2-rendering-engine
+git checkout main && git pull
 npm test              # Verify all 118 tests pass
 npm run build         # Verify TypeScript compilation
 npm run lint           # Verify 0 ESLint errors
@@ -150,7 +148,7 @@ npm run test:coverage  # Verify coverage thresholds
 
 ## Git Status
 
-**Branch:** `feature/sprint-2-rendering-engine` (created from `main` at `d684201`, per ADR-0017)
-**`main` last synced with `origin/main`:** `d684201`
+**Branch:** `main`
+**`main` synced with `origin/main` at:** `32ac220` (PR #1 merge commit — `feature/sprint-2-rendering-engine` → `main`)
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
 **Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`

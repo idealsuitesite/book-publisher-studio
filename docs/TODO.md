@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 22:25 UTC
+**Last Updated:** July 17, 2026 23:40 UTC
 
 ---
 
@@ -12,26 +12,9 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-### Sprint 2 implementation ✅ built, on `feature/sprint-2-rendering-engine`, not yet merged
+### Quality Sprint: 0 ESLint warnings
 
-1. **Theme Engine** (Domain, concrete class — not a port) — ADR-0016
-   - [x] `Theme` interface (fonts, sizes, colors, spacing) — kept proportional to what `DOCXRenderer` consumes (no per-block-type overrides beyond heading-vs-body yet)
-   - [x] `ThemeEngine.applyTheme(book, theme): StyledBook`
-   - [x] Classic built-in theme + `getTheme(name)` registry
-
-2. **Layout Engine** (Domain, concrete class — not a port) — ADR-0013
-   - [x] `PageLayout` interface (margins, page size, headers/footers) — always explicit per export request, no theme-level defaults
-   - [x] Heuristic pagination logic, returns `PaginatedBook` (not a bare `Page[]`, per the Design Review revision)
-
-3. **Professional DOCX Export** — ADR-0012, ADR-0018
-   - [x] `ExportManuscriptUseCase` (Application, same `UseCase<TRequest,TResponse>` shape as `ImportManuscriptUseCase`) — single round trip (DOCX in, styled DOCX out), no persistence layer to look anything up from
-   - [x] `DOCXRenderer` (Infrastructure, implements the `Renderer` port) — uses the `docx` npm package (ADR-0018)
-   - [x] `POST /api/manuscripts/export` route + `ExportController`
-
-4. **Quality Sprint: 0 ESLint warnings**
-   - [ ] Still 37 warnings, unchanged this sprint — not fixed, remains explicitly scheduled (not silently dropped)
-
-**Before merging to `main`:** run through `docs/MERGE_CHECKLIST.md` explicitly (build/test/lint/coverage all re-verified green as of this update — 118 tests, Domain 92.64%, global 88.01% — but the checklist should still be walked, not assumed).
+- [ ] Still 37 warnings, unchanged across Phase 2 and Sprint 2 — not fixed, remains explicitly scheduled (not silently dropped)
 
 ### Medium Priority (Sprint 3)
 
@@ -75,6 +58,16 @@ None currently.
 - ✅ `ManuscriptController` + `POST /api/manuscripts/import` route + error handling middleware
 - ✅ ESLint, Prettier, vitest coverage, GitHub Actions CI — none of which existed before this phase
 - ✅ **88 total tests passing**, verified against a real DOCX POSTed to a running server
+
+### Sprint 2 - Rendering Engine (merged via PR #1, `32ac220`)
+
+- ✅ `ThemeEngine` (concrete class) + Classic built-in theme + `getTheme(name)` registry
+- ✅ `LayoutEngine` (concrete class) — heuristic pagination, returns `PaginatedBook`
+- ✅ `Renderer<TOutput>` port + `DOCXRenderer` (uses the `docx` npm package, ADR-0018)
+- ✅ `ExportManuscriptUseCase` + `POST /api/manuscripts/export` + `ExportController`
+- ✅ `UnknownThemeError` (typed, maps unknown theme names to 400)
+- ✅ **118 total tests passing**, re-verified on merged `main` (not just the feature branch), plus a real DOCX exported end-to-end
+- ✅ Design Review completed and approved *before* any implementation code (ADR-0012 through ADR-0018)
 
 ---
 
