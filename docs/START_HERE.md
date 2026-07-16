@@ -1,24 +1,20 @@
-# Start Here - Book Publisher Studio
+# Session Startup
 
-Publishing software for Christian authors in francophone West Africa: DOCX import, AST-based book model, PDF/EPUB export, AI-assisted editing. See [PROJECT.md](PROJECT.md) for the full mission and stack.
+Book Publisher Studio is a global publishing software platform (DOCX import, AST-based book model, PDF/EPUB export, AI-assisted editing) — not limited to any single audience or region.
 
-## Read these first, in order
-
-1. [CLAUDE.md](CLAUDE.md) — process rules and architecture constraints
-2. [PROJECT.md](PROJECT.md) — mission, stack, timeline
-3. [ARCHITECTURE.md](ARCHITECTURE.md) — layer responsibilities and pipeline
-4. [CURRENT_STATE.md](CURRENT_STATE.md) — what's built, what's in progress
-5. [ROADMAP.md](ROADMAP.md) — sprint plan
-6. [DECISIONS.md](DECISIONS.md) — architectural decision records (ADRs)
-
-For the full list of every file under `docs/`, see [PROJECT_MANIFEST.md](PROJECT_MANIFEST.md).
-
-For active tasks, see [TODO.md](TODO.md).
-
-## Quick start
-
-```bash
-cd backend
-npm test      # run the test suite
-npm run build # verify TypeScript compilation
-```
+1. Verify this is the project root.
+2. Verify CLAUDE.md exists.
+3. Verify src/ exists.
+4. Verify package.json exists.
+5. Read:
+   - CLAUDE.md
+   - docs/CURRENT_STATE.md
+   - docs/ARCHITECTURE.md
+   - docs/DECISIONS.md
+6. Run the test suite.
+7. Summarize:
+   - Current sprint
+   - Current architecture
+   - Current task
+   - Risks
+8. Wait for approval before coding.
