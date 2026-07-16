@@ -111,10 +111,10 @@ export function createApp(): Express {
         success: true,
         data: content,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error processing file:', error);
       res.status(500).json({
-        error: error.message || 'Failed to process DOCX file',
+        error: error instanceof Error ? error.message : 'Failed to process DOCX file',
       });
     }
   });
