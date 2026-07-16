@@ -1,13 +1,32 @@
 import type {
-  Book, Chapter, Section, Content, Block, Heading, Paragraph,
-  Quote, Scripture, Image, Table, List, Footnote, BookMetadata,
+  Book,
+  Chapter,
+  Section,
+  Content,
+  Block,
+  Heading,
+  Paragraph,
+  Quote,
+  Scripture,
+  Image,
+  Table,
+  List,
+  Footnote,
+  BookMetadata,
 } from '../models/Book';
 import type {
-  NormalizedDocument, AnyNormalizedNode, HeadingNode, ParagraphNode,
-  ImageNode, TableNode, QuoteNode, ScriptureNode, ListNode, FootnoteNode,
+  NormalizedDocument,
+  AnyNormalizedNode,
+  HeadingNode,
+  ParagraphNode,
+  ImageNode,
+  TableNode,
+  QuoteNode,
+  ScriptureNode,
+  ListNode,
+  FootnoteNode,
 } from '../models/Normalized';
 import { createIdGenerator } from '../../shared/utils/idGenerator';
-import { countWords, estimateReadingTime, estimatePageCount } from '../../shared/utils/textMetrics';
 
 interface SectionStackEntry {
   level: number;
@@ -109,7 +128,6 @@ export class ASTBuilder {
     }
 
     const metadata = this.buildMetadata(doc);
-    const wordCount = this.calculateWordCount(mainContent);
 
     return {
       id: ids.book(),
@@ -117,9 +135,6 @@ export class ASTBuilder {
       frontMatter: {},
       mainContent,
       backMatter: {},
-      wordCount,
-      pageCount: estimatePageCount(wordCount),
-      readingTime: estimateReadingTime(wordCount),
       createdAt: now,
       updatedAt: now,
       version: 1,
@@ -132,14 +147,22 @@ export class ASTBuilder {
     footnoteNumber: number
   ): Block {
     switch (node.type) {
-      case 'heading': return this.convertHeading(node as HeadingNode, ids);
-      case 'paragraph': return this.convertParagraph(node as ParagraphNode, ids);
-      case 'quote': return this.convertQuote(node as QuoteNode, ids);
-      case 'scripture': return this.convertScripture(node as ScriptureNode, ids);
-      case 'image': return this.convertImage(node as ImageNode, ids);
-      case 'table': return this.convertTable(node as TableNode, ids);
-      case 'list': return this.convertList(node as ListNode, ids);
-      case 'footnote': return this.convertFootnote(node as FootnoteNode, ids, footnoteNumber);
+      case 'heading':
+        return this.convertHeading(node as HeadingNode, ids);
+      case 'paragraph':
+        return this.convertParagraph(node as ParagraphNode, ids);
+      case 'quote':
+        return this.convertQuote(node as QuoteNode, ids);
+      case 'scripture':
+        return this.convertScripture(node as ScriptureNode, ids);
+      case 'image':
+        return this.convertImage(node as ImageNode, ids);
+      case 'table':
+        return this.convertTable(node as TableNode, ids);
+      case 'list':
+        return this.convertList(node as ListNode, ids);
+      case 'footnote':
+        return this.convertFootnote(node as FootnoteNode, ids, footnoteNumber);
       default: {
         const _exhaustive: never = node;
         throw new Error(`Unsupported node type: ${JSON.stringify(_exhaustive)}`);
@@ -147,12 +170,18 @@ export class ASTBuilder {
     }
   }
 
-  private convertHeading(node: HeadingNode, ids: ReturnType<ASTBuilder['createIdGenerators']>): Heading {
+  private convertHeading(
+    node: HeadingNode,
+    ids: ReturnType<ASTBuilder['createIdGenerators']>
+  ): Heading {
     const level = Math.min(6, Math.max(1, node.level)) as Heading['level'];
     return { type: 'heading', id: ids.heading(), level, text: node.text };
   }
 
-  private convertParagraph(node: ParagraphNode, ids: ReturnType<ASTBuilder['createIdGenerators']>): Paragraph {
+  private convertParagraph(
+    node: ParagraphNode,
+    ids: ReturnType<ASTBuilder['createIdGenerators']>
+  ): Paragraph {
     const text = node.inlines.map((i) => i.text).join('');
     return {
       type: 'paragraph',
@@ -174,7 +203,10 @@ export class ASTBuilder {
     };
   }
 
-  private convertScripture(node: ScriptureNode, ids: ReturnType<ASTBuilder['createIdGenerators']>): Scripture {
+  private convertScripture(
+    node: ScriptureNode,
+    ids: ReturnType<ASTBuilder['createIdGenerators']>
+  ): Scripture {
     return {
       type: 'scripture',
       id: ids.scripture(),
@@ -235,12 +267,18 @@ export class ASTBuilder {
       .filter((inline) => inline.type !== 'text')
       .map((inline) => {
         switch (inline.type) {
-          case 'bold': return { type: 'bold' as const, text: inline.text };
-          case 'italic': return { type: 'italic' as const, text: inline.text };
-          case 'underline': return { type: 'underline' as const, text: inline.text };
-          case 'link': return { type: 'link' as const, text: inline.text, url: inline.url ?? '' };
-          case 'small-caps': return { type: 'small-caps' as const, text: inline.text };
-          default: return { type: 'bold' as const, text: inline.text };
+          case 'bold':
+            return { type: 'bold' as const, text: inline.text };
+          case 'italic':
+            return { type: 'italic' as const, text: inline.text };
+          case 'underline':
+            return { type: 'underline' as const, text: inline.text };
+          case 'link':
+            return { type: 'link' as const, text: inline.text, url: inline.url ?? '' };
+          case 'small-caps':
+            return { type: 'small-caps' as const, text: inline.text };
+          default:
+            return { type: 'bold' as const, text: inline.text };
         }
       });
   }
@@ -259,35 +297,6 @@ export class ASTBuilder {
       author: doc.metadata.author ?? 'Unknown',
       language: 'fr',
     };
-  }
-
-  private calculateWordCount(mainContent: Content[]): number {
-    let total = 0;
-    const walkBlocks = (blocks: Block[]): void => {
-      for (const block of blocks) {
-        if (block.type === 'paragraph') total += countWords(block.text);
-        else if (block.type === 'heading') total += countWords(block.text);
-        else if (block.type === 'quote') total += countWords(block.text);
-        else if (block.type === 'scripture') total += countWords(block.text);
-        else if (block.type === 'list') total += countWords(block.items.join(' '));
-        else if (block.type === 'table') total += countWords([...block.headers, ...block.rows.flat()].join(' '));
-        else if (block.type === 'footnote') total += countWords(block.content);
-        else if (block.type === 'image') total += countWords(block.caption ?? '');
-      }
-    };
-    const walkContent = (contents: Content[]): void => {
-      for (const content of contents) {
-        total += countWords(content.title);
-        walkBlocks(content.content);
-        if (content.type === 'chapter' && content.sections) {
-          walkContent(content.sections as unknown as Content[]);
-        } else if (content.type === 'section' && content.subsections) {
-          walkContent(content.subsections as unknown as Content[]);
-        }
-      }
-    };
-    walkContent(mainContent);
-    return total;
   }
 
   private createIdGenerators() {

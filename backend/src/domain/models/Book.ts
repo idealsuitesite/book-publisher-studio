@@ -1,13 +1,13 @@
 /**
  * Book Domain Model
- * 
+ *
  * This is the core domain model for the publishing system.
  * It represents a complete book with all its content, metadata, and structure.
- * 
+ *
  * This model is IMMUTABLE - transformations return new instances.
  * This model is SERIALIZABLE - can be saved/loaded to JSON.
  * This model is FORMAT-AGNOSTIC - supports any export format.
- * 
+ *
  * @see Architecture documentation for design rationale
  */
 
@@ -21,12 +21,12 @@ export interface Book {
   frontMatter: FrontMatter;
   mainContent: Content[];
   backMatter: BackMatter;
-  
+
   // Computed properties (read-only, calculated on-the-fly)
   wordCount?: number;
   pageCount?: number;
   readingTime?: number; // in minutes
-  
+
   // Metadata
   createdAt: Date;
   updatedAt: Date;
@@ -45,22 +45,22 @@ export interface BookMetadata {
   isbn?: string;
   issn?: string;
   language: string; // ISO 639-1 (e.g., "en", "fr")
-  
+
   // Cover & Marketing
   coverImage?: Image;
   description?: string;
   keywords?: string[];
-  
+
   // Copyright & Legal
   copyright?: string;
   license?: string; // e.g., "CC-BY-4.0"
   licenseUrl?: string;
-  
+
   // Publishing Info
   edition?: string;
   publicationDate?: Date;
   rights?: string;
-  
+
   // Contact
   authorEmail?: string;
   authorWebsite?: string;
@@ -113,11 +113,11 @@ export interface Chapter {
   subtitle?: string;
   content: Block[];
   sections?: Section[];
-  
+
   // Print formatting
   openingPageStyle?: 'right' | 'left' | 'any';
   startPageNumber?: number;
-  
+
   // Metadata
   createdAt: Date;
   updatedAt: Date;
@@ -129,10 +129,10 @@ export interface Section {
   title: string;
   content: Block[];
   subsections?: Section[];
-  
+
   // Hierarchy
   level: number; // 1-6 for h1-h6
-  
+
   // Metadata
   createdAt: Date;
   updatedAt: Date;
@@ -142,17 +142,8 @@ export interface Section {
 // BLOCKS (Core Content Elements)
 // ============================================================================
 
-export type Block = 
-  | Heading 
-  | Paragraph 
-  | Quote 
-  | Scripture 
-  | Image 
-  | Table 
-  | List 
-  | Footnote
-  | PageBreak
-  | Divider;
+export type Block =
+  Heading | Paragraph | Quote | Scripture | Image | Table | List | Footnote | PageBreak | Divider;
 
 // --- Heading ---
 export interface Heading {
@@ -169,17 +160,17 @@ export interface Paragraph {
   id: string;
   text: string;
   inlines?: InlineElement[];
-  
+
   // Formatting
   style?: 'normal' | 'first' | 'hanging';
   dropCap?: boolean;
   align?: 'left' | 'center' | 'right' | 'justify';
-  
+
   // Spacing (in points)
   spaceBefore?: number;
   spaceAfter?: number;
   lineHeight?: number;
-  
+
   // Keep rules
   keepWithNext?: boolean;
   keepLinesTogether?: boolean;
@@ -193,7 +184,7 @@ export interface Quote {
   inlines?: InlineElement[];
   attribution?: string;
   quoteType?: 'block' | 'pullquote' | 'epigraph';
-  
+
   // Styling
   align?: 'left' | 'center' | 'right';
 }
@@ -204,14 +195,14 @@ export interface Scripture {
   id: string;
   text: string;
   inlines?: InlineElement[];
-  
+
   // Reference info
   reference?: {
     book: string;
     chapter: number;
     verses: string; // "3:16" or "3:16-20"
   };
-  
+
   translation?: string; // "KJV", "NIV", "ESV", etc.
   formatType?: 'superscript' | 'inline' | 'footnote';
 }
@@ -222,21 +213,21 @@ export interface Image {
   id: string;
   url: string;
   base64?: string; // For embedded images
-  
+
   // Metadata
   caption?: string;
   alt?: string;
   copyright?: string;
-  
+
   // Dimensions (in pixels or inches)
   width?: number;
   height?: number;
-  
+
   // Print
   dpi?: number; // 72 for screen, 300+ for print
   printWidth?: number; // in inches
   printHeight?: number;
-  
+
   // Positioning
   alignment?: 'left' | 'center' | 'right';
   wrapping?: 'none' | 'square' | 'tight';
@@ -246,19 +237,19 @@ export interface Image {
 export interface Table {
   type: 'table';
   id: string;
-  
+
   // Content
   headers: string[];
   rows: (string | null)[][];
-  
+
   // Metadata
   caption?: string;
-  
+
   // Styling
   striped?: boolean;
   bordered?: boolean;
   align?: 'left' | 'center' | 'right';
-  
+
   // Column widths (percentage or points)
   columnWidths?: number[];
 }
@@ -267,12 +258,12 @@ export interface Table {
 export interface List {
   type: 'list';
   id: string;
-  
+
   // Content
   ordered: boolean; // true = numbered, false = bulleted
   items: string[];
   inlines?: InlineElement[][]; // For each item
-  
+
   // Styling
   depth?: number; // For nested lists
   startNumber?: number; // For ordered lists
@@ -306,12 +297,12 @@ export interface Divider {
 // INLINE ELEMENTS (Text formatting)
 // ============================================================================
 
-export type InlineElement = 
-  | BoldText 
-  | ItalicText 
-  | UnderlineText 
+export type InlineElement =
+  | BoldText
+  | ItalicText
+  | UnderlineText
   | StrikethroughText
-  | Link 
+  | Link
   | SmallCaps
   | Superscript
   | Subscript
@@ -464,13 +455,13 @@ export interface QualityMetrics {
   imageCount: number;
   tableCount: number;
   footnoteCount: number;
-  
+
   averageParagraphLength: number;
   averageChapterLength: number;
-  
+
   readingTimeMinutes: number;
   estimatedPageCount: number;
-  
+
   // Typography issues
   widowsAndOrphans: number;
   inconsistentSpacing: number;
@@ -484,10 +475,7 @@ export interface QualityMetrics {
 /**
  * Factory function to create a new Book
  */
-export function createBook(
-  metadata: BookMetadata,
-  mainContent: Content[] = []
-): Book {
+export function createBook(metadata: BookMetadata, mainContent: Content[] = []): Book {
   return {
     id: generateId(),
     metadata,

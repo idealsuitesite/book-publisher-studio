@@ -8,6 +8,10 @@ import type {
   ImageNode,
   TableNode,
   ScriptureNode,
+  QuoteNode,
+  ListNode,
+  FootnoteNode,
+  InlineNode,
 } from '../models/Normalized';
 import type { Chapter, Section } from '../models/Book';
 
@@ -64,6 +68,44 @@ function scripture(text: string, reference?: string): ScriptureNode {
   };
 }
 
+function quote(text: string, attribution?: string): QuoteNode {
+  return {
+    id: `n-${nextIndex()}`,
+    type: 'quote',
+    inlines: [{ type: 'text', text }],
+    attribution,
+    source: { originalIndex: nextIndex() },
+  };
+}
+
+function list(items: string[], ordered = false): ListNode {
+  return {
+    id: `n-${nextIndex()}`,
+    type: 'list',
+    ordered,
+    items,
+    source: { originalIndex: nextIndex() },
+  };
+}
+
+function footnote(content: string): FootnoteNode {
+  return {
+    id: `n-${nextIndex()}`,
+    type: 'footnote',
+    content,
+    source: { originalIndex: nextIndex() },
+  };
+}
+
+function paragraphWithInlines(inlines: InlineNode[]): ParagraphNode {
+  return {
+    id: `n-${nextIndex()}`,
+    type: 'paragraph',
+    inlines,
+    source: { originalIndex: nextIndex() },
+  };
+}
+
 function buildDocument(nodes: AnyNormalizedNode[]): NormalizedDocument {
   return {
     metadata: {
@@ -94,20 +136,20 @@ describe('ASTBuilder', () => {
       expect((book.mainContent[0] as Chapter).number).toBe(1);
     });
 
-   it('groups paragraphs following a heading into that chapter content', () => {
-  const doc = buildDocument([
-    heading(1, 'Chapter One'),
-    paragraph('First paragraph.'),
-    paragraph('Second paragraph.'),
-  ]);
-  const book = new ASTBuilder().build(doc);
-  const chapter = book.mainContent[0] as Chapter;
+    it('groups paragraphs following a heading into that chapter content', () => {
+      const doc = buildDocument([
+        heading(1, 'Chapter One'),
+        paragraph('First paragraph.'),
+        paragraph('Second paragraph.'),
+      ]);
+      const book = new ASTBuilder().build(doc);
+      const chapter = book.mainContent[0] as Chapter;
 
-  expect(chapter.content).toHaveLength(2);
-  expect(chapter.content[0].type).toBe('paragraph');
-  // Cast au type Paragraph pour accéder à .text
-  expect((chapter.content[0] as any).text).toBe('First paragraph.');
-});
+      expect(chapter.content).toHaveLength(2);
+      expect(chapter.content[0].type).toBe('paragraph');
+      // Cast au type Paragraph pour accéder à .text
+      expect((chapter.content[0] as any).text).toBe('First paragraph.');
+    });
 
     it('numbers multiple chapters sequentially', () => {
       const doc = buildDocument([
@@ -200,31 +242,13 @@ describe('ASTBuilder', () => {
   });
 
   describe('Metrics calculation', () => {
-    it('sums word count across headings, paragraphs, quotes, and scripture', () => {
-      const doc = buildDocument([
-        heading(1, 'Two Words'),
-        paragraph('Three words here'),
-        scripture('For God so loved the world'),
-      ]);
+    it('leaves wordCount/pageCount/readingTime undefined (owned by BookMetricsCalculator now)', () => {
+      const doc = buildDocument([heading(1, 'Chapter One'), paragraph('Some words here.')]);
       const book = new ASTBuilder().build(doc);
 
-      expect(book.wordCount).toBe(11);
-    });
-
-    it('derives readingTime from wordCount at 200 words per minute, rounded up', () => {
-      const doc = buildDocument([paragraph(new Array(250).fill('word').join(' '))]);
-      const book = new ASTBuilder().build(doc);
-
-      expect(book.wordCount).toBe(250);
-      expect(book.readingTime).toBe(2);
-    });
-
-    it('derives pageCount from wordCount at 300 words per page, minimum 1 page if any words exist', () => {
-      const doc = buildDocument([paragraph('Just a few words.')]);
-      const book = new ASTBuilder().build(doc);
-
-      expect(book.wordCount).toBe(4);
-      expect(book.pageCount).toBe(1);
+      expect(book.wordCount).toBeUndefined();
+      expect(book.pageCount).toBeUndefined();
+      expect(book.readingTime).toBeUndefined();
     });
   });
 
@@ -289,10 +313,7 @@ describe('ASTBuilder', () => {
     it('splits a table node into headers and body rows', () => {
       const doc = buildDocument([
         heading(1, 'Chapter One'),
-        table([
-          { cells: ['Name', 'Age'], isHeader: true },
-          { cells: ['Alexandre', '30'] },
-        ]),
+        table([{ cells: ['Name', 'Age'], isHeader: true }, { cells: ['Alexandre', '30'] }]),
       ]);
       const book = new ASTBuilder().build(doc);
       const chapter = book.mainContent[0] as Chapter;
@@ -314,6 +335,75 @@ describe('ASTBuilder', () => {
       expect(chapter.content[0].type).toBe('scripture');
       const scr = chapter.content[0] as any;
       expect(scr.reference).toEqual({ book: 'John', chapter: 3, verses: '16' });
+    });
+
+    it('leaves the reference undefined for an unparseable scripture reference string', () => {
+      const doc = buildDocument([
+        heading(1, 'Chapter One'),
+        scripture('Some text', 'not a valid reference'),
+      ]);
+      const book = new ASTBuilder().build(doc);
+      const chapter = book.mainContent[0] as Chapter;
+
+      const scr = chapter.content[0] as any;
+      expect(scr.reference).toBeUndefined();
+    });
+
+    it('converts a quote node, defaulting quoteType to block', () => {
+      const doc = buildDocument([heading(1, 'Chapter One'), quote('Some wisdom.', 'A. Author')]);
+      const book = new ASTBuilder().build(doc);
+      const chapter = book.mainContent[0] as Chapter;
+
+      expect(chapter.content[0].type).toBe('quote');
+      const q = chapter.content[0] as any;
+      expect(q.attribution).toBe('A. Author');
+      expect(q.quoteType).toBe('block');
+    });
+
+    it('converts a list node', () => {
+      const doc = buildDocument([heading(1, 'Chapter One'), list(['One', 'Two'], true)]);
+      const book = new ASTBuilder().build(doc);
+      const chapter = book.mainContent[0] as Chapter;
+
+      expect(chapter.content[0].type).toBe('list');
+      const l = chapter.content[0] as any;
+      expect(l.ordered).toBe(true);
+      expect(l.items).toEqual(['One', 'Two']);
+    });
+
+    it('converts a footnote node with a sequential number', () => {
+      const doc = buildDocument([heading(1, 'Chapter One'), footnote('See appendix A.')]);
+      const book = new ASTBuilder().build(doc);
+      const chapter = book.mainContent[0] as Chapter;
+
+      expect(chapter.content[0].type).toBe('footnote');
+      const fn = chapter.content[0] as any;
+      expect(fn.number).toBe(1);
+      expect(fn.content).toBe('See appendix A.');
+    });
+
+    it('converts inline formatting: bold, italic, underline, link, small-caps', () => {
+      const doc = buildDocument([
+        heading(1, 'Chapter One'),
+        paragraphWithInlines([
+          { type: 'bold', text: 'bold' },
+          { type: 'italic', text: 'italic' },
+          { type: 'underline', text: 'underline' },
+          { type: 'link', text: 'link', url: 'https://example.com' },
+          { type: 'small-caps', text: 'caps' },
+        ]),
+      ]);
+      const book = new ASTBuilder().build(doc);
+      const chapter = book.mainContent[0] as Chapter;
+      const p = chapter.content[0] as any;
+
+      expect(p.inlines).toEqual([
+        { type: 'bold', text: 'bold' },
+        { type: 'italic', text: 'italic' },
+        { type: 'underline', text: 'underline' },
+        { type: 'link', text: 'link', url: 'https://example.com' },
+        { type: 'small-caps', text: 'caps' },
+      ]);
     });
   });
 });

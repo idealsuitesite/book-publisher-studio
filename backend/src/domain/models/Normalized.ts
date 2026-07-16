@@ -3,7 +3,8 @@
 // Input contract for ASTBuilder: what the Infrastructure/Application
 // Normalizer must produce from raw DOCX/HTML before passing to the Domain.
 
-export type NodeType = 'heading' | 'paragraph' | 'image' | 'table' | 'quote' | 'scripture' | 'list' | 'footnote';
+export type NodeType =
+  'heading' | 'paragraph' | 'image' | 'table' | 'quote' | 'scripture' | 'list' | 'footnote';
 
 export interface SourceMetadata {
   originalIndex: number;
