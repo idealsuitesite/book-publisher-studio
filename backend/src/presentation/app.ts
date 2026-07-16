@@ -11,8 +11,14 @@ import { BookValidator } from '../domain/services/BookValidator';
 import { BookMetricsCalculator } from '../domain/services/BookMetricsCalculator';
 import { BookMapper } from '../application/mappers/BookMapper';
 import { ImportManuscriptUseCase } from '../application/use-cases/ImportManuscriptUseCase';
+import { ExportManuscriptUseCase } from '../application/use-cases/ExportManuscriptUseCase';
+import { ThemeEngine } from '../domain/services/ThemeEngine';
+import { LayoutEngine } from '../domain/services/LayoutEngine';
+import { DOCXRenderer } from '../infrastructure/renderers/DOCXRenderer';
 import { ManuscriptController } from './controllers/ManuscriptController';
+import { ExportController } from './controllers/ExportController';
 import { manuscriptRoutes } from './routes/manuscripts';
+import { exportRoutes } from './routes/export';
 import { errorHandler } from './middleware/errorHandler';
 
 export function createApp(): Express {
@@ -32,6 +38,18 @@ export function createApp(): Express {
   );
   const manuscriptController = new ManuscriptController(importManuscriptUseCase);
   app.use('/api/manuscripts', manuscriptRoutes(manuscriptController));
+
+  // Sprint 2: Rendering pipeline (Theme Engine, Layout Engine, DOCX export)
+  const exportManuscriptUseCase = new ExportManuscriptUseCase(
+    new MammothParser(),
+    new HtmlNormalizer(),
+    new ASTBuilder(),
+    new ThemeEngine(),
+    new LayoutEngine(),
+    new DOCXRenderer()
+  );
+  const exportController = new ExportController(exportManuscriptUseCase);
+  app.use('/api/manuscripts', exportRoutes(exportController));
 
   // --- Legacy pipeline (kept as-is, unrelated decision pending) ---
   const uploadDir = path.join(process.cwd(), 'uploads');

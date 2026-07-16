@@ -1,5 +1,6 @@
 import type { Theme } from '../models/Theme';
 import { ClassicTheme } from './ClassicTheme';
+import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
 
 const THEMES: Record<string, Theme> = {
   classic: ClassicTheme,
@@ -8,7 +9,7 @@ const THEMES: Record<string, Theme> = {
 export function getTheme(name: string): Theme {
   const theme = THEMES[name];
   if (!theme) {
-    throw new Error(`Unknown theme: ${name}`);
+    throw new UnknownThemeError(`Unknown theme: ${name}`);
   }
   return theme;
 }
