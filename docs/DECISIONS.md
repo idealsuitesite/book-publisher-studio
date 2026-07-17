@@ -698,3 +698,34 @@ So this is one precisely-located gap: `MammothParser.ts`'s `mammoth.convertToHtm
 - Exact KDP/platform trim-size values are explicitly not decided by this ADR — they require a real spike against each platform's own published specs (ADR-0019/0020 precedent) before any new `PageLayout` preset ships.
 
 **Related:** `docs/architecture/diagrams/PROFESSIONAL_LAYOUT_ENGINE.md` (the Sprint 6 Design Review this ADR formalizes), `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` (Level 1), ADR-0012 (`Renderer` port precedent for `LayoutSelector`), ADR-0013 (pagination-is-a-heuristic, EPUB-excluded precedent), ADR-0022/ADR-0027 (additive-field pattern), ADR-0023 (bug-fixed-as-refactor-side-effect precedent), ADR-0028 (the no-op-rule principle Decision 3 is deliberately distinguished from)
+
+---
+
+## ADR-0030: KDP/Platform Trim-Size Spike Findings (Sprint 6, Commit 0)
+
+**Status:** APPROVED
+**Date:** 2026-07-17
+**Decision:** Resolves the one item ADR-0029 explicitly declined to decide ("exact KDP/platform trim-size values... require a real spike... before any new `PageLayout` preset ships"). Spike script: `backend/spikes/kdp-trim-size-spike.ts`, run via `npx tsx spikes/kdp-trim-size-spike.ts`, same throwaway/not-in-`src/`/not-test-covered discipline as `pdfkit-spike.ts` (ADR-0019) and `epub-library-spike.ts` (ADR-0020).
+
+**Verified values (this sprint's `PageLayout` presets):**
+
+| Preset | Source | Dimensions (pt) |
+|---|---|---|
+| `A4PageLayout` | PDFKit's own real runtime output (`new PDFDocument({size:'A4'}).page.width/height`) — the exact library `PDFRenderer` already depends on — cross-checked against an independent ISO 216 210mm×297mm→pt conversion; both agree exactly | 595.28 × 841.89 |
+| `A5PageLayout` | Same method, ISO 216 148mm×210mm | 419.53 × 595.28 |
+| `KDP5x8PageLayout` | kdp.amazon.com's own published paperback trim-size table (`/en_US/help/topic/GVBQ3CMEQW3W2VL6`, fetched directly, re-fetched a second time for consistency), 5in×8in at exact 72pt/inch | 360 × 576 |
+| `KDP5_5x8_5PageLayout` | Same source, 5.5in×8.5in — KDP's own page names this "popular for fiction" | 396 × 612 |
+| `KDP6x9PageLayout` | Same source, 6in×9in — KDP's own page names this "the most common trim size for books in the U.S." | 432 × 648 |
+
+**Method (two independent checks, not a single trusted source, per ADR-0019/0020 discipline):**
+1. A4/A5 verified by actually instantiating a real `PDFDocument` and reading its computed page size back — not copied from PDFKit's source or README — then cross-checked against an independently computed ISO 216 mm→pt conversion at the standard 72pt/25.4mm ratio. Both methods agreed exactly (595.28×841.89 and 419.53×595.28); the spike script throws if they ever disagree, so a future PDFKit upgrade that changes this table would fail loudly rather than silently drift.
+2. KDP sizes fetched directly from KDP's own help page (not a third-party aggregator) and cross-checked against one independent secondary source (`kdpprintcover.com`), which agreed on 15 of 16 published sizes. The one disagreement (the 16th "large format" entry: KDP's own page returned `8.27"×11.69"` on two separate fetches; the secondary source listed `8.25"×11"` instead) is disclosed, not silently resolved — and moot for this ADR's actual decision, since neither disputed value was selected (see scope decision below).
+
+**Scope decision — 3 of KDP's 16 published sizes selected, not all 16:** `5x8`, `5.5x8.5`, `6x9` — the three KDP's own page and independent guides repeatedly single out by name as the sizes an actual author picks (compact/mass-market fiction, popular fiction, and "the most common trim size for books in the U.S." respectively). The remaining 13 (including the disputed 16th) are recorded in the spike script's `KDP_ALL_SIZES` table for a future session to add on real demand, not guessed now — same restraint already applied to `RunningHead`'s fields (ADR-0029 Risk 5) and `ValidationContext`'s reserved fields (Sprint 5): real, disclosed scope-narrowing, not an oversight.
+
+**Consequences:**
+- `domain/layouts/` gains 5 new preset files (commit 1) built directly from this table — no further trim-size research needed for this sprint's acceptance criteria (A4 + one KDP size, per `PROFESSIONAL_LAYOUT_ENGINE.md` §9).
+- `PageLayout.pageSize`'s union type gains `'kdp-5x8' | 'kdp-5.5x8.5' | 'kdp-6x9'` alongside the existing `'letter' | 'a4' | 'a5'` (commit 1) — an additive union extension, not a breaking change to any existing switch/lookup over the old 3-value union (each such site must add the new cases explicitly, not fall through silently).
+- If a future session adds one of the other 13 sizes, it must re-run or extend this same spike rather than trust this ADR's table read in isolation years later — trim sizes "change sometimes" in the CTO's own words (`PROFESSIONAL_LAYOUT_ENGINE.md` §3).
+
+**Related:** ADR-0029 (the design decision this spike unblocks), ADR-0019/ADR-0020 (spike-before-decide precedent and throwaway-script discipline), `backend/spikes/kdp-trim-size-spike.ts` (the spike itself)
