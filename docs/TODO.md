@@ -12,20 +12,22 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-None currently — Quality Sprint is complete, Sprint 3 hasn't started.
+**Sprint 3A (PDF export) — implementation complete on `feature/sprint-3a-pdf-export`, not yet reviewed/merged/tagged.** Per ADR-0017, this stays IN PROGRESS (not COMPLETED) until it's actually merged to `main` — moving it to Completed before that would repeat the `159a49b3` failure mode this project's discipline exists to prevent.
 
-### Medium Priority (Sprint 3 — "Professional Export", planned commit sequence agreed 2026-07-17, not started)
+### Medium Priority (Sprint 3 — "Professional Export", planned commit sequence agreed 2026-07-17)
 
 Same discipline as Sprint 2: Design Review → ADR → small atomic commits → green build/tests → PR → merge → tag.
 
 **Sprint 3A (PDF export, priority — CTO-directed re-sequencing, 2026-07-17):**
 
 1. ✅ PDFKit spike + ADR-0019 (`backend/spikes/pdfkit-spike.ts`) — fonts, Unicode, images, tables, page breaks, headers/footers, bleed, crop marks all verified against real output before writing `PDFRenderer`
-2. `PDFRenderer`
-3. `ExportPDFUseCase`
-4. PDF endpoint
-5. Tests
-6. Verification pass (`docs/MERGE_CHECKLIST.md`)
+2. ✅ `PDFRenderer` (`backend/src/infrastructure/renderers/PDFRenderer.ts`) — mirrors `DOCXRenderer`'s block coverage; built on `bufferPages: true` after two rounds of real bugs found and fixed (ADR-0019 finding 6: stack overflow, cursor-strand page blowup, wrong "Page N of TOTAL" caught against a real DOCX)
+3. ✅ PDF export reuses `ExportManuscriptUseCase` as-is (already renderer-agnostic per ADR-0012) — no separate `ExportPDFUseCase` class needed, just a second instance configured with `PDFRenderer`
+4. ✅ PDF endpoint — existing `POST /api/manuscripts/export` gained a `format` field (`docx` default, `pdf`), not a new route
+5. ✅ Tests — 6 `PDFRenderer.test.ts` cases + 1 E2E `format=pdf` case in `export.test.ts`; 125/125 total tests passing, 84.47% global coverage
+6. ✅ Verification pass — build/lint/test/coverage all green; also exported a real DOCX from `backend/uploads/` to PDF through the running dev server (not just fixtures), which is what caught the "Page N of TOTAL" bug in step 2
+
+**Still open before merge:** PR not yet opened — waiting on go-ahead.
 
 **Sprint 3B (EPUB, after 3A ships):**
 
