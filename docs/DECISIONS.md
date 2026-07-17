@@ -387,3 +387,40 @@ For the first implementation, pagination is heuristic, not exact: each block typ
 - `DOCXRenderer` consumes `PaginatedBook.styledBook.blockStyles` (font/size/color per block) to build styled `docx` paragraphs, and `PaginatedBook.pages` to insert explicit page breaks at the `LayoutEngine`'s estimated boundaries — Word will still reflow within those breaks, so this is a best-effort layout, not authoritative (ADR-0013)
 
 **Related:** ADR-0012, ADR-0013, ADR-0014 (same rationale pattern as the PDFKit decision), Sprint 2 (Professional DOCX Export)
+
+---
+
+## ADR-0019: PDF Renderer Spike Findings
+
+**Status:** APPROVED
+**Date:** 2026-07-17
+**Decision:** Before writing `PDFRenderer`, a throwaway spike (`backend/spikes/pdfkit-spike.ts`, not part of `src/` or the test suite, run via `npx tsx spikes/pdfkit-spike.ts`) exercised real PDFKit output for every capability ADR-0014 deferred to implementation time: font embedding, Unicode, images, tables, page breaks, headers/footers, bleed, crop marks. This ADR records what was actually verified, not assumed, and the concrete choices `PDFRenderer` must make as a result.
+
+**Findings (each visually verified against generated PDF output, not just "it didn't throw"):**
+
+1. **Fonts.** PDFKit's 14 standard fonts (Helvetica, Times-Roman, Courier + variants, Symbol, ZapfDingbats) are WinAnsi-only and ship with no glyph data beyond that — there is no bundled "Georgia" or any theme font. `ClassicTheme`'s `Georgia` font family (`docs/ARCHITECTURE.md`/`Theme.ts`) does not exist in PDFKit and must be embedded as a real TTF file. TTF embedding itself works cleanly (`doc.font(pathToTtf)`), verified with a real Georgia TTF. **Open item, not resolved by this ADR:** Georgia itself is a Microsoft-licensed font, not redistributable — production needs an openly-licensed font asset shipped with the app (e.g. an SIL-OFL serif), not an OS font lookup, since deployment targets (Linux containers) won't have Windows fonts installed at all. Bold/italic variants need their own separate TTF files per family; PDFKit does not synthesize them from a single regular-weight file. (Not currently a blocker: `DOCXRenderer` doesn't render inline bold/italic runs either — see ADR-0018/`Block.inlines` — so `PDFRenderer` v1 can match that existing scope.)
+
+2. **Unicode.** Confirmed non-Latin text is unreadable through a standard-14 font (mojibake), as expected. A single embedded Unicode-capable font (tested: Malgun Gothic) does **not** solve global text support: it rendered Chinese, Cyrillic, and Korean correctly, dropped an accented Greek character (glyph missing from that specific font), and rendered Arabic as blank boxes (no Arabic glyphs in that font at all) — and even a font with Arabic glyphs wouldn't fix RTL rendering, since PDFKit does no bidi reordering or Arabic contextual shaping on its own. **Decision:** `PDFRenderer` needs a small per-script font stack (Latin/Cyrillic/Greek, CJK, Arabic/Hebrew with bidi handling), selected per block/run — not one "Unicode font" for everything. Full RTL support is real, separate work, not a font swap; this ADR flags it but does not schedule it (out of scope for Sprint 3A, which targets the same content shape `DOCXRenderer` already handles).
+
+3. **Images.** `doc.image()` accepts a `Buffer` (matches `Image.base64` on the `Block` type) with `fit: [w, h]` or `width` options; both preserve aspect ratio correctly, verified visually. No surprises — same no-network-fetch rule as `DOCXRenderer` applies (embed from `base64` or fall back to a text placeholder, per ADR-0012/existing `DOCXRenderer` behavior).
+
+4. **Tables.** PDFKit has no table primitive at all. Verified a manual approach works: draw cell borders with `rect().stroke()`, compute row height per row via `doc.heightOfString(text, { width: colWidth })` across all cells in the row (tallest cell wins), draw text into each cell at accumulated `x`. This is hand-rolled logic in `PDFRenderer`, structurally parallel to `LayoutEngine`'s own heuristic block-height estimation (ADR-0013) — not a new kind of complexity for this codebase, just a new place it has to happen.
+
+5. **Page breaks.** `doc.addPage()` maps 1:1 onto `PaginatedBook.pages` boundaries — no surprises, matches the `DOCXRenderer` pattern of inserting a break at each page's first block.
+
+6. **Headers/footers — real bug found and fixed.** The `pageAdded` event fires on every `addPage()` (not on the document's initial page — that one must be drawn directly) and is the right hook for repeating header/footer content, including an accurate running page number. **Reproduced a stack-overflow bug:** drawing footer text below the page's bottom-margin boundary (e.g. `y = pageHeight - 50` against a 72pt margin) makes PDFKit's own overflow-triggered auto-pagination fire *from inside* the `pageAdded` handler that's currently drawing the footer — which re-emits `pageAdded`, re-entering the same handler, recursing until the stack overflows. `lineBreak: false` does **not** fix this (it only suppresses line-wrapping, not the bottom-margin overflow check). **Fix, verified:** temporarily set `doc.page.margins.bottom = 0` for the duration of the header/footer draw call, then restore the saved value. `PDFRenderer` must use this pattern for any absolute-positioned header/footer drawing. "Page N of TOTAL" is cheap to add correctly (no two-pass render needed) because `PaginatedBook.pages.length` is already known before `PDFRenderer` ever runs — `LayoutEngine` computed it first.
+
+7. **Bleed and crop marks.** Bleed is straightforward: set the PDFKit page size to trim size + bleed on all sides, and offset all content by the bleed amount. Crop marks have no built-in support and are drawn manually with `moveTo`/`lineTo` (same category of manual work as the table grid). **Caveat:** PDFKit's public API only ever writes the PDF's `/MediaBox`; there is no `trimBox`/`bleedBox` option. Setting real `/TrimBox` and `/BleedBox` page-dictionary entries (so print/prepress software can tell bleed from trim) is only reachable via an undocumented internal property, `doc.page.dictionary.data`, not a supported API. This is a real forward-compat risk if `pdfkit` changes its internals across versions.
+
+**Rationale:**
+- Matches this project's established discipline (ADR-0012 through ADR-0018): resolve unknowns with evidence before writing the real component, not while writing it
+- A spike script (not shipped code, not test-suite code) is the right vehicle — cheaper to throw away sections that don't pan out than to discover a stack-overflow bug for the first time inside `PDFRenderer.test.ts`
+- Two findings (font redistribution licensing, `/TrimBox`/`/BleedBox` via undocumented internals) are real risks worth recording even though neither blocks Sprint 3A's first cut of `PDFRenderer`
+
+**Consequences:**
+- `PDFRenderer` implementation must use the `margins.bottom = 0` pattern for header/footer drawing (finding 6) — this is not optional, it's a reproduced crash
+- `PDFRenderer` v1 targets the same content scope `DOCXRenderer` already covers (no inline bold/italic, no RTL) — both are explicit, tracked gaps, not silent omissions (`docs/TODO.md`)
+- Choosing and licensing a real font asset to ship (replacing the spike's ad hoc system-font lookup) is a follow-up decision, not resolved here — tracked in `docs/TODO.md`
+- `pdfkit` version should be pinned (already true via `package.json`'s `^0.19.1`, but the undocumented-internals risk (finding 7) means a version bump needs a manual bleed/crop-mark smoke check, not just `npm test`
+
+**Related:** ADR-0012, ADR-0013, ADR-0014, Sprint 3A (PDF export)

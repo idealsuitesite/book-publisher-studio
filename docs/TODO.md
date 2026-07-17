@@ -18,13 +18,24 @@ None currently — Quality Sprint is complete, Sprint 3 hasn't started.
 
 Same discipline as Sprint 2: Design Review → ADR → small atomic commits → green build/tests → PR → merge → tag.
 
-1. PDF Renderer (PDFKit, ADR-0014 already decided)
-2. `ExportPDFUseCase`
-3. PDF endpoint (`POST /api/manuscripts/export?format=pdf` or equivalent — exact route shape is a Design Review question, not decided yet)
-4. EPUB library spike + ADR (ADR-0015 — `epub-gen` vs. hand-rolled OOXML via `jszip`)
-5. EPUB Renderer
-6. EPUB endpoint
-7. Verification pass (`docs/MERGE_CHECKLIST.md`)
+**Sprint 3A (PDF export, priority — CTO-directed re-sequencing, 2026-07-17):**
+
+1. ✅ PDFKit spike + ADR-0019 (`backend/spikes/pdfkit-spike.ts`) — fonts, Unicode, images, tables, page breaks, headers/footers, bleed, crop marks all verified against real output before writing `PDFRenderer`
+2. `PDFRenderer`
+3. `ExportPDFUseCase`
+4. PDF endpoint
+5. Tests
+6. Verification pass (`docs/MERGE_CHECKLIST.md`)
+
+**Sprint 3B (EPUB, after 3A ships):**
+
+1. EPUB library spike + ADR (ADR-0015 — `epub-gen` vs. hand-rolled OOXML via `jszip`)
+2. EPUB Renderer
+3. EPUB endpoint
+4. Verification pass (`docs/MERGE_CHECKLIST.md`)
+
+- [ ] **Font asset for PDF/theme rendering** (surfaced by ADR-0019): Georgia (`ClassicTheme`) is a Microsoft-licensed font, not redistributable, and PDFKit ships no font data at all — production needs an openly-licensed font file shipped with the app, not an OS font lookup. Not yet decided which font or license.
+- [ ] **RTL / multi-script text support** (surfaced by ADR-0019): no single embedded font covers every script (verified: Arabic renders as blank boxes, Greek dropped a glyph), and PDFKit does no bidi reordering or Arabic contextual shaping. Real work, not a font swap — flagged, not scheduled.
 
 - [ ] **Remove legacy `/api/upload` route** (`docxParser.ts`, disk-based multer) — both now marked `@deprecated`; confirm nothing depends on the raw-paragraph response shape first (ADR-0011)
 
