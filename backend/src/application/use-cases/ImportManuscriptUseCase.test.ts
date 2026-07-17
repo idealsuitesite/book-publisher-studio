@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ImportManuscriptUseCase } from './ImportManuscriptUseCase';
 import { ASTBuilder } from '../../domain/services/ASTBuilder';
-import { BookValidator } from '../../domain/services/BookValidator';
+import { createValidationEngine } from '../../domain/services/validation/createValidationEngine';
 import { BookMetricsCalculator } from '../../domain/services/BookMetricsCalculator';
 import { BookMapper } from '../mappers/BookMapper';
 import { HtmlNormalizer } from '../../infrastructure/normalizers/HtmlNormalizer';
@@ -28,7 +28,7 @@ function buildUseCase(parser: DocumentParser = new MammothParser()) {
     parser,
     new HtmlNormalizer(),
     new ASTBuilder(),
-    new BookValidator(),
+    createValidationEngine(),
     new BookMetricsCalculator(),
     new BookMapper()
   );
@@ -175,12 +175,19 @@ describe('ImportManuscriptUseCase', () => {
         mimeType: 'x',
       });
 
-      expect(response.report).toEqual({
-        status: 'success',
-        statistics: { chapters: 1, images: 0, tables: 0, words: expect.any(Number) },
-        warnings: [],
-        errors: [],
-      });
+      // Sprint 5: warnings is no longer empty here on purpose - ASTBuilder
+      // never populates isbn/description/coverImage from DOCX content, so
+      // MetadataRule/ComplianceRule now genuinely (and correctly) flag this
+      // as an incomplete manuscript. errors stays empty since none of that
+      // is ERROR-severity - the book is still successfully importable.
+      expect(response.report.status).toBe('success');
+      expect(response.report.statistics).toEqual({ chapters: 1, images: 0, tables: 0, words: expect.any(Number) });
+      expect(response.report.errors).toEqual([]);
+      expect(response.report.warnings.length).toBeGreaterThan(0);
+      expect(response.report.issues).toHaveLength(response.report.warnings.length);
+      expect(response.report.issues.every((issue) => issue.severity === 'WARNING')).toBe(true);
+      expect(response.report.score.overall).toBeLessThan(100);
+      expect(response.report.score.overall).toBeGreaterThanOrEqual(0);
     });
 
     it('calcule les métriques de lecture', async () => {

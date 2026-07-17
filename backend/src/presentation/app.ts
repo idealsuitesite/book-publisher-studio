@@ -3,7 +3,7 @@ import cors from 'cors';
 import { MammothParser } from '../infrastructure/parsers/MammothParser';
 import { HtmlNormalizer } from '../infrastructure/normalizers/HtmlNormalizer';
 import { ASTBuilder } from '../domain/services/ASTBuilder';
-import { BookValidator } from '../domain/services/BookValidator';
+import { createValidationEngine } from '../domain/services/validation/createValidationEngine';
 import { BookMetricsCalculator } from '../domain/services/BookMetricsCalculator';
 import { BookMapper } from '../application/mappers/BookMapper';
 import { ImportManuscriptUseCase } from '../application/use-cases/ImportManuscriptUseCase';
@@ -27,11 +27,14 @@ export function createApp(): Express {
   app.use(express.json());
 
   // New Application/Presentation pipeline (Book AST-based import)
+  // Sprint 5: ValidationEngine (8 rules, docs/architecture/diagrams/
+  // VALIDATION_ENGINE.md) replaces the structural-only BookValidator here -
+  // BookValidator itself still exists, now used internally by StructuralRule.
   const importManuscriptUseCase = new ImportManuscriptUseCase(
     new MammothParser(),
     new HtmlNormalizer(),
     new ASTBuilder(),
-    new BookValidator(),
+    createValidationEngine(),
     new BookMetricsCalculator(),
     new BookMapper()
   );

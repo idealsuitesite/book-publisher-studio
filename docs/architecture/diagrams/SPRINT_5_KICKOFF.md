@@ -1,6 +1,6 @@
 # Sprint 5 Kickoff — Validation Engine
 
-**Status:** ✅ Design Review complete, awaiting explicit CTO go-ahead to branch.
+**Status:** ✅ Implementation complete (all 11 commits, CTO-approved one by one). Verified against this charter's own Definition of Done below (2026-07-17, governance closure pass) — one item found not yet satisfied, corrected before the PR opens. PR not yet opened.
 **Date:** 2026-07-17
 
 This is the charter for Sprint 5. It doesn't repeat the full design — that's `VALIDATION_ENGINE.md` (Level 2) and `PLATFORM_ARCHITECTURE_ROADMAP.md` (Level 1). This document is what a developer (or a fresh session) should be able to read in two minutes and know exactly what's expected, before opening either of those.
@@ -66,16 +66,16 @@ Per `VALIDATION_ENGINE.md` §8, one responsibility each, green build/tests befor
 
 ## Definition of "Done"
 
-Sprint 5 is done when, and only when:
+Sprint 5 is done when, and only when — verified here against what actually happened, not assumed:
 
-- All 11 implementation commits landed, each with its own green build/lint/test before the next started
-- Every rule has its own test file (one responsibility, own test suite — no shared "all rules" test file)
-- Every rule's test suite asserts input immutability (deep-equality of `ValidationContext`/`Book` before vs. after `evaluate()`) per ADR-0027
-- `BookValidator.test.ts`'s 5 existing cases pass unchanged, now exercised through `StructuralRule`
-- A real DOCX from `backend/verification/` produces a `ValidationReport` with real, non-hardcoded-zero findings when imported through the running dev server
-- `docs/REAL_EXPORT_CHECKLIST.md` completed for the `ImportManuscriptUseCase` change
-- `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` reconciled, any new ADRs written
-- PR opened, reviewed, merged — no direct commits to `main`
+- [x] All 11 implementation commits landed, each with its own green build/lint/test before the next started
+- [x] Every rule has its own test file (one responsibility, own test suite — no shared "all rules" test file): `StructuralRule`, `MetadataRule`, `HeadingRule`, `MissingRequiredStyleRule`, `TypographyRule`, `ImageRule`, `HyperlinkRule`, `ComplianceRule` all have one
+- [x] Every rule's test suite asserts input immutability (deep-equality of `ValidationContext`/`Book` before vs. after `evaluate()`) per ADR-0027
+- [x] `BookValidator`'s existing behavior (6 cases, not 5 — corrected count) preserved unchanged: `BookValidator.test.ts` still tests it directly, and the new `StructuralRule.test.ts` independently verifies the same 6 cases through the `ValidationRule` adapter
+- [x] A real DOCX from `backend/verification/` produces a `ValidationReport` with real, non-hardcoded-zero findings when imported through the running dev server — confirmed against `typography-test.docx` (4 `WARNING` issues, score 60/100) and `large-book.docx`
+- [x] `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` reconciled, new ADRs written (ADR-0027, ADR-0028)
+- [ ] ~~`docs/REAL_EXPORT_CHECKLIST.md` completed for the `ImportManuscriptUseCase` change~~ — **found not yet done during this verification pass.** `npm run verify-server`/`verify-real-export` both ran and passed (commit 11), but the literal filled-out checklist template (matching Sprint 4 PR #9's own precedent, embedded in the PR body) was not produced as its own artifact yet. Will be completed as part of the PR body, before the PR opens - not silently skipped.
+- [ ] PR opened, reviewed, merged — no direct commits to `main` — not yet done, explicitly deferred pending CTO go-ahead
 
 ## Quality Checklist (run before every commit, not just at the end)
 
