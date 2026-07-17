@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
 import type { PaginatedBook } from '../../domain/models/PaginatedBook';
 import type { Theme } from '../../domain/models/Theme';
-import type { Content, Block, Chapter, Image } from '../../domain/models/Book';
+import type { Content, Block, Image } from '../../domain/models/Book';
 
 type EpubFn = (options: EpubOptions, content: EpubChapter[]) => Promise<Buffer>;
 
@@ -43,9 +43,14 @@ export class EPUBRenderer implements Renderer<Buffer> {
     const tmpDir = mkdtempSync(join(tmpdir(), 'epub-images-'));
 
     try {
-      const chapters = domainBook.mainContent
-        .filter((content): content is Chapter => content.type === 'chapter')
-        .map((chapter) => this.buildChapter(chapter, tmpDir));
+      // mainContent isn't always Chapter[] - ASTBuilder falls back to a top-level Section
+      // ("preamble") when the source document has no Heading-1-level break at all (confirmed:
+      // this is exactly what a real DOCX from backend/uploads/ produces). DOCXRenderer and
+      // PDFRenderer both already walk Content generically for this reason; an earlier version of
+      // this renderer filtered for Chapter only, which silently produced a structurally valid
+      // but completely empty EPUB for that file - caught only by inspecting real output, not by
+      // any test with a synthetic always-has-a-chapter fixture.
+      const chapters = domainBook.mainContent.map((content) => this.buildChapter(content, tmpDir));
 
       const options: EpubOptions = {
         title: context.metadata?.title ?? domainBook.metadata.title,
@@ -81,15 +86,20 @@ export class EPUBRenderer implements Renderer<Buffer> {
     `;
   }
 
-  private buildChapter(chapter: Chapter, tmpDir: string): EpubChapter {
+  private buildChapter(content: Content, tmpDir: string): EpubChapter {
     const parts: string[] = [];
-    this.renderContentInto(chapter, parts, tmpDir);
-    return { title: chapter.title, content: parts.join('\n') };
+    this.renderContentInto(content, parts, tmpDir);
+    // An untitled top-level Section ("preamble", see the mainContent comment above) has an
+    // empty title - fall back to a non-blank label for the TOC entry specifically, without
+    // fabricating heading text in the body (renderContentInto already omits an empty heading tag).
+    return { title: content.title || 'Untitled', content: parts.join('\n') };
   }
 
   private renderContentInto(content: Content, parts: string[], tmpDir: string): void {
-    const level = content.type === 'chapter' ? 1 : Math.min(6, Math.max(1, content.level));
-    parts.push(`<h${level}>${escapeHtml(content.title)}</h${level}>`);
+    if (content.title) {
+      const level = content.type === 'chapter' ? 1 : Math.min(6, Math.max(1, content.level));
+      parts.push(`<h${level}>${escapeHtml(content.title)}</h${level}>`);
+    }
 
     for (const block of content.content) {
       parts.push(this.renderBlock(block, tmpDir));
