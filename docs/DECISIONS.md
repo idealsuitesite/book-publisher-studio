@@ -316,7 +316,7 @@ For the first implementation, pagination is heuristic, not exact: each block typ
 
 ## ADR-0015: EPUB Renderer — Library TBD, Spike Required
 
-**Status:** PROPOSED (design only, decision incomplete)
+**Status:** RESOLVED by ADR-0020 (2026-07-17) — `epub-gen-memory` chosen. This entry is left as-written (not rewritten) per this project's own precedent (ADR-0007/ADR-0010: correct via a new ADR + pointer, not a silent edit to history) — see ADR-0020 for the spike findings and final decision.
 **Date:** 2026-07-17
 **Decision:** `EPUBRenderer` (Infrastructure) will generate EPUB3-compliant output (per `ROADMAP.md`'s stated goal). Unlike ADR-0014, the exact library is **not** being committed to here — candidates are an existing EPUB-generation npm package (e.g. `epub-gen`) or hand-rolling the OCF/OPF/XHTML structure directly using `jszip` (already a project dependency, added for DOCX test fixtures). A short spike at the start of the EPUB work should decide between them before writing `EPUBRenderer` itself.
 
@@ -429,3 +429,32 @@ For the first implementation, pagination is heuristic, not exact: each block typ
 - `pdfkit` version should be pinned (already true via `package.json`'s `^0.19.1`, but the undocumented-internals risk (finding 7) means a version bump needs a manual bleed/crop-mark smoke check, not just `npm test`
 
 **Related:** ADR-0012, ADR-0013, ADR-0014, Sprint 3A (PDF export)
+
+---
+
+## ADR-0020: EPUB Renderer — Library Decision (resolves ADR-0015)
+
+**Status:** APPROVED
+**Date:** 2026-07-17
+**Decision:** `EPUBRenderer` (Infrastructure) will use **`epub-gen-memory`** (a maintained fork of `epub-gen`), not `epub-gen` itself and not a hand-rolled OCF/OPF/XHTML implementation via `jszip`. Resolves ADR-0015's open spike requirement. Verified with a real spike (`backend/spikes/epub-library-spike.ts`) before this ADR was written, same discipline as ADR-0019 for PDF.
+
+**Evidence gathered (via `npm view`, GitHub's API, and real generated output — not the README alone):**
+
+1. **`epub-gen` (the ADR-0015 example candidate) is unmaintained.** Last published to npm 2022-06-17 (over 4 years stale as of this decision), never left `0.1.0`, written in CoffeeScript, GitHub shows **no detected license** (`license: null`) despite `package.json` claiming MIT — an ambiguity, not just staleness. Its dependency tree carries genuinely legacy packages: `q@^1.5.1` (pre-native-Promises era), `rimraf@^2.6.3` and `archiver@^3.0.0` (both several majors behind current), `cheerio@^0.22.0` (a *different major* than this project's own `cheerio@^1.2.0`, meaning it would install a second, ancient copy alongside ours).
+2. **`epub-gen-memory`** (`cpiber/epub-gen-memory`, a fork of `epub-gen`) is the stronger candidate: TypeScript-native with bundled `.d.ts` types (no separate `@types` package needed), MIT-licensed (GitHub confirms a real `license` object, unlike the parent), last pushed 2024-07-29 (~2 years old, notably fresher than the parent), 58 stars / 22 forks / 1 open issue, and its dependency tree is current and free of the parent's legacy packages — including `jszip@^3.7.1`, compatible with this project's own `jszip@^3.10.1` (already a dependency for DOCX test fixtures, ADR-0018's precedent).
+3. **API shape verified with real output, not assumed:** `epub(options, content: Chapter[], version)` returns `Promise<Buffer>` directly — matches `Renderer<Buffer>` (ADR-0012) with no filesystem round-trip needed, unlike the parent `epub-gen`'s file-path-based API. A generated EPUB was inspected structurally: `mimetype` is correctly the first zip entry and stored uncompressed (EPUB OCF spec requirement, confirmed via JSZip's compression metadata), the OPF manifest declares `version="3.0"`, and both `toc.ncx` (EPUB2 back-compat) and `toc.xhtml` (EPUB3 nav document) are generated automatically. Chapter content is an **HTML string** per chapter, not our Book AST directly — `EPUBRenderer` needs a small `Block[] → HTML` serializer (structurally simpler than PDFKit's imperative drawing API, and the natural fit ADR-0015's rationale already predicted: "blocks map naturally to XHTML elements").
+4. **Real import gotcha (reproduced):** the README's `import epub from 'epub-gen-memory'` does not yield a callable under this project's tsx/ESM toolchain — the package is TS-compiled-to-CJS, and under Node's ESM/CJS interop the callable arrives double-wrapped (`module.default.default`, not `module.default`). Confirmed by inspecting the runtime module object directly. `EPUBRenderer` must import it this way; a naive default import will fail with a non-obvious "epub is not a function" error.
+5. **Real architectural conflict found and resolved:** the README states chapter-content image sources are downloaded, and this was verified to mean *unconditionally* — even a `data:` URI throws `"Only HTTP(S) protocols are supported"` (the library routes every `<img src>` through `node-fetch`, with no bypass for already-available bytes). This conflicts with this project's established rule (`DOCXRenderer`, `PDFRenderer`): no hidden network I/O inside a renderer. **Verified workaround:** the library does support `file://` local paths with zero network calls. `EPUBRenderer` must write embedded base64 image bytes to a scoped temp directory per render (`fs.mkdtempSync`), reference them via a `file://` URL, and delete the temp directory after rendering completes — a real, documented integration cost, not a silent gap. Images without embedded base64 data are simply omitted from the HTML (same placeholder-only rule the other two renderers already follow) — never worth triggering a real fetch for.
+
+**Rationale:**
+- Hand-rolling OCF/OPF/XHTML from scratch (ADR-0015's other candidate) is strictly more work for no benefit once a well-tested, actively-maintained, TypeScript-native library is confirmed to produce spec-correct output with an API shape that already matches `Renderer<Buffer>` — rejected on those grounds, not on principle
+- `epub-gen` itself (the literal ADR-0015 example) is rejected on maintenance and dependency-health grounds — this is a "don't guess, verify" correction of ADR-0015's own example candidate, exactly the kind of unverified claim this project's discipline exists to catch before it becomes code
+- The image-fetching conflict is real but has a verified, contained workaround (temp file + `file://`) rather than requiring either a rule exception or abandoning the library
+
+**Consequences:**
+- `EPUBRenderer` needs a `Block[] → HTML` serializer as its main body of work — mapping the same block types `DOCXRenderer`/`PDFRenderer` already handle (headings, paragraphs, quotes, lists, tables, footnotes, images) onto HTML tags
+- `EPUBRenderer` must manage a scoped temp directory for embedded images per render call (create before rendering, delete in a `finally`) — this is new lifecycle-management code neither `DOCXRenderer` nor `PDFRenderer` needed, since neither writes to disk
+- No pagination needed (ADR-0013, unchanged) — EPUB is reflowable, `PaginatedBook.pages` is not consulted by `EPUBRenderer` the way `PDFRenderer`/`DOCXRenderer` consult it for forced page breaks
+- `epub-gen-memory` becomes a new runtime dependency; its own dependency tree should be watched at upgrade time given it's a smaller-community fork (58 stars) of a more popular but unmaintained parent (458 stars) — not a reason to avoid it now, but a reason not to assume it's risk-free forever
+
+**Related:** ADR-0012, ADR-0013, ADR-0015 (resolved by this ADR), ADR-0018 (same rationale pattern — verify a library choice with evidence, same as the `docx` package decision), Sprint 3B (EPUB export)
