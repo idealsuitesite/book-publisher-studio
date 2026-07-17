@@ -31,7 +31,7 @@ Copy this block into the PR description (or a linked comment) for every qualifyi
 
 Sprint:
 Renderer(s) touched:
-Test manuscript: (path under backend/uploads/, or note if a new one was needed and why)
+Test manuscript: backend/verification/typography-test.docx (default — use large-book.docx/images.docx/tables.docx instead only if the change specifically concerns pagination, images, or tables; see backend/verification/README.md and docs/CLAUDE.md's Real Export Policy — never backend/uploads/, never a generated/temporary file)
 Export method: POST /api/manuscripts/export via the running dev server (NOT calling renderer classes directly)
 
 ### 1. Unit tests
@@ -39,6 +39,9 @@ Export method: POST /api/manuscripts/export via the running dev server (NOT call
 
 ### 2. Integration / E2E tests
 - [ ] Existing E2E export tests (export.test.ts) passing
+
+### 2b. Server verification (docs/CLAUDE.md's Server Verification Policy)
+- [ ] npm run verify-server passes (confirms the real port, the export route, and the fixture — never assume the port)
 
 ### 3. Real export (all 3 formats, even if only one renderer changed —
 ###    a shared Domain change like ThemeEngine/LayoutEngine/TypographyResolver
