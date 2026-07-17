@@ -1,15 +1,15 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 (Sprint 4, commits 1-10 complete and verified)
-**Sprint:** Sprint 4 ("Typography Engine") in progress on `feature/sprint-4-typography-engine`. Design Review approved (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`, 11-commit plan). Commits 1-10 implemented, tested, and verified against real files. Commit 11 remains (final docs pass with ADR-0022/0023/0024).
+**Last Updated:** July 17, 2026 (Sprint 4, commits 1-11 complete — sprint closed, PR not yet opened)
+**Sprint:** Sprint 4 ("Typography Engine") **complete** on `feature/sprint-4-typography-engine`. Design Review approved (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`, 11-commit plan) and fully executed — all 11 commits implemented, tested, and verified against real files. ADR-0022/0023/0024/0025/0026 written; `docs/releases/v0.5.0-alpha/SPRINT_4_FINAL_REPORT.md` records the full sprint retrospective. **Next action is opening the Sprint 4 PR** (pending explicit go-ahead — PR creation is a shared-state action).
 **Branch:** `feature/sprint-4-typography-engine` (branched from `main` at `5eb71c4`, rebased once onto `main` after PR #7/#8 merged, pushed to `origin` for the first time 2026-07-17). `main` itself has PR #1-#5 merged plus `fix/pdf-table-without-header` (PR #8) and the server-verification tooling (PR #6/#7) — no other open feature branches.
 
 ---
 
 ## Summary
 
-**Completed (Sprint 4, commits 1-10):** Domain types (`ResolvedTypography`/`TypeRun`), additive `StyledBook.blockTypography`, `TypographyResolver` (inline run resolution, drop caps, English-only smart quotes, forced quote/scripture italics, heading `staysWithNext`), `LayoutEngine` keep-with-next pagination support, real font embedding (Gelasio/Inter/JetBrains Mono, SIL OFL, 12 `.ttf` files in `backend/assets/fonts/`) with a role-based `PdfFontRegistry` API (`resolveBody`/`resolveHeading`/`resolveMonospace`/`resolveDefault`), full `TypeRun` rendering support in `PDFRenderer`/`DOCXRenderer`/`EPUBRenderer`, `BookMetricsCalculator.calculateQualityMetrics(paginated: PaginatedBook): QualityMetrics` activating all 7 `QualityMetrics` fields with real computed values, and a completed E2E real-file verification pass (commit 10) that found and fixed 3 real content-fidelity bugs in the import pipeline (ADR-0026, see below). 195 tests passing ✅, re-verified before every commit via `npm run build`, `npm run lint`, `npm test`, `npm run verify-server`, and `npm run verify-real-export` (16/16 checks: 4 fixtures × import + export-docx/pdf/epub).
-**Next:** Commit 11 (ADR-0022 Typography Resolution Pipeline, ADR-0023 Font Embedding, ADR-0024 Hyphenation/Smart-quotes-deferred, plus final `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` pass) before the Sprint 4 PR is opened. **PR only once the whole sprint is done and verified** — no PR yet.
+**Completed (Sprint 4, all 11 commits):** Domain types (`ResolvedTypography`/`TypeRun`), additive `StyledBook.blockTypography`, `TypographyResolver` (inline run resolution, drop caps, English-only smart quotes, forced quote/scripture italics, heading `staysWithNext`), `LayoutEngine` keep-with-next pagination support, real font embedding (Gelasio/Inter/JetBrains Mono, SIL OFL, 12 `.ttf` files in `backend/assets/fonts/`) with a role-based `PdfFontRegistry` API (`resolveBody`/`resolveHeading`/`resolveMonospace`/`resolveDefault`), full `TypeRun` rendering support in `PDFRenderer`/`DOCXRenderer`/`EPUBRenderer`, `BookMetricsCalculator.calculateQualityMetrics(paginated: PaginatedBook): QualityMetrics` activating all 7 `QualityMetrics` fields with real computed values, a completed E2E real-file verification pass (commit 10) that found and fixed 3 real content-fidelity bugs in the import pipeline (ADR-0026), and a final docs/ADR pass (commit 11: ADR-0022/0023/0024, `docs/releases/v0.5.0-alpha/SPRINT_4_FINAL_REPORT.md`). 195 tests passing ✅, 90.49% global / 92.57% domain coverage, 0 ESLint warnings, re-verified before every commit via `npm run build`, `npm run lint`, `npm test`, `npm run verify-server`, and `npm run verify-real-export` (16/16 checks: 4 fixtures × import + export-docx/pdf/epub).
+**Next:** Open the Sprint 4 PR (`feature/sprint-4-typography-engine` → `main`) — the whole sprint is now done and verified, satisfying the "PR only once the whole sprint is done and verified" rule. PR creation itself is a shared-state action requiring explicit user go-ahead in this session before it happens.
 
 **Design-review gap found and resolved during commit 9:** the Design Review (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`) locked exact formulas for `averageHeadingDepth`/`paragraphDensity`/`lineDensity`/`dropCaps` (CTO Final Decision 4) but left the 3 pre-existing ADR-0008 fields (`widowsAndOrphans`/`inconsistentSpacing`/`emptyHeadings`) with no formula — only "activate them, the resolver already computes the underlying data." Flagged and confirmed before implementation rather than guessed silently: `widowsAndOrphans` = count of blocks where `TypographyResolver` resolved `staysWithNext: true` (currently all headings); `emptyHeadings` = `Heading.text.trim() === ''`; `inconsistentSpacing` = count of `Paragraph` blocks whose explicit `spaceBefore`/`spaceAfter`/`lineHeight` diverges from the theme-resolved value — functional definition deliberately kept general ("a block whose explicit style overrides a theme-resolved value") per the CTO's direction, so future style dimensions (alignment, indentation, color, font) can be folded in later without resemanticizing the field; Sprint 4's implementation checks spacing only. Also confirmed: `calculateQualityMetrics` is a new method operating on `PaginatedBook` (needs `blockTypography` + real page count, both unavailable on a bare `Book`), not wired into `ExportManuscriptUseCase` or any route this commit — that wiring is explicitly `ValidatorEngine` scope, not Sprint 4.
 
@@ -148,48 +148,41 @@ All three were fixed by the `bufferPages` redesign above.
 
 **Verified with real files before every commit:** `npm run verify-server` + `npm run verify-real-export` (16/16 checks — 4 canonical fixtures × import + export-docx/pdf/epub) run against the actual running dev server, not just unit tests, per the project's Real Export Policy.
 
-**Remaining (commit 11):**
-- [ ] Commit 11: ADR-0022 (Typography Resolution Pipeline), ADR-0023 (Font Embedding), ADR-0024 (Hyphenation/Smart quotes deferred to v2) + final `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` pass
-- [ ] Open the Sprint 4 PR only once commit 11 is done and re-verified
+**Commit 11 (final docs pass):**
+- [x] ADR-0022 (Typography Resolution Pipeline), ADR-0023 (PDF Font Embedding), ADR-0024 (Hyphenation/Locale-Aware Smart Quotes Deferred to v2) — all written with full evidence of what was actually built, not just the original Design Review plan
+- [x] `docs/releases/v0.5.0-alpha/SPRINT_4_FINAL_REPORT.md` — objectives, delivered features, ADRs created, historical bugs found/fixed, final metrics, deferred items, residual risks, lessons learned
+- [x] Final `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` reconciliation pass (this update) — exact per-file test counts, exact coverage percentages
+- [ ] Open the Sprint 4 PR — sprint is done and re-verified; **pending explicit go-ahead**
 
 ---
 
 ## Test Summary
 
-| Component | Tests |
-|-----------|-------|
-| Book domain model | 10 |
-| ASTBuilder | 22 |
-| BookValidator | 6 |
-| BookMetricsCalculator | 10 (up from 6 — added `calculateQualityMetrics` coverage this sprint) |
-| HtmlNormalizer | 17 |
-| MammothParser | 3 |
-| BookMapper | 6 |
-| ImportManuscriptUseCase | 13 |
-| Manuscript import route (E2E) | 5 |
-| ThemeEngine | 4 |
-| getTheme | 2 |
-| LayoutEngine | 8 |
-| DOCXRenderer | 5 |
-| ExportManuscriptUseCase | 6 |
-| Manuscript export route (E2E) | 7 (up from 6 — added a `format=epub` case this sprint) |
-| PDFRenderer | 6 |
-| EPUBRenderer | 7 |
-| **TypographyResolver** | **~15** |
-| **PdfFontRegistry** | **~8** |
-| **extractPdfText (font-aware rewrite)** | **~6** |
-| **DOCXRenderer (TypeRun coverage)** | **+~5** |
-| **PDFRenderer (TypeRun coverage)** | **+~5** |
-| **EPUBRenderer (TypeRun coverage)** | **+~5** |
-| **MammothParser (ADR-0025 regression)** | **+1** |
-| **BookMetricsCalculator (calculateQualityMetrics, commit 9)** | **+4** |
-| **HtmlNormalizer (strikethrough + whitespace fix, commit 10 / ADR-0026)** | **+4 (17 → 21)** |
-| **ASTBuilder (plain-text-inline preservation, commit 10 / ADR-0026)** | **+1 (22 → 23)** |
-| **export.test.ts real-fixture E2E (commit 10)** | **+3** |
-| **ExportManuscriptUseCase (PDF real-fixture font-weight, commit 10)** | **+1 (6 → 7)** |
-| **Total** | **195** |
+Exact counts, reconciled in commit 11 (previous versions of this table used `~` approximations for new Sprint 4 files — those are gone as of this pass):
 
-(Bold rows are new or grown this sprint — Sprint 4, commits 1-10. Exact per-file counts to be reconciled in commit 11's docs pass; 195 is the verified total from the last full `npm test` run. Note the `HtmlNormalizer`/`ASTBuilder`/`ExportManuscriptUseCase` row counts above are deltas against the non-bold rows earlier in this table, not additional separate components.)
+| Component | Tests | Sprint 4 change |
+|-----------|-------|------------------|
+| Book domain model | 10 | unchanged |
+| ASTBuilder | 23 | +1 this sprint (plain-text-inline preservation, commit 10 / ADR-0026) |
+| BookValidator | 6 | unchanged |
+| BookMetricsCalculator | 10 | +4 this sprint (`calculateQualityMetrics`, commit 9) |
+| HtmlNormalizer | 21 | +4 this sprint (strikethrough + whitespace fix, commit 10 / ADR-0026) |
+| MammothParser | 4 | +1 this sprint (ADR-0025 regression) |
+| BookMapper | 6 | unchanged |
+| ImportManuscriptUseCase | 13 | unchanged |
+| Manuscript import route (E2E) | 5 | unchanged |
+| ThemeEngine | 4 | unchanged |
+| getTheme | 2 | unchanged |
+| LayoutEngine | 10 | +2 this sprint (`blockTypography`-bearing fixtures, orphan-risk cases) |
+| DOCXRenderer | 9 | +4 this sprint (`TypeRun` coverage) |
+| ExportManuscriptUseCase | 7 | +1 this sprint (PDF real-fixture font-weight check, commit 10) |
+| Manuscript export route (E2E) | 10 | +4 this sprint (`format=epub` case, +3 real-fixture E2E cases commit 10) |
+| PDFRenderer | 16 | +10 this sprint (`TypeRun` coverage, font embedding, drop caps) |
+| EPUBRenderer | 11 | +4 this sprint (`TypeRun` coverage, drop caps) |
+| TypographyResolver | 17 | new this sprint |
+| PdfFontRegistry | 7 | new this sprint |
+| extractPdfText | 4 | new this sprint (font-aware rewrite, `extractPdfRuns()`) |
+| **Total** | **195** | up from 133 at Sprint 4 start (+62) |
 
 ---
 
@@ -205,8 +198,8 @@ All three were fixed by the `bufferPages` redesign above.
 | No circular dependencies | ✅ |
 | TypeScript strict mode | ✅ |
 | Controller contains no business logic | ✅ |
-| Domain coverage >90% | ✅ (verified >90% before every commit via `npm run test:coverage`; exact percentage to be reconciled and recorded in commit 11's docs pass) |
-| Global coverage >80% | ✅ (verified >80% before every commit via `npm run test:coverage`; exact percentage to be reconciled and recorded in commit 11's docs pass) |
+| Domain coverage >90% | ✅ 92.57% statements (`domain/services`, `npm run test:coverage`, final Sprint 4 run) |
+| Global coverage >80% | ✅ 90.49% statements (`npm run test:coverage`, final Sprint 4 run) |
 | Renderer is a port; ThemeEngine/LayoutEngine are concrete classes | ✅ (Design Review decision, ADR-0012 addendum) |
 | Zero ESLint warnings | ✅ (0 errors, 0 warnings — held since Quality Sprint, PR #2) |
 
@@ -228,8 +221,7 @@ All three were fixed by the `bufferPages` redesign above.
 - `QualityMetrics` is now computable via `BookMetricsCalculator.calculateQualityMetrics(paginated)` (Sprint 4 commit 9) but isn't surfaced through any HTTP route/DTO yet — deliberately out of commit 9's scope; wiring it into a response is `ValidatorEngine` work (Sprint 4+ priority #2).
 - `DOCXRenderer`'s footnote rendering is simplified (inline `[n] content` paragraph, not real Word footnotes) and ordered lists use a manual prefix instead of `docx`'s numbering config — both documented, deliberate simplifications, not silent gaps.
 - `PDFRenderer`'s table rendering does not split a table across a forced page break (matches `LayoutEngine`'s own treatment of a table as one non-splitting unit, ADR-0013 — not an inconsistency, but a real large-table edge case that could visually overflow a page if it ever occurs).
-- Hyphenation and non-English smart quotes are deliberately deferred to v2 (Design Review decision, to be recorded formally in ADR-0024 at commit 11).
-- ADR-0022 (Typography Resolution Pipeline) and ADR-0023 (Font Embedding) are not yet written — the Design Review doc (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`) exists and was followed, but the formal ADR entries are deferred to commit 11 per the CTO's stated preference (document once the real code state is final, not mid-sprint).
+- Hyphenation and non-English smart quotes are deliberately deferred to v2 (ADR-0024, written commit 11).
 - `EPUBRenderer`'s `page-break` block renders a CSS `page-break-before` hint, not a real page break — EPUB is reflowable (ADR-0013), and reading systems vary in whether they honor the hint at all. Documented, not a silent gap.
 - `docs/architecture/diagrams/BASELINE_v0.1.md`'s "86/86 tests" claim was corrected via ADR-0010 (status annotation only, content not rewritten, per the doc's own frozen/ADR-only change rule).
 
@@ -239,7 +231,9 @@ All three were fixed by the `bufferPages` redesign above.
 
 **To resume work:** say "Read docs/SESSION_BOOTSTRAP.md and follow it" — it fixes the reading order (`START_HERE.md` → `CURRENT_STATE.md` → `TODO.md` → `DECISIONS.md` → `VERSIONS.md`) and requires a summary + explicit approval before any code is written.
 
-**Next task is already mid-flight, not a fresh Design Review:** Sprint 4 (Typography Engine) commits 1-10 are done and verified; **commit 11 is next** — ADR-0022/0023/0024 + final `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` reconciliation pass, then open the Sprint 4 PR (only once commit 11 is done and re-verified). Continue on `feature/sprint-4-typography-engine` (pushed to `origin`) — do not branch again. Follow the same per-commit discipline used for commits 1-10: one responsibility per commit, build/lint/tests green, no scope drift, `npm run verify-server` + `npm run verify-real-export` before every commit, stop and present any real design/implementation mismatch rather than silently working around it (commit 10 did exactly this for 2 real import-pipeline bugs before fixing them — see ADR-0026), wait for explicit approval.
+**Sprint 4 is complete.** All 11 commits done, tested, and verified. The next action is opening the Sprint 4 PR (`feature/sprint-4-typography-engine` → `main`) — this needs explicit user go-ahead in-session (PR creation is a shared-state action), not something to do automatically on session resume. If a new session starts before that PR is opened, check `git log origin/main..HEAD` on this branch first to see whether it happened in the meantime.
+
+**After the PR merges:** per the CTO's stated recommendation (2026-07-17, not yet a formal decision), freeze new feature work briefly and treat Sprint 5 as its own from-scratch project with a dedicated Design Review — do not start Sprint 5 implementation without one, matching the discipline already used for Sprints 2/3A/3B/4. Sprint 5's actual priority order is explicitly **not yet decided** (see `docs/TODO.md`'s backlog notes on the competing proposals raised 2026-07-17: the existing recorded "CTO priority order" vs. a newer proposed Editorial AI Engine/Professional Layout Engine/Validation Engine/Publishing Engine ordering) — resolve that as part of the Design Review, not by assumption.
 
 **Quick Start:**
 ```bash
