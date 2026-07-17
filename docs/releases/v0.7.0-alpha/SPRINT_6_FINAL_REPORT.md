@@ -3,8 +3,8 @@
 **Sprint:** Sprint 6 ("Professional Layout Engine")
 **Branch:** `feature/sprint-6-professional-layout-engine`
 **Date:** 2026-07-17 (single-day sprint, commit 0 spike + 10 implementation commits + 2 disclosed fix commits)
-**Status:** Implementation complete, all commits done and verified against real files. PR not yet opened — this report and the final docs pass are the last governance step before it, matching Sprint 4/5's own "PR only once the whole sprint is done and verified" precedent.
-**Target version:** `v0.7.0-alpha` (see `docs/VERSIONS.md` — tag not yet cut; this report precedes the tag, matching `v0.5.0-alpha`/`v0.6.0-alpha`'s own precedent).
+**Status:** ✅ Complete, merged, and released. PR #11 merged (`eb05beb`), tagged `v0.7.0-alpha`.
+**Target version:** `v0.7.0-alpha` (see `docs/VERSIONS.md` and `docs/releases/v0.7.0-alpha/ReleaseNotes.md`).
 
 ---
 

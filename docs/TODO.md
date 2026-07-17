@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 (Sprint 6 Professional Layout Engine implementation complete on its feature branch, real-file verified; PR not yet opened)
+**Last Updated:** July 17, 2026 (Sprint 6 released as `v0.7.0-alpha`)
 
 ---
 
@@ -12,7 +12,9 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-**Sprint 6 (Professional Layout Engine)** — Design Review ✅ APPROVED (`docs/architecture/diagrams/PROFESSIONAL_LAYOUT_ENGINE.md`, ADR-0029, `docs/architecture/diagrams/SPRINT_6_KICKOFF.md`), **implementation ✅ COMPLETE** on `feature/sprint-6-professional-layout-engine` (commit 0 spike + 10 numbered commits + 2 disclosed fix commits, 328/328 tests, `npm run verify-server`/`verify-real-export` both green). Two real bugs found and fixed during real-file verification, ADR-0031. See the COMPLETED section below and `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md` for full detail. **PR not yet opened** — awaiting explicit go-ahead to push the branch and open it.
+None currently.
+
+Sprint 6 (Professional Layout Engine) is **complete, merged, and released** — commit 0's spike + 10 numbered commits + 2 disclosed fix commits done, tested (328/328), verified against real files (`npm run verify-server` + `npm run verify-real-export`, 16/16 checks), merged via PR #11 (`eb05beb`), tagged `v0.7.0-alpha`. Two real bugs found and fixed during real-file verification (ADR-0031). See the COMPLETED section below and `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md` / `ReleaseNotes.md` for full detail. `feature/sprint-6-professional-layout-engine` deleted (local + remote).
 
 Sprint 5 (Validation Engine) is **complete, merged, and released** — all 11 commits done, tested (282/282), verified against real files (`npm run verify-server` + `npm run verify-real-export`, 16/16 checks), merged via PR #10 (`3032d70`), tagged `v0.6.0-alpha`. See the COMPLETED section below and `docs/releases/v0.6.0-alpha/SPRINT_5_FINAL_REPORT.md` / `ReleaseNotes.md` for full detail. `feature/sprint-5-validation-engine` deleted (local + remote).
 
@@ -141,7 +143,7 @@ Sprint 4 (Typography Engine) is **complete, merged, and released** — all 11 co
 - ✅ **282 total tests passing** (up from 195), 91.77% global / 93.06% domain coverage, 0 ESLint warnings; every one of the 8 rules has its own test file including an ADR-0027 immutability check; `npm run verify-server` + `npm run verify-real-export` both green (16/16)
 - ✅ Full retrospective: `docs/releases/v0.6.0-alpha/SPRINT_5_FINAL_REPORT.md` (objectives, ADRs created, design-review gaps found mid-sprint, final metrics, deferred items, residual risks, lessons learned)
 
-### Sprint 6 - Professional Layout Engine (implementation complete on `feature/sprint-6-professional-layout-engine`; PR not yet opened)
+### Sprint 6 - Professional Layout Engine (merged via PR #11, `eb05beb`; tagged `v0.7.0-alpha`)
 
 - ✅ KDP/platform trim-size spike (`backend/spikes/kdp-trim-size-spike.ts`, ADR-0030) completed before any preset code, matching the ADR-0019/0020 precedent — A4/A5 verified against PDFKit's own real runtime output, KDP sizes fetched directly from kdp.amazon.com
 - ✅ `LayoutEngine` extended, not replaced (ADR-0029 Decision 1) — real `PageLayout` presets (A4/A5/KDP 5x8/5.5x8.5/6x9), `LayoutSelector` port + `ManualLayoutSelector` (`AutomaticLayoutSelector` named, not built), `Theme.runningHead` (`ClassicTheme` populated), per-page header/footer resolution, `Chapter.openingPageStyle`/`startPageNumber` honored, automatic Table of Contents generation
@@ -150,7 +152,7 @@ Sprint 4 (Typography Engine) is **complete, merged, and released** — all 11 co
 - ✅ **Two real bugs found and fixed during real-file verification (ADR-0031), not deferred:** neither renderer had ever consumed `PageLayout` at all (every new preset would have had zero effect on real output); automatic TOC generation originally walked only `Heading` blocks, which real DOCX imports never produce (real headings become `Chapter`/`Section` titles instead) — found against `large-book.docx`'s 15 real chapters, fixed, re-verified against the same fixture
 - ✅ **328 total tests passing** (up from 282), 92.78% global / 93.75% domain coverage, 0 ESLint warnings; `npm run verify-server` + `npm run verify-real-export` both green (16/16); real HTTP exports confirmed A4/KDP-6x9 PDF and A5 DOCX geometry match the selected layout exactly
 - ✅ Full retrospective: `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md` (objectives, ADRs created, real bugs found and fixed, final metrics, deferred items, residual risks, lessons learned)
-- [ ] PR not yet opened — awaiting explicit go-ahead; tag/`ReleaseNotes.md`/`main` merge all deferred until after
+- [x] PR #11 merged (`eb05beb`), tagged `v0.7.0-alpha`, `docs/releases/v0.7.0-alpha/ReleaseNotes.md` written, `feature/sprint-6-professional-layout-engine` deleted (local + remote)
 
 ---
 
@@ -198,4 +200,4 @@ Sprint 4 (Typography Engine) is **complete, merged, and released** — all 11 co
 - **Code Quality:** TypeScript strict mode ✅, ESLint **0 errors / 0 warnings**, Prettier applied
 - **Tests:** 328 passing, 0 failing
 - **Architecture Debt:** see Technical Debt above (`QualityMetrics`/`ValidationContext.metrics` gap from Sprint 5, unchanged; `AutomaticLayoutSelector` not built, TOC page excluded from body page-number sequence, both Sprint 6)
-- **Documentation:** Reconciled with actual code as of 2026-07-17 (Sprint 6 implementation-complete on its feature branch, all commits + 2 disclosed fix commits; ADR-0029/0030/0031 written; PR not yet opened)
+- **Documentation:** Reconciled with actual code as of 2026-07-17 (Sprint 6 merged and released as `v0.7.0-alpha`, all commits + 2 disclosed fix commits; ADR-0029/0030/0031 written)

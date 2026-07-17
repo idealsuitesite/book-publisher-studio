@@ -1,8 +1,8 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 (Sprint 6 implementation complete on its feature branch, real-file verified — PR not yet opened)
-**Sprint:** Sprint 5 ("Validation Engine") **✅ COMPLETE AND RELEASED**, tagged `v0.6.0-alpha` (see prior entries below for full detail). **Sprint 6 ("Professional Layout Engine") ✅ IMPLEMENTATION COMPLETE**, real-file verified, on `feature/sprint-6-professional-layout-engine` — `LayoutEngine` extended (not replaced, ADR-0029) with real `PageLayout` presets (A4/A5/KDP 5x8/5.5x8.5/6x9, ADR-0030), `LayoutSelector` port + `ManualLayoutSelector`, `Theme.runningHead` (`ClassicTheme` populated, replaces the old hardcoded PDF running-head string), real header/footer in `PDFRenderer`/`DOCXRenderer`, `Chapter.openingPageStyle`/`startPageNumber` honored, automatic Table of Contents generation (rendered as real front-matter content in both PDF and DOCX). Two real bugs found and fixed during real-file verification (ADR-0031): neither renderer had ever consumed `PageLayout` at all; TOC generation originally walked only `Heading` blocks, which real DOCX imports never produce (real headings become `Chapter`/`Section` titles instead). 328/328 tests, `npm run verify-server`/`verify-real-export` both green. Full detail: `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md`. **PR not yet opened** — awaiting explicit go-ahead to push the branch and open it.
-**Branch:** `feature/sprint-6-professional-layout-engine` (based on `main` at `46c9dd1`, tag `v0.6.0-alpha`). `main` itself is unchanged from Sprint 5's merge — no direct commits to `main` this sprint (ADR-0017).
+**Last Updated:** July 17, 2026 (Sprint 6 merged and tagged `v0.7.0-alpha` — sprint fully closed)
+**Sprint:** Sprint 6 ("Professional Layout Engine") **✅ COMPLETE AND RELEASED** — `LayoutEngine` extended (not replaced, ADR-0029) with real `PageLayout` presets (A4/A5/KDP 5x8/5.5x8.5/6x9, ADR-0030), `LayoutSelector` port + `ManualLayoutSelector`, `Theme.runningHead` (`ClassicTheme` populated, replaces the old hardcoded PDF running-head string), real header/footer in `PDFRenderer`/`DOCXRenderer`, `Chapter.openingPageStyle`/`startPageNumber` honored, automatic Table of Contents generation (rendered as real front-matter content in both PDF and DOCX). Two real bugs found and fixed during real-file verification (ADR-0031): neither renderer had ever consumed `PageLayout` at all; TOC generation originally walked only `Heading` blocks, which real DOCX imports never produce (real headings become `Chapter`/`Section` titles instead). Merged via PR #11 (merge commit `eb05beb`), re-verified on `main` (328/328 tests, `verify-server`/`verify-real-export` both green), tagged `v0.7.0-alpha`. `docs/releases/v0.7.0-alpha/ReleaseNotes.md` and `SPRINT_6_FINAL_REPORT.md` record the release and full retrospective.
+**Branch:** `main`, at the `v0.7.0-alpha` tag (merge commit `eb05beb`). No open feature branches.
 
 ---
 
@@ -198,7 +198,7 @@ All three were fixed by the `bufferPages` redesign above.
 
 ---
 
-## Sprint 6: Professional Layout Engine ✅ IMPLEMENTATION COMPLETE (on `feature/sprint-6-professional-layout-engine`, PR not yet opened)
+## Sprint 6: Professional Layout Engine ✅ COMPLETE AND RELEASED (PR #11, merge commit `eb05beb`, tagged `v0.7.0-alpha`)
 
 **Design Review completed and approved before any implementation code** (`docs/architecture/diagrams/PROFESSIONAL_LAYOUT_ENGINE.md`, ADR-0029, `docs/architecture/diagrams/SPRINT_6_KICKOFF.md`) — chosen from the 4 remaining Level-1-mapped engines for its lowest-risk profile (no external vendor, no UI requirement, extends existing `LayoutEngine`). A real KDP/platform trim-size spike (`backend/spikes/kdp-trim-size-spike.ts`, ADR-0030) was completed as commit 0, before any preset code, matching the ADR-0019/0020 precedent.
 
@@ -234,9 +234,9 @@ All three were fixed by the `bufferPages` redesign above.
 - [x] `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md` written
 - [x] Final `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` reconciliation pass (this update)
 - [x] `VERSIONS.md` renumbered: `v0.7.0-alpha` corrected from a superseded "Premium UI/UX" placeholder to the actual Professional Layout Engine milestone; every subsequent never-released row shifted down one version accordingly
-- [ ] Open the Sprint 6 PR — not yet done, awaiting explicit go-ahead (pushing a branch and opening a PR are both actions requiring explicit user confirmation)
-- [ ] Tag `v0.7.0-alpha`, write `docs/releases/v0.7.0-alpha/ReleaseNotes.md`, flip `VERSIONS.md`'s row to Released — deferred until after the PR actually merges, matching this project's own "tag only after the tag is pushed" rule
-- [ ] Delete `feature/sprint-6-professional-layout-engine` (local + remote) — after merge
+- [x] Open the Sprint 6 PR (#11) — merged, merge commit `eb05beb`, re-verified on `main` (328/328, `verify-server`/`verify-real-export` both green)
+- [x] Tag `v0.7.0-alpha`, write `docs/releases/v0.7.0-alpha/ReleaseNotes.md`, flip `VERSIONS.md`'s row to Released
+- [x] Delete `feature/sprint-6-professional-layout-engine` (local + remote), matching the cleanup pattern used after every prior sprint merge
 
 ---
 
@@ -343,12 +343,12 @@ Exact counts (via vitest's own JSON reporter, not hand-counted):
 
 **Sprint 5 is complete, merged, and tagged.** PR #10 merged (`3032d70`), `v0.6.0-alpha` tagged and pushed, `feature/sprint-5-validation-engine` deleted (local + remote).
 
-**Sprint 6 (Professional Layout Engine) implementation is complete on `feature/sprint-6-professional-layout-engine`, real-file verified, PR not yet opened.** All 10 numbered commits + commit 0's spike + 2 disclosed fix commits landed, each with its own green build/lint/test before the next started (328/328 final). Two real bugs found and fixed during real-file verification (ADR-0031). Full design: `docs/architecture/diagrams/PROFESSIONAL_LAYOUT_ENGINE.md`, ADR-0029/0030/0031, `docs/architecture/diagrams/SPRINT_6_KICKOFF.md`. Full retrospective: `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md`. **Opening the PR (pushing the branch, creating the PR) is deliberately left for explicit user go-ahead** — both are actions this session's operating rules require confirmation for, distinct from local commits. Editorial AI Engine, Plugin System, and Publishing Engine remain mapped at Level 1 only, no Sprint assignment.
+**Sprint 6 is complete, merged, and tagged.** PR #11 merged (`eb05beb`), `v0.7.0-alpha` tagged and pushed, `feature/sprint-6-professional-layout-engine` deleted (local + remote). Two real bugs found and fixed during real-file verification (ADR-0031). Work happens on `main` now — there is no active feature branch.
 
-**Quick Start (on the Sprint 6 branch, before it merges):**
+**Quick Start:**
 ```bash
 cd "D:\Book Publisher Studio\backend"
-git checkout feature/sprint-6-professional-layout-engine
+git checkout main && git pull
 npm test               # Verify all 328 tests pass
 npm run build          # Verify TypeScript compilation
 npm run lint            # Verify 0 ESLint errors
@@ -382,9 +382,8 @@ npm run verify-real-export   # Verify real import + export-docx/pdf/epub against
 
 ## Git Status
 
-**Current branch:** `feature/sprint-6-professional-layout-engine`, based on `main` at `46c9dd1`. Not yet pushed to the remote; PR not yet opened.
-**`main`:** unchanged from Sprint 5's merge, still at `46c9dd1`, tag `v0.6.0-alpha`. No direct commits to `main` this sprint (ADR-0017).
-**Sprint 6 branch history (most recent first, local only):** docs reconciliation (this pass, pending commit) → TOC real-import fix (ADR-0031 bug 2) → commit 10 (automatic TOC generation) → commit 9 (`Chapter.startPageNumber`) → commit 8 (`Chapter.openingPageStyle`) → commit 7 (DOCXRenderer header/footer) → commit 6 (PDFRenderer header/footer) → commit 5 (LayoutEngine header/footer resolution) → commit 4 (`Theme.runningHead`) → `PageLayout`-consumption fix (ADR-0031 bug 1) → commit 3 (`ExportController` uses `LayoutSelector`) → commit 2 (`LayoutSelector` port + `ManualLayoutSelector`) → commit 1 (A4/A5/KDP `PageLayout` presets) → commit 0 (KDP trim-size spike) → branched from `main` at `46c9dd1`.
+**Branch:** `main`, at the `v0.7.0-alpha` tag (merge commit `eb05beb`). No open feature branches.
+**`main` history (most recent first):** `eb05beb` (**merge PR #11** — Sprint 6, Professional Layout Engine) → `4951b59` (Sprint 5 governance-closure docs) → `46c9dd1` (post-merge docs/release commit, Sprint 5) → `3032d70` (merge PR #10 — Sprint 5, Validation Engine) → further back per prior entries.
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
-**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha`, `v0.4.1-alpha` (EPUB export — see `docs/releases/v0.4.1-alpha/ReleaseNotes.md`), `v0.5.0-alpha` (Typography Engine — see `docs/releases/v0.5.0-alpha/ReleaseNotes.md`), `v0.6.0-alpha` (Validation Engine, cut 2026-07-17, PR #10 — see `docs/VERSIONS.md` and `docs/releases/v0.6.0-alpha/ReleaseNotes.md`). **`v0.7.0-alpha` not yet cut** — Sprint 6 (Professional Layout Engine) is implementation-complete but not yet merged.
-**Open branches:** `feature/sprint-6-professional-layout-engine` (local only, not pushed) — Sprint 6 implementation, complete and real-file verified, awaiting PR.
+**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha`, `v0.4.1-alpha` (EPUB export — see `docs/releases/v0.4.1-alpha/ReleaseNotes.md`), `v0.5.0-alpha` (Typography Engine — see `docs/releases/v0.5.0-alpha/ReleaseNotes.md`), `v0.6.0-alpha` (Validation Engine, cut 2026-07-17, PR #10 — see `docs/VERSIONS.md` and `docs/releases/v0.6.0-alpha/ReleaseNotes.md`), **`v0.7.0-alpha`** (Professional Layout Engine, cut 2026-07-17, PR #11 — see `docs/VERSIONS.md` and `docs/releases/v0.7.0-alpha/ReleaseNotes.md`).
+**Open branches:** none — `feature/sprint-6-professional-layout-engine` deleted (local + remote) after PR #11 merged.
