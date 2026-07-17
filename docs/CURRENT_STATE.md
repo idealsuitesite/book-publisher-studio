@@ -185,7 +185,7 @@ npm run test:coverage  # Verify coverage thresholds
 ## Git Status
 
 **Branch:** `main`
-**`main` synced with `origin/main` at:** `820f1ef` (PR #3 merge commit — `feature/sprint-3a-pdf-export` → `main`; PR #2 `c507f5d` and PR #1 `32ac220` merged earlier in the same history)
+**`main` synced with `origin/main` at:** `d593922` (docs commit marking `v0.4.0-alpha` Released, immediately after tagging; contains PR #3's merge commit `820f1ef` — `feature/sprint-3a-pdf-export` → `main` — in its history, same pattern as `v0.3.0-alpha`'s tag. PR #2 `c507f5d` and PR #1 `32ac220` merged earlier in the same history.)
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
 **Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha` (PDF export — see `docs/VERSIONS.md` and `docs/releases/v0.4.0-alpha/ReleaseNotes.md`)
 **Open branches:** none — all merged feature branches deleted locally and remotely after merge
