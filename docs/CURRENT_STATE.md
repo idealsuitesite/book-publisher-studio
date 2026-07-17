@@ -1,15 +1,15 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 (Sprint 4 released as `v0.5.0-alpha`; Sprint 5 Validation Engine Design Review approved — no code yet)
-**Sprint:** Sprint 4 ("Typography Engine") **✅ COMPLETE AND RELEASED** (PR #9, merge commit `27a4347`, tag `v0.5.0-alpha`, 195/195 tests). Sprint 5 ("Validation Engine") **Design Review ✅ APPROVED**, two levels: `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` (global 5-engine map — Validation, Editorial AI, Plugin System, Professional Layout, Publishing — with a "Document Intelligence Engine" sixth candidate proposed and explicitly withdrawn) and `docs/architecture/diagrams/VALIDATION_ENGINE.md` (Sprint 5's full design: `ValidationEngine` orchestrating a `RuleRegistry` of pure `ValidationRule`s, new `ValidationContext`/`ValidationSeverity` types). ADR-0027 (Validation Engine is read-only) written. **No branch created, no code written yet** — implementation starts only once the CTO gives explicit go-ahead, per their own stated framing that this finalization happens before any implementation.
-**Branch:** `main`, at `3894489` (Sprint 5 Design Review docs commit), tag `v0.5.0-alpha`. No open feature branches.
+**Last Updated:** July 17, 2026 (Sprint 5 Validation Engine implementation-complete, all 11 commits done — governance closure done, PR pending)
+**Sprint:** Sprint 4 ("Typography Engine") **✅ COMPLETE AND RELEASED** (PR #9, merge commit `27a4347`, tag `v0.5.0-alpha`, 195/195 tests at release). Sprint 5 ("Validation Engine") **✅ IMPLEMENTATION COMPLETE**, all 11 commits done and CTO-approved one by one: `ValidationEngine` orchestrating a `RuleRegistry` of 8 pure `ValidationRule`s (`StructuralRule`, `MetadataRule`, `HeadingRule`, `MissingRequiredStyleRule`, `TypographyRule`, `ImageRule`, `HyperlinkRule`, `ComplianceRule`), wired into `ImportManuscriptUseCase`. Two-level Design Review (`docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` + `VALIDATION_ENGINE.md`) approved before any code; a "Document Intelligence Engine" sixth candidate was proposed and explicitly withdrawn. ADR-0027 (read-only) and ADR-0028 (rule design principles) written. `docs/releases/v0.6.0-alpha/SPRINT_5_FINAL_REPORT.md` records the full retrospective. 282/282 tests, 91.77% global / 93.06% domain coverage, `npm run verify-real-export` 16/16. **PR not yet opened — pending explicit go-ahead.**
+**Branch:** `feature/sprint-5-validation-engine` at `8c5c695` (commit 11, final implementation commit), pushed to `origin`. Not yet merged.
 
 ---
 
 ## Summary
 
 **Completed (Sprint 4, all 11 commits):** Domain types (`ResolvedTypography`/`TypeRun`), additive `StyledBook.blockTypography`, `TypographyResolver` (inline run resolution, drop caps, English-only smart quotes, forced quote/scripture italics, heading `staysWithNext`), `LayoutEngine` keep-with-next pagination support, real font embedding (Gelasio/Inter/JetBrains Mono, SIL OFL, 12 `.ttf` files in `backend/assets/fonts/`) with a role-based `PdfFontRegistry` API (`resolveBody`/`resolveHeading`/`resolveMonospace`/`resolveDefault`), full `TypeRun` rendering support in `PDFRenderer`/`DOCXRenderer`/`EPUBRenderer`, `BookMetricsCalculator.calculateQualityMetrics(paginated: PaginatedBook): QualityMetrics` activating all 7 `QualityMetrics` fields with real computed values, a completed E2E real-file verification pass (commit 10) that found and fixed 3 real content-fidelity bugs in the import pipeline (ADR-0026), and a final docs/ADR pass (commit 11: ADR-0022/0023/0024, `docs/releases/v0.5.0-alpha/SPRINT_4_FINAL_REPORT.md`). 195 tests passing ✅, 90.49% global / 92.57% domain coverage, 0 ESLint warnings, re-verified before every commit via `npm run build`, `npm run lint`, `npm test`, `npm run verify-server`, and `npm run verify-real-export` (16/16 checks: 4 fixtures × import + export-docx/pdf/epub).
-**Next:** Sprint 4 is merged (PR #9, `27a4347`) and tagged `v0.5.0-alpha`. Sprint 5 scope is **not yet decided** — see `docs/TODO.md`'s backlog notes on two competing priority proposals raised during Sprint 4 (the existing CTO priority order vs. a newer Editorial AI Engine/Professional Layout Engine/Validation Engine/Publishing Engine ordering). Per the CTO's own recommendation, Sprint 5 should get its own dedicated Design Review before implementation starts, matching the discipline used for every prior sprint — do not assume an ordering.
+**Next:** Sprint 4 is merged (PR #9, `27a4347`) and tagged `v0.5.0-alpha`. Sprint 5 (Validation Engine) is now **implementation-complete** on `feature/sprint-5-validation-engine` (11/11 commits, 282/282 tests) — see the dedicated Sprint 5 section below and `docs/releases/v0.6.0-alpha/SPRINT_5_FINAL_REPORT.md`. **PR not yet opened**, pending explicit go-ahead (same gate used for Sprint 4).
 
 **Design-review gap found and resolved during commit 9:** the Design Review (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`) locked exact formulas for `averageHeadingDepth`/`paragraphDensity`/`lineDensity`/`dropCaps` (CTO Final Decision 4) but left the 3 pre-existing ADR-0008 fields (`widowsAndOrphans`/`inconsistentSpacing`/`emptyHeadings`) with no formula — only "activate them, the resolver already computes the underlying data." Flagged and confirmed before implementation rather than guessed silently: `widowsAndOrphans` = count of blocks where `TypographyResolver` resolved `staysWithNext: true` (currently all headings); `emptyHeadings` = `Heading.text.trim() === ''`; `inconsistentSpacing` = count of `Paragraph` blocks whose explicit `spaceBefore`/`spaceAfter`/`lineHeight` diverges from the theme-resolved value — functional definition deliberately kept general ("a block whose explicit style overrides a theme-resolved value") per the CTO's direction, so future style dimensions (alignment, indentation, color, font) can be folded in later without resemanticizing the field; Sprint 4's implementation checks spacing only. Also confirmed: `calculateQualityMetrics` is a new method operating on `PaginatedBook` (needs `blockTypography` + real page count, both unavailable on a bare `Book`), not wired into `ExportManuscriptUseCase` or any route this commit — that wiring is explicitly `ValidatorEngine` scope, not Sprint 4.
 
@@ -111,7 +111,7 @@ All three were fixed by the `bufferPages` redesign above.
 
 **Nothing outstanding from Sprint 3B** — fully merged and verified on `main`.
 
-## Sprint 4: Typography Engine 🟡 IN PROGRESS (commits 1-10 of 11, branch `feature/sprint-4-typography-engine`, not yet pushed as a PR)
+## Sprint 4: Typography Engine ✅ COMPLETE AND RELEASED (PR #9, merge commit `27a4347`, tagged `v0.5.0-alpha`)
 
 **Design Review completed and approved before any implementation code** (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`) — iterated through multiple rounds with the CTO; rejected an initial `TypesetBook`/`LayoutEngine`-signature-change proposal in favor of an additive `StyledBook.blockTypography` field, keeping `LayoutEngine.paginate()`'s signature unchanged. Final pipeline: `ThemeEngine → TypographyResolver → LayoutEngine → Renderer`.
 
@@ -158,33 +158,82 @@ All three were fixed by the `bufferPages` redesign above.
 
 ---
 
+## Sprint 5: Validation Engine ✅ IMPLEMENTATION COMPLETE (branch `feature/sprint-5-validation-engine`, target tag `v0.6.0-alpha`, PR not yet opened)
+
+**Two-level Design Review completed and approved before any implementation code** (`docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` Level 1 + `VALIDATION_ENGINE.md` Level 2) — mapped all 5 remaining engines (Validation, Editorial AI, Plugin System, Professional Layout, Publishing) and their dependencies before designing any one in depth. A sixth candidate, "Document Intelligence Engine," was proposed and explicitly withdrawn (no prior definition anywhere in the project, overlapped Validation/Editorial AI). Two review rounds resolved 4 open questions plus 2 CTO-requested additions (`ValidationContext`, `ValidationSeverity`).
+
+**Domain (new):**
+- ✅ `ValidationContext`/`ValidationSeverity`/`ValidationIssue`/`ValidationReport`/`QualityScore` types (commit 1) — `validate(context: ValidationContext)` replaces the originally-sketched `validate(book, paginated?)` to stabilize the public API against future per-platform rule variants without another signature break
+- ✅ `ValidationRule` contract + `RuleRegistry` (commit 2) — a thin, order-preserving container; the engine only knows the interface, never a concrete rule class
+- ✅ `ValidationEngine` orchestrator (commit 3) — assembles every registered rule's findings into one `ValidationReport`; never mutates its input (ADR-0027)
+- ✅ 8 independent, pure rules, one per commit (3-9): `StructuralRule` (wraps `BookValidator` unchanged), `MetadataRule`, `HeadingRule`, `MissingRequiredStyleRule`, `TypographyRule`, `ImageRule`, `HyperlinkRule`, `ComplianceRule`
+- ✅ `QualityScore` composite scoring (commit 10) — severity-weighted penalty formula (ERROR 25/WARNING 10/INFO 3/SUGGESTION 1), per-category subscores via a `RULE_CATEGORY` string-keyed lookup (no rule imports, stays decoupled), strictly an interpretation layer over `issues` — never a substitute for them
+- ✅ `createValidationEngine()` factory (`domain/services/validation/`) — single source of truth for "which 8 rules exist," used by both `app.ts` and tests
+
+**Application:**
+- ✅ `ImportManuscriptUseCase` (commit 11) — `validator: BookValidator` → `validator: ValidationEngine`; calls `validate({ book })` (no `PaginatedBook`/metrics on the import path, disclosed not guessed — `TypographyRule` is a no-op here as a result, by its own already-documented design)
+- ✅ New DTOs: `ValidationIssueDTO`, `QualityScoreDTO`; `ImportReportDTO` gains `issues`/`score` additively — `warnings`/`errors` unchanged for existing consumers
+
+**Real, disclosed behavior change confirmed against the real running server** (not just `npm test`): importing `backend/verification/typography-test.docx` and `large-book.docx` now returns 4 real `WARNING` issues (missing ISBN/description/cover-image/KDP-readiness — `ASTBuilder` never populates these from DOCX content) and a `score.overall` of 60/100. This is the intended effect of Sprint 5, not a regression — the existing `ImportManuscriptUseCase.test.ts` exact-report-equality test was updated from a stale empty-warnings snapshot to assert the new shape's properties.
+
+**Design-review gaps found and resolved mid-sprint, each generalized into ADR-0028:**
+1. Commit 6: two CTO-named `MissingRequiredStyleRule` variants (TOC-without-H1, FootnoteReference-without-Footnote) aren't implemented — the second needs a `Book` domain-model addition (no `FootnoteReference` inline element exists). Documented in the rule's own comment, not registered as no-op stubs.
+2. Commit 7: `QualityMetrics.widowsAndOrphans` is structurally equal to `headingCount` under Sprint 4's `TypographyResolver` (every `Heading` gets `staysWithNext: true` unconditionally) — a threshold on it would always fire or never fire, no real signal. Not implemented, documented why.
+3. Commit 9: `ComplianceRule` deliberately reads the same fields `MetadataRule`/`StructuralRule` already check — confirmed as intentional (different business questions, same data), not duplicated responsibility.
+
+**ADR-0027 (Validation Engine is read-only, written before commit 1) and ADR-0028 (the three principles above, confirmed as official CTO policy across commits 6/7/9, recorded together after the fact).**
+
+**Verified with real files:** `npm run verify-server` + `npm run verify-real-export` (16/16 checks) on commit 11; real import responses for `typography-test.docx`/`large-book.docx` read directly from the running server, not just asserted via `npm test`.
+
+**Full retrospective:** `docs/releases/v0.6.0-alpha/SPRINT_5_FINAL_REPORT.md` (objectives, ADRs, design-review gaps, final metrics, deferred items, residual risks, lessons learned).
+
+**Commit 12 (governance closure, this pass):**
+- [x] `docs/releases/v0.6.0-alpha/SPRINT_5_FINAL_REPORT.md` written
+- [x] ADR-0028 written
+- [x] Final `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` reconciliation (this update) — including a stale "🟡 IN PROGRESS" Sprint 4 section header found and fixed during this same pass (found via the CTO-requested final coherence check, not before)
+- [x] `VERSIONS.md` renumbered: `v0.6.0-alpha` corrected from a superseded "Premium UI/UX" guess to the actual Validation Engine milestone; every subsequent never-released row shifted down one version accordingly
+- [ ] Open the Sprint 5 PR — pending explicit go-ahead (not yet requested)
+
+---
+
 ## Test Summary
 
-Exact counts, reconciled in commit 11 (previous versions of this table used `~` approximations for new Sprint 4 files — those are gone as of this pass):
+Exact counts (via vitest's own JSON reporter, not hand-counted):
 
-| Component | Tests | Sprint 4 change |
-|-----------|-------|------------------|
-| Book domain model | 10 | unchanged |
-| ASTBuilder | 23 | +1 this sprint (plain-text-inline preservation, commit 10 / ADR-0026) |
-| BookValidator | 6 | unchanged |
-| BookMetricsCalculator | 10 | +4 this sprint (`calculateQualityMetrics`, commit 9) |
-| HtmlNormalizer | 21 | +4 this sprint (strikethrough + whitespace fix, commit 10 / ADR-0026) |
-| MammothParser | 4 | +1 this sprint (ADR-0025 regression) |
-| BookMapper | 6 | unchanged |
-| ImportManuscriptUseCase | 13 | unchanged |
-| Manuscript import route (E2E) | 5 | unchanged |
-| ThemeEngine | 4 | unchanged |
-| getTheme | 2 | unchanged |
-| LayoutEngine | 10 | +2 this sprint (`blockTypography`-bearing fixtures, orphan-risk cases) |
-| DOCXRenderer | 9 | +4 this sprint (`TypeRun` coverage) |
-| ExportManuscriptUseCase | 7 | +1 this sprint (PDF real-fixture font-weight check, commit 10) |
-| Manuscript export route (E2E) | 10 | +4 this sprint (`format=epub` case, +3 real-fixture E2E cases commit 10) |
-| PDFRenderer | 16 | +10 this sprint (`TypeRun` coverage, font embedding, drop caps) |
-| EPUBRenderer | 11 | +4 this sprint (`TypeRun` coverage, drop caps) |
-| TypographyResolver | 17 | new this sprint |
-| PdfFontRegistry | 7 | new this sprint |
-| extractPdfText | 4 | new this sprint (font-aware rewrite, `extractPdfRuns()`) |
-| **Total** | **195** | up from 133 at Sprint 4 start (+62) |
+| Component | Tests | Notes |
+|-----------|-------|-------|
+| Book domain model | 10 | |
+| ASTBuilder | 23 | |
+| BookValidator | 6 | unchanged since Sprint 4 - still directly tested; also now `StructuralRule`'s internal implementation |
+| BookMetricsCalculator | 10 | |
+| HtmlNormalizer | 21 | |
+| MammothParser | 4 | |
+| BookMapper | 6 | |
+| ImportManuscriptUseCase | 13 | Sprint 5: `BookValidator` → `ValidationEngine` wiring, one test's exact-report-equality assertion updated for the new `issues`/`score` fields |
+| Manuscript import route (E2E) | 5 | |
+| ThemeEngine | 4 | |
+| getTheme | 2 | |
+| LayoutEngine | 10 | |
+| DOCXRenderer | 9 | |
+| ExportManuscriptUseCase | 7 | |
+| Manuscript export route (E2E) | 10 | |
+| PDFRenderer | 16 | |
+| EPUBRenderer | 11 | |
+| TypographyResolver | 17 | |
+| PdfFontRegistry | 7 | |
+| extractPdfText | 4 | |
+| **ValidationEngine** | **10** | Sprint 5, new |
+| **RuleRegistry** | **4** | Sprint 5, new |
+| **createValidationEngine** | **3** | Sprint 5, new |
+| **StructuralRule** | **7** | Sprint 5, new |
+| **MetadataRule** | **8** | Sprint 5, new |
+| **HeadingRule** | **8** | Sprint 5, new |
+| **MissingRequiredStyleRule** | **10** | Sprint 5, new |
+| **TypographyRule** | **9** | Sprint 5, new |
+| **ImageRule** | **8** | Sprint 5, new |
+| **HyperlinkRule** | **13** | Sprint 5, new (includes an `it.each` over 2 URL cases) |
+| **ComplianceRule** | **7** | Sprint 5, new |
+| **Total** | **282** | up from 195 at Sprint 5 start (+87) |
 
 ---
 
@@ -196,13 +245,14 @@ Exact counts, reconciled in commit 11 (previous versions of this table used `~` 
 | Application depends only on interfaces (ports live in Domain) | ✅ |
 | No Domain objects in DTOs | ✅ |
 | Dependency Inversion enforced (constructor injection throughout) | ✅ |
-| All tests passing | ✅ (195/195) |
+| All tests passing | ✅ (282/282) |
 | No circular dependencies | ✅ |
 | TypeScript strict mode | ✅ |
 | Controller contains no business logic | ✅ |
-| Domain coverage >90% | ✅ 92.57% statements (`domain/services`, `npm run test:coverage`, final Sprint 4 run) |
-| Global coverage >80% | ✅ 90.49% statements (`npm run test:coverage`, final Sprint 4 run) |
+| Domain coverage >90% | ✅ 93.06% statements (`domain/services`, `npm run test:coverage`, final Sprint 5 run) |
+| Global coverage >80% | ✅ 91.77% statements (`npm run test:coverage`, final Sprint 5 run) |
 | Renderer is a port; ThemeEngine/LayoutEngine are concrete classes | ✅ (Design Review decision, ADR-0012 addendum) |
+| ValidationEngine is a concrete class; ValidationRule is the swappable unit (RuleRegistry holds instances, not classes) | ✅ (Sprint 5 Design Review decision, ADR-0027/0028) |
 | Zero ESLint warnings | ✅ (0 errors, 0 warnings — held since Quality Sprint, PR #2) |
 
 ---
@@ -215,12 +265,16 @@ Exact counts, reconciled in commit 11 (previous versions of this table used `~` 
 - PDFKit has no native primitive for superscript/subscript/small-caps — `PDFRenderer` documents these as unrendered `TypeRun` flags (DOCX and EPUB both render them correctly; this is a PDFKit-specific gap, not a pipeline gap).
 - No RTL / multi-script text support yet (ADR-0019, confirmed out of scope for Sprint 4 by explicit Design Review decision): verified no single embedded font covers every script (Arabic renders as blank boxes with the font tested), and PDFKit does no bidi reordering or Arabic contextual glyph shaping. Real, separate work — flagged, not scheduled.
 - `epub-gen-memory` (ADR-0020) is a smaller-community fork (58 GitHub stars) of a more popular but unmaintained parent (`epub-gen`, 458 stars) — worth watching at upgrade time, not a reason to avoid it now.
+- **`TypographyRule` is currently a no-op on every real import** (Sprint 5) — `ValidationContext.metrics` is never populated on the import path (no `PaginatedBook` exists there), so its 3 real checks (empty headings, inconsistent spacing, drop-cap ratio) never fire in production today, only in its own unit tests. Disclosed consequence of Sprint 5's "import path only" wiring scope, not a defect.
+- **`MetadataRule`/`ComplianceRule` flag nearly every real DOCX import** (Sprint 5) — `ASTBuilder.buildMetadata()` never sets `isbn`/`description`/`coverImage` from DOCX content, confirmed by reading the code. Accurate, not a false positive, but a UI consuming `ImportReportDTO` should expect this, not be surprised by it.
 
 ---
 
 ## Technical Debt
 
-- `QualityMetrics` is now computable via `BookMetricsCalculator.calculateQualityMetrics(paginated)` (Sprint 4 commit 9) but isn't surfaced through any HTTP route/DTO yet — deliberately out of commit 9's scope; wiring it into a response is `ValidatorEngine` work (Sprint 4+ priority #2).
+- `QualityMetrics` is computable via `BookMetricsCalculator.calculateQualityMetrics(paginated)` (Sprint 4 commit 9) and `ImportReportDTO` now has real `issues`/`score` fields ready to carry metrics-derived findings (Sprint 5) — but `ValidationContext.metrics` is never actually populated on the import path, so `TypographyRule` is currently a no-op in every real report (see Known Issues above). Wiring `ValidationEngine` into `ExportManuscriptUseCase` (where a `PaginatedBook` exists) would close this — not scoped for any sprint yet.
+- **`ValidationEngine`'s `RULE_CATEGORY` lookup (`ValidationEngine.ts`) is a string-keyed map with no compile-time link to actual rule names** — a future rule added without a matching entry silently contributes to `QualityScore.overall` but no category subscore. Disclosed in the code's own comment (Sprint 5 commit 10).
+- **`ValidationContext`'s 5 reserved fields** (`configuration`, `locale`, `theme`, `rendererCapabilities`, `validationProfile`) **carry zero real usage** as of Sprint 5 — a deliberate, disclosed tradeoff to stabilize the public API now (CTO's explicit request, commit 1) rather than break it later; worth revisiting if none of them end up used by Sprint 6/7.
 - `DOCXRenderer`'s footnote rendering is simplified (inline `[n] content` paragraph, not real Word footnotes) and ordered lists use a manual prefix instead of `docx`'s numbering config — both documented, deliberate simplifications, not silent gaps.
 - `PDFRenderer`'s table rendering does not split a table across a forced page break (matches `LayoutEngine`'s own treatment of a table as one non-splitting unit, ADR-0013 — not an inconsistency, but a real large-table edge case that could visually overflow a page if it ever occurs).
 - Hyphenation and non-English smart quotes are deliberately deferred to v2 (ADR-0024, written commit 11).
@@ -233,15 +287,17 @@ Exact counts, reconciled in commit 11 (previous versions of this table used `~` 
 
 **To resume work:** say "Read docs/SESSION_BOOTSTRAP.md and follow it" — it fixes the reading order (`START_HERE.md` → `CURRENT_STATE.md` → `TODO.md` → `DECISIONS.md` → `VERSIONS.md`) and requires a summary + explicit approval before any code is written.
 
-**Sprint 4 is complete, merged, and tagged.** PR #9 merged (`27a4347`), `v0.5.0-alpha` tagged and pushed, `feature/sprint-4-typography-engine` deleted (local + remote). Work happens on `main` now — there is no active feature branch.
+**Sprint 4 is complete, merged, and tagged.** PR #9 merged (`27a4347`), `v0.5.0-alpha` tagged and pushed, `feature/sprint-4-typography-engine` deleted (local + remote).
 
-**Before starting Sprint 5:** per the CTO's stated recommendation (2026-07-17, not yet a formal decision), freeze new feature work briefly and treat Sprint 5 as its own from-scratch project with a dedicated Design Review — do not start Sprint 5 implementation without one, matching the discipline already used for Sprints 2/3A/3B/4. Sprint 5's actual priority order is explicitly **not yet decided** (see `docs/TODO.md`'s backlog notes on the competing proposals raised 2026-07-17: the existing recorded "CTO priority order" vs. a newer proposed Editorial AI Engine/Professional Layout Engine/Validation Engine/Publishing Engine ordering) — resolve that as part of the Design Review, not by assumption. When Sprint 5 actually starts, branch from `main` per ADR-0017 (no direct-to-`main` implementation work — the docs/release commits made directly to `main` after Sprint 4's merge are the established exception for pure documentation, not a precedent for code).
+**Sprint 5 (Validation Engine) is implementation-complete but not yet merged.** All 11 commits done and CTO-approved on `feature/sprint-5-validation-engine`, pushed to `origin`. Governance closure (this pass) done: `docs/releases/v0.6.0-alpha/SPRINT_5_FINAL_REPORT.md`, ADR-0028, `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` reconciled. **Next action: open the Sprint 5 PR** (`feature/sprint-5-validation-engine` → `main`) — this needs explicit user go-ahead in-session (PR creation is a shared-state action), not something to do automatically on session resume. If a new session starts before that PR is opened, check `git log origin/main..feature/sprint-5-validation-engine` first to see whether it happened in the meantime.
 
-**Quick Start:**
+**After the PR merges:** tag `v0.6.0-alpha`, write `docs/releases/v0.6.0-alpha/ReleaseNotes.md`, flip `VERSIONS.md`'s row to Released, delete the feature branch — same close-out sequence used for Sprint 4. Then Sprint 6's scope is **not yet decided** — Editorial AI Engine, Plugin System, Professional Layout Engine, and Publishing Engine are all mapped at Level 1 (`docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md`) with real dependencies fixed (Editorial AI Engine depends on Validation Engine's output) but no relative ordering or Sprint assignment decided — resolve that with a dedicated Design Review per engine, one at a time, not by assumption.
+
+**Quick Start (on the Sprint 5 branch, until merged):**
 ```bash
 cd "D:\Book Publisher Studio\backend"
-git checkout main && git pull
-npm test               # Verify all 195 tests pass
+git checkout feature/sprint-5-validation-engine && git pull
+npm test               # Verify all 282 tests pass
 npm run build          # Verify TypeScript compilation
 npm run lint            # Verify 0 ESLint errors
 npm run test:coverage   # Verify coverage thresholds
@@ -274,8 +330,8 @@ npm run verify-real-export   # Verify real import + export-docx/pdf/epub against
 
 ## Git Status
 
-**Branch:** `main`, at `01c5c39` ("docs(release): post-merge state update for PR #9") — the only branch, no open feature branches. `feature/sprint-4-typography-engine` deleted (local + remote) after PR #9 merged.
-**`main` history (most recent first):** `01c5c39` (release docs + `VERSIONS.md` flip) → `27a4347` (**merge PR #9** — Sprint 4, Typography Engine, squash of `ea6df67`...`15a1b7b`, 11 commits + 3 docs touch-ups) → `4f488ad` (PR #8 merge — `fix/pdf-table-without-header`; also has PR #7 `39b173f`, PR #6 `33b9b0f`, PR #5 `5eb71c4`, governance commit `e512ee7`, PR #4 `a7a38a0`, PR #3 `820f1ef`, PR #2 `c507f5d`, PR #1 `32ac220` further back).
+**`main`:** at `599e297` ("docs(sprint-5): add Sprint 5 Kickoff charter") — all Sprint 5 Design Review/Kickoff docs live on `main` (committed directly, matching the docs-only exception to ADR-0017 already used for Sprint 4's post-merge release docs). No code on `main` beyond what PR #9 merged.
+**`feature/sprint-5-validation-engine`:** at `8c5c695` (commit 11, final implementation commit), branched from `main` at `599e297`, pushed to `origin`. **Not yet merged** — this is the active work branch. 11 implementation commits (oldest first): `0280ae0` → `6c4d2df` (docs touch-up) → `fe41025` → `0b6bd2f` → `4eba321` → `132ad93` → `e183cf8` → `8a41f4c` → `c8182c6` → `1f3ea5c` → `f9115cd` → `8c5c695`.
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
-**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha`, `v0.4.1-alpha` (EPUB export — see `docs/releases/v0.4.1-alpha/ReleaseNotes.md`), **`v0.5.0-alpha`** (Typography Engine, cut 2026-07-17, PR #9 — see `docs/VERSIONS.md` and `docs/releases/v0.5.0-alpha/ReleaseNotes.md`)
-**Open branches:** none — the 3 stale merged branches found still on `origin` (see prior note) were deleted locally and remotely 2026-07-17.
+**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha`, `v0.4.1-alpha` (EPUB export — see `docs/releases/v0.4.1-alpha/ReleaseNotes.md`), `v0.5.0-alpha` (Typography Engine, PR #9 — see `docs/VERSIONS.md` and `docs/releases/v0.5.0-alpha/ReleaseNotes.md`). **`v0.6.0-alpha` (Validation Engine) not yet cut** — tags only after merge, per this file's own established rule.
+**Open branches:** `feature/sprint-5-validation-engine` (active, pending PR).
