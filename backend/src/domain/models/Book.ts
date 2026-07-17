@@ -482,6 +482,50 @@ export interface QualityMetrics {
 }
 
 // ============================================================================
+// VALIDATION ENGINE (Sprint 5, additive)
+//
+// See docs/architecture/diagrams/VALIDATION_ENGINE.md for the full design and
+// ADR-0027 for the read-only constraint every ValidationRule must honor.
+// ============================================================================
+
+/**
+ * Four levels, not the binary ValidationError/ValidationWarning split above -
+ * ValidationReport.errors/.warnings (below) are derived views over
+ * ValidationIssue[] for backward compatibility with existing ValidationResult
+ * consumers, not a second independent source of truth.
+ */
+export type ValidationSeverity = 'ERROR' | 'WARNING' | 'INFO' | 'SUGGESTION';
+
+export interface ValidationIssue {
+  code: string;
+  message: string;
+  location: string;
+  severity: ValidationSeverity;
+  suggestion?: string;
+}
+
+export interface QualityScore {
+  overall: number; // 0-100
+  categories: {
+    structure: number;
+    metadata: number;
+    typography: number;
+    accessibility: number;
+  };
+}
+
+/**
+ * ValidationEngine.validate()'s return type. Extends ValidationResult so every
+ * existing ValidationResult consumer (ImportManuscriptUseCase) keeps working
+ * unchanged - errors/warnings are computed from `issues` by severity filter,
+ * not populated independently (see ValidationEngine.ts).
+ */
+export interface ValidationReport extends ValidationResult {
+  issues: ValidationIssue[];
+  score: QualityScore;
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
