@@ -1,4 +1,5 @@
 import type { Book } from './Book';
+import type { ResolvedTypography } from './ResolvedTypography';
 
 export interface Theme {
   name: string;
@@ -39,4 +40,7 @@ export interface StyledBook {
   book: Book;
   theme: Theme;
   blockStyles: Record<string, ResolvedBlockStyle>;
+  // Populated by TypographyResolver (Sprint 4) - additive, optional so existing
+  // StyledBook producers/consumers stay unaffected until they opt in.
+  blockTypography?: Record<string, ResolvedTypography>;
 }
