@@ -1,8 +1,8 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 (Sprint 4 merged and tagged `v0.5.0-alpha` — sprint fully closed)
-**Sprint:** Sprint 4 ("Typography Engine") **✅ COMPLETE AND RELEASED**. Design Review approved (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`, 11-commit plan), fully executed (all 11 commits), merged via PR #9 (merge commit `27a4347`), re-verified on `main` (195/195 tests), and tagged `v0.5.0-alpha`. ADR-0022/0023/0024/0025/0026 written; `docs/releases/v0.5.0-alpha/ReleaseNotes.md` and `SPRINT_4_FINAL_REPORT.md` record the release and full sprint retrospective. `feature/sprint-4-typography-engine` deleted (local + remote) after merge. **Next: Sprint 5 scope is not yet decided** — see `docs/TODO.md`'s backlog notes on the two competing priority proposals; needs its own Design Review before any implementation starts.
-**Branch:** `main`, at `01c5c39` (post-merge docs/release commit), tag `v0.5.0-alpha`. No open feature branches.
+**Last Updated:** July 17, 2026 (Sprint 4 released as `v0.5.0-alpha`; Sprint 5 Validation Engine Design Review approved — no code yet)
+**Sprint:** Sprint 4 ("Typography Engine") **✅ COMPLETE AND RELEASED** (PR #9, merge commit `27a4347`, tag `v0.5.0-alpha`, 195/195 tests). Sprint 5 ("Validation Engine") **Design Review ✅ APPROVED**, two levels: `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` (global 5-engine map — Validation, Editorial AI, Plugin System, Professional Layout, Publishing — with a "Document Intelligence Engine" sixth candidate proposed and explicitly withdrawn) and `docs/architecture/diagrams/VALIDATION_ENGINE.md` (Sprint 5's full design: `ValidationEngine` orchestrating a `RuleRegistry` of pure `ValidationRule`s, new `ValidationContext`/`ValidationSeverity` types). ADR-0027 (Validation Engine is read-only) written. **No branch created, no code written yet** — implementation starts only once the CTO gives explicit go-ahead, per their own stated framing that this finalization happens before any implementation.
+**Branch:** `main`, at `3894489` (Sprint 5 Design Review docs commit), tag `v0.5.0-alpha`. No open feature branches.
 
 ---
 
