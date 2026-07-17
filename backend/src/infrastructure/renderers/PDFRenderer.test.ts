@@ -5,7 +5,7 @@ import { LayoutEngine } from '../../domain/services/LayoutEngine';
 import { TypographyResolver } from '../../domain/services/TypographyResolver';
 import { ClassicTheme } from '../../domain/themes/ClassicTheme';
 import { createBook } from '../../domain/models/Book';
-import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement } from '../../domain/models/Book';
+import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement, TableOfContents } from '../../domain/models/Book';
 import type { PageLayout } from '../../domain/models/PageLayout';
 import type { Theme } from '../../domain/models/Theme';
 import { extractPdfText, extractPdfRuns, countPdfPages } from '../../test-utils/extractPdfText';
@@ -50,6 +50,12 @@ function paginate(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT, theme
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
   const styled = new ThemeEngine().applyTheme(book, theme);
   return new LayoutEngine().paginate(styled, layout);
+}
+
+function paginateWithToc(chapters: Chapter[], toc: TableOfContents) {
+  const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
+  const styled = new ThemeEngine().applyTheme({ ...book, frontMatter: { toc } }, ClassicTheme);
+  return new LayoutEngine().paginate(styled, LETTER_LAYOUT);
 }
 
 // Chains TypographyResolver after ThemeEngine, so blockTypography (inline runs, drop
@@ -384,6 +390,43 @@ describe('PDFRenderer', () => {
 
       expect(text).toContain('LOWERCASE TITLE');
       expect(text).not.toContain('lowercase title');
+    });
+  });
+
+  // Sprint 6 (Functional Spec item 7, Architecture Impact §4): PDFRenderer consumes
+  // paginated.tableOfContents.
+  describe('table of contents (PaginatedBook.tableOfContents)', () => {
+    it('renders a real TOC page with entry titles and resolved page numbers, as its own front-matter page before body content', async () => {
+      const paginated = paginateWithToc(
+        [
+          chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1 }),
+          chapter([heading(1, 'h-2', 'Chapter Two'), paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2 }),
+        ],
+        { generateAutomatically: true, entries: [] }
+      );
+      expect(paginated.tableOfContents).toEqual([
+        { level: 1, title: 'Chapter One', pageNumber: 1, headingId: 'h-1' },
+        { level: 1, title: 'Chapter Two', pageNumber: 2, headingId: 'h-2' },
+      ]);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).toContain('Table of Contents');
+      expect(text).toContain('Chapter One');
+      expect(text).toContain('Chapter Two');
+      // 3 physical pages: the TOC page + 2 body content pages (one per chapter).
+      expect(countPdfPages(buffer)).toBe(3);
+    });
+
+    it('renders no TOC page when tableOfContents is absent (generateAutomatically not set)', async () => {
+      const paginated = paginate([chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1')])]);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).not.toContain('Table of Contents');
+      expect(countPdfPages(buffer)).toBe(1);
     });
   });
 });

@@ -21,7 +21,7 @@ import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
 import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
-import type { Content, Block, Chapter, Section } from '../../domain/models/Book';
+import type { Content, Block, Chapter, Section, TOCEntry } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 
@@ -177,6 +177,32 @@ function buildHeaderFooter(book: PaginatedBook): { headers?: ISectionOptions['he
   return { headers, footers };
 }
 
+// Functional Spec item 7 / Architecture Impact §4: DOCXRenderer becomes a consumer of
+// paginated.tableOfContents, mirroring PDFRenderer's Sprint 6 wiring. Rendered as literal
+// paragraphs from our own precomputed entries (title indented by level, page number appended
+// inline) rather than docx's native TableOfContents field - a real Word TOC field requires
+// Word to "update fields" before showing real text, which would make this unverifiable by real
+// text extraction (this project's Real Export Policy, docs/CLAUDE.md) the same way every other
+// renderer output already is; consistency with PDFRenderer's own literal-paragraph approach was
+// also preferred over introducing a second rendering strategy for the same data.
+function buildTableOfContentsParagraphs(entries: TOCEntry[], theme: Theme): Paragraph[] {
+  const paragraphs: Paragraph[] = [
+    new Paragraph({ heading: HeadingLevel.HEADING_1, text: 'Table of Contents' }),
+  ];
+  for (const entry of entries) {
+    paragraphs.push(
+      new Paragraph({
+        indent: { left: (entry.level - 1) * 360 }, // 360 twips = 0.25in per level
+        children: [
+          new TextRun({ text: entry.title, font: theme.fonts.body }),
+          ...(entry.pageNumber !== undefined ? [new TextRun({ text: `\t${entry.pageNumber}`, font: theme.fonts.body })] : []),
+        ],
+      })
+    );
+  }
+  return paragraphs;
+}
+
 export class DOCXRenderer implements Renderer<Buffer> {
   async render(book: PaginatedBook, _context: RenderContext): Promise<Buffer> {
     const pageStarts = new Map<string, Page>();
@@ -185,14 +211,16 @@ export class DOCXRenderer implements Renderer<Buffer> {
       if (firstId) pageStarts.set(firstId, page);
     }
 
-    const children: (Paragraph | Table)[] = [];
+    const tocEntries = book.tableOfContents ?? [];
+    const children: (Paragraph | Table)[] = tocEntries.length > 0 ? buildTableOfContentsParagraphs(tocEntries, book.styledBook.theme) : [];
     this.renderContent(
       book.styledBook.book.mainContent,
       book.styledBook.blockStyles,
       book.styledBook.blockTypography,
       pageStarts,
       true,
-      children
+      children,
+      tocEntries.length > 0
     );
 
     // docx measures page geometry in twips (1pt = 20 twips) - PageLayout is in points
@@ -234,8 +262,10 @@ export class DOCXRenderer implements Renderer<Buffer> {
     blockTypography: Record<string, ResolvedTypography> | undefined,
     pageStarts: Map<string, Page>,
     isTopLevel: boolean,
-    out: (Paragraph | Table)[]
+    out: (Paragraph | Table)[],
+    forceBreakOnFirst = false
   ): void {
+    let isFirstContent = true;
     for (const content of contents) {
       const firstBlockId = content.content[0]?.id;
       const ownerPage = isTopLevel && content.type === 'chapter' && firstBlockId !== undefined ? pageStarts.get(firstBlockId) : undefined;
@@ -248,7 +278,12 @@ export class DOCXRenderer implements Renderer<Buffer> {
         out.push(new Paragraph({ pageBreakBefore: true, children: [] }));
       }
 
-      out.push(this.renderTitle(content, ownerPage !== undefined));
+      // A generated TOC (commit 10) was prepended to `out` before this call - the very first
+      // top-level content needs its own forced break to separate it from the TOC, even though
+      // it's normally the one case that never breaks (it's the document's own first content).
+      const breaksPage = ownerPage !== undefined || (isTopLevel && isFirstContent && forceBreakOnFirst);
+      out.push(this.renderTitle(content, breaksPage));
+      isFirstContent = false;
 
       for (const block of content.content) {
         out.push(...this.renderBlock(block, blockStyles[block.id], blockTypography, pageStarts));

@@ -1,5 +1,6 @@
 import type { StyledBook } from './Theme';
 import type { PageLayout } from './PageLayout';
+import type { TOCEntry } from './Book';
 
 export interface Page {
   number: number;
@@ -32,4 +33,13 @@ export interface PaginatedBook {
   // found while wiring RunningHead/header-footer support, fixed as a direct prerequisite (same
   // precedent as ADR-0023/ADR-0026: found and fixed, not filed separately).
   pageLayout: PageLayout;
+  // Sprint 6 (Functional Spec item 7): automatically generated from Heading blocks, only when
+  // Book.frontMatter.toc?.generateAutomatically is true - undefined otherwise. Book itself is
+  // never mutated (ADR-0001), so a manually-authored frontMatter.toc.entries is never touched or
+  // overwritten by this - the two live in entirely separate places. A flat, level-annotated list
+  // in document order, not a nested tree: TOCEntry.children is always left undefined here -
+  // nesting rules (which headings are "children" of which) aren't specified anywhere in the
+  // design and would need their own decision; deferred rather than guessed (same restraint as
+  // ADR-0029 Risk 5).
+  tableOfContents?: TOCEntry[];
 }

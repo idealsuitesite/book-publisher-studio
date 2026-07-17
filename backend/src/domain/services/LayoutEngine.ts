@@ -1,7 +1,7 @@
 import type { StyledBook } from '../models/Theme';
 import type { PageLayout } from '../models/PageLayout';
 import type { Page, PaginatedBook } from '../models/PaginatedBook';
-import type { Content, Block } from '../models/Book';
+import type { Content, Block, TOCEntry } from '../models/Book';
 import { countWords } from '../../shared/utils/textMetrics';
 
 const WORDS_PER_LINE = 12;
@@ -139,7 +139,48 @@ export class LayoutEngine {
     walkContent(styled.book.mainContent, true);
     flushPage();
 
-    return { styledBook: styled, pages, pageLayout: layout };
+    return { styledBook: styled, pages, pageLayout: layout, tableOfContents: this.buildTableOfContents(styled, pages) };
+  }
+
+  // Functional Spec item 7: walks every Heading block in document order, post-pagination (so
+  // each entry's pageNumber can be resolved), only when Book.frontMatter.toc.generateAutomatically
+  // is true - Book is never mutated (ADR-0001), so this never touches a manually-authored
+  // frontMatter.toc.entries at all; the two are entirely separate fields. A flat, level-annotated
+  // list, not a nested tree - see PaginatedBook.tableOfContents's doc comment for why nesting is
+  // deliberately out of scope rather than guessed.
+  private buildTableOfContents(styled: StyledBook, pages: Page[]): TOCEntry[] | undefined {
+    const toc = styled.book.frontMatter.toc;
+    if (!toc?.generateAutomatically) return undefined;
+
+    const pageNumberByBlockId = new Map<string, number>();
+    for (const page of pages) {
+      for (const blockId of page.blocks) {
+        if (!pageNumberByBlockId.has(blockId)) pageNumberByBlockId.set(blockId, page.number);
+      }
+    }
+
+    const entries: TOCEntry[] = [];
+    const walk = (contents: Content[]): void => {
+      for (const content of contents) {
+        for (const block of content.content) {
+          if (block.type === 'heading' && (toc.maxDepth === undefined || block.level <= toc.maxDepth)) {
+            entries.push({
+              level: block.level,
+              title: block.text,
+              pageNumber: pageNumberByBlockId.get(block.id),
+              headingId: block.id,
+            });
+          }
+        }
+        if (content.type === 'chapter' && content.sections) {
+          walk(content.sections as unknown as Content[]);
+        } else if (content.type === 'section' && content.subsections) {
+          walk(content.subsections as unknown as Content[]);
+        }
+      }
+    };
+    walk(styled.book.mainContent);
+    return entries;
   }
 
   private estimateBlockHeight(block: Block, styled: StyledBook): number {

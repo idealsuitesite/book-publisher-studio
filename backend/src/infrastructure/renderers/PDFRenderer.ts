@@ -3,7 +3,7 @@ import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
 import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
-import type { Content, Block, Chapter, Section } from '../../domain/models/Book';
+import type { Content, Block, Chapter, Section, TOCEntry } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
@@ -72,7 +72,21 @@ export class PDFRenderer implements Renderer<Buffer> {
       // below (not assumed 1:1 with book.pages - both pagination-estimate drift, ADR-0013, and
       // this commit's own blank pages, which own no domain Page at all, break that assumption).
       // drawHeadersAndFooters() reads this instead of indexing into book.pages directly.
-      const pageOwners: PageOwner[] = [book.pages[0]];
+      //
+      // Sprint 6 commit 10: a generated TOC (book.tableOfContents) renders as its own
+      // unnumbered front-matter page(s) before body content, matching real print convention
+      // (front matter is typically unnumbered or uses a separate roman-numeral sequence, out of
+      // scope here) - it deliberately does NOT participate in the body's own page-number
+      // sequence, which LayoutEngine already computed without reserving room for a TOC page (a
+      // real, disclosed simplification: a very long TOC that overflows onto extra physical
+      // pages falls into the same pagination-estimate-drift bucket as any other overflow).
+      const pageOwners: PageOwner[] = [];
+      if (book.tableOfContents && book.tableOfContents.length > 0) {
+        this.renderTableOfContents(doc, book.tableOfContents, book.styledBook.theme);
+        pageOwners.push('blank');
+        doc.addPage();
+      }
+      pageOwners.push(book.pages[0]);
 
       this.renderContent(
         doc,
@@ -212,6 +226,22 @@ export class PDFRenderer implements Renderer<Buffer> {
       } else if (content.type === 'section' && content.subsections) {
         this.renderContent(doc, content.subsections, theme, blockStyles, blockTypography, pageStarts, pageOwners, false);
       }
+    }
+  }
+
+  // Functional Spec item 7 / Architecture Impact §4: PDFRenderer becomes a consumer of
+  // paginated.tableOfContents, the same way it already consumes resolved header/footer data.
+  // Each entry indents by its heading level and shows "Title    N" - no dotted-leader styling
+  // (a cosmetic detail the design doesn't specify), title left, page number appended inline.
+  private renderTableOfContents(doc: PDFKit.PDFDocument, entries: TOCEntry[], theme: Theme): void {
+    doc.font(this.fonts.resolveHeading(1, theme, true, false)).fontSize(24).fillColor('#000').text('Table of Contents');
+    doc.moveDown();
+
+    for (const entry of entries) {
+      const indent = (entry.level - 1) * 18;
+      const pageLabel = entry.pageNumber !== undefined ? `    ${entry.pageNumber}` : '';
+      doc.font(this.fonts.resolveBody(theme, false, false)).fontSize(11).fillColor('#000');
+      doc.text(`${entry.title}${pageLabel}`, doc.page.margins.left + indent, doc.y);
     }
   }
 

@@ -6,7 +6,7 @@ import { LayoutEngine } from '../../domain/services/LayoutEngine';
 import { TypographyResolver } from '../../domain/services/TypographyResolver';
 import { ClassicTheme } from '../../domain/themes/ClassicTheme';
 import { createBook } from '../../domain/models/Book';
-import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement } from '../../domain/models/Book';
+import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement, TableOfContents } from '../../domain/models/Book';
 import type { PageLayout } from '../../domain/models/PageLayout';
 import type { Theme } from '../../domain/models/Theme';
 
@@ -56,6 +56,12 @@ function paginate(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT, theme
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
   const styled = new ThemeEngine().applyTheme(book, theme);
   return new LayoutEngine().paginate(styled, layout);
+}
+
+function paginateWithToc(chapters: Chapter[], toc: TableOfContents) {
+  const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
+  const styled = new ThemeEngine().applyTheme({ ...book, frontMatter: { toc } }, ClassicTheme);
+  return new LayoutEngine().paginate(styled, LETTER_LAYOUT);
 }
 
 // Chains TypographyResolver after ThemeEngine, so blockTypography (inline runs, drop
@@ -291,5 +297,40 @@ describe('DOCXRenderer', () => {
     expect(xml).toContain('O');
     expect(xml).toContain('nce upon a time.');
     expect((xml.match(/Once upon a time\./g) ?? []).length).toBe(0); // never appears whole in one run
+  });
+
+  // Sprint 6 (Functional Spec item 7, Architecture Impact §4): DOCXRenderer consumes
+  // paginated.tableOfContents.
+  describe('table of contents (PaginatedBook.tableOfContents)', () => {
+    it('renders a real TOC with entry titles and resolved page numbers before body content, on its own page', async () => {
+      const paginated = paginateWithToc(
+        [
+          chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1 }),
+          chapter([heading(1, 'h-2', 'Chapter Two'), paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2 }),
+        ],
+        { generateAutomatically: true, entries: [] }
+      );
+
+      const buffer = await renderer.render(paginated, {});
+      const xml = await extractDocumentXml(buffer);
+
+      expect(xml).toContain('Table of Contents');
+      expect(xml).toContain('Chapter One');
+      expect(xml).toContain('Chapter Two');
+      // The TOC's own heading + chapter 1's title both carry a page break: one separating
+      // the TOC page from body content, one starting chapter 2 (chapter 1 is the document's
+      // own first real page after the TOC, so it needs the forced break; chapter 2 gets its
+      // normal chapter-start break).
+      expect((xml.match(/<w:pageBreakBefore\/>/g) ?? []).length).toBe(2);
+    });
+
+    it('renders no TOC when tableOfContents is absent (generateAutomatically not set)', async () => {
+      const paginated = paginate([chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1')])]);
+
+      const buffer = await renderer.render(paginated, {});
+      const xml = await extractDocumentXml(buffer);
+
+      expect(xml).not.toContain('Table of Contents');
+    });
   });
 });
