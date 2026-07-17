@@ -628,3 +628,23 @@ So this is one precisely-located gap: `MammothParser.ts`'s `mammoth.convertToHtm
 - Reinforces the "Import Fidelity" backlog item (`docs/TODO.md`) as still real and still needed for the remaining named gaps (highlight, track changes, comments, text boxes, SmartArt, floating images, nested tables, DrawingML) — this ADR closes 3 specific findings, not the whole category
 
 **Related:** ADR-0025 (the precedent this deviates from, and why), ADR-0019/ADR-0020 (real-file verification discipline), `docs/REAL_EXPORT_CHECKLIST.md`, Sprint 4 commit 10
+
+---
+
+## ADR-0027: Validation Engine Is Read-Only
+
+**Status:** APPROVED
+**Date:** 2026-07-17
+**Decision:** No component of the Validation Engine (`ValidationEngine`, `RuleRegistry`, or any individual `ValidationRule`) may ever mutate the `Book` AST it's given, directly or indirectly. Every rule is a pure function: `evaluate(context: ValidationContext): ValidationIssue[]`, reading from `ValidationContext` and returning findings, never touching the `Book`/`PaginatedBook` objects inside it. This is a hard architectural boundary, not a coding-style preference.
+
+**Rationale:**
+- **Separates diagnosis from correction, cleanly, by construction.** Validation Engine's whole purpose (`docs/architecture/diagrams/VALIDATION_ENGINE.md`, `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md`) is to say *what* is wrong with a manuscript. *Fixing* what's wrong is explicitly Editorial AI Engine's job (content-level suggestions, accept/reject by the author) or Professional Layout Engine's job (composition/layout decisions) — never Validation Engine's. Making this a type-level/architectural guarantee, not just a documented intention, prevents the boundary eroding one "helpful" auto-fix at a time across future sprints (the same kind of drift ADR-0026 found had already happened once, silently, in `ASTBuilder.convertInlines()`'s data-dropping bug).
+- **Matches this project's existing purity precedent.** `TypographyResolver.resolve()`, `ThemeEngine.applyTheme()`, and `LayoutEngine.paginate()` are all already immutable, input-in/new-object-out Domain services (ADR-0001's "immutable updates only" rule) — Validation Engine doesn't even need to return a new `Book`, since it never had a reason to touch one in the first place. This ADR is a stricter version of an already-established pattern, not a new one.
+- **Makes Editorial AI Engine's eventual design safer.** Once Editorial AI Engine (Sprint 6/7) exists and legitimately does need to propose content changes, the fact that everything upstream of it (Validation Engine) is provably read-only means any `Book` mutation found anywhere in the pipeline can be immediately attributed to Editorial AI Engine or Professional Layout Engine — never "was it Validation Engine?"
+
+**Consequences:**
+- Every `ValidationRule` implementation is testable by construction: a test can assert the input `Book`/`ValidationContext` is unchanged (deep-equality before/after `evaluate()`) as a standard part of that rule's test suite, not just its stated findings — `docs/architecture/diagrams/VALIDATION_ENGINE.md` §9 makes this an explicit Acceptance Criterion, not merely a code-review expectation.
+- `ValidationEngine.validate()`'s return type (`ValidationReport`) contains only diagnostics (`issues`, `errors`, `warnings`, `score`) — it never returns a `Book`, unlike `ThemeEngine.applyTheme()`/`TypographyResolver.resolve()`/`LayoutEngine.paginate()`, which all return a new, richer version of what they were given. This is a deliberate, visible asymmetry with those three services, not an inconsistency — they *transform* the book toward its rendered form; Validation Engine only *observes* it.
+- If a future sprint finds a genuine need for Validation Engine to suggest a fix (not just flag a problem), that capability belongs in Editorial AI Engine consuming Validation Engine's diagnostics (already the fixed dependency direction, `PLATFORM_ARCHITECTURE_ROADMAP.md` §3) — not a carve-out in this ADR.
+
+**Related:** `docs/architecture/diagrams/VALIDATION_ENGINE.md` (Sprint 5 Design Review this ADR constrains), `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` (Level 1 — Validation Engine → Editorial AI Engine dependency), ADR-0001 (immutable updates only), ADR-0022 (`TypographyResolver`'s own immutability precedent)
