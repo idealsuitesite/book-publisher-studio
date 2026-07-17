@@ -93,4 +93,24 @@ describe('POST /api/manuscripts/export', () => {
     const pdf = response.body as Buffer;
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
+
+  it('returns 200 with a valid EPUB when format=epub', async () => {
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello world.'] });
+
+    const response = await request(app)
+      .post('/api/manuscripts/export')
+      .field('theme', 'classic')
+      .field('format', 'epub')
+      .attach('file', buffer, 'manuscript.docx')
+      .buffer(true)
+      .parse(binaryParser);
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('application/epub+zip');
+    const epubBuffer = response.body as Buffer;
+    const zip = await JSZip.loadAsync(epubBuffer);
+    const entryOrder = Object.keys(zip.files);
+    expect(entryOrder[0]).toBe('mimetype');
+    expect(await zip.file('mimetype')!.async('string')).toBe('application/epub+zip');
+  });
 });
