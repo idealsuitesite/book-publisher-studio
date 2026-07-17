@@ -7,7 +7,8 @@ import { ClassicTheme } from '../../domain/themes/ClassicTheme';
 import { createBook } from '../../domain/models/Book';
 import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement } from '../../domain/models/Book';
 import type { PageLayout } from '../../domain/models/PageLayout';
-import { extractPdfText, countPdfPages } from '../../test-utils/extractPdfText';
+import { extractPdfText, extractPdfRuns, countPdfPages } from '../../test-utils/extractPdfText';
+import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
 
 const LETTER_LAYOUT: PageLayout = {
   pageSize: 'letter',
@@ -62,6 +63,7 @@ function paginateWithTypography(chapters: Chapter[], layout: PageLayout = LETTER
 
 describe('PDFRenderer', () => {
   const renderer = new PDFRenderer({ compress: false });
+  const fontRegistry = new PdfFontRegistry();
 
   it('produces a valid PDF starting with the %PDF header', async () => {
     const paginated = paginate([chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1', 'Hello world.')])]);
@@ -199,7 +201,7 @@ describe('PDFRenderer', () => {
     expect(text).toContain('A cover');
   });
 
-  it('renders bold and italic inline runs, using the correct PDFKit font per run', async () => {
+  it('renders bold and italic inline runs, each using the font PdfFontRegistry resolves for that weight/style', async () => {
     const inlines: InlineElement[] = [
       { type: 'text', text: 'Plain ' },
       { type: 'bold', text: 'bold ' },
@@ -210,12 +212,23 @@ describe('PDFRenderer', () => {
 
     const buffer = await renderer.render(paginated, {});
     const text = extractPdfText(buffer);
-    const raw = buffer.toString('latin1');
+    const runs = extractPdfRuns(buffer);
 
+    // Functional check: the text is extracted correctly regardless of which fonts
+    // rendered it.
     expect(text).toContain('Plain bold italic.');
-    // ClassicTheme's body font is Georgia, which maps onto the Times family (resolveFont).
-    expect(raw).toContain('/Times-Bold');
-    expect(raw).toContain('/Times-Italic');
+
+    // Functional check: each styled run used the font PdfFontRegistry itself resolves
+    // for that weight/style - derived from the registry's own public API, not a
+    // hardcoded PDFKit-internal name (family choice, subset tagging, and PDFKit's own
+    // naming are all implementation details this test should stay correct across).
+    const plainFont = fontRegistry.resolve(ClassicTheme.fonts.body, false, false);
+    const boldFont = fontRegistry.resolve(ClassicTheme.fonts.body, true, false);
+    const italicFont = fontRegistry.resolve(ClassicTheme.fonts.body, false, true);
+
+    expect(runs.find((r) => r.text.includes('Plain'))?.baseFont).toContain(plainFont);
+    expect(runs.find((r) => r.text.includes('bold'))?.baseFont).toContain(boldFont);
+    expect(runs.find((r) => r.text.includes('italic'))?.baseFont).toContain(italicFont);
   });
 
   it('sizes a level-1 heading from theme.fontSizes.h1, not the old hardcoded per-level formula', async () => {
@@ -231,18 +244,20 @@ describe('PDFRenderer', () => {
     expect(raw).not.toMatch(/\b25 Tf\b/);
   });
 
-  it('renders per-item inline runs within a list', async () => {
+  it("renders per-item inline runs within a list, using the correct resolved font for each item's style", async () => {
     const inlinesPerItem: InlineElement[][] = [[{ type: 'text', text: 'First' }], [{ type: 'bold', text: 'Second' }]];
     const list: List = { type: 'list', id: 'l-1', ordered: false, items: ['ignored', 'ignored'], inlines: inlinesPerItem };
     const paginated = paginateWithTypography([chapter([list])]);
 
     const buffer = await renderer.render(paginated, {});
     const text = extractPdfText(buffer);
-    const raw = buffer.toString('latin1');
+    const runs = extractPdfRuns(buffer);
 
     expect(text).toContain('First');
     expect(text).toContain('Second');
-    expect(raw).toContain('/Times-Bold');
+
+    const boldFont = fontRegistry.resolve(ClassicTheme.fonts.body, true, false);
+    expect(runs.find((r) => r.text.includes('Second'))?.baseFont).toContain(boldFont);
   });
 
   it("applies a drop cap by enlarging the paragraph's first character, without losing or duplicating text", async () => {

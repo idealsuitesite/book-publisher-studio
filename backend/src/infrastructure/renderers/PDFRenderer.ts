@@ -5,6 +5,7 @@ import type { ResolvedBlockStyle } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
 import type { Content, Block, Chapter, Section } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
+import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
 
 const PAGE_SIZE: PDFKit.PDFDocumentOptions['size'] = 'LETTER';
 const MARGIN = 72;
@@ -15,37 +16,6 @@ const MARGIN = 72;
 // framing already established for pagination, ADR-0013). Documented simplification, not
 // a silent gap.
 const DROP_CAP_SCALE = 2.5;
-
-// This mapping is an Infrastructure concern (ADR-0002: Domain has zero infra deps), not
-// something TypographyResolver could own - PDFKit ships only the 14 standard PDF fonts
-// (Helvetica/Times/Courier + variants); no theme font (e.g. Georgia) exists as embeddable
-// glyph data yet (ADR-0019, finding 1; shipping a real font asset is ADR-0021/0023,
-// Sprint 4 commit 6). Until then, map theme font family names onto the closest standard
-// family by name heuristic. TypographyResolver resolves *which* runs are bold/italic
-// (Domain, content-only); this function resolves what concrete PDFKit font that maps to
-// (Infrastructure) - same division of responsibility ResolvedBlockStyle.fontFamily
-// already has across all three renderers.
-const SERIF_PATTERN = /times|georgia|serif|garamond|palatino|cambria|book antiqua|minion/i;
-const MONO_PATTERN = /courier|mono|consolas/i;
-
-function resolveFont(fontFamily: string, bold: boolean, italic: boolean): string {
-  if (MONO_PATTERN.test(fontFamily)) {
-    if (bold && italic) return 'Courier-BoldOblique';
-    if (bold) return 'Courier-Bold';
-    if (italic) return 'Courier-Oblique';
-    return 'Courier';
-  }
-  if (SERIF_PATTERN.test(fontFamily)) {
-    if (bold && italic) return 'Times-BoldItalic';
-    if (bold) return 'Times-Bold';
-    if (italic) return 'Times-Italic';
-    return 'Times-Roman';
-  }
-  if (bold && italic) return 'Helvetica-BoldOblique';
-  if (bold) return 'Helvetica-Bold';
-  if (italic) return 'Helvetica-Oblique';
-  return 'Helvetica';
-}
 
 function plainTypeRun(text: string): TypeRun {
   return {
@@ -74,6 +44,8 @@ export class PDFRenderer implements Renderer<Buffer> {
   // test-utils/extractPdfText.ts - PDFKit encodes text as hex-string TJ/Tj operands, not the
   // literal-string runs a format like DOCX's XML would have, so a compressed stream can't be
   // grepped for content at all).
+  private fonts = new PdfFontRegistry();
+
   constructor(private options: { compress?: boolean } = {}) {}
 
   async render(book: PaginatedBook, context: RenderContext): Promise<Buffer> {
@@ -90,6 +62,8 @@ export class PDFRenderer implements Renderer<Buffer> {
           ...(context.metadata?.author ? { Author: context.metadata.author } : {}),
         },
       });
+
+      this.fonts.registerAll(doc);
 
       const chunks: Buffer[] = [];
       doc.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -141,7 +115,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       const { width, height } = doc.page;
       const savedBottom = doc.page.margins.bottom;
       doc.page.margins.bottom = 0;
-      doc.font('Helvetica').fontSize(9).fillColor('#000');
+      doc.font(this.fonts.resolveDefault(false, false)).fontSize(9).fillColor('#000');
       doc.text('Book Publisher Studio', MARGIN, 40, { width: width - MARGIN * 2, align: 'left', lineBreak: false });
       doc.text(`Page ${i + 1} of ${range.count}`, MARGIN, height - 50, {
         width: width - MARGIN * 2,
@@ -182,7 +156,7 @@ export class PDFRenderer implements Renderer<Buffer> {
 
   private renderTitle(doc: PDFKit.PDFDocument, content: Chapter | Section): void {
     const size = content.type === 'chapter' ? 24 : Math.max(12, 22 - content.level * 2);
-    doc.font('Helvetica-Bold').fontSize(size).fillColor('#000').text(content.title);
+    doc.font(this.fonts.resolveDefault(true, false)).fontSize(size).fillColor('#000').text(content.title);
     doc.moveDown();
   }
 
@@ -249,7 +223,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         return;
 
       case 'table':
-        this.renderTable(doc, block.headers, block.rows, fontSize);
+        this.renderTable(doc, block.headers, block.rows, fontFamily, fontSize);
         return;
 
       case 'footnote': {
@@ -266,7 +240,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         } else {
           // No embedded data - never fetch remote URLs at render time (no hidden network I/O
           // in a renderer, same rule DOCXRenderer follows). Falls back to a text placeholder.
-          doc.font('Helvetica-Oblique').fontSize(fontSize).text(`[Image: ${block.caption ?? block.url}]`);
+          doc.font(this.fonts.resolve(fontFamily, false, true)).fontSize(fontSize).text(`[Image: ${block.caption ?? block.url}]`);
         }
         doc.moveDown(0.5);
         return;
@@ -276,7 +250,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         return;
 
       case 'divider':
-        doc.font('Helvetica').fontSize(fontSize).fillColor(color).text('* * *', { align: 'center' });
+        doc.font(this.fonts.resolve(fontFamily, false, false)).fontSize(fontSize).fillColor(color).text('* * *', { align: 'center' });
         doc.moveDown(0.5);
         return;
 
@@ -330,7 +304,7 @@ export class PDFRenderer implements Renderer<Buffer> {
     segments.forEach((seg, index) => {
       const isFirst = index === 0;
       const isLast = index === segments.length - 1;
-      doc.font(resolveFont(fontFamily, seg.bold, seg.italic)).fontSize(fontSize).fillColor(color);
+      doc.font(this.fonts.resolve(fontFamily, seg.bold, seg.italic)).fontSize(fontSize).fillColor(color);
       doc.text(seg.text, {
         ...(isFirst ? paragraphOptions : {}),
         continued: !isLast,
@@ -362,7 +336,7 @@ export class PDFRenderer implements Renderer<Buffer> {
     const remainderOfFirstRun = firstRun.text.slice(1);
     const remainingRuns: TypeRun[] = remainderOfFirstRun ? [{ ...firstRun, text: remainderOfFirstRun }, ...restRuns] : restRuns;
 
-    doc.font(resolveFont(fontFamily, true, firstRun.italic)).fontSize(fontSize * DROP_CAP_SCALE).fillColor(color);
+    doc.font(this.fonts.resolve(fontFamily, true, firstRun.italic)).fontSize(fontSize * DROP_CAP_SCALE).fillColor(color);
     doc.text(dropCapChar, { ...paragraphOptions, continued: remainingRuns.length > 0 });
 
     if (remainingRuns.length > 0) {
@@ -383,7 +357,13 @@ export class PDFRenderer implements Renderer<Buffer> {
   // (HTTP 500 on every such export). Column count now falls back to the first data
   // row's width when there are no headers, and a genuinely empty table (no headers,
   // no rows) is skipped entirely rather than dividing by zero.
-  private renderTable(doc: PDFKit.PDFDocument, headers: string[], rows: (string | null)[][], fontSize: number): void {
+  private renderTable(
+    doc: PDFKit.PDFDocument,
+    headers: string[],
+    rows: (string | null)[][],
+    fontFamily: string,
+    fontSize: number
+  ): void {
     const columnCount = headers.length > 0 ? headers.length : (rows[0]?.length ?? 0);
     if (columnCount === 0) return;
 
@@ -399,7 +379,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       if (cells.length === 0) return;
       const h = rowHeight(cells);
       const y = doc.y;
-      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(Math.max(8, fontSize - 1));
+      doc.font(this.fonts.resolve(fontFamily, bold, false)).fontSize(Math.max(8, fontSize - 1));
       cells.forEach((text, i) => {
         const x = startX + i * colWidth;
         doc.rect(x, y, colWidth, h).stroke();
