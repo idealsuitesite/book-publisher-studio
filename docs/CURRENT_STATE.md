@@ -278,9 +278,9 @@ npm run verify-real-export   # Verify real import + export-docx/pdf/epub against
 
 ## Git Status
 
-**Branch:** `feature/sprint-4-typography-engine` at `c87d72b` (commit 9, "BookMetricsCalculator populates QualityMetrics via calculateQualityMetrics"), on top of `77ab1c2` (commit 8) and `8ab6ffb` (docs consolidation after commits 1-8, adds `SESSION_BOOTSTRAP.md`). Not yet pushed to `origin` (commits 1-8 and the docs consolidation were pushed 2026-07-17; commit 9 is local, pending push).
+**Branch:** `feature/sprint-4-typography-engine` at `8a6422e` (commit 10, "E2E real-file verification pass, fixes 3 import-pipeline bugs (ADR-0026)"), on top of `e0e22b3` (commit 9 + its Git Status docs touch-up) and `8ab6ffb` (docs consolidation after commits 1-8). Pushed to `origin` 2026-07-17.
 **Branched from / rebased onto `main` at:** `4f488ad` (PR #8 merge — `fix/pdf-table-without-header`; `main` also has PR #7 `39b173f` and PR #6 `33b9b0f`, the server-verification tooling, both merged before Sprint 4 resumed).
-**Sprint 4 commits on this branch (1-9, oldest first):** `ea6df67` → `5b550cf` → `0a1a0c7` → `a045f21` → `d17555e` → `041319e` → `36692a9` → `9be7325` → `0f4a750` → `e2973cc` (ADR-0025) → `77ab1c2` → `8ab6ffb` (docs consolidation) → `c87d72b` (commit 9).
+**Sprint 4 commits on this branch (1-10, oldest first):** `ea6df67` → `5b550cf` → `0a1a0c7` → `a045f21` → `d17555e` → `041319e` → `36692a9` → `9be7325` → `0f4a750` → `e2973cc` (ADR-0025) → `77ab1c2` → `8ab6ffb` (docs consolidation) → `c87d72b` (commit 9) → `e0e22b3` (docs touch-up) → `8a6422e` (commit 10 / ADR-0026).
 **`main` synced with `origin/main` at:** `4f488ad` (see PR #5 `5eb71c4`, governance commit `e512ee7`, PR #4 `a7a38a0`, PR #3 `820f1ef`, PR #2 `c507f5d`, PR #1 `32ac220` further back in history).
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
 **Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha`, **`v0.4.1-alpha`** (EPUB export, cut 2026-07-17 per ADR-0021 — see `docs/VERSIONS.md` and `docs/releases/v0.4.1-alpha/ReleaseNotes.md`)
