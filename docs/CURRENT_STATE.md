@@ -9,7 +9,7 @@
 ## Summary
 
 **Completed:** 125 tests passing ✅ (re-verified on merged `main`, not just the feature branch: `npm test`, `npm run build`, `npm run lint`, `npm run test:coverage`, plus a real DOCX from `backend/uploads/` exported to both `.docx` and `.pdf` via the running dev server)
-**Next:** Sprint 3B (EPUB export — ADR-0015 spike still needed, library TBD between `epub-gen` and hand-rolled OOXML via `jszip`)
+**Next:** Sprint 3B (EPUB export — ADR-0015 spike still needed, library TBD between `epub-gen` and hand-rolled OCF/OPF/XHTML via `jszip`)
 
 ---
 
@@ -148,7 +148,7 @@ All three were fixed by the `bufferPages` redesign above.
 **To resume work:**
 1. Read `docs/START_HERE.md`
 2. Read this file (`CURRENT_STATE.md`)
-3. Begin Sprint 3B (EPUB export — ADR-0015 spike first: `epub-gen` vs. hand-rolled OOXML via `jszip`, decide before writing `EPUBRenderer`) on a new dedicated branch per ADR-0017, e.g. `feature/sprint-3b-epub-export`
+3. Begin Sprint 3B (EPUB export — ADR-0015 spike first: `epub-gen` vs. hand-rolled OCF/OPF/XHTML via `jszip`, decide before writing `EPUBRenderer`) on a new dedicated branch per ADR-0017, e.g. `feature/sprint-3b-epub-export`
 
 **Quick Start:**
 ```bash

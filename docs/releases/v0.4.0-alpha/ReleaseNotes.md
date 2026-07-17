@@ -55,7 +55,7 @@ Documented in code and in `docs/DECISIONS.md` (ADR-0019), not silent gaps:
 
 ## What This Release Does Not Include
 
-EPUB export (ADR-0015 still needs a library spike — `epub-gen` vs. hand-rolled OOXML via `jszip` — before `EPUBRenderer` is written; this is Sprint 3B / v0.4.1-alpha), Typography Engine, fuller `ValidatorEngine` (readability/completeness scoring), plugin system, premium UI, AI features, licensing enforcement, database, authentication, collaboration. See `docs/VISION.md` for the long-term plan and `docs/TODO.md` for what's scheduled next.
+EPUB export (ADR-0015 still needs a library spike — `epub-gen` vs. hand-rolled OCF/OPF/XHTML via `jszip` — before `EPUBRenderer` is written; this is Sprint 3B / v0.4.1-alpha), Typography Engine, fuller `ValidatorEngine` (readability/completeness scoring), plugin system, premium UI, AI features, licensing enforcement, database, authentication, collaboration. See `docs/VISION.md` for the long-term plan and `docs/TODO.md` for what's scheduled next.
 
 ## Upgrade / Migration Notes
 

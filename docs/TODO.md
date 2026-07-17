@@ -31,7 +31,7 @@ Same discipline as Sprint 2: Design Review → ADR → small atomic commits → 
 
 **Sprint 3B (EPUB, after 3A ships):**
 
-1. EPUB library spike + ADR (ADR-0015 — `epub-gen` vs. hand-rolled OOXML via `jszip`)
+1. EPUB library spike + ADR (ADR-0015 — `epub-gen` vs. hand-rolled OCF/OPF/XHTML via `jszip`)
 2. EPUB Renderer
 3. EPUB endpoint
 4. Verification pass (`docs/MERGE_CHECKLIST.md`)
