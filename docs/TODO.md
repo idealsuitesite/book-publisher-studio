@@ -14,10 +14,18 @@ None currently.
 
 None currently — Quality Sprint is complete, Sprint 3 hasn't started.
 
-### Medium Priority (Sprint 3)
+### Medium Priority (Sprint 3 — "Professional Export", planned commit sequence agreed 2026-07-17, not started)
 
-- [ ] PDF export (`PDFRenderer` — PDFKit, ADR-0014; `ExportPDFUseCase`)
-- [ ] EPUB export (`EPUBRenderer` — library TBD, spike required per ADR-0015; `ExportEPUBUseCase`)
+Same discipline as Sprint 2: Design Review → ADR → small atomic commits → green build/tests → PR → merge → tag.
+
+1. PDF Renderer (PDFKit, ADR-0014 already decided)
+2. `ExportPDFUseCase`
+3. PDF endpoint (`POST /api/manuscripts/export?format=pdf` or equivalent — exact route shape is a Design Review question, not decided yet)
+4. EPUB library spike + ADR (ADR-0015 — `epub-gen` vs. hand-rolled OOXML via `jszip`)
+5. EPUB Renderer
+6. EPUB endpoint
+7. Verification pass (`docs/MERGE_CHECKLIST.md`)
+
 - [ ] **Remove legacy `/api/upload` route** (`docxParser.ts`, disk-based multer) — both now marked `@deprecated`; confirm nothing depends on the raw-paragraph response shape first (ADR-0011)
 
 ### Low Priority (Sprint 4+)
