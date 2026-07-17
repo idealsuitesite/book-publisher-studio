@@ -36,9 +36,12 @@ function resolveFont(fontFamily: string, bold: boolean, italic: boolean): string
 export class PDFRenderer implements Renderer<Buffer> {
   async render(book: PaginatedBook, context: RenderContext): Promise<Buffer> {
     return new Promise((resolve, reject) => {
+      // bufferPages defers writing pages to the output stream until flushed - see
+      // drawHeadersAndFooters() below for why this is the right approach here.
       const doc = new PDFDocument({
         size: PAGE_SIZE,
         margin: MARGIN,
+        bufferPages: true,
         info: {
           ...(context.metadata?.title ? { Title: context.metadata.title } : {}),
           ...(context.metadata?.author ? { Author: context.metadata.author } : {}),
@@ -50,54 +53,53 @@ export class PDFRenderer implements Renderer<Buffer> {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', (err: unknown) => reject(err instanceof Error ? err : new Error(String(err))));
 
-      const totalPages = book.pages.length;
-      this.setupHeaderFooter(doc, totalPages);
-
       const pageStartBlockIds = new Set(
         book.pages.slice(1).map((page) => page.blocks[0]).filter((id): id is string => Boolean(id))
       );
 
       this.renderContent(doc, book.styledBook.book.mainContent, book.styledBook.blockStyles, pageStartBlockIds, true);
 
+      this.drawHeadersAndFooters(doc);
+
       doc.end();
     });
   }
 
-  // ADR-0019 finding 6: writing header/footer text below the margin-defined content box
-  // triggers PDFKit's own overflow-based auto-pagination from inside the 'pageAdded' handler
-  // that's drawing it, causing unbounded recursion. Fix: suppress the bottom-margin overflow
-  // check for the duration of this draw by temporarily zeroing it.
+  // ADR-0019 finding 6: an earlier version drew headers/footers live via the 'pageAdded' event
+  // while content was flowing, which caused two real bugs - (a) writing footer text below the
+  // margin triggered PDFKit's own overflow-based auto-pagination from inside the handler that
+  // was drawing it, recursing until the stack overflowed, and (b) doc.text(x, y, ...) leaves
+  // PDFKit's cursor (doc.x/doc.y) stranded near the bottom of the page, so every subsequent
+  // content call without explicit coordinates immediately overflowed onto a new page (a 9-page
+  // document rendered as 212 pages). A separate real-world test (a genuine DOCX from
+  // backend/uploads/) then surfaced a third problem with the live-draw approach even after
+  // those fixes: the footer showed "Page 6 of 4" - LayoutEngine's word-count heuristic (used for
+  // the "of TOTAL" figure) undershot PDFKit's actual rendered page count once real content
+  // exceeded the estimate.
   //
-  // Second gotcha (reproduced): doc.text(str, x, y, opts) moves PDFKit's internal cursor
-  // (doc.x/doc.y) to just below the text it wrote. Since the footer is drawn near the bottom
-  // of the page, that leaves the cursor there - and every subsequent block render call that
-  // omits explicit x/y (paragraphs, headings, etc.) continues writing FROM that cursor, so it
-  // overflows onto a new page almost immediately. Observed effect: a 9-page document rendered
-  // as 212 pages. Fix: explicitly reset the cursor to the top margin after each header/footer
-  // draw, before content resumes.
-  private setupHeaderFooter(doc: PDFKit.PDFDocument, totalPages: number): void {
-    let pageNum = 1;
-    const draw = (n: number): void => {
+  // bufferPages: true fixes all three at once. Content renders first with no header/footer
+  // interference at all (doc.addPage() flows freely, cursor is never touched by header/footer
+  // code). Only after every page actually exists do we loop back with switchToPage() and stamp
+  // each one - at which point doc.bufferedPageRange().count is the true, exact page count, not
+  // an estimate. No two-pass *render* is needed, just a two-pass *header/footer draw*, and
+  // PaginatedBook.pages.length (LayoutEngine's estimate) is no longer used for the displayed
+  // total at all.
+  private drawHeadersAndFooters(doc: PDFKit.PDFDocument): void {
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
       const { width, height } = doc.page;
       const savedBottom = doc.page.margins.bottom;
       doc.page.margins.bottom = 0;
       doc.font('Helvetica').fontSize(9).fillColor('#000');
       doc.text('Book Publisher Studio', MARGIN, 40, { width: width - MARGIN * 2, align: 'left', lineBreak: false });
-      doc.text(`Page ${n} of ${totalPages}`, MARGIN, height - 50, {
+      doc.text(`Page ${i + 1} of ${range.count}`, MARGIN, height - 50, {
         width: width - MARGIN * 2,
         align: 'center',
         lineBreak: false,
       });
       doc.page.margins.bottom = savedBottom;
-      doc.x = MARGIN;
-      doc.y = doc.page.margins.top;
-    };
-
-    doc.on('pageAdded', () => {
-      pageNum += 1;
-      draw(pageNum);
-    });
-    draw(1); // the document's own first page never fires 'pageAdded'
+    }
   }
 
   private renderContent(
