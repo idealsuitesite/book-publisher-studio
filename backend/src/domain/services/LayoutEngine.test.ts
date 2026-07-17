@@ -6,6 +6,7 @@ import { ClassicTheme } from '../themes/ClassicTheme';
 import { createBook } from '../models/Book';
 import type { Chapter, Section, Heading, Paragraph, Image, List, Table, Footnote, Block } from '../models/Book';
 import type { PageLayout } from '../models/PageLayout';
+import type { Theme } from '../models/Theme';
 
 const LETTER_LAYOUT: PageLayout = {
   pageSize: 'letter',
@@ -58,6 +59,11 @@ function chapter(content: Block[], overrides: Partial<Chapter> = {}): Chapter {
 function styledBookFrom(chapters: Chapter[]) {
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
   return new ThemeEngine().applyTheme(book, ClassicTheme);
+}
+
+function styledBookFromWithTheme(chapters: Chapter[], theme: Theme) {
+  const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
+  return new ThemeEngine().applyTheme(book, theme);
 }
 
 // Chains TypographyResolver after ThemeEngine, so blockTypography (and its
@@ -192,5 +198,52 @@ describe('LayoutEngine', () => {
     expect(result.pages).toHaveLength(2);
     expect(result.pages[0].blocks).toEqual([...fillers.map((f) => f.id), 'h-1']);
     expect(result.pages[1].blocks).toEqual(['p-big']);
+  });
+
+  // Sprint 6 (Professional Layout Engine): per-page running-head title resolution.
+  describe('headerFooterTitle resolution (Theme.runningHead)', () => {
+    it("resolves every page's title to the book's title when content is 'bookTitle' (ClassicTheme's default)", () => {
+      const styled = styledBookFrom([
+        chapter([paragraph('p-1')], { id: 'c-1', number: 1, title: 'Chapter One' }),
+        chapter([paragraph('p-2')], { id: 'c-2', number: 2, title: 'Chapter Two' }),
+      ]);
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      expect(result.pages.map((p) => p.headerFooterTitle)).toEqual(['T', 'T']);
+    });
+
+    it("resolves each page's title to its own chapter's title when content is 'chapterTitle'", () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, content: 'chapterTitle' } };
+      const styled = styledBookFromWithTheme(
+        [
+          chapter([paragraph('p-1')], { id: 'c-1', number: 1, title: 'Chapter One' }),
+          chapter([paragraph('p-2')], { id: 'c-2', number: 2, title: 'Chapter Two' }),
+        ],
+        theme
+      );
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      expect(result.pages.map((p) => p.headerFooterTitle)).toEqual(['Chapter One', 'Chapter Two']);
+    });
+
+    it('leaves headerFooterTitle undefined when the theme has no runningHead at all', () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: undefined };
+      const styled = styledBookFromWithTheme([chapter([paragraph('p-1')])], theme);
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      expect(result.pages[0].headerFooterTitle).toBeUndefined();
+    });
+
+    it('leaves headerFooterTitle undefined when runningHead.show is false', () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, show: false } };
+      const styled = styledBookFromWithTheme([chapter([paragraph('p-1')])], theme);
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      expect(result.pages[0].headerFooterTitle).toBeUndefined();
+    });
   });
 });

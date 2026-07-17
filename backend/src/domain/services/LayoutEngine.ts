@@ -15,10 +15,23 @@ export class LayoutEngine {
     let currentPageHeights: number[] = [];
     let currentHeight = 0;
     let pageNumber = 1;
+    // Whichever top-level Chapter/Section's blocks are being added when a page is flushed -
+    // the only piece of running-head resolution only LayoutEngine can compute (see
+    // Page.headerFooterTitle's doc comment). Chapters always start a new page (existing rule
+    // below), so in practice this is exact for chapter-content pages; top-level Sections can
+    // share a page, matching this pipeline's existing "best-effort, not guaranteed" pagination
+    // philosophy (ADR-0013).
+    let currentTopLevelTitle: string | undefined;
+
+    const resolveHeaderFooterTitle = (): string | undefined => {
+      const runningHead = styled.theme.runningHead;
+      if (!runningHead?.show) return undefined;
+      return runningHead.content === 'bookTitle' ? styled.book.metadata.title : currentTopLevelTitle;
+    };
 
     const flushPage = (): void => {
       if (currentPageBlocks.length === 0) return;
-      pages.push({ number: pageNumber, blocks: currentPageBlocks });
+      pages.push({ number: pageNumber, blocks: currentPageBlocks, headerFooterTitle: resolveHeaderFooterTitle() });
       pageNumber += 1;
       currentPageBlocks = [];
       currentPageHeights = [];
@@ -70,7 +83,13 @@ export class LayoutEngine {
         const startsChapter = isTopLevel && content.type === 'chapter';
         let isFirstBlock = true;
         for (const block of content.content) {
-          addBlock(block, isFirstBlock && startsChapter);
+          const forceNewPage = isFirstBlock && startsChapter;
+          // Flush (attributing the closing page to the OLD currentTopLevelTitle) before
+          // reassigning - reassigning first would mislabel the page that's closing right now
+          // as belonging to the chapter that's only just starting.
+          if (forceNewPage) flushPage();
+          if (isTopLevel) currentTopLevelTitle = content.title;
+          addBlock(block, false);
           isFirstBlock = false;
         }
         if (content.type === 'chapter' && content.sections) {
