@@ -1,5 +1,6 @@
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Theme } from '../../domain/models/Theme';
 
 // Resolves ADR-0019 finding 1 / ADR-0021 / ADR-0023: three real, embedded font families
 // (Gelasio, Inter, JetBrains Mono - all SIL OFL 1.1, redistributable) replace PDFKit's
@@ -57,6 +58,8 @@ const FAMILIES: FontFamilyDefinition[] = [
   },
 ];
 
+const MONOSPACE_FAMILY = FAMILIES[0]; // JetBrainsMono
+
 // Inter (sans-serif, last in FAMILIES) is also the default when a theme's font name
 // matches none of the patterns above - same fallback behavior the old Helvetica-by-
 // default heuristic had.
@@ -67,10 +70,16 @@ function resolveFamily(fontFamily: string): FontFamilyDefinition {
 }
 
 /**
- * Owns the mapping from a theme's logical font family name to a real, embedded PDFKit
- * font - both which family (Gelasio/Inter/JetBrains Mono) and which physical .ttf file
- * backs each weight/style. PDFRenderer only calls registerAll() once per document and
- * resolve() per run; it never touches font file paths directly.
+ * Owns every PDF font decision: which of the 3 embedded families (Gelasio/Inter/
+ * JetBrains Mono) backs a given typographic *role*, which physical .ttf file backs each
+ * weight/style, and registering them with PDFKit. Deliberately role-based
+ * (resolveBody/resolveHeading/resolveMonospace/resolveDefault), not string-based -
+ * PDFRenderer never inspects a theme's font-name string or does its own family-matching;
+ * it only asks for a role and gets a registered PDFKit font name back. Contains no PDF
+ * *rendering* logic (no doc.font() selection calls, no coordinates, no font sizes) - only
+ * font registration and name resolution - so this can become the template for a shared
+ * FontRegistry across PDF/DOCX/EPUB later without carrying any PDF-specific drawing
+ * concerns with it.
  */
 export class PdfFontRegistry {
   /** Fonts are registered per-document (PDFKit has no global font registry). */
@@ -83,18 +92,28 @@ export class PdfFontRegistry {
     }
   }
 
-  /** Resolves a theme's logical font family + weight/style to a registered PDFKit font name. */
-  resolve(fontFamily: string, bold: boolean, italic: boolean): string {
-    const family = resolveFamily(fontFamily).name;
-    return this.variant(family, bold, italic);
+  /** Body text role - resolves from the theme's body font (e.g. paragraphs, quotes, lists, footnotes, tables). */
+  resolveBody(theme: Theme, bold: boolean, italic: boolean): string {
+    return this.variant(resolveFamily(theme.fonts.body).name, bold, italic);
   }
 
   /**
-   * Resolves the default (sans-serif) embedded family for content with no theme font of
-   * its own - page chrome (running header/footer) and chapter/section titles, which
-   * PDFRenderer draws independently of any block's ResolvedBlockStyle. Still routes
-   * through this registry rather than a raw PDFKit standard-14 name, so PdfFontRegistry
-   * stays the only place that knows a font file path or family name.
+   * Heading role for the given level - resolves from the theme's heading font. `level`
+   * is accepted now (not yet used to vary the family) so a future theme that wants a
+   * different family per heading level doesn't require an API change.
+   */
+  resolveHeading(_level: number, theme: Theme, bold: boolean, italic: boolean): string {
+    return this.variant(resolveFamily(theme.fonts.heading).name, bold, italic);
+  }
+
+  /** Monospace role - always JetBrains Mono, independent of theme (e.g. future code blocks). */
+  resolveMonospace(bold: boolean, italic: boolean): string {
+    return this.variant(MONOSPACE_FAMILY.name, bold, italic);
+  }
+
+  /**
+   * Default (sans-serif) role for content with no theme font of its own - page chrome
+   * (running header/footer) that PDFRenderer draws independently of any block or theme.
    */
   resolveDefault(bold: boolean, italic: boolean): string {
     return this.variant(DEFAULT_FAMILY.name, bold, italic);

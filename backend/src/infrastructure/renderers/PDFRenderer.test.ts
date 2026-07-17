@@ -222,9 +222,9 @@ describe('PDFRenderer', () => {
     // for that weight/style - derived from the registry's own public API, not a
     // hardcoded PDFKit-internal name (family choice, subset tagging, and PDFKit's own
     // naming are all implementation details this test should stay correct across).
-    const plainFont = fontRegistry.resolve(ClassicTheme.fonts.body, false, false);
-    const boldFont = fontRegistry.resolve(ClassicTheme.fonts.body, true, false);
-    const italicFont = fontRegistry.resolve(ClassicTheme.fonts.body, false, true);
+    const plainFont = fontRegistry.resolveBody(ClassicTheme, false, false);
+    const boldFont = fontRegistry.resolveBody(ClassicTheme, true, false);
+    const italicFont = fontRegistry.resolveBody(ClassicTheme, false, true);
 
     expect(runs.find((r) => r.text.includes('Plain'))?.baseFont).toContain(plainFont);
     expect(runs.find((r) => r.text.includes('bold'))?.baseFont).toContain(boldFont);
@@ -256,7 +256,7 @@ describe('PDFRenderer', () => {
     expect(text).toContain('First');
     expect(text).toContain('Second');
 
-    const boldFont = fontRegistry.resolve(ClassicTheme.fonts.body, true, false);
+    const boldFont = fontRegistry.resolveBody(ClassicTheme, true, false);
     expect(runs.find((r) => r.text.includes('Second'))?.baseFont).toContain(boldFont);
   });
 

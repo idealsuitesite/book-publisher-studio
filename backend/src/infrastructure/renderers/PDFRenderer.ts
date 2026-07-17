@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
 import type { PaginatedBook } from '../../domain/models/PaginatedBook';
-import type { ResolvedBlockStyle } from '../../domain/models/Theme';
+import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
 import type { Content, Block, Chapter, Section } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
@@ -17,6 +17,9 @@ const MARGIN = 72;
 // framing already established for pagination, ADR-0013). Documented simplification, not
 // a silent gap.
 const DROP_CAP_SCALE = 2.5;
+
+/** Resolves which registered font to use for a run, given its bold/italic flags. */
+type FontResolver = (bold: boolean, italic: boolean) => string;
 
 export class PDFRenderer implements Renderer<Buffer> {
   // compress defaults to true for real output; tests pass false so the content stream stays
@@ -57,6 +60,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       this.renderContent(
         doc,
         book.styledBook.book.mainContent,
+        book.styledBook.theme,
         book.styledBook.blockStyles,
         book.styledBook.blockTypography,
         pageStartBlockIds,
@@ -109,6 +113,7 @@ export class PDFRenderer implements Renderer<Buffer> {
   private renderContent(
     doc: PDFKit.PDFDocument,
     contents: Content[],
+    theme: Theme,
     blockStyles: Record<string, ResolvedBlockStyle>,
     blockTypography: Record<string, ResolvedTypography> | undefined,
     pageStartBlockIds: Set<string>,
@@ -120,29 +125,35 @@ export class PDFRenderer implements Renderer<Buffer> {
       if (breaksPage && firstBlockId) pageStartBlockIds.delete(firstBlockId);
 
       if (breaksPage) doc.addPage();
-      this.renderTitle(doc, content);
+      this.renderTitle(doc, content, theme);
 
       for (const block of content.content) {
-        this.renderBlock(doc, block, blockStyles[block.id], blockTypography, pageStartBlockIds);
+        this.renderBlock(doc, block, theme, blockStyles[block.id], blockTypography, pageStartBlockIds);
       }
 
       if (content.type === 'chapter' && content.sections) {
-        this.renderContent(doc, content.sections, blockStyles, blockTypography, pageStartBlockIds, false);
+        this.renderContent(doc, content.sections, theme, blockStyles, blockTypography, pageStartBlockIds, false);
       } else if (content.type === 'section' && content.subsections) {
-        this.renderContent(doc, content.subsections, blockStyles, blockTypography, pageStartBlockIds, false);
+        this.renderContent(doc, content.subsections, theme, blockStyles, blockTypography, pageStartBlockIds, false);
       }
     }
   }
 
-  private renderTitle(doc: PDFKit.PDFDocument, content: Chapter | Section): void {
+  private renderTitle(doc: PDFKit.PDFDocument, content: Chapter | Section, theme: Theme): void {
+    const level = content.type === 'chapter' ? 1 : content.level;
     const size = content.type === 'chapter' ? 24 : Math.max(12, 22 - content.level * 2);
-    doc.font(this.fonts.resolveDefault(true, false)).fontSize(size).fillColor('#000').text(content.title);
+    // Chapter/section titles are conceptually headings, so they now resolve through the
+    // same heading role as Heading blocks (Sprint 4 commit 7 amendment) - previously they
+    // used the generic "default" chrome font, a real inconsistency with Heading blocks
+    // rendering in the theme's actual heading family.
+    doc.font(this.fonts.resolveHeading(level, theme, true, false)).fontSize(size).fillColor('#000').text(content.title);
     doc.moveDown();
   }
 
   private renderBlock(
     doc: PDFKit.PDFDocument,
     block: Block,
+    theme: Theme,
     style: ResolvedBlockStyle | undefined,
     blockTypography: Record<string, ResolvedTypography> | undefined,
     pageStartBlockIds: Set<string>
@@ -152,10 +163,10 @@ export class PDFRenderer implements Renderer<Buffer> {
       pageStartBlockIds.delete(block.id);
     }
 
-    const fontFamily = style?.fontFamily ?? 'Helvetica';
     const fontSize = style?.fontSize ?? 11;
     const color = style?.color ?? '#000000';
     const spaceAfter = style?.spaceAfter ?? 8;
+    const resolveBody: FontResolver = (bold, italic) => this.fonts.resolveBody(theme, bold, italic);
 
     switch (block.type) {
       case 'heading': {
@@ -165,7 +176,8 @@ export class PDFRenderer implements Renderer<Buffer> {
         // heading) is still respected. Size now comes from the theme (style.fontSize,
         // theme.fontSizes.h1-h6 via ThemeEngine) instead of a hardcoded per-level formula -
         // design review §4 item 3.
-        this.renderRuns(doc, runs, fontFamily, fontSize, color, {}, undefined, true);
+        const resolveHeadingFont: FontResolver = (bold, italic) => this.fonts.resolveHeading(block.level, theme, bold, italic);
+        this.renderRuns(doc, runs, resolveHeadingFont, fontSize, color, {}, undefined, true);
         doc.moveDown(0.5);
         return;
       }
@@ -175,9 +187,9 @@ export class PDFRenderer implements Renderer<Buffer> {
         const dropCap = blockTypography?.[block.id]?.dropCap ?? false;
         const options: PDFKit.Mixins.TextOptions = { align: block.align === 'justify' ? 'justify' : (block.align ?? 'left') };
         if (dropCap) {
-          this.renderRunsWithDropCap(doc, runs, fontFamily, fontSize, color, options);
+          this.renderRunsWithDropCap(doc, runs, resolveBody, fontSize, color, options);
         } else {
-          this.renderRuns(doc, runs, fontFamily, fontSize, color, options);
+          this.renderRuns(doc, runs, resolveBody, fontSize, color, options);
         }
         doc.moveDown(spaceAfter / fontSize);
         return;
@@ -188,7 +200,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         // Italics are already forced onto every run by TypographyResolver
         // (design review §4 item 9) - no block-level italic override needed here anymore.
         const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
-        this.renderRuns(doc, runs, fontFamily, fontSize, color, { indent: 36 });
+        this.renderRuns(doc, runs, resolveBody, fontSize, color, { indent: 36 });
         doc.moveDown(spaceAfter / fontSize);
         return;
       }
@@ -197,18 +209,18 @@ export class PDFRenderer implements Renderer<Buffer> {
         block.items.forEach((item, index) => {
           const prefix = block.ordered ? `${index + 1}. ` : '• ';
           const itemRuns = runsOrPlainFallback(blockTypography?.[listItemTypographyKey(block.id, index)], item);
-          this.renderRuns(doc, itemRuns, fontFamily, fontSize, color, { indent: 18 }, prefix);
+          this.renderRuns(doc, itemRuns, resolveBody, fontSize, color, { indent: 18 }, prefix);
         });
         doc.moveDown(spaceAfter / fontSize);
         return;
 
       case 'table':
-        this.renderTable(doc, block.headers, block.rows, fontFamily, fontSize);
+        this.renderTable(doc, block.headers, block.rows, theme, fontSize);
         return;
 
       case 'footnote': {
         const runs = runsOrPlainFallback(blockTypography?.[block.id], block.content);
-        this.renderRuns(doc, runs, fontFamily, Math.max(7, fontSize - 2), color, {}, `[${block.number}] `);
+        this.renderRuns(doc, runs, resolveBody, Math.max(7, fontSize - 2), color, {}, `[${block.number}] `);
         return;
       }
 
@@ -220,7 +232,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         } else {
           // No embedded data - never fetch remote URLs at render time (no hidden network I/O
           // in a renderer, same rule DOCXRenderer follows). Falls back to a text placeholder.
-          doc.font(this.fonts.resolve(fontFamily, false, true)).fontSize(fontSize).text(`[Image: ${block.caption ?? block.url}]`);
+          doc.font(this.fonts.resolveBody(theme, false, true)).fontSize(fontSize).text(`[Image: ${block.caption ?? block.url}]`);
         }
         doc.moveDown(0.5);
         return;
@@ -230,7 +242,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         return;
 
       case 'divider':
-        doc.font(this.fonts.resolve(fontFamily, false, false)).fontSize(fontSize).fillColor(color).text('* * *', { align: 'center' });
+        doc.font(this.fonts.resolveBody(theme, false, false)).fontSize(fontSize).fillColor(color).text('* * *', { align: 'center' });
         doc.moveDown(0.5);
         return;
 
@@ -254,11 +266,13 @@ export class PDFRenderer implements Renderer<Buffer> {
   // leadingPlainText (list "1. "/"• " prefixes, footnote "[n] " prefixes) renders in the
   // block's plain (non-bold, non-italic) style before the real runs, on the same line.
   // forceBold applies to every run in this call (headings only, a PDFRenderer-level
-  // rendering choice - not a Domain rule).
+  // rendering choice - not a Domain rule). resolveFont is bound by the caller to the
+  // correct PdfFontRegistry role (body vs heading) - this method never talks to
+  // PdfFontRegistry directly, keeping all font-selection policy in the registry.
   private renderRuns(
     doc: PDFKit.PDFDocument,
     runs: TypeRun[],
-    fontFamily: string,
+    resolveFont: FontResolver,
     fontSize: number,
     color: string,
     paragraphOptions: PDFKit.Mixins.TextOptions = {},
@@ -284,7 +298,7 @@ export class PDFRenderer implements Renderer<Buffer> {
     segments.forEach((seg, index) => {
       const isFirst = index === 0;
       const isLast = index === segments.length - 1;
-      doc.font(this.fonts.resolve(fontFamily, seg.bold, seg.italic)).fontSize(fontSize).fillColor(color);
+      doc.font(resolveFont(seg.bold, seg.italic)).fontSize(fontSize).fillColor(color);
       doc.text(seg.text, {
         ...(isFirst ? paragraphOptions : {}),
         continued: !isLast,
@@ -301,14 +315,14 @@ export class PDFRenderer implements Renderer<Buffer> {
   private renderRunsWithDropCap(
     doc: PDFKit.PDFDocument,
     runs: TypeRun[],
-    fontFamily: string,
+    resolveFont: FontResolver,
     fontSize: number,
     color: string,
     paragraphOptions: PDFKit.Mixins.TextOptions
   ): void {
     const [firstRun, ...restRuns] = runs;
     if (!firstRun || firstRun.text.length === 0) {
-      this.renderRuns(doc, runs, fontFamily, fontSize, color, paragraphOptions);
+      this.renderRuns(doc, runs, resolveFont, fontSize, color, paragraphOptions);
       return;
     }
 
@@ -316,11 +330,11 @@ export class PDFRenderer implements Renderer<Buffer> {
     const remainderOfFirstRun = firstRun.text.slice(1);
     const remainingRuns: TypeRun[] = remainderOfFirstRun ? [{ ...firstRun, text: remainderOfFirstRun }, ...restRuns] : restRuns;
 
-    doc.font(this.fonts.resolve(fontFamily, true, firstRun.italic)).fontSize(fontSize * DROP_CAP_SCALE).fillColor(color);
+    doc.font(resolveFont(true, firstRun.italic)).fontSize(fontSize * DROP_CAP_SCALE).fillColor(color);
     doc.text(dropCapChar, { ...paragraphOptions, continued: remainingRuns.length > 0 });
 
     if (remainingRuns.length > 0) {
-      this.renderRuns(doc, remainingRuns, fontFamily, fontSize, color, {});
+      this.renderRuns(doc, remainingRuns, resolveFont, fontSize, color, {});
     }
   }
 
@@ -337,13 +351,7 @@ export class PDFRenderer implements Renderer<Buffer> {
   // (HTTP 500 on every such export). Column count now falls back to the first data
   // row's width when there are no headers, and a genuinely empty table (no headers,
   // no rows) is skipped entirely rather than dividing by zero.
-  private renderTable(
-    doc: PDFKit.PDFDocument,
-    headers: string[],
-    rows: (string | null)[][],
-    fontFamily: string,
-    fontSize: number
-  ): void {
+  private renderTable(doc: PDFKit.PDFDocument, headers: string[], rows: (string | null)[][], theme: Theme, fontSize: number): void {
     const columnCount = headers.length > 0 ? headers.length : (rows[0]?.length ?? 0);
     if (columnCount === 0) return;
 
@@ -359,7 +367,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       if (cells.length === 0) return;
       const h = rowHeight(cells);
       const y = doc.y;
-      doc.font(this.fonts.resolve(fontFamily, bold, false)).fontSize(Math.max(8, fontSize - 1));
+      doc.font(this.fonts.resolveBody(theme, bold, false)).fontSize(Math.max(8, fontSize - 1));
       cells.forEach((text, i) => {
         const x = startX + i * colWidth;
         doc.rect(x, y, colWidth, h).stroke();
