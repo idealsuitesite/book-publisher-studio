@@ -13,7 +13,17 @@ import type {
   FootnoteNode,
   InlineNode,
 } from '../models/Normalized';
-import type { Chapter, Section } from '../models/Book';
+import type {
+  Chapter,
+  Section,
+  Paragraph,
+  Image,
+  Table,
+  Scripture,
+  Quote,
+  List,
+  Footnote,
+} from '../models/Book';
 
 let autoIndex = 0;
 function nextIndex(): number {
@@ -148,7 +158,7 @@ describe('ASTBuilder', () => {
       expect(chapter.content).toHaveLength(2);
       expect(chapter.content[0].type).toBe('paragraph');
       // Cast au type Paragraph pour accéder à .text
-      expect((chapter.content[0] as any).text).toBe('First paragraph.');
+      expect((chapter.content[0] as Paragraph).text).toBe('First paragraph.');
     });
 
     it('numbers multiple chapters sequentially', () => {
@@ -302,7 +312,7 @@ describe('ASTBuilder', () => {
       const chapter = book.mainContent[0] as Chapter;
 
       expect(chapter.content[0].type).toBe('image');
-      const img = chapter.content[0] as any;
+      const img = chapter.content[0] as Image;
       expect(img.url).toBe('https://example.com/cover.png');
       expect(img.caption).toBe('A cover');
       expect(img.alt).toBe('Cover art');
@@ -319,7 +329,7 @@ describe('ASTBuilder', () => {
       const chapter = book.mainContent[0] as Chapter;
 
       expect(chapter.content[0].type).toBe('table');
-      const tbl = chapter.content[0] as any;
+      const tbl = chapter.content[0] as Table;
       expect(tbl.headers).toEqual(['Name', 'Age']);
       expect(tbl.rows).toEqual([['Alexandre', '30']]);
     });
@@ -333,7 +343,7 @@ describe('ASTBuilder', () => {
       const chapter = book.mainContent[0] as Chapter;
 
       expect(chapter.content[0].type).toBe('scripture');
-      const scr = chapter.content[0] as any;
+      const scr = chapter.content[0] as Scripture;
       expect(scr.reference).toEqual({ book: 'John', chapter: 3, verses: '16' });
     });
 
@@ -345,7 +355,7 @@ describe('ASTBuilder', () => {
       const book = new ASTBuilder().build(doc);
       const chapter = book.mainContent[0] as Chapter;
 
-      const scr = chapter.content[0] as any;
+      const scr = chapter.content[0] as Scripture;
       expect(scr.reference).toBeUndefined();
     });
 
@@ -355,7 +365,7 @@ describe('ASTBuilder', () => {
       const chapter = book.mainContent[0] as Chapter;
 
       expect(chapter.content[0].type).toBe('quote');
-      const q = chapter.content[0] as any;
+      const q = chapter.content[0] as Quote;
       expect(q.attribution).toBe('A. Author');
       expect(q.quoteType).toBe('block');
     });
@@ -366,7 +376,7 @@ describe('ASTBuilder', () => {
       const chapter = book.mainContent[0] as Chapter;
 
       expect(chapter.content[0].type).toBe('list');
-      const l = chapter.content[0] as any;
+      const l = chapter.content[0] as List;
       expect(l.ordered).toBe(true);
       expect(l.items).toEqual(['One', 'Two']);
     });
@@ -377,7 +387,7 @@ describe('ASTBuilder', () => {
       const chapter = book.mainContent[0] as Chapter;
 
       expect(chapter.content[0].type).toBe('footnote');
-      const fn = chapter.content[0] as any;
+      const fn = chapter.content[0] as Footnote;
       expect(fn.number).toBe(1);
       expect(fn.content).toBe('See appendix A.');
     });
@@ -395,7 +405,7 @@ describe('ASTBuilder', () => {
       ]);
       const book = new ASTBuilder().build(doc);
       const chapter = book.mainContent[0] as Chapter;
-      const p = chapter.content[0] as any;
+      const p = chapter.content[0] as Paragraph;
 
       expect(p.inlines).toEqual([
         { type: 'bold', text: 'bold' },

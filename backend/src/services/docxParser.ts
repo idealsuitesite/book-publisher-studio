@@ -58,10 +58,9 @@ export async function parseDocxFile(filePath: string): Promise<ExtractedContent>
     };
 
     return extractedContent;
-  } catch (error: any) {
-    const wrapped = new Error(`Failed to parse DOCX: ${error.message}`) as Error & {
-      cause?: unknown;
-    };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    const wrapped = new Error(`Failed to parse DOCX: ${message}`) as Error & { cause?: unknown };
     wrapped.cause = error;
     throw wrapped;
   }

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { HtmlNormalizer } from './HtmlNormalizer';
+import type {
+  ParagraphNode,
+  ImageNode,
+  TableNode,
+  ListNode,
+  QuoteNode,
+} from '../../domain/models/Normalized';
 
 describe('HtmlNormalizer', () => {
   const normalizer = new HtmlNormalizer();
@@ -45,9 +52,9 @@ describe('HtmlNormalizer', () => {
     it('detects bold text', () => {
       const html = `<p>This is <strong>bold</strong> text.</p>`;
       const doc = normalizer.normalize(html);
-      const para = doc.nodes[0] as any;
+      const para = doc.nodes[0] as ParagraphNode;
 
-      const boldInline = para.inlines.find((i: any) => i.type === 'bold');
+      const boldInline = para.inlines.find((i) => i.type === 'bold');
       expect(boldInline).toBeDefined();
       expect(boldInline?.text).toBe('bold');
     });
@@ -55,18 +62,18 @@ describe('HtmlNormalizer', () => {
     it('detects italic text', () => {
       const html = `<p>This is <em>italic</em> text.</p>`;
       const doc = normalizer.normalize(html);
-      const para = doc.nodes[0] as any;
+      const para = doc.nodes[0] as ParagraphNode;
 
-      const italicInline = para.inlines.find((i: any) => i.type === 'italic');
+      const italicInline = para.inlines.find((i) => i.type === 'italic');
       expect(italicInline).toBeDefined();
     });
 
     it('detects links', () => {
       const html = `<p>Check <a href="https://example.com">this link</a>.</p>`;
       const doc = normalizer.normalize(html);
-      const para = doc.nodes[0] as any;
+      const para = doc.nodes[0] as ParagraphNode;
 
-      const linkInline = para.inlines.find((i: any) => i.type === 'link');
+      const linkInline = para.inlines.find((i) => i.type === 'link');
       expect(linkInline?.url).toBe('https://example.com');
     });
   });
@@ -77,7 +84,7 @@ describe('HtmlNormalizer', () => {
       const doc = normalizer.normalize(html);
 
       expect(doc.nodes[0].type).toBe('image');
-      const img = doc.nodes[0] as any;
+      const img = doc.nodes[0] as ImageNode;
       expect(img.image.url).toBe('https://example.com/image.png');
       expect(img.image.alt).toBe('An image');
     });
@@ -85,7 +92,7 @@ describe('HtmlNormalizer', () => {
     it('extracts image caption', () => {
       const html = `<img src="test.png" title="My caption" />`;
       const doc = normalizer.normalize(html);
-      const img = doc.nodes[0] as any;
+      const img = doc.nodes[0] as ImageNode;
 
       expect(img.image.caption).toBe('My caption');
     });
@@ -102,7 +109,7 @@ describe('HtmlNormalizer', () => {
       const doc = normalizer.normalize(html);
 
       expect(doc.nodes[0].type).toBe('table');
-      const table = doc.nodes[0] as any;
+      const table = doc.nodes[0] as TableNode;
       expect(table.rows.length).toBeGreaterThanOrEqual(2);
     });
   });
@@ -113,7 +120,7 @@ describe('HtmlNormalizer', () => {
       const doc = normalizer.normalize(html);
 
       expect(doc.nodes[0].type).toBe('list');
-      const list = doc.nodes[0] as any;
+      const list = doc.nodes[0] as ListNode;
       expect(list.ordered).toBe(false);
       expect(list.items).toEqual(['Item 1', 'Item 2']);
     });
@@ -121,7 +128,7 @@ describe('HtmlNormalizer', () => {
     it('parses ordered lists', () => {
       const html = `<ol><li>First</li><li>Second</li></ol>`;
       const doc = normalizer.normalize(html);
-      const list = doc.nodes[0] as any;
+      const list = doc.nodes[0] as ListNode;
 
       expect(list.ordered).toBe(true);
     });
@@ -138,7 +145,7 @@ describe('HtmlNormalizer', () => {
     it('extracts attribution', () => {
       const html = `<blockquote>A quote<footer>— Author</footer></blockquote>`;
       const doc = normalizer.normalize(html);
-      const quote = doc.nodes[0] as any;
+      const quote = doc.nodes[0] as QuoteNode;
 
       expect(quote.attribution).toContain('Author');
     });

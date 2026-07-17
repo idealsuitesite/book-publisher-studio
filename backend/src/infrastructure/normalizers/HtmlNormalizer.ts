@@ -1,4 +1,6 @@
 import { load } from 'cheerio';
+import type { Cheerio, CheerioAPI } from 'cheerio';
+import { isTag, isText, type AnyNode, type Element } from 'domhandler';
 import type {
   NormalizedDocument,
   AnyNormalizedNode,
@@ -18,22 +20,23 @@ export class HtmlNormalizer implements DocumentNormalizer {
 
     root
       .find('h1, h2, h3, h4, h5, h6, p, img, table, ul, ol, blockquote')
-      .each((_: number, elem: any) => {
+      .each((_: number, elem: Element) => {
         const $elem = $(elem);
         const tag = elem.name?.toLowerCase();
         const text = $elem.text().trim();
 
         if (!text && tag !== 'img' && tag !== 'table') return;
 
-        if (tag?.match(/^h[1-6]$/)) {
-          const level = parseInt(tag[1], 10);
+        const headingMatch = tag?.match(/^h([1-6])$/);
+        if (headingMatch) {
+          const level = parseInt(headingMatch[1], 10);
           nodes.push({
             id: ids.node(),
             type: 'heading',
             level,
             text,
             source: { originalIndex: nodes.length },
-          } as any);
+          });
         } else if (tag === 'p') {
           const inlines = this.extractInlines($, $elem);
           nodes.push({
@@ -41,7 +44,7 @@ export class HtmlNormalizer implements DocumentNormalizer {
             type: 'paragraph',
             inlines: inlines.length ? inlines : [{ type: 'text', text }],
             source: { originalIndex: nodes.length },
-          } as any);
+          });
         } else if (tag === 'img') {
           nodes.push({
             id: ids.node(),
@@ -52,14 +55,14 @@ export class HtmlNormalizer implements DocumentNormalizer {
               caption: $elem.attr('title'),
             },
             source: { originalIndex: nodes.length },
-          } as any);
+          });
         } else if (tag === 'table') {
-          const rows: any[] = [];
-          $elem.find('tr').each((_: number, row: any) => {
+          const rows: { cells: string[]; isHeader: boolean }[] = [];
+          $elem.find('tr').each((_: number, row: Element) => {
             const cells: string[] = [];
             $(row)
               .find('td, th')
-              .each((_: number, cell: any) => {
+              .each((_: number, cell: Element) => {
                 cells.push($(cell).text().trim());
               });
             rows.push({ cells, isHeader: $(row).find('th').length > 0 });
@@ -69,10 +72,10 @@ export class HtmlNormalizer implements DocumentNormalizer {
             type: 'table',
             rows,
             source: { originalIndex: nodes.length },
-          } as any);
+          });
         } else if (tag === 'ul' || tag === 'ol') {
           const items: string[] = [];
-          $elem.find('li').each((_: number, li: any) => {
+          $elem.find('li').each((_: number, li: Element) => {
             items.push($(li).text().trim());
           });
           nodes.push({
@@ -81,7 +84,7 @@ export class HtmlNormalizer implements DocumentNormalizer {
             ordered: tag === 'ol',
             items,
             source: { originalIndex: nodes.length },
-          } as any);
+          });
         } else if (tag === 'blockquote') {
           const inlines = this.extractInlines($, $elem);
           nodes.push({
@@ -90,7 +93,7 @@ export class HtmlNormalizer implements DocumentNormalizer {
             inlines: inlines.length ? inlines : [{ type: 'text', text }],
             attribution: $elem.find('footer, cite').text().trim() || undefined,
             source: { originalIndex: nodes.length },
-          } as any);
+          });
         }
       });
 
@@ -105,14 +108,14 @@ export class HtmlNormalizer implements DocumentNormalizer {
     };
   }
 
-  private extractInlines($: any, $elem: any): InlineNode[] {
+  private extractInlines($: CheerioAPI, $elem: Cheerio<Element>): InlineNode[] {
     const inlines: InlineNode[] = [];
 
-    $elem.contents().each((_: number, node: any) => {
-      if (node.type === 'text') {
+    $elem.contents().each((_: number, node: AnyNode) => {
+      if (isText(node)) {
         const text = node.data?.trim();
         if (text) inlines.push({ type: 'text', text });
-      } else if (node.type === 'tag') {
+      } else if (isTag(node)) {
         const $node = $(node);
         const tag = node.name?.toLowerCase();
         const text = $node.text().trim();
