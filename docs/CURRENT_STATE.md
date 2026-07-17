@@ -1,14 +1,14 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 23:40 UTC
-**Sprint:** Sprint 2 - Rendering Engine (Theme Engine, Layout Engine, DOCX Export) ✅ MERGED
-**Branch:** `main` — Sprint 2 merged via PR #1 (merge commit `32ac220`), feature branch work complete
+**Last Updated:** July 17, 2026 00:05 UTC
+**Sprint:** Sprint 2 - Rendering Engine ✅ MERGED, Quality Sprint ✅ MERGED
+**Branch:** `main` — PR #1 (Sprint 2, `32ac220`) and PR #2 (Quality Sprint, `c507f5d`) both merged, no open feature branches
 
 ---
 
 ## Summary
 
-**Completed:** 118 tests passing ✅ (re-verified on merged `main`, not just the feature branch: `npm test`, `npm run build`, `npm run lint`, plus the earlier real-DOCX manual export check)
+**Completed:** 118 tests passing ✅ (re-verified on merged `main`, not just feature branches: `npm test`, `npm run build`, `npm run lint`, `npm run test:coverage`)
 **Next:** Sprint 3 (PDF export — ADR-0014 already decided; EPUB export — ADR-0015 spike still needed)
 
 ---
@@ -45,8 +45,11 @@ Domain + Infrastructure + Application + Presentation for `POST /api/manuscripts/
 
 **Verified with a real file:** a real DOCX from `backend/uploads/` was exported via the running dev server — valid zip structure, correct Word parts (`word/document.xml`, `styles.xml`, `numbering.xml`), page breaks present, Classic theme's Georgia font applied.
 
-**Still outstanding (carried into Sprint 3, not blocking the merge):**
-- Quality Sprint: 37 ESLint warnings still outstanding (unchanged since Phase 2, tracked not fixed)
+## Quality Sprint ✅ COMPLETE (merged to `main` via PR #2, `c507f5d`)
+
+All 37 `@typescript-eslint/no-explicit-any` warnings eliminated — no behavior change, 118/118 tests unchanged, coverage unchanged. `HtmlNormalizer.ts` now uses real cheerio/domhandler types (`Element`, `AnyNode`, `isTag`/`isText` guards) instead of `any`; two test files use proper Domain type casts instead of `as any`; two `catch` blocks narrow via `instanceof Error`. ESLint now reports **0 errors, 0 warnings**.
+
+**Nothing outstanding from Sprint 2 or the Quality Sprint** — both fully merged and verified on `main`.
 
 ---
 
@@ -88,8 +91,9 @@ Domain + Infrastructure + Application + Presentation for `POST /api/manuscripts/
 | TypeScript strict mode | ✅ |
 | Controller contains no business logic | ✅ |
 | Domain coverage >90% | ✅ (92.64%) |
-| Global coverage >80% | ✅ (88.01%) |
+| Global coverage >80% | ✅ (88.03%) |
 | Renderer is a port; ThemeEngine/LayoutEngine are concrete classes | ✅ (Design Review decision, ADR-0012 addendum) |
+| Zero ESLint warnings | ✅ (0 errors, 0 warnings — Quality Sprint, PR #2) |
 
 ---
 
@@ -104,7 +108,6 @@ Domain + Infrastructure + Application + Presentation for `POST /api/manuscripts/
 ## Technical Debt
 
 - `QualityMetrics` interface (in `Book.ts`) is declared but unused — needs the Typography Engine (Sprint 4).
-- 37 ESLint warnings (`@typescript-eslint/no-explicit-any`) — tracked as a Sprint 2 Quality Sprint item, not yet fixed.
 - `DOCXRenderer`'s footnote rendering is simplified (inline `[n] content` paragraph, not real Word footnotes) and ordered lists use a manual prefix instead of `docx`'s numbering config — both documented, deliberate simplifications, not silent gaps.
 - `docs/architecture/diagrams/BASELINE_v0.1.md`'s "86/86 tests" claim was corrected via ADR-0010 (status annotation only, content not rewritten, per the doc's own frozen/ADR-only change rule).
 
@@ -134,8 +137,9 @@ npm run test:coverage  # Verify coverage thresholds
 **Runtime:**
 - mammoth (DOCX parser)
 - cheerio (HTML normalizer)
+- **domhandler** (cheerio's node types — `Element`/`AnyNode`/`isTag`/`isText` — explicit dependency added during the Quality Sprint instead of relying on transitive resolution)
 - express, multer, cors
-- **docx** (DOCX generation — new this sprint, ADR-0018)
+- **docx** (DOCX generation — ADR-0018)
 
 **Dev:**
 - vitest, @vitest/coverage-v8
@@ -149,6 +153,7 @@ npm run test:coverage  # Verify coverage thresholds
 ## Git Status
 
 **Branch:** `main`
-**`main` synced with `origin/main` at:** `32ac220` (PR #1 merge commit — `feature/sprint-2-rendering-engine` → `main`)
+**`main` synced with `origin/main` at:** `c507f5d` (PR #2 merge commit — `chore/quality-sprint-no-explicit-any` → `main`; PR #1 `32ac220` merged earlier in the same history)
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
-**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`
+**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`
+**Open branches:** none — both feature branches deleted locally and remotely after merge

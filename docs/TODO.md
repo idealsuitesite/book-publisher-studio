@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 23:40 UTC
+**Last Updated:** July 17, 2026 00:05 UTC
 
 ---
 
@@ -12,9 +12,7 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-### Quality Sprint: 0 ESLint warnings
-
-- [ ] Still 37 warnings, unchanged across Phase 2 and Sprint 2 — not fixed, remains explicitly scheduled (not silently dropped)
+None currently — Quality Sprint is complete, Sprint 3 hasn't started.
 
 ### Medium Priority (Sprint 3)
 
@@ -69,6 +67,12 @@ None currently.
 - ✅ **118 total tests passing**, re-verified on merged `main` (not just the feature branch), plus a real DOCX exported end-to-end
 - ✅ Design Review completed and approved *before* any implementation code (ADR-0012 through ADR-0018)
 
+### Quality Sprint (merged via PR #2, `c507f5d`)
+
+- ✅ All 37 `@typescript-eslint/no-explicit-any` warnings eliminated (14 in `HtmlNormalizer.ts` with real cheerio/domhandler types, 21 across two test files with proper Domain type casts, 2 `catch` blocks narrowed via `instanceof Error`)
+- ✅ No behavior change — 118/118 tests unchanged, coverage unchanged
+- ✅ ESLint now reports **0 errors, 0 warnings**
+
 ---
 
 ## 📋 BACKLOG (Future)
@@ -104,8 +108,8 @@ None currently.
 
 ## 📊 METRICS
 
-- **Test Coverage:** Domain 92.64% stmts, global 88.01% stmts (both verified via `npm run test:coverage`, not asserted)
-- **Code Quality:** TypeScript strict mode ✅, ESLint 0 errors / 37 warnings, Prettier applied
+- **Test Coverage:** Domain 92.64% stmts, global 88.03% stmts (both verified via `npm run test:coverage`, not asserted)
+- **Code Quality:** TypeScript strict mode ✅, ESLint **0 errors / 0 warnings**, Prettier applied
 - **Tests:** 118 passing, 0 failing
 - **Architecture Debt:** Legacy route duplication (see Known Issues)
-- **Documentation:** Reconciled with actual code as of 2026-07-17 (Sprint 2 implementation, pre-merge)
+- **Documentation:** Reconciled with actual code as of 2026-07-17 (post Sprint 2 + Quality Sprint merge)
