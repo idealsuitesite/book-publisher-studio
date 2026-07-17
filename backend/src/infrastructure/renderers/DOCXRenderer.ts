@@ -9,6 +9,10 @@ import {
   TableRow,
   TableCell,
   ImageRun,
+  Header,
+  Footer,
+  PageNumber,
+  AlignmentType,
   type ISectionOptions,
   type IStylesOptions,
   type ParagraphChild,
@@ -126,6 +130,53 @@ function buildRunsWithDropCap(
   return [dropCapRun, ...buildRuns(remainingRuns, font, size, color)];
 }
 
+// Sprint 6 (ADR-0029 Decision 6, Functional Spec item 9): DOCX gains header/footer support -
+// a genuinely new capability, DOCXRenderer had none before this. A single Header/Footer applies
+// to the whole document (docx's own per-section header/footer model would need splitting the
+// single ISectionOptions this renderer builds into one section per top-level Chapter/Section to
+// alternate a 'chapterTitle' running head per chapter - not built this sprint, a real, disclosed
+// limitation; ClassicTheme's own 'bookTitle' content is constant document-wide regardless, so
+// this doesn't affect the one populated theme that exists). The title used for 'chapterTitle'
+// content is the first page's resolved title (Page.headerFooterTitle, LayoutEngine) - the best
+// single value available without per-section splitting.
+//
+// The footer's page number uses docx's own PageNumber.CURRENT/TOTAL_PAGES fields (not a
+// pre-computed string like PDFRenderer's) - Word recalculates these live as the document
+// reflows, which is the structurally correct choice for a format that isn't fixed-layout the
+// way rendered PDF pages are (ADR-0013 already treats our own Page[] as an estimate).
+function buildHeaderFooter(book: PaginatedBook): { headers?: ISectionOptions['headers']; footers?: ISectionOptions['footers'] } {
+  const runningHead = book.styledBook.theme.runningHead;
+  if (!runningHead?.show) return {};
+
+  const alignment = runningHead.position === 'left' ? AlignmentType.LEFT : AlignmentType.RIGHT;
+  const title = book.pages[0]?.headerFooterTitle;
+  const headerText = title ? (runningHead.uppercase ? title.toUpperCase() : title) : undefined;
+
+  const headers = headerText
+    ? { default: new Header({ children: [new Paragraph({ alignment, children: [new TextRun({ text: headerText, size: (runningHead.size ?? 9) * 2 })] })] }) }
+    : undefined;
+
+  const footers = runningHead.pageNumber
+    ? {
+        default: new Footer({
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({ text: 'Page ', size: (runningHead.size ?? 9) * 2 }),
+                new TextRun({ children: [PageNumber.CURRENT], size: (runningHead.size ?? 9) * 2 }),
+                new TextRun({ text: ' of ', size: (runningHead.size ?? 9) * 2 }),
+                new TextRun({ children: [PageNumber.TOTAL_PAGES], size: (runningHead.size ?? 9) * 2 }),
+              ],
+            }),
+          ],
+        }),
+      }
+    : undefined;
+
+  return { headers, footers };
+}
+
 export class DOCXRenderer implements Renderer<Buffer> {
   async render(book: PaginatedBook, _context: RenderContext): Promise<Buffer> {
     const pageStartBlockIds = new Set(
@@ -150,6 +201,7 @@ export class DOCXRenderer implements Renderer<Buffer> {
     // doc comment for the full disclosure.
     const { width, height, marginTop, marginBottom, marginLeft, marginRight } = book.pageLayout;
     const TWIPS_PER_POINT = 20;
+    const { headers, footers } = buildHeaderFooter(book);
     const section: ISectionOptions = {
       properties: {
         page: {
@@ -162,6 +214,8 @@ export class DOCXRenderer implements Renderer<Buffer> {
           },
         },
       },
+      headers,
+      footers,
       children,
     };
     const doc = new Document({

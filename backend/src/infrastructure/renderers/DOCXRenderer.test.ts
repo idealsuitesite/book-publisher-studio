@@ -8,6 +8,7 @@ import { ClassicTheme } from '../../domain/themes/ClassicTheme';
 import { createBook } from '../../domain/models/Book';
 import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement } from '../../domain/models/Book';
 import type { PageLayout } from '../../domain/models/PageLayout';
+import type { Theme } from '../../domain/models/Theme';
 
 const LETTER_LAYOUT: PageLayout = {
   pageSize: 'letter',
@@ -51,9 +52,9 @@ async function extractDocumentXml(buffer: Buffer): Promise<string> {
   return doc.async('string');
 }
 
-function paginate(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT) {
+function paginate(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT, theme: Theme = ClassicTheme) {
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
-  const styled = new ThemeEngine().applyTheme(book, ClassicTheme);
+  const styled = new ThemeEngine().applyTheme(book, theme);
   return new LayoutEngine().paginate(styled, layout);
 }
 
@@ -94,6 +95,53 @@ describe('DOCXRenderer', () => {
     const xml = await extractDocumentXml(buffer);
 
     expect(xml).toMatch(/<w:pgSz[^>]*w:w="11905"[^>]*w:h="16837"/);
+  });
+
+  // Sprint 6 (ADR-0029, Functional Spec item 9): DOCXRenderer gains header/footer support -
+  // a genuinely new capability, none existed before this.
+  describe('header/footer (Theme.runningHead)', () => {
+    it("writes a real header part with the book's title and a footer part with a live PAGE/NUMPAGES field", async () => {
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])]);
+
+      const buffer = await renderer.render(paginated, {});
+      const zip = await JSZip.loadAsync(buffer);
+      const headerFile = Object.keys(zip.files).find((f) => /word\/header\d+\.xml/.test(f));
+      const footerFile = Object.keys(zip.files).find((f) => /word\/footer\d+\.xml/.test(f));
+
+      expect(headerFile).toBeDefined();
+      expect(footerFile).toBeDefined();
+
+      const headerXml = await zip.file(headerFile!)!.async('string');
+      const footerXml = await zip.file(footerFile!)!.async('string');
+
+      expect(headerXml).toContain('T'); // paginate()'s book title
+      expect(footerXml).toContain('PAGE');
+      expect(footerXml).toContain('NUMPAGES');
+    });
+
+    it('writes no header/footer parts when runningHead.show is false', async () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, show: false } };
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
+
+      const buffer = await renderer.render(paginated, {});
+      const zip = await JSZip.loadAsync(buffer);
+      const headerFile = Object.keys(zip.files).find((f) => /word\/header\d+\.xml/.test(f));
+      const footerFile = Object.keys(zip.files).find((f) => /word\/footer\d+\.xml/.test(f));
+
+      expect(headerFile).toBeUndefined();
+      expect(footerFile).toBeUndefined();
+    });
+
+    it('writes no header/footer parts when the theme has no runningHead at all', async () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: undefined };
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
+
+      const buffer = await renderer.render(paginated, {});
+      const zip = await JSZip.loadAsync(buffer);
+      const headerFile = Object.keys(zip.files).find((f) => /word\/header\d+\.xml/.test(f));
+
+      expect(headerFile).toBeUndefined();
+    });
   });
 
   it('includes chapter titles as headings', async () => {
