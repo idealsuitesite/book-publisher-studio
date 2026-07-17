@@ -4,6 +4,7 @@ import type { DocumentNormalizer } from '../../domain/ports/DocumentNormalizer';
 import type { Renderer } from '../../domain/ports/Renderer';
 import type { ASTBuilder } from '../../domain/services/ASTBuilder';
 import type { ThemeEngine } from '../../domain/services/ThemeEngine';
+import type { TypographyResolver } from '../../domain/services/TypographyResolver';
 import type { LayoutEngine } from '../../domain/services/LayoutEngine';
 import type { PageLayout } from '../../domain/models/PageLayout';
 import { getTheme } from '../../domain/themes/getTheme';
@@ -21,6 +22,7 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
     private normalizer: DocumentNormalizer,
     private builder: ASTBuilder,
     private themeEngine: ThemeEngine,
+    private typographyResolver: TypographyResolver,
     private layoutEngine: LayoutEngine,
     private renderer: Renderer<Buffer>
   ) {}
@@ -32,7 +34,8 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
 
     const theme = getTheme(request.themeName);
     const styled = this.themeEngine.applyTheme(book, theme);
-    const paginated = this.layoutEngine.paginate(styled, request.pageLayout);
+    const typeset = this.typographyResolver.resolve(styled);
+    const paginated = this.layoutEngine.paginate(typeset, request.pageLayout);
 
     return this.renderer.render(paginated, { language: book.metadata.language });
   }

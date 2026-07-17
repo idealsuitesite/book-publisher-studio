@@ -9,6 +9,7 @@ import { BookMapper } from '../application/mappers/BookMapper';
 import { ImportManuscriptUseCase } from '../application/use-cases/ImportManuscriptUseCase';
 import { ExportManuscriptUseCase } from '../application/use-cases/ExportManuscriptUseCase';
 import { ThemeEngine } from '../domain/services/ThemeEngine';
+import { TypographyResolver } from '../domain/services/TypographyResolver';
 import { LayoutEngine } from '../domain/services/LayoutEngine';
 import { DOCXRenderer } from '../infrastructure/renderers/DOCXRenderer';
 import { PDFRenderer } from '../infrastructure/renderers/PDFRenderer';
@@ -40,11 +41,15 @@ export function createApp(): Express {
   // Sprint 2: Rendering pipeline (Theme Engine, Layout Engine, DOCX export)
   // Sprint 3A: PDF export reuses the same renderer-agnostic use case with PDFRenderer instead
   // Sprint 3B: EPUB export reuses it again with EPUBRenderer
+  // Sprint 4: TypographyResolver runs between ThemeEngine and LayoutEngine (inline runs,
+  // drop caps, smart quotes, heading keep-with-next) - same instance reused across all
+  // three formats, matching ThemeEngine/LayoutEngine's own reuse
   const exportDocxUseCase = new ExportManuscriptUseCase(
     new MammothParser(),
     new HtmlNormalizer(),
     new ASTBuilder(),
     new ThemeEngine(),
+    new TypographyResolver(),
     new LayoutEngine(),
     new DOCXRenderer()
   );
@@ -53,6 +58,7 @@ export function createApp(): Express {
     new HtmlNormalizer(),
     new ASTBuilder(),
     new ThemeEngine(),
+    new TypographyResolver(),
     new LayoutEngine(),
     new PDFRenderer()
   );
@@ -61,6 +67,7 @@ export function createApp(): Express {
     new HtmlNormalizer(),
     new ASTBuilder(),
     new ThemeEngine(),
+    new TypographyResolver(),
     new LayoutEngine(),
     new EPUBRenderer()
   );

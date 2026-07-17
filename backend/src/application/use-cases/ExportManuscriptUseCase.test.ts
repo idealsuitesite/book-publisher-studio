@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import { ExportManuscriptUseCase } from './ExportManuscriptUseCase';
 import { ASTBuilder } from '../../domain/services/ASTBuilder';
 import { ThemeEngine } from '../../domain/services/ThemeEngine';
+import { TypographyResolver } from '../../domain/services/TypographyResolver';
 import { LayoutEngine } from '../../domain/services/LayoutEngine';
 import { HtmlNormalizer } from '../../infrastructure/normalizers/HtmlNormalizer';
 import { MammothParser } from '../../infrastructure/parsers/MammothParser';
@@ -18,6 +19,7 @@ function buildUseCase() {
     new HtmlNormalizer(),
     new ASTBuilder(),
     new ThemeEngine(),
+    new TypographyResolver(),
     new LayoutEngine(),
     new DOCXRenderer()
   );
