@@ -113,7 +113,13 @@ export class HtmlNormalizer implements DocumentNormalizer {
 
     $elem.contents().each((_: number, node: AnyNode) => {
       if (isText(node)) {
-        const text = node.data?.trim();
+        // Collapse internal whitespace runs (stray tabs/newlines from the source markup)
+        // to a single space, but never trim the ends. A text node sitting between two
+        // tags (e.g. the " " between "</strong>" and "<em>") IS the word separator -
+        // trimming it away silently jams adjacent words together (e.g. "mixesbold") on
+        // any real multi-run paragraph. Only a genuinely empty node (zero characters
+        // after collapsing) is dropped - this is the fix, not a stricter emptiness check.
+        const text = (node.data ?? '').replace(/\s+/g, ' ');
         if (text) inlines.push({ type: 'text', text });
       } else if (isTag(node)) {
         const $node = $(node);
@@ -124,6 +130,7 @@ export class HtmlNormalizer implements DocumentNormalizer {
         if (tag === 'strong' || tag === 'b') inlines.push({ type: 'bold', text });
         else if (tag === 'em' || tag === 'i') inlines.push({ type: 'italic', text });
         else if (tag === 'u') inlines.push({ type: 'underline', text });
+        else if (tag === 's' || tag === 'strike' || tag === 'del') inlines.push({ type: 'strikethrough', text });
         else if (tag === 'a') inlines.push({ type: 'link', text, url: $node.attr('href') ?? '' });
         else inlines.push({ type: 'text', text });
       }

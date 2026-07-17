@@ -392,13 +392,14 @@ describe('ASTBuilder', () => {
       expect(fn.content).toBe('See appendix A.');
     });
 
-    it('converts inline formatting: bold, italic, underline, link, small-caps', () => {
+    it('converts inline formatting: bold, italic, underline, strikethrough, link, small-caps', () => {
       const doc = buildDocument([
         heading(1, 'Chapter One'),
         paragraphWithInlines([
           { type: 'bold', text: 'bold' },
           { type: 'italic', text: 'italic' },
           { type: 'underline', text: 'underline' },
+          { type: 'strikethrough', text: 'struck' },
           { type: 'link', text: 'link', url: 'https://example.com' },
           { type: 'small-caps', text: 'caps' },
         ]),
@@ -411,8 +412,34 @@ describe('ASTBuilder', () => {
         { type: 'bold', text: 'bold' },
         { type: 'italic', text: 'italic' },
         { type: 'underline', text: 'underline' },
+        { type: 'strikethrough', text: 'struck' },
         { type: 'link', text: 'link', url: 'https://example.com' },
         { type: 'small-caps', text: 'caps' },
+      ]);
+    });
+
+    // Regression for a real bug (Sprint 4 commit 10, found via a real DOCX round trip):
+    // convertInlines() used to filter every plain 'text' inline out of Paragraph.inlines,
+    // so a paragraph with any formatting lost all of its surrounding, unformatted prose in
+    // every renderer that reads .inlines (TypographyResolver prefers .inlines over .text
+    // whenever it's non-empty) - not a styling loss, actual missing sentences.
+    it('keeps plain text inlines alongside formatted ones, not just the formatted runs', () => {
+      const doc = buildDocument([
+        heading(1, 'Chapter One'),
+        paragraphWithInlines([
+          { type: 'text', text: 'Some prose, then ' },
+          { type: 'bold', text: 'bold' },
+          { type: 'text', text: ', then more prose.' },
+        ]),
+      ]);
+      const book = new ASTBuilder().build(doc);
+      const chapter = book.mainContent[0] as Chapter;
+      const p = chapter.content[0] as Paragraph;
+
+      expect(p.inlines).toEqual([
+        { type: 'text', text: 'Some prose, then ' },
+        { type: 'bold', text: 'bold' },
+        { type: 'text', text: ', then more prose.' },
       ]);
     });
   });

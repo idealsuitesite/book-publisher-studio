@@ -13,6 +13,7 @@ import type {
   List,
   Footnote,
   BookMetadata,
+  InlineElement,
 } from '../models/Book';
 import type {
   NormalizedDocument,
@@ -25,6 +26,7 @@ import type {
   ScriptureNode,
   ListNode,
   FootnoteNode,
+  InlineNode,
 } from '../models/Normalized';
 import { createIdGenerator } from '../../shared/utils/idGenerator';
 
@@ -262,25 +264,39 @@ export class ASTBuilder {
     };
   }
 
-  private convertInlines(inlines: { type: string; text: string; url?: string }[]) {
-    return inlines
-      .filter((inline) => inline.type !== 'text')
-      .map((inline) => {
-        switch (inline.type) {
-          case 'bold':
-            return { type: 'bold' as const, text: inline.text };
-          case 'italic':
-            return { type: 'italic' as const, text: inline.text };
-          case 'underline':
-            return { type: 'underline' as const, text: inline.text };
-          case 'link':
-            return { type: 'link' as const, text: inline.text, url: inline.url ?? '' };
-          case 'small-caps':
-            return { type: 'small-caps' as const, text: inline.text };
-          default:
-            return { type: 'bold' as const, text: inline.text };
+  // Plain text runs are kept (not filtered out) - a paragraph with any inline formatting
+  // still has ordinary prose between/around the formatted runs (e.g. "This paragraph
+  // mixes <bold>bold</bold>, <italic>italic</italic>..."), and dropping those 'text'
+  // entries here made every renderer that reads Paragraph.inlines silently lose that
+  // surrounding prose entirely on any real formatted document (found via Sprint 4 commit
+  // 10's real-file verification, docs/REAL_EXPORT_CHECKLIST.md - see commit message).
+  // Exhaustive switch (no catch-all default) so a new InlineNode.type added to
+  // Normalized.ts without a corresponding case here is a compile error, not a silently
+  // mislabeled run - the previous `default: return bold` fallback is exactly what let the
+  // Normalized 'strikethrough' gap upstream slip through unnoticed.
+  private convertInlines(inlines: InlineNode[]): InlineElement[] {
+    return inlines.map((inline): InlineElement => {
+      switch (inline.type) {
+        case 'text':
+          return { type: 'text', text: inline.text };
+        case 'bold':
+          return { type: 'bold', text: inline.text };
+        case 'italic':
+          return { type: 'italic', text: inline.text };
+        case 'underline':
+          return { type: 'underline', text: inline.text };
+        case 'strikethrough':
+          return { type: 'strikethrough', text: inline.text };
+        case 'link':
+          return { type: 'link', text: inline.text, url: inline.url ?? '' };
+        case 'small-caps':
+          return { type: 'small-caps', text: inline.text };
+        default: {
+          const _exhaustive: never = inline.type;
+          throw new Error(`Unsupported inline type: ${JSON.stringify(_exhaustive)}`);
         }
-      });
+      }
+    });
   }
 
   private parseScriptureReference(reference?: string) {

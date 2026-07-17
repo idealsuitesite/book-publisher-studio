@@ -73,7 +73,7 @@ export type AnyNormalizedNode =
   | FootnoteNode;
 
 export interface InlineNode {
-  type: 'text' | 'bold' | 'italic' | 'underline' | 'link' | 'small-caps';
+  type: 'text' | 'bold' | 'italic' | 'underline' | 'strikethrough' | 'link' | 'small-caps';
   text: string;
   url?: string;
 }
