@@ -34,6 +34,13 @@ function resolveFont(fontFamily: string, bold: boolean, italic: boolean): string
 }
 
 export class PDFRenderer implements Renderer<Buffer> {
+  // compress defaults to true for real output; tests pass false so the content stream stays
+  // plain text and its rendered text can be extracted for assertions (see
+  // test-utils/extractPdfText.ts - PDFKit encodes text as hex-string TJ/Tj operands, not the
+  // literal-string runs a format like DOCX's XML would have, so a compressed stream can't be
+  // grepped for content at all).
+  constructor(private options: { compress?: boolean } = {}) {}
+
   async render(book: PaginatedBook, context: RenderContext): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       // bufferPages defers writing pages to the output stream until flushed - see
@@ -42,6 +49,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         size: PAGE_SIZE,
         margin: MARGIN,
         bufferPages: true,
+        compress: this.options.compress ?? true,
         info: {
           ...(context.metadata?.title ? { Title: context.metadata.title } : {}),
           ...(context.metadata?.author ? { Author: context.metadata.author } : {}),

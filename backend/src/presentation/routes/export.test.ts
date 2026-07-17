@@ -76,4 +76,21 @@ describe('POST /api/manuscripts/export', () => {
 
     expect(response.status).toBe(400);
   });
+
+  it('returns 200 with a valid PDF when format=pdf', async () => {
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello world.'] });
+
+    const response = await request(app)
+      .post('/api/manuscripts/export')
+      .field('theme', 'classic')
+      .field('format', 'pdf')
+      .attach('file', buffer, 'manuscript.docx')
+      .buffer(true)
+      .parse(binaryParser);
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('application/pdf');
+    const pdf = response.body as Buffer;
+    expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
 });
