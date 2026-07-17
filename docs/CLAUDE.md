@@ -90,6 +90,14 @@ src/
 - Minimum 80% coverage
 - All tests must pass before commit
 
+## Permanent Verification Policy (Real Export Checklist)
+
+This project has already missed multiple real bugs that synthetic fixtures did not detect: PDF "Page 6 of 4" (ADR-0019 finding 6C), a completely empty EPUB (ADR-0020 addendum), and PDFKit infinite pagination (ADR-0019 finding 6B). All three were caught only by exporting a real manuscript through the running HTTP API and visually inspecting the output — never by a green `npm test` alone.
+
+**Rule:** any change touching `DOCXRenderer`, `PDFRenderer`, `EPUBRenderer`, `ThemeEngine`, `LayoutEngine`, `TypographyResolver`, the `Renderer` port, or `ExportManuscriptUseCase` must complete `docs/REAL_EXPORT_CHECKLIST.md` before the task is considered done — unit tests and E2E tests passing is necessary but never sufficient on its own for this category of change. No sprint touching the rendering pipeline is complete until at least one real manuscript from `backend/uploads/` has been exported (all applicable formats) through `POST /api/manuscripts/export` and manually inspected — not by calling a renderer class directly in a script.
+
+This is enforced at merge time via `docs/MERGE_CHECKLIST.md`'s own gate for this category of change. It applies automatically in every session touching the rendering pipeline, without needing to be re-requested.
+
 ## Naming Conventions
 
 - Domain: `Book`, `Chapter`, `Block`, `Validator`, `Calculator`

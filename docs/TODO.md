@@ -32,7 +32,11 @@ None currently. Sprint 3 ("Professional Export") is fully merged and tagged (`v0
 - [ ] AI features (explicitly deferred — architecture should stay extensible for these, not build them now)
 - [ ] Licensing/subscription model, observability/telemetry (also explicitly deferred — no DB/auth exists yet)
 
-**CTO priority order for Sprint 4+ (2026-07-17):** 1) Typography Engine, 2) `ValidatorEngine`, 3) Plugin system, 4) Premium UI, 5) AI features. Typography Engine is next — Design Review required before any implementation code (see `docs/architecture/diagrams/` once written).
+**CTO priority order for Sprint 4+ (2026-07-17):** 1) Typography Engine, 2) `ValidatorEngine`, 3) Plugin system, 4) Premium UI, 5) AI features.
+
+**Typography Engine Design Review — DRAFT v2** (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`), revised after CTO review 2026-07-17: pipeline position and responsibility split approved; `TypesetBook`/`LayoutEngine` signature-change proposal rejected in favor of a smaller-blast-radius design (`StyledBook` gains an additive `blockTypography` field instead); component renamed `TypographyEngine` → `TypographyResolver`; hyphenation confirmed deferred to v2; smart quotes confirmed English-only v1. Awaiting final CTO approval before any implementation code (no branch opened yet).
+
+**New permanent governance policy (2026-07-17):** `docs/REAL_EXPORT_CHECKLIST.md` created — mandatory for any change touching the rendering pipeline (renderers, `ThemeEngine`, `LayoutEngine`, future `TypographyResolver`, `Renderer` port, `ExportManuscriptUseCase`). Enforced via a new gate in `docs/MERGE_CHECKLIST.md` and referenced in `docs/CLAUDE.md` so it applies automatically in future sessions without being re-requested.
 
 ---
 

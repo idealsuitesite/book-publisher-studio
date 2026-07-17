@@ -12,6 +12,7 @@ Formalizes what ADR-0017 (`main` as a production branch) implied but didn't spel
 
 ## Conditional — only if applicable, but don't skip the check
 
+- [ ] **`docs/REAL_EXPORT_CHECKLIST.md` completed and attached to the PR** if the change touches `DOCXRenderer`, `PDFRenderer`, `EPUBRenderer`, `ThemeEngine`, `LayoutEngine`, `TypographyResolver`, the `Renderer` port, or `ExportManuscriptUseCase`. This project has already missed 3 real bugs (PDF "Page 6 of 4", empty EPUB, PDFKit infinite pagination) that synthetic fixtures alone did not catch — all three were only found by exporting a real manuscript from `backend/uploads/` through the running dev server and visually inspecting the output. `npm test` passing is necessary but never sufficient for this category of change. See `docs/REAL_EXPORT_CHECKLIST.md` for the required steps and template.
 - [ ] **ADR written** if the change makes an architectural decision (new pattern, new dependency, a trade-off that could reasonably have gone another way). Not every change needs one — a bug fix doesn't. A new port, a new engine, a naming convention, a layering rule: yes.
 - [ ] **Release Notes updated** if user-facing/API behavior changes (new endpoint, changed response shape, new export format). Internal refactors with no behavior change don't need this.
 - [ ] **`docs/CURRENT_STATE.md` updated** with real, verified numbers (test count, coverage) — not asserted, checked. This project has a documented history of doc claims drifting from reality; don't add to it.
