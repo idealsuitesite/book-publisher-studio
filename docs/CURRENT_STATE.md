@@ -1,15 +1,15 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 10:00 UTC
-**Sprint:** Sprint 3B - EPUB Export ✅ MERGED. Sprint 3A, Sprint 2, and Quality Sprint remain ✅ MERGED. Sprint 3 ("Professional Export") is now fully complete.
-**Branch:** `main` — PR #1 (Sprint 2, `32ac220`), PR #2 (Quality Sprint, `c507f5d`), PR #3 (Sprint 3A PDF export, `820f1ef`), and PR #4 (Sprint 3B EPUB export, `a7a38a0`) all merged, no open feature branches
+**Last Updated:** July 17, 2026 (post-Sprint-3 governance pass, ADR-0021)
+**Sprint:** Sprint 3 ("Professional Export") fully complete and tagged. Post-Sprint-3 governance pass (ADR-0021) resolved 4 open items. Sprint 4 (Typography Engine) is in Design Review — CTO-set priority order: Typography Engine → ValidatorEngine → Plugin system → Premium UI → AI features.
+**Branch:** `main` — PR #1 (Sprint 2, `32ac220`), PR #2 (Quality Sprint, `c507f5d`), PR #3 (Sprint 3A PDF export, `820f1ef`), PR #4 (Sprint 3B EPUB export, `a7a38a0`), and governance commit `e512ee7` (ADR-0021) all on `main`. **Open:** PR #5 (`chore/remove-legacy-upload-route`) awaiting merge.
 
 ---
 
 ## Summary
 
-**Completed:** 133 tests passing ✅ (re-verified on merged `main`, not just the feature branch: clean `npm install`, `npm run build`, `npm run lint`, `npm test`, `npm run test:coverage`, plus a real DOCX from `backend/uploads/` exported to `.docx`, `.pdf`, and `.epub` via the running dev server)
-**Next:** Sprint 3 (Professional Export — PDF + EPUB) is fully done. Sprint 4 is not yet scoped by the CTO — see `docs/TODO.md`'s backlog (Typography Engine, fuller `ValidatorEngine`, plugin system) and the still-open legacy `/api/upload` removal (ADR-0011, tracked since Sprint 3 planning, not yet done).
+**Completed:** 133 tests passing ✅ (re-verified on merged `main`, not just the feature branch: clean `npm install`, `npm run build`, `npm run lint`, `npm test`, `npm run test:coverage`, plus a real DOCX from `backend/uploads/` exported to `.docx`, `.pdf`, and `.epub` via the running dev server). `v0.4.1-alpha` tagged and pushed (2026-07-17).
+**Next:** Sprint 3 (Professional Export — PDF + EPUB) is fully done and tagged. Post-Sprint-3 governance pass (ADR-0021, 2026-07-17) resolved: tag `v0.4.1-alpha` (done), legacy `/api/upload` removal (PR #5 open, awaiting merge — code change verified: 133/133 tests, clean build/lint), font policy (decided: Gelasio, embedding deferred to Sprint 4), `backend/uploads/` history (decided: keep as-is). Sprint 4 scope is now set by CTO priority: Typography Engine first — a Design Review (docs only, no code) is being prepared per the project's established discipline (ADR-driven design before implementation, see ADR-0012 through ADR-0020's precedent).
 
 ---
 
@@ -150,9 +150,9 @@ All three were fixed by the `bufferPages` redesign above.
 
 ## Known Issues
 
-- Two DOCX-import code paths exist side by side: the new tested pipeline (`/api/manuscripts/import`) and the old untested one (`/api/upload`, `docxParser.ts`). Both marked `@deprecated`, removal still scheduled — not yet done (ADR-0011).
-- `backend/uploads/` history: files are untracked going forward (fixed — see ADR in `docs/DECISIONS.md` / `docs/TODO.md`), but still present in past git history. Full history purge is a separate, not-yet-made decision.
-- No redistributable font asset is shipped for PDF/theme rendering (ADR-0019): `ClassicTheme`'s Georgia isn't licensed for redistribution, and PDFKit ships no font data of its own. Theme fonts currently map onto PDFKit's standard-14 fonts by a name heuristic — functional, not the intended typography. (Not an issue for EPUB — CSS `font-family` is just a reader-side hint, no font file needs to be embedded or licensed for redistribution.)
+- Legacy `/api/upload`/`docxParser.ts` removal is code-complete on `chore/remove-legacy-upload-route` (PR #5) but **not yet merged to `main`** — until merged, `main` still has the old route live (harmless, just not yet cleaned up).
+- `backend/uploads/` history: files are untracked going forward, decided to keep past git history as-is, no purge planned (ADR-0021, closes the open decision).
+- No redistributable font asset is shipped for PDF/theme rendering yet (ADR-0019): `ClassicTheme`'s Georgia isn't licensed for redistribution, and PDFKit ships no font data of its own. **Font decided (ADR-0021): Gelasio (SIL OFL)** — but not yet embedded; `PDFRenderer` still maps theme fonts onto PDFKit's standard-14 fonts by name heuristic until Sprint 4 (Typography Engine) implements it. (Not an issue for EPUB — CSS `font-family` is just a reader-side hint, no font file needs to be embedded or licensed for redistribution.)
 - No RTL / multi-script text support yet (ADR-0019): verified no single embedded font covers every script (Arabic renders as blank boxes with the font tested), and PDFKit does no bidi reordering or Arabic contextual glyph shaping. Real, separate work — flagged, not scheduled.
 - `epub-gen-memory` (ADR-0020) is a smaller-community fork (58 GitHub stars) of a more popular but unmaintained parent (`epub-gen`, 458 stars) — worth watching at upgrade time, not a reason to avoid it now.
 
@@ -173,7 +173,8 @@ All three were fixed by the `bufferPages` redesign above.
 **To resume work:**
 1. Read `docs/START_HERE.md`
 2. Read this file (`CURRENT_STATE.md`)
-3. Sprint 3 (Professional Export) is fully done. Sprint 4 has not been scoped by the CTO yet — see `docs/TODO.md`'s Low Priority backlog (Typography Engine, fuller `ValidatorEngine`, plugin system) and the still-open legacy `/api/upload` removal (ADR-0011) for candidates, but wait for direction before starting either on a new branch (ADR-0017)
+3. Check whether PR #5 (`chore/remove-legacy-upload-route`) has been merged; if not, that's a 1-click merge with no further action needed
+4. Sprint 4 scope is set (CTO priority: Typography Engine first, ADR-0021/`docs/TODO.md`). Per the CTO's explicit instruction, the next session should produce a **Design Review only** (objectives, architecture impact, functional/technical specs, public interfaces, ADRs to update, commit plan, acceptance criteria, migration strategy, risks, test strategy, doc updates) — no implementation code until that review is written and approved, matching the discipline already used for ADR-0012 through ADR-0020
 
 **Quick Start:**
 ```bash
@@ -211,7 +212,7 @@ npm run test:coverage  # Verify coverage thresholds
 ## Git Status
 
 **Branch:** `main`
-**`main` synced with `origin/main` at:** `a7a38a0` (PR #4 merge commit — `feature/sprint-3b-epub-export` → `main`; PR #3 `820f1ef`, PR #2 `c507f5d`, and PR #1 `32ac220` merged earlier in the same history)
+**`main` synced with `origin/main` at:** `e512ee7` (docs: ADR-0021 governance pass; on top of PR #4 merge `a7a38a0`, PR #3 `820f1ef`, PR #2 `c507f5d`, PR #1 `32ac220`)
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
-**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha` (PDF export — see `docs/VERSIONS.md` and `docs/releases/v0.4.0-alpha/ReleaseNotes.md`). `v0.4.1-alpha` (EPUB export) is merged but **not yet tagged** — waiting on explicit confirmation before creating it, per this project's own rule (`docs/VERSIONS.md`: a row only moves to Released once the tag is actually pushed).
-**Open branches:** none — all merged feature branches deleted locally and remotely after merge
+**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha`, **`v0.4.1-alpha`** (EPUB export, cut 2026-07-17 per ADR-0021 — see `docs/VERSIONS.md` and `docs/releases/v0.4.1-alpha/ReleaseNotes.md`)
+**Open branches:** `chore/remove-legacy-upload-route` (PR #5, pushed, awaiting merge — 133/133 tests, clean build/lint, verified no remaining references to the legacy route anywhere in `backend/src`)
