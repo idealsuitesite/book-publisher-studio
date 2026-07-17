@@ -11,6 +11,7 @@ import { ExportManuscriptUseCase } from '../application/use-cases/ExportManuscri
 import { ThemeEngine } from '../domain/services/ThemeEngine';
 import { TypographyResolver } from '../domain/services/TypographyResolver';
 import { LayoutEngine } from '../domain/services/LayoutEngine';
+import { ManualLayoutSelector } from '../domain/services/ManualLayoutSelector';
 import { DOCXRenderer } from '../infrastructure/renderers/DOCXRenderer';
 import { PDFRenderer } from '../infrastructure/renderers/PDFRenderer';
 import { EPUBRenderer } from '../infrastructure/renderers/EPUBRenderer';
@@ -74,11 +75,17 @@ export function createApp(): Express {
     new LayoutEngine(),
     new EPUBRenderer()
   );
-  const exportController = new ExportController({
-    docx: exportDocxUseCase,
-    pdf: exportPdfUseCase,
-    epub: exportEpubUseCase,
-  });
+  // Sprint 6: ExportController resolves page layout via LayoutSelector instead of a
+  // hardcoded LetterPageLayout constant (ADR-0029 Decision 5). ManualLayoutSelector is the
+  // only implementation - wraps today's caller-by-name behavior, defaulting to Letter.
+  const exportController = new ExportController(
+    {
+      docx: exportDocxUseCase,
+      pdf: exportPdfUseCase,
+      epub: exportEpubUseCase,
+    },
+    new ManualLayoutSelector()
+  );
   app.use('/api/manuscripts', exportRoutes(exportController));
 
   app.get('/api/health', (req: Request, res: Response) => {

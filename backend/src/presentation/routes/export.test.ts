@@ -73,6 +73,36 @@ describe('POST /api/manuscripts/export', () => {
     expect(response.body.error).toMatch(/Unknown theme/);
   });
 
+  it('returns 400 for an unknown page layout', async () => {
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Body.'] });
+
+    const response = await request(app)
+      .post('/api/manuscripts/export')
+      .field('theme', 'classic')
+      .field('layout', 'nonexistent')
+      .attach('file', buffer, 'manuscript.docx');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/Unknown page layout/);
+  });
+
+  it('accepts an explicit KDP trim-size layout and produces valid output', async () => {
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello world.'] });
+
+    const response = await request(app)
+      .post('/api/manuscripts/export')
+      .field('theme', 'classic')
+      .field('format', 'pdf')
+      .field('layout', 'kdp-6x9')
+      .attach('file', buffer, 'manuscript.docx')
+      .buffer(true)
+      .parse(binaryParser);
+
+    expect(response.status).toBe(200);
+    const pdf = response.body as Buffer;
+    expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  });
+
   it('returns 400 for a corrupted DOCX', async () => {
     const response = await request(app)
       .post('/api/manuscripts/export')
