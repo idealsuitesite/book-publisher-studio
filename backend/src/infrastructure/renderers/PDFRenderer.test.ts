@@ -82,6 +82,91 @@ describe('PDFRenderer', () => {
     expect(text).toContain('Alexandre');
   });
 
+  // Regression suite for a real bug found via npm run verify-real-export against a
+  // genuine DOCX (backend/verification/tables.docx): a Word table with no distinguishable
+  // header row makes ASTBuilder produce headers: [] - a common real-world shape, not a
+  // malformed edge case. renderTable() divided usableWidth by headers.length (0),
+  // producing Infinity, then NaN positioning the first cell - PDFKit rejected it and
+  // every such export crashed with HTTP 500.
+  describe('table rendering without a header row (renderTable column-count fallback)', () => {
+    function pdfStart(buffer: Buffer): string {
+      return buffer.subarray(0, 5).toString('latin1');
+    }
+
+    it('renders a table with headers, multiple columns', async () => {
+      const table: Table = { type: 'table', id: 't-1', headers: ['Name', 'Role'], rows: [['Alexandre', 'Author']] };
+      const buffer = await renderer.render(paginate([chapter([table])]), {});
+      const text = extractPdfText(buffer);
+
+      expect(pdfStart(buffer)).toBe('%PDF-');
+      expect(text).toContain('Name');
+      expect(text).toContain('Alexandre');
+    });
+
+    it('renders a table without headers (headers: []), multiple columns - the exact crash scenario', async () => {
+      const table: Table = {
+        type: 'table',
+        id: 't-1',
+        headers: [],
+        rows: [
+          ['Name', 'Role'],
+          ['Alexandre', 'Author'],
+        ],
+      };
+      const buffer = await renderer.render(paginate([chapter([table])]), {});
+      const text = extractPdfText(buffer);
+
+      expect(pdfStart(buffer)).toBe('%PDF-');
+      expect(text).toContain('Name');
+      expect(text).toContain('Alexandre');
+    });
+
+    it('renders nothing and does not throw for a genuinely empty table (no headers, no rows)', async () => {
+      const table: Table = { type: 'table', id: 't-1', headers: [], rows: [] };
+      const buffer = await renderer.render(paginate([chapter([table])]), {});
+
+      expect(pdfStart(buffer)).toBe('%PDF-');
+    });
+
+    it('renders a single-column table with headers', async () => {
+      const table: Table = { type: 'table', id: 't-1', headers: ['Only'], rows: [['A'], ['B']] };
+      const buffer = await renderer.render(paginate([chapter([table])]), {});
+      const text = extractPdfText(buffer);
+
+      expect(pdfStart(buffer)).toBe('%PDF-');
+      expect(text).toContain('Only');
+      expect(text).toContain('A');
+    });
+
+    it('renders a single-column table without headers - column count falls back to the first data row', async () => {
+      const table: Table = { type: 'table', id: 't-1', headers: [], rows: [['A'], ['B']] };
+      const buffer = await renderer.render(paginate([chapter([table])]), {});
+      const text = extractPdfText(buffer);
+
+      expect(pdfStart(buffer)).toBe('%PDF-');
+      expect(text).toContain('A');
+      expect(text).toContain('B');
+    });
+
+    it('renders a multi-column table without headers', async () => {
+      const table: Table = {
+        type: 'table',
+        id: 't-1',
+        headers: [],
+        rows: [
+          ['A', 'B', 'C', 'D'],
+          ['1', '2', '3', '4'],
+        ],
+      };
+      const buffer = await renderer.render(paginate([chapter([table])]), {});
+      const text = extractPdfText(buffer);
+
+      expect(pdfStart(buffer)).toBe('%PDF-');
+      expect(text).toContain('A');
+      expect(text).toContain('4');
+    });
+  });
+
   it('inserts a page break when pagination calls for one', async () => {
     const manyParagraphs = Array.from({ length: 200 }, (_, i) => paragraph(`p-${i}`, 'word '.repeat(50)));
     const smallLayout: PageLayout = { ...LETTER_LAYOUT, height: 300 };
