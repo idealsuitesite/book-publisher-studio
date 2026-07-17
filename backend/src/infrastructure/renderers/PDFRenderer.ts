@@ -5,6 +5,7 @@ import type { ResolvedBlockStyle } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
 import type { Content, Block, Chapter, Section } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
+import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
 
 const PAGE_SIZE: PDFKit.PDFDocumentOptions['size'] = 'LETTER';
@@ -16,27 +17,6 @@ const MARGIN = 72;
 // framing already established for pagination, ADR-0013). Documented simplification, not
 // a silent gap.
 const DROP_CAP_SCALE = 2.5;
-
-function plainTypeRun(text: string): TypeRun {
-  return {
-    text,
-    bold: false,
-    italic: false,
-    underline: false,
-    strikethrough: false,
-    superscript: false,
-    subscript: false,
-    smallCaps: false,
-  };
-}
-
-// blockTypography is populated by TypographyResolver, but stays optional on StyledBook
-// (commit 1) so any caller that hasn't run it yet (or a hand-built test fixture) still
-// renders the block's plain text, unstyled - same defensive-optional pattern LayoutEngine
-// already uses for blockTypography?.[...]?.staysWithNext.
-function runsOrPlainFallback(entry: ResolvedTypography | undefined, fallbackText: string): TypeRun[] {
-  return entry && entry.runs.length > 0 ? entry.runs : [plainTypeRun(fallbackText)];
-}
 
 export class PDFRenderer implements Renderer<Buffer> {
   // compress defaults to true for real output; tests pass false so the content stream stays
