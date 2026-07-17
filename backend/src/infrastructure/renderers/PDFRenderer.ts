@@ -238,9 +238,21 @@ export class PDFRenderer implements Renderer<Buffer> {
   // heightOfString() per cell to grow each row to fit its tallest cell's wrapped text.
   // Matches LayoutEngine's own treatment of a table as one non-splitting unit (ADR-0013) -
   // this does not attempt to split a table across a forced page break.
+  //
+  // Bug fixed here: a Word table with no distinguishable header row makes ASTBuilder
+  // produce headers: [] (confirmed against a real DOCX, not assumed) - a very common
+  // real-world shape, not a malformed edge case. `usableWidth / headers.length` then
+  // divided by zero (Infinity), which produced NaN positioning the first cell of the
+  // first data row and crashed PDFKit's rect() call with "unsupported number: NaN"
+  // (HTTP 500 on every such export). Column count now falls back to the first data
+  // row's width when there are no headers, and a genuinely empty table (no headers,
+  // no rows) is skipped entirely rather than dividing by zero.
   private renderTable(doc: PDFKit.PDFDocument, headers: string[], rows: (string | null)[][], fontSize: number): void {
+    const columnCount = headers.length > 0 ? headers.length : (rows[0]?.length ?? 0);
+    if (columnCount === 0) return;
+
     const usableWidth = doc.page.width - MARGIN * 2;
-    const colWidth = usableWidth / headers.length;
+    const colWidth = usableWidth / columnCount;
     const cellPad = 4;
     const startX = doc.x;
 
@@ -248,6 +260,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       Math.max(...cells.map((text) => doc.heightOfString(text, { width: colWidth - cellPad * 2 }))) + cellPad * 2;
 
     const drawRow = (cells: string[], bold: boolean): void => {
+      if (cells.length === 0) return;
       const h = rowHeight(cells);
       const y = doc.y;
       doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(Math.max(8, fontSize - 1));
@@ -259,7 +272,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       doc.y = y + h;
     };
 
-    drawRow(headers, true);
+    if (headers.length > 0) drawRow(headers, true);
     for (const row of rows) drawRow(row.map((cell) => cell ?? ''), false);
     doc.moveDown();
   }
