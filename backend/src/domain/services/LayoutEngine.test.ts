@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { LayoutEngine } from './LayoutEngine';
 import { ThemeEngine } from './ThemeEngine';
+import { TypographyResolver } from './TypographyResolver';
 import { ClassicTheme } from '../themes/ClassicTheme';
 import { createBook } from '../models/Book';
 import type { Chapter, Section, Heading, Paragraph, Image, List, Table, Footnote, Block } from '../models/Book';
@@ -57,6 +58,15 @@ function chapter(content: Block[], overrides: Partial<Chapter> = {}): Chapter {
 function styledBookFrom(chapters: Chapter[]) {
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
   return new ThemeEngine().applyTheme(book, ClassicTheme);
+}
+
+// Chains TypographyResolver after ThemeEngine, so blockTypography (and its
+// staysWithNext flag on headings) is actually populated - styledBookFrom() above
+// deliberately does not do this, to keep the existing pre-TypographyResolver test
+// cases exercising LayoutEngine with blockTypography absent, exactly as
+// ExportManuscriptUseCase's pipeline behaved before commit 4.
+function typesetBookFrom(chapters: Chapter[]) {
+  return new TypographyResolver().resolve(styledBookFrom(chapters));
 }
 
 describe('LayoutEngine', () => {
@@ -160,5 +170,27 @@ describe('LayoutEngine', () => {
     const allBlocks = result.pages.flatMap((p) => p.blocks);
 
     expect(allBlocks).toEqual(['p-1', 'p-sec', 'p-subsec']);
+  });
+
+  it('carries a heading onto the next page instead of stranding it when the following block does not fit', () => {
+    const fillers = Array.from({ length: 39 }, (_, i) => paragraph(`f-${i}`, 'Filler.'));
+    const styled = typesetBookFrom([chapter([...fillers, heading(1, 'h-1'), paragraph('p-big', 'word '.repeat(50))])]);
+
+    const result = engine.paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages).toHaveLength(2);
+    expect(result.pages[0].blocks).toEqual(fillers.map((f) => f.id));
+    expect(result.pages[1].blocks).toEqual(['h-1', 'p-big']);
+  });
+
+  it('strands the heading alone when blockTypography is absent (documents the pre-commit-4 behavior this feature changes)', () => {
+    const fillers = Array.from({ length: 39 }, (_, i) => paragraph(`f-${i}`, 'Filler.'));
+    const styled = styledBookFrom([chapter([...fillers, heading(1, 'h-1'), paragraph('p-big', 'word '.repeat(50))])]);
+
+    const result = engine.paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages).toHaveLength(2);
+    expect(result.pages[0].blocks).toEqual([...fillers.map((f) => f.id), 'h-1']);
+    expect(result.pages[1].blocks).toEqual(['p-big']);
   });
 });

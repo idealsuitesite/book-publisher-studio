@@ -76,6 +76,49 @@ describe('HtmlNormalizer', () => {
       const linkInline = para.inlines.find((i) => i.type === 'link');
       expect(linkInline?.url).toBe('https://example.com');
     });
+
+    it('detects strikethrough text (<s>)', () => {
+      const html = `<p>This is <s>struck</s> text.</p>`;
+      const doc = normalizer.normalize(html);
+      const para = doc.nodes[0] as ParagraphNode;
+
+      const strikeInline = para.inlines.find((i) => i.type === 'strikethrough');
+      expect(strikeInline?.text).toBe('struck');
+    });
+
+    it('detects strikethrough text (<strike> and <del>)', () => {
+      const html = `<p><strike>old</strike> and <del>removed</del>.</p>`;
+      const doc = normalizer.normalize(html);
+      const para = doc.nodes[0] as ParagraphNode;
+
+      expect(para.inlines.filter((i) => i.type === 'strikethrough')).toEqual([
+        { type: 'strikethrough', text: 'old' },
+        { type: 'strikethrough', text: 'removed' },
+      ]);
+    });
+
+    // Regression for a real bug (Sprint 4 commit 10, found via a real DOCX round trip):
+    // trimming every text node independently silently dropped the word-separating space
+    // between adjacent inline elements, jamming e.g. "mixes bold" into "mixesbold".
+    it('preserves the whitespace between adjacent inline elements instead of jamming words together', () => {
+      const html = `<p>This paragraph mixes <strong>bold</strong>, <em>italic</em>, and <s>struck</s> text.</p>`;
+      const doc = normalizer.normalize(html);
+      const para = doc.nodes[0] as ParagraphNode;
+
+      const joined = para.inlines.map((i) => i.text).join('');
+      expect(joined).toBe('This paragraph mixes bold, italic, and struck text.');
+    });
+
+    it('does not push a text node that is truly empty (adjacent tags with no separating text)', () => {
+      const html = `<p><strong>bold</strong><em>italic</em></p>`;
+      const doc = normalizer.normalize(html);
+      const para = doc.nodes[0] as ParagraphNode;
+
+      expect(para.inlines).toEqual([
+        { type: 'bold', text: 'bold' },
+        { type: 'italic', text: 'italic' },
+      ]);
+    });
   });
 
   describe('Image parsing', () => {

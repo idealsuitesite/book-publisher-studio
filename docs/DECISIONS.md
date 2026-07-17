@@ -485,3 +485,146 @@ For the first implementation, pagination is heuristic, not exact: each block typ
 - `PDFRenderer`/`ClassicTheme` still render Georgia-by-name-heuristic until Sprint 4 actually embeds Gelasio — this ADR does not change current PDF output, only the plan for it
 
 **Related:** ADR-0011, ADR-0019, ADR-0020, `docs/VERSIONS.md`, `docs/TODO.md`
+
+---
+
+## ADR-0022: Typography Resolution Pipeline
+
+**Status:** APPROVED — implemented, Sprint 4 commits 1-4
+**Date:** 2026-07-17
+**Decision:** A new concrete Domain service, `TypographyResolver`, is inserted into the rendering pipeline: `ThemeEngine → TypographyResolver → LayoutEngine → Renderer`. `StyledBook` gains one additive optional field, `blockTypography?: Record<string, ResolvedTypography>`, populated by `TypographyResolver.resolve(styled, options?): StyledBook` (same input/output type, immutable — a `{ ...styled, blockTypography }` spread, matching `ThemeEngine.applyTheme()`'s own pattern). `LayoutEngine.paginate()`, `PaginatedBook`, and `Renderer<TOutput>` all keep their exact pre-Sprint-4 signatures — `LayoutEngine` only gains an *internal* read of the new optional field.
+
+**Rationale:**
+- **What this replaces:** before this sprint, none of the three renderers (`PDFRenderer`/`DOCXRenderer`/`EPUBRenderer`) rendered `Block.inlines` at all — bold/italic/underline/strikethrough/superscript/subscript/links/small-caps were silently dropped to plain text in every export. Heading size (`theme.fontSizes.h1-h6`) was ignored entirely by `PDFRenderer` (hardcoded formula) and `DOCXRenderer` (delegated to `docx`'s own default `HeadingLevel` styling). Quote/scripture italics were three independent per-renderer hardcodes that happened to agree, not a shared rule. `TypographyResolver` centralizes all of this into one Domain component, computed once instead of three times.
+- **Design Review rejected a larger v1 proposal** (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`, CTO Review Outcomes #3/#4): a new `TypesetBook` type with `LayoutEngine`/`PaginatedBook` retyped to match. Judged not worth the blast radius (every renderer's access path, `LayoutEngine.test.ts`, every `PaginatedBook`-typed fixture across 4 test files) for what is, in the end, additive data. The additive-field version shipped instead.
+- **Block-type typography rules (quote/scripture italics, etc.) are `TypographyResolver`-internal defaults in v1, not `Theme`-configurable** (CTO Final Decision 1) — Sprint 4's goal was centralizing typography, not making it configurable; that's separable future work the current design doesn't block.
+
+**What was actually built (commits 1-4):**
+- `ResolvedTypography`/`TypeRun` domain types (`domain/models/ResolvedTypography.ts`) — per-run bold/italic/underline/strikethrough/superscript/subscript/smallCaps/linkUrl, plus block-level `dropCap`/`staysWithNext`.
+- `TypographyResolver.resolve()` — inline run resolution (`Block.inlines` → `TypeRun[]`, with a plain-text fallback via `shared/utils/typographyRuns.ts`'s `plainTypeRun`/`runsOrPlainFallback`, used identically by all 3 renderers), drop caps (`Paragraph.dropCap` → `ResolvedTypography.dropCap`), English-only smart quotes (see ADR-0024), and forced italics on quote/scripture blocks.
+- A composite key convention (`shared/utils/typographyKeys.ts`): `blockTypographyKey(id)` is the identity function (most blocks own one text stream, keyed by their own `block.id`); `listItemTypographyKey(id, index)` gives `List` — the one block type with several independent text streams (one per item) — a distinct key per item instead of losing item boundaries; `::cell-R-C` reserved (not yet implemented) for a future `Table` inline-support case.
+- **The design doc's proposed `orphanRisk` flag was renamed `staysWithNext` during implementation** — the actual behavior only ever flags `Heading` blocks (`staysWithNext: true` unconditionally, computed with no page-layout knowledge), and `LayoutEngine` never splits a block's content mid-page, so there is no line-level widow/orphan under this pagination model, only this block-level "don't strand this block alone at a page break" signal. The field name was corrected to describe what it actually does, not what the original design doc assumed it might grow into.
+- `LayoutEngine.paginate()` reads `styled.blockTypography?.[lastBlockId]?.staysWithNext` on an overflow-triggered page break and carries that block onto the new page instead of leaving it stranded — best-effort, layered on top of `LayoutEngine`'s already-approximate heuristic pagination (ADR-0013's own documented "not guaranteed to agree exactly with real rendered output" caveat now also covers this nudge).
+
+**Consequences:**
+- All three renderers became pure "drawers": they consume `styled.blockTypography?.[block.id]?.runs` instead of `block.text` directly, and each renderer's private font-heuristic/heading-size/italic-hardcode logic was deleted.
+- `TypographyResolver` is a concrete class, not a port — same reasoning as `ThemeEngine`/`LayoutEngine`/`ASTBuilder`/`BookValidator`: one correct implementation for this project's Book model, no swappable-adapter case (ADR-0002).
+- `blockTypography` being optional on `StyledBook` means every reader must tolerate its absence (a `StyledBook` produced by a path that skips `TypographyResolver`, e.g. a hand-built test fixture) — production code paths are safe by construction since `ExportManuscriptUseCase` always calls `resolve()` before `paginate()`; test fixtures must opt in deliberately (see `LayoutEngine.test.ts`'s `styledBookFrom()` vs `typesetBookFrom()` helpers, which exist specifically to exercise both states).
+- Real bugs found via this pipeline's own real-file verification led directly to ADR-0026 (3 import-pipeline content-fidelity bugs, fixed as an explicit scope exception) — the same "verify with a real file" discipline this pipeline's `TypeRun` rendering was built under caught bugs one layer upstream of it.
+
+**Related:** `docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md` (full Design Review), ADR-0012 (`Renderer` is a port; `ThemeEngine`/`LayoutEngine` are concrete classes), ADR-0013 (pagination heuristic, "not guaranteed to agree exactly"), ADR-0008 (`QualityMetrics`, extended in commit 9), ADR-0023 (font embedding this pipeline's `PDFRenderer` consumes), ADR-0024 (hyphenation/locale-aware quotes deferred), ADR-0026 (bugs found via this pipeline's real-file verification)
+
+---
+
+## ADR-0023: PDF Font Embedding — Gelasio, Inter, JetBrains Mono
+
+**Status:** APPROVED — implemented, Sprint 4 commit 6
+**Date:** 2026-07-17
+**Decision:** Three real, embedded, redistributable font families replace `PDFRenderer`'s PDFKit standard-14 substitutes across **all three** typographic categories, not just the serif/Georgia gap ADR-0021 originally flagged: **Gelasio** (serif, replaces the Georgia/Times fallback), **Inter** (sans-serif, replaces the Helvetica fallback), **JetBrains Mono** (monospace, replaces the Courier fallback). All three are open-licensed and safe to redistribute (Gelasio and Inter under SIL OFL 1.1, JetBrains Mono under Apache 2.0) — 12 `.ttf` files (4 weight/style combinations × 3 families) committed to `backend/assets/fonts/`, with license files and a sourcing README, so there is no network dependency at build/test/export time.
+
+**Rationale:**
+- Resolves ADR-0021 finding 3, which recorded the font **choice** (Gelasio) but explicitly deferred embedding the actual asset to Sprint 4 as "a natural fit for the Typography Engine, which will own font/size/weight/style resolution."
+- **Scope expanded from one family to three** (CTO Final Decision 2, Design Review round 2): technical/professional documents routinely contain code (monospace) and the existing Courier fallback read as unpolished — no reason to fix only the serif gap while leaving sans-serif and monospace on bare PDFKit standard-14 substitutes.
+- DOCX and EPUB output do **not** need this kind of embedding — `docx`'s `TextRun.font` passes a font name straight through for the reader's own Word/LibreOffice installation to resolve, and EPUB's CSS `font-family` is a reader-side hint for the e-reader's own font stack. Only `PDFRenderer` bakes glyphs directly into the output file, so only PDF had a real "no redistributable font data" gap (ADR-0019 finding 1) to close.
+
+**What was built:** `PdfFontRegistry` (`infrastructure/fonts/PdfFontRegistry.ts`) — deliberately **role-based**, not string-based: `resolveBody(theme, bold, italic)`, `resolveHeading(level, theme, bold, italic)`, `resolveMonospace(bold, italic)`, `resolveDefault(bold, italic)` (page chrome — running header/footer — drawn independently of any block or theme), plus `registerAll(doc)` to register all 12 files with PDFKit once per document. `PDFRenderer` never inspects a theme's font-name string or does its own family-matching anymore; it only asks for a role and gets back a registered PDFKit font name. `resolveFamily()`'s regex-based family detection (mapping theme font-name strings like `"Georgia"`/`"Helvetica"`/`"Courier"` onto one of the 3 embedded families) is kept internally — still needed to decide *which* family a given theme font name means — but its output is now one of the 3 registered embedded families instead of a PDFKit standard-14 name.
+
+`PdfFontRegistry` was audited to confirm it contains **zero PDF-rendering logic** — only `doc.registerFont()` calls and name resolution, no `doc.font()` selection calls, no coordinates, no font sizes — so it can become the template for a shared `FontRegistry` across PDF/DOCX/EPUB later without carrying any PDF-specific drawing concerns with it.
+
+**Real bug found and fixed as a side effect of this refactor:** `PDFRenderer.renderTitle()` was calling `resolveDefault()` (the sans-serif page-chrome fallback) instead of `resolveHeading()` for chapter title text — a heading-font inconsistency that predated this commit but was only surfaced while auditing every call site during the role-based API migration. Fixed and disclosed in the commit message, not folded in silently.
+
+**Consequences:**
+- `ClassicTheme`'s `fonts.heading`/`fonts.body` (both `"Georgia"`) now resolve to real embedded Gelasio glyphs in PDF output, verifiable via the extracted `/BaseFont` name in the generated PDF (`extractPdfText.ts`'s `extractPdfRuns()`, rewritten this sprint to be font-aware for exactly this purpose).
+- No RTL/multi-script coverage — verified no single one of the 3 embedded families covers every script (Arabic renders as blank boxes with the fonts tested); this was already flagged out of scope by ADR-0019 finding 2 and remains flagged, not solved by this ADR.
+- PDFKit has no native primitive for superscript/subscript/small-caps — these `TypeRun` flags remain unrendered in `PDFRenderer` regardless of which font backs them (a PDFKit API gap, not a font-asset gap; DOCX and EPUB render all three correctly).
+
+**Related:** ADR-0019 finding 1 (Georgia not redistributable, PDFKit ships no font data), ADR-0021 (font policy decision, embedding deferred to Sprint 4), ADR-0022 (the pipeline `PdfFontRegistry` integrates with via `PDFRenderer`'s `FontResolver` closure)
+
+---
+
+## ADR-0024: Hyphenation and Locale-Aware Smart Quotes Deferred to v2
+
+**Status:** APPROVED — confirmed decision, not new design
+**Date:** 2026-07-17
+**Decision:** Two typography features are formally out of Sprint 4 scope, recording what the Design Review already decided informally (CTO Review Outcomes #6/#7) rather than introducing a new decision:
+1. **Hyphenation.** No language-aware, dictionary-based line-breaking is implemented anywhere in `LayoutEngine` or the three renderers. Not attempted even partially or naively this sprint.
+2. **Locale-aware smart quotes.** `TypographyResolver`'s `smartenQuotes()` applies **English-only** straight-to-curly substitution (`"` → `“`/`”`, `'` → `‘`/`’`) unconditionally, regardless of `Book.metadata.language`. French (`« »`), German (`„ "`), and every other locale's own quoting convention is explicit, tracked future work — not silently missing, since `Book.metadata.language` already carries the ISO 639-1 code a future locale-aware implementation would key off of.
+
+**Rationale:**
+- **Hyphenation** is materially bigger scope than every other Sprint 4 typography item combined (Design Review §4 item 7) — real hyphenation needs per-language dictionaries and correct handling of compound words, proper nouns, and existing manual hyphens; a naive character-count-based approach would produce visibly wrong breaks, which is worse than not hyphenating at all.
+- **Locale-aware quotes** were confirmed v1-English-only specifically to keep Sprint 4 focused (Design Review §4 item 5, same "avoiding scope creep" framing the CTO used for the Round 2 final decisions) — English quoting is also what every canonical verification fixture (`backend/verification/`) currently exercises, so this is the tested, evidenced state, not an untested guess.
+
+**A real, disclosed consequence, not just a feature gap:** because `smartenQuotes()` runs unconditionally, importing a **French-language** manuscript today produces English-style curly quotes on its straight quotes/apostrophes — this is **wrong output for that document**, not merely "a feature not yet built." Flagged explicitly here so a future session doesn't mistake this for an oversight when a non-English real document is verified.
+
+**Also confirmed, not touched:** no line-breaking/overflow handling exists for long unhyphenated words — in a narrow column or justified-text layout, a sufficiently long word can visually overflow rather than break, since `LayoutEngine`'s pagination is word-count-based (ADR-0013) and has no per-line glyph-width awareness to detect this in the first place.
+
+**Consequences:**
+- `TypographyOptions.smartQuotes?: boolean` (default `true`) remains the only quoting control surface — an on/off switch, not a locale selector. Adding locale-aware quoting later is additive (a new option or a `Book.metadata.language`-keyed lookup inside `smartenQuotes()`), not an architecture change.
+- Tracked as explicit future work, not folded into the "Import Fidelity" backlog item (that's for import-pipeline fidelity; this is rendering-pipeline scope) — no dedicated backlog entry exists yet beyond this ADR and the Design Review doc; a future session should give it one before starting the work, matching this project's "spike/design before code" discipline (ADR-0019/ADR-0020 precedent) given hyphenation in particular is real, multi-locale, dictionary-dependent work.
+
+**Related:** `docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md` §4 items 5 and 7 (Design Review), ADR-0022 (the pipeline `TypographyResolver` belongs to), ADR-0013 (word-count pagination heuristic, relevant to the unhyphenated-overflow consequence above)
+
+---
+
+## ADR-0025: Mammoth Drops DOCX Underline Formatting by Default (Import Pipeline Limitation)
+
+**Status:** APPROVED — documented and deferred, not fixed
+**Date:** 2026-07-17
+**Decision:** A real, verified limitation surfaced while real-export-verifying Sprint 4 commit 7 (`npm run verify-real-export` against `backend/verification/typography-test.docx`). Explicit CTO triage: this belongs to the **import** pipeline (`MammothParser`), not the **rendering** pipeline Sprint 4 is building — document it now, do not modify `MammothParser` or any import-side code this sprint. Tracked for a future dedicated "Import Fidelity" sprint instead.
+
+**What's lost:** Underline formatting (`<u>` in Word) on inline text is silently dropped during `MammothParser`'s DOCX→HTML conversion. The underlined *word* survives; only the underline *styling* is lost. No error, no warning — the round trip DOCX → Book AST → export (DOCX/PDF/EPUB) produces text that reads correctly but has silently lost that emphasis.
+
+**Evidence (mammoth's own documentation, not assumed):**
+> "By default, the underlining of any text is ignored since underlining can be confused with links in HTML documents." — `node_modules/mammoth/README.md`, "Underline" section
+
+Confirmed empirically against a real document, not just the docs: `MammothParser.parse()`'s raw HTML output for `backend/verification/typography-test.docx` (authored with an explicit underlined run via the `docx` package) contains the word "underlined" as plain, untagged text — no `<u>` anywhere — while the *same paragraph's* bold/italic/strikethrough runs correctly produce `<strong>`, `<em>`, `<s>`. This confirms mammoth's underline-dropping is a deliberate default specific to underline, not a general inline-formatting failure — bold/italic/strikethrough all round-trip correctly today, confirmed by `MammothParser.test.ts`.
+
+The rest of the pipeline already fully supports underline — confirmed by reading the code, not assumed:
+- `HtmlNormalizer.ts:126`: `else if (tag === 'u') inlines.push({ type: 'underline', text });`
+- `ASTBuilder.ts:274-275`: `case 'underline': return { type: 'underline' as const, text: inline.text };`
+- `TypographyResolver`/`PDFRenderer`/`DOCXRenderer` (Sprint 4 commits 2-7) all correctly render an `UnderlineText` `InlineElement` when the Book AST actually has one (both renderers' test suites include passing underline cases against hand-built fixtures).
+
+So this is one precisely-located gap: `MammothParser.ts`'s `mammoth.convertToHtml({ buffer })` call passes no `styleMap` option, so mammoth's underline-ignoring default applies. Everything downstream of that call is already correct and ready.
+
+**User impact:** Any real DOCX containing underlined text (a common choice, especially in legal/academic/business documents) silently loses that formatting on import, with no error surfaced.
+
+**Documented, verified workaround — not implemented this sprint:** mammoth supports exactly this case via a `styleMap` option: `styleMap: ["u => u"]` passed to `mammoth.convertToHtml()` would map Word's underline run style onto an HTML `<u>` tag, which `HtmlNormalizer`/`ASTBuilder` already correctly convert into an `UnderlineText` inline element — closing the gap with what reads like a one-line change to `MammothParser.ts`. Deliberately not applied now: Sprint 4 does not touch the import pipeline, even for a small, well-understood fix — that is Import Fidelity sprint scope, not Rendering (Sprint 4) scope.
+
+**Alternative libraries — named as candidates for a future spike, not evaluated with real evidence here (that's Import Fidelity sprint work, matching the ADR-0019/ADR-0020 spike-before-decide precedent):**
+- Mammoth's own `styleMap` option (above) — smallest possible change, keeps the already-adopted, already-verified library
+- `docx4js` — an alternative DOCX parser more OOXML-structure-aware than mammoth's HTML-semantic focus; maintenance/license status not checked
+- Hand-rolling a minimal OOXML run-property reader against `word/document.xml` via `jszip` (already a project dependency) for just the formatting flags mammoth currently drops — bypasses HTML entirely for this narrow purpose; more code to own, full control (same reasoning pattern as ADR-0018's docx-generation choice)
+
+**Other known mammoth-default-drops worth the same future sprint's attention (named, not yet individually verified):** highlight, track changes, comments, text boxes, SmartArt, floating images, nested tables, DrawingML.
+
+**Consequences:**
+- No import-pipeline code change this sprint
+- `MammothParser.test.ts` gains a regression test asserting this AS the current, correct, documented behavior (word present, `<u>` absent) — so a future engineer (or session) never mistakes this for a Sprint 4 typography regression, and so a future fix (e.g. adding the `styleMap`) shows up as an intentional, visible test change rather than silently flipping an unguarded assertion
+- Tracked for a dedicated future "Import Fidelity" sprint (post-Sprint-4): underline (this ADR) plus highlight, track changes, comments, text boxes, SmartArt, floating images, nested tables, DrawingML — evaluate mammoth `styleMap` options and/or alternative libraries with real spike evidence before deciding, matching this project's established discipline
+
+**Related:** ADR-0019, ADR-0020 (spike-before-decide precedent), Sprint 4 Typography Engine design review, `docs/TODO.md` (Import Fidelity backlog entry)
+
+---
+
+## ADR-0026: Two Import-Pipeline Bugs Fixed During Sprint 4 Commit 10 (Explicit Scope Exception)
+
+**Status:** APPROVED
+**Date:** 2026-07-17
+**Decision:** Sprint 4 commit 10's real-file verification (`docs/REAL_EXPORT_CHECKLIST.md`, `typography-test.docx` through the running dev server) found two real bugs in `HtmlNormalizer`/`ASTBuilder` — both in the **import** pipeline, which ADR-0025 (this same sprint, one commit earlier) had just established as explicitly out of scope. Unlike ADR-0025's underline finding, the CTO reviewed these two and directed an immediate fix rather than document-and-defer, on the grounds that both are genuine content-fidelity losses, not formatting-only gaps.
+
+**What was found and fixed:**
+1. **Strikethrough (`<s>`/`<strike>`/`<del>`) silently downgraded to plain text.** `HtmlNormalizer.extractInlines()`'s tag-to-type mapping (`HtmlNormalizer.ts`) had cases for `strong/b`, `em/i`, `u`, `a`, but nothing for strikethrough — it fell through to the generic `else` branch and was stored as an untyped `'text'` inline. The word survived; the styling silently didn't. Fixed by adding a case mapping `s`/`strike`/`del` to `type: 'strikethrough'` (`Normalized.ts`'s `InlineNode.type` union gained the member).
+2. **Whitespace between adjacent inline elements silently dropped, jamming words together.** `extractInlines()` called `.trim()` on every individual text node independently. A text node that IS a lone word-separating space between two tags (e.g. the `" "` between `</strong>` and `<em>`) trims to `''` and was dropped entirely; a text node with real leading/trailing space lost it too. Real effect on `typography-test.docx`: `"This paragraph mixes bold, italic..."` imported as `"This paragraph mixesbold,italic..."` — not a styling loss, corrupted, unprofessional-reading output in every exported format. Fixed by collapsing internal whitespace runs to a single space (`.replace(/\s+/g, ' ')`) without trimming the ends, so a node is only dropped when genuinely zero-length after collapsing.
+3. **A closely related third bug surfaced while fixing the above:** `ASTBuilder.convertInlines()` filtered every plain `'text'`-type inline out of `Paragraph.inlines` entirely (`.filter((inline) => inline.type !== 'text')`), and its `switch` had a `default: return { type: 'bold', ... }` fallback — any inline type without an explicit case (which is exactly what the untyped strikethrough became, finding 1) was silently mislabeled as **bold**. Since `TypographyResolver.resolveRuns()` prefers `Block.inlines` over `Block.text` whenever `inlines.length > 0`, any real paragraph with at least one formatted run lost **all of its surrounding plain prose** in every renderer — not a spacing bug, missing sentences. Fixed by keeping `'text'` inlines in the mapped output and replacing the silent `default` with an exhaustive `never`-checked switch (compile error on an unhandled `InlineNode.type`, not a silent mislabel) — the same idiom already used elsewhere in this codebase (`BlockMapper.map()`, `LayoutEngine.estimateBlockHeight()`).
+
+**Why fixed now instead of deferred like ADR-0025:** ADR-0025's underline finding is a pure styling loss — the word is intact, only its emphasis is gone, and a reader gets the correct sentence. All three findings here are **content-fidelity** losses: strikethrough is at least word-preserving like underline, but findings 2 and 3 actually corrupt or delete real text a reader would see. The CTO's triage line was specifically "is the logical content of the document still intact," not "does the import pipeline belong to Sprint 4."
+
+**Evidence:** found and confirmed via `typography-test.docx` (the canonical fixture) through the real `ThemeEngine → TypographyResolver → LayoutEngine → Renderer` pipeline via `POST /api/manuscripts/export`, not a synthetic fixture or a renderer class called directly — same discipline as every other real bug this project has caught (ADR-0019 finding 6, ADR-0020 addendum).
+
+**Consequences:**
+- `Normalized.ts`, `HtmlNormalizer.ts`, `ASTBuilder.ts` all changed this sprint despite ADR-0025's "Sprint 4 does not touch the import pipeline" framing — that framing now reads as "does not touch the import pipeline **except for confirmed content-fidelity bugs found via real-file verification**," not an absolute rule
+- New regression tests: `HtmlNormalizer.test.ts` (+4: strikethrough via `<s>`, strikethrough via `<strike>`/`<del>`, whitespace preservation, true-empty-node dropping), `ASTBuilder.test.ts` (+1, plus one existing test extended to cover strikethrough), plus real-fixture E2E regressions in `export.test.ts` (+3) and `ExportManuscriptUseCase.test.ts` (+1, PDF font-weight check needs `compress: false`, incompatible with the real HTTP route's production `compress: true` default — see that test's own comment)
+- ADR-0025's underline finding is unaffected and still deferred — underline specifically is dropped by **mammoth itself** before HTML ever reaches `HtmlNormalizer` (a different, harder problem: fixing it means adding a `styleMap` option to the mammoth call, genuinely separate from these three `HtmlNormalizer`/`ASTBuilder`-internal bugs)
+- Reinforces the "Import Fidelity" backlog item (`docs/TODO.md`) as still real and still needed for the remaining named gaps (highlight, track changes, comments, text boxes, SmartArt, floating images, nested tables, DrawingML) — this ADR closes 3 specific findings, not the whole category
+
+**Related:** ADR-0025 (the precedent this deviates from, and why), ADR-0019/ADR-0020 (real-file verification discipline), `docs/REAL_EXPORT_CHECKLIST.md`, Sprint 4 commit 10

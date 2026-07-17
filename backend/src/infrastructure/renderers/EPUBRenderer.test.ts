@@ -3,17 +3,18 @@ import JSZip from 'jszip';
 import { EPUBRenderer } from './EPUBRenderer';
 import { ThemeEngine } from '../../domain/services/ThemeEngine';
 import { LayoutEngine } from '../../domain/services/LayoutEngine';
+import { TypographyResolver } from '../../domain/services/TypographyResolver';
 import { ClassicTheme } from '../../domain/themes/ClassicTheme';
 import { LetterPageLayout } from '../../domain/layouts/LetterPageLayout';
 import { createBook } from '../../domain/models/Book';
-import type { Chapter, Section, Content, Heading, Paragraph, Table, Image } from '../../domain/models/Book';
+import type { Chapter, Section, Content, Heading, Paragraph, Table, Image, List, Quote, InlineElement } from '../../domain/models/Book';
 
-function paragraph(id: string, text = 'Some body text.'): Paragraph {
-  return { type: 'paragraph', id, text };
+function paragraph(id: string, text = 'Some body text.', inlines?: InlineElement[]): Paragraph {
+  return { type: 'paragraph', id, text, inlines };
 }
 
 function chapter(
-  content: (Heading | Paragraph | Table | Image)[],
+  content: (Heading | Paragraph | Table | Image | List | Quote)[],
   overrides: Partial<Chapter> = {}
 ): Chapter {
   const now = new Date();
@@ -47,6 +48,16 @@ function paginate(mainContent: Content[]) {
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, mainContent);
   const styled = new ThemeEngine().applyTheme(book, ClassicTheme);
   return new LayoutEngine().paginate(styled, LetterPageLayout);
+}
+
+// Chains TypographyResolver after ThemeEngine, so blockTypography (inline runs, drop
+// caps) is actually populated - paginate() above deliberately does not do this, so the
+// existing pre-commit-8 test cases keep exercising the plain-text fallback path.
+function paginateWithTypography(mainContent: Content[]) {
+  const book = createBook({ title: 'T', author: 'A', language: 'en' }, mainContent);
+  const styled = new ThemeEngine().applyTheme(book, ClassicTheme);
+  const typeset = new TypographyResolver().resolve(styled);
+  return new LayoutEngine().paginate(typeset, LetterPageLayout);
 }
 
 async function extractChapterHtml(buffer: Buffer): Promise<string> {
@@ -151,5 +162,62 @@ describe('EPUBRenderer', () => {
     const html = await extractChapterHtml(buffer);
     expect(html).toContain('<img');
     expect(html).not.toContain('https://example.com/a.png');
+  });
+
+  it('renders bold, italic, underline, strikethrough, superscript, subscript, and link inline runs', async () => {
+    const inlines: InlineElement[] = [
+      { type: 'text', text: 'Plain ' },
+      { type: 'bold', text: 'bold ' },
+      { type: 'italic', text: 'italic ' },
+      { type: 'underline', text: 'under ' },
+      { type: 'strikethrough', text: 'strike ' },
+      { type: 'superscript', text: 'sup ' },
+      { type: 'subscript', text: 'sub ' },
+      { type: 'link', text: 'a link', url: 'https://example.com' },
+    ];
+    const paginated = paginateWithTypography([chapter([paragraph('p-1', 'ignored when inlines present', inlines)])]);
+
+    const buffer = await renderer.render(paginated, {});
+    const html = await extractChapterHtml(buffer);
+
+    expect(html).toContain('<strong>bold </strong>');
+    expect(html).toContain('<em>italic </em>');
+    expect(html).toContain('<u>under </u>');
+    expect(html).toContain('<s>strike </s>');
+    expect(html).toContain('<sup>sup </sup>');
+    expect(html).toContain('<sub>sub </sub>');
+    expect(html).toContain('<a href="https://example.com">a link</a>');
+  });
+
+  it('forces italic on quote/scripture runs via TypographyResolver (not a hardcoded CSS rule anymore)', async () => {
+    const quote: Quote = { type: 'quote', id: 'q-1', text: 'A quoted line.' };
+    const paginated = paginateWithTypography([chapter([quote])]);
+
+    const buffer = await renderer.render(paginated, {});
+    const html = await extractChapterHtml(buffer);
+
+    expect(html).toContain('<blockquote><em>A quoted line.</em></blockquote>');
+  });
+
+  it("renders per-item inline runs within a list, preserving each item's style", async () => {
+    const inlinesPerItem: InlineElement[][] = [[{ type: 'text', text: 'First' }], [{ type: 'bold', text: 'Second' }]];
+    const list: List = { type: 'list', id: 'l-1', ordered: false, items: ['ignored', 'ignored'], inlines: inlinesPerItem };
+    const paginated = paginateWithTypography([chapter([list])]);
+
+    const buffer = await renderer.render(paginated, {});
+    const html = await extractChapterHtml(buffer);
+
+    expect(html).toContain('<li>First</li>');
+    expect(html).toContain('<li><strong>Second</strong></li>');
+  });
+
+  it("applies a real CSS drop cap (floated span), without losing or duplicating text", async () => {
+    const para: Paragraph = { type: 'paragraph', id: 'p-1', text: 'Once upon a time.', dropCap: true };
+    const paginated = paginateWithTypography([chapter([para])]);
+
+    const buffer = await renderer.render(paginated, {});
+    const html = await extractChapterHtml(buffer);
+
+    expect(html).toContain('<span class="dropcap">O</span>nce upon a time.');
   });
 });

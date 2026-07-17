@@ -6,7 +6,10 @@ import { join } from 'node:path';
 import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
 import type { PaginatedBook } from '../../domain/models/PaginatedBook';
 import type { Theme } from '../../domain/models/Theme';
+import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
 import type { Content, Block, Image } from '../../domain/models/Book';
+import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
+import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 
 type EpubFn = (options: EpubOptions, content: EpubChapter[]) => Promise<Buffer>;
 
@@ -34,9 +37,51 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// EPUB is just HTML+CSS, so unlike PDFRenderer/DOCXRenderer (which both need a "v1
+// approximation" for drop caps, since neither PDFKit nor docx does real line-aware text
+// wrap-around), EPUB gets a real drop cap: CSS `float: left` makes the reading system's own
+// layout engine wrap the following text around the enlarged letter, same technique any web
+// page uses. No approximation needed here - this renderer's own documented gap elsewhere
+// (superscript/subscript in PDFRenderer, etc.) doesn't apply to this feature.
+const DROP_CAP_CSS = '.dropcap { float: left; font-size: 2.5em; line-height: 0.8em; padding-right: 0.08em; font-weight: bold; }';
+
+// Renders one TypeRun as HTML, nesting tags for runs with multiple flags set (e.g. bold +
+// italic). Every TypeRun flag maps onto a real HTML element - unlike PDFKit, nothing here
+// needs a documented gap for superscript/subscript/small-caps.
+function renderRun(run: TypeRun): string {
+  let html = escapeHtml(run.text);
+  if (run.superscript) html = `<sup>${html}</sup>`;
+  if (run.subscript) html = `<sub>${html}</sub>`;
+  if (run.smallCaps) html = `<span style="font-variant: small-caps">${html}</span>`;
+  if (run.strikethrough) html = `<s>${html}</s>`;
+  if (run.underline) html = `<u>${html}</u>`;
+  if (run.italic) html = `<em>${html}</em>`;
+  if (run.bold) html = `<strong>${html}</strong>`;
+  if (run.linkUrl) html = `<a href="${escapeHtml(run.linkUrl)}">${html}</a>`;
+  return html;
+}
+
+function renderRuns(runs: TypeRun[]): string {
+  return runs.map(renderRun).join('');
+}
+
+// Drop-cap v1: wraps the first character of the first run in a floated span (see
+// DROP_CAP_CSS). Real text-wrap, not an approximation - the reading system's own CSS
+// engine handles it.
+function renderRunsWithDropCap(runs: TypeRun[]): string {
+  const [firstRun, ...restRuns] = runs;
+  if (!firstRun || firstRun.text.length === 0) return renderRuns(runs);
+
+  const dropCapChar = firstRun.text[0];
+  const remainderOfFirstRun = firstRun.text.slice(1);
+  const remainingRuns: TypeRun[] = remainderOfFirstRun ? [{ ...firstRun, text: remainderOfFirstRun }, ...restRuns] : restRuns;
+
+  return `<span class="dropcap">${escapeHtml(dropCapChar)}</span>${renderRuns(remainingRuns)}`;
+}
+
 export class EPUBRenderer implements Renderer<Buffer> {
   async render(book: PaginatedBook, context: RenderContext): Promise<Buffer> {
-    const { book: domainBook, theme } = book.styledBook;
+    const { book: domainBook, theme, blockTypography } = book.styledBook;
     // Scoped per render call: images with embedded base64 data are written here and referenced
     // via file:// (ADR-0020, finding 5 - epub-gen-memory unconditionally fetches <img src>, with
     // no bypass for already-available bytes; file:// is the verified zero-network-call path).
@@ -50,7 +95,7 @@ export class EPUBRenderer implements Renderer<Buffer> {
       // this renderer filtered for Chapter only, which silently produced a structurally valid
       // but completely empty EPUB for that file - caught only by inspecting real output, not by
       // any test with a synthetic always-has-a-chapter fixture.
-      const chapters = domainBook.mainContent.map((content) => this.buildChapter(content, tmpDir));
+      const chapters = domainBook.mainContent.map((content) => this.buildChapter(content, blockTypography, tmpDir));
 
       const options: EpubOptions = {
         title: context.metadata?.title ?? domainBook.metadata.title,
@@ -81,55 +126,76 @@ export class EPUBRenderer implements Renderer<Buffer> {
       h5 { font-size: ${theme.fontSizes.h5}pt; }
       h6 { font-size: ${theme.fontSizes.h6}pt; }
       p { font-size: ${theme.fontSizes.body}pt; margin: 0 0 ${theme.spacing.paragraphSpacing}pt; }
-      blockquote { font-style: italic; margin-left: 1.5em; }
+      blockquote { margin-left: 1.5em; }
       table, th, td { border: 1px solid #999; border-collapse: collapse; padding: 4px; }
+      ${DROP_CAP_CSS}
     `;
   }
 
-  private buildChapter(content: Content, tmpDir: string): EpubChapter {
+  private buildChapter(content: Content, blockTypography: Record<string, ResolvedTypography> | undefined, tmpDir: string): EpubChapter {
     const parts: string[] = [];
-    this.renderContentInto(content, parts, tmpDir);
+    this.renderContentInto(content, blockTypography, parts, tmpDir);
     // An untitled top-level Section ("preamble", see the mainContent comment above) has an
     // empty title - fall back to a non-blank label for the TOC entry specifically, without
     // fabricating heading text in the body (renderContentInto already omits an empty heading tag).
     return { title: content.title || 'Untitled', content: parts.join('\n') };
   }
 
-  private renderContentInto(content: Content, parts: string[], tmpDir: string): void {
+  private renderContentInto(
+    content: Content,
+    blockTypography: Record<string, ResolvedTypography> | undefined,
+    parts: string[],
+    tmpDir: string
+  ): void {
     if (content.title) {
       const level = content.type === 'chapter' ? 1 : Math.min(6, Math.max(1, content.level));
       parts.push(`<h${level}>${escapeHtml(content.title)}</h${level}>`);
     }
 
     for (const block of content.content) {
-      parts.push(this.renderBlock(block, tmpDir));
+      parts.push(this.renderBlock(block, blockTypography, tmpDir));
     }
 
     const nested = content.type === 'chapter' ? content.sections : content.subsections;
     if (nested) {
-      for (const child of nested) this.renderContentInto(child, parts, tmpDir);
+      for (const child of nested) this.renderContentInto(child, blockTypography, parts, tmpDir);
     }
   }
 
-  private renderBlock(block: Block, tmpDir: string): string {
+  private renderBlock(block: Block, blockTypography: Record<string, ResolvedTypography> | undefined, tmpDir: string): string {
     switch (block.type) {
       case 'heading': {
         const level = Math.min(6, Math.max(1, block.level));
-        return `<h${level}>${escapeHtml(block.text)}</h${level}>`;
+        const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
+        return `<h${level}>${renderRuns(runs)}</h${level}>`;
       }
 
       case 'paragraph': {
+        const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
+        const dropCap = blockTypography?.[block.id]?.dropCap ?? false;
         const align = block.align && block.align !== 'left' ? ` style="text-align: ${block.align}"` : '';
-        return `<p${align}>${escapeHtml(block.text)}</p>`;
+        const inner = dropCap ? renderRunsWithDropCap(runs) : renderRuns(runs);
+        return `<p${align}>${inner}</p>`;
       }
 
       case 'quote':
-      case 'scripture':
-        return `<blockquote>${escapeHtml(block.text)}</blockquote>`;
+      case 'scripture': {
+        // Italics are already forced onto every run by TypographyResolver
+        // (design review §4 item 9) - the CSS blockquote rule no longer hardcodes
+        // font-style: italic (removed), since the runs themselves now carry real <em>
+        // tags reflecting that same rule, traceable to one place instead of two.
+        const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
+        return `<blockquote>${renderRuns(runs)}</blockquote>`;
+      }
 
       case 'list': {
         const tag = block.ordered ? 'ol' : 'ul';
-        const items = block.items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+        const items = block.items
+          .map((item, index) => {
+            const itemRuns = runsOrPlainFallback(blockTypography?.[listItemTypographyKey(block.id, index)], item);
+            return `<li>${renderRuns(itemRuns)}</li>`;
+          })
+          .join('');
         return `<${tag}>${items}</${tag}>`;
       }
 
@@ -141,8 +207,10 @@ export class EPUBRenderer implements Renderer<Buffer> {
         return `<table>${headerRow}${bodyRows}</table>`;
       }
 
-      case 'footnote':
-        return `<p>[${block.number}] ${escapeHtml(block.content)}</p>`;
+      case 'footnote': {
+        const runs = runsOrPlainFallback(blockTypography?.[block.id], block.content);
+        return `<p>[${block.number}] ${renderRuns(runs)}</p>`;
+      }
 
       case 'image':
         return this.renderImage(block, tmpDir);

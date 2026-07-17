@@ -2,6 +2,8 @@
 
 Book Publisher Studio is a global publishing software platform (DOCX import, AST-based book model, PDF/EPUB export, AI-assisted editing) — not limited to any single audience or region.
 
+> For a condensed version of this checklist (this file + the other 4 core docs, in one fixed reading order), see [docs/SESSION_BOOTSTRAP.md](SESSION_BOOTSTRAP.md). Saying "Read docs/SESSION_BOOTSTRAP.md and follow it" at the start of a session covers steps 1–7 below in one shot.
+
 1. Verify this is the project root.
 2. Verify CLAUDE.md exists.
 3. Verify src/ exists.
