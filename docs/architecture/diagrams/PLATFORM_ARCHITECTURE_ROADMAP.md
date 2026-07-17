@@ -116,6 +116,18 @@ Deliberately left to each engine's own Level 2 Design Review, matching this proj
 - Publishing Engine's exact port shape and which platform ships first
 - Sprint numbering/scheduling for Editorial AI Engine, Professional Layout Engine, Plugin System, and Publishing Engine beyond "Validation Engine is Sprint 5" — no commitment made here about Sprint 6, 7, 8 assignments
 
+## 4a. Proposed Sprint 7 Scope Change — Not Yet Decided
+
+**Status:** PROPOSED (2026-07-17, CTO recommendation, post-Sprint-6). Explicitly not approved — recorded here so it isn't lost before its own Design Review, and so `docs/VERSIONS.md`'s existing sequencing (Plugin System / Editorial AI Engine / Publishing Engine before Premium UI/UX at `v0.8.0-alpha`) isn't silently contradicted by a later session picking a different Sprint 7 without knowing this was floated.
+
+**The proposal:** make Sprint 7 the project's first interactive, demonstrable milestone rather than the next backend-only engine. Concretely: launch Book Publisher Studio, import a real DOCX manuscript, see the book's structure, change the export format (A4/A5/KDP 6×9) via `LayoutSelector`, preview the result, and export to PDF/DOCX/EPUB — end to end, through a UI, not just `curl`/Postman against `POST /api/manuscripts/*`. This is substantively the `v0.8.0-alpha` "Premium UI/UX" (Next.js frontend, drag-and-drop import, live preview) milestone already named in `docs/VERSIONS.md`, proposed to move ahead of Plugin System / Editorial AI Engine / Publishing Engine rather than after them.
+
+**Rationale offered:** every engine a demo would need already exists and is real-file-verified (import, theme/typography/layout, PDF/DOCX/EPUB export, layout selection) — the gap is visibility, not capability. A working, showable version unblocks external validation (editors, authors, partners) before investing further in engines nothing outside the API surface can yet exercise.
+
+**What would change if approved:** `docs/VERSIONS.md`'s `v0.8.0-alpha` (Premium UI/UX) row would become Sprint 7, and Plugin System/Editorial AI Engine/Publishing Engine would each shift one slot later — the same renumbering mechanics already used twice (Sprint 5, Sprint 6) when a placeholder milestone got superseded by an actual Design-Review-backed decision.
+
+**Explicitly not done as part of recording this proposal:** no `docs/VERSIONS.md` renumbering, no Sprint 7 branch, no frontend code, no Level 2 Design Review yet — this section exists only so the option is on the record. A dedicated Design Review (matching every prior engine's own process — evidence gathered, options weighed, CTO decision recorded) is the next step before any of this is scheduled or built.
+
 ---
 
 ## 5. Related

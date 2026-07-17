@@ -12,7 +12,9 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-None currently.
+**Sprint 7 scope — pending Design Review, not yet started.** CTO proposal (2026-07-17, post-Sprint-6): make Sprint 7 the project's first interactive demo (UI import → structure view → format change via `LayoutSelector` → preview → PDF/DOCX/EPUB export) instead of the next backend-only engine — substantively `v0.8.0-alpha` "Premium UI/UX" moved ahead of Plugin System/Editorial AI Engine/Publishing Engine. **Recorded, not decided** — see `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` §4a for the full proposal and rationale. No `docs/VERSIONS.md` renumbering, no branch, no code until its own Design Review is done and explicitly approved. The professional editorial fixture library (novels/technical/academic/magazine/bible/children/poetry/cookbook, see Backlog below) is deliberately deferred until this scope is fixed, so fixtures aren't built for a sprint whose perimeter isn't set yet.
+
+Also post-Sprint-6 (2026-07-17), independent of the Sprint 7 scope question: new governance docs formalizing practices that had previously lived only in ADRs/session discipline — `docs/QUALITY_GATE.md` (per-commit checklist + 3 validation levels: Development/Product/Release), `docs/TESTING_STRATEGY.md` (functional-vs-rendering and structural(L1)-vs-rendering(L2) test taxonomies), `docs/REAL_FIXTURE_POLICY.md` (broadens real-fixture verification beyond the rendering pipeline to also cover import and TOC generation, formalizing the trigger gap ADR-0031 bug 2 exposed). ADR-0032 written (TOC generation must use `Chapter`/`Section` titles, never `Heading` blocks — formalizes ADR-0031 bug 2 as a standing rule so a future session can't silently reintroduce it).
 
 Sprint 6 (Professional Layout Engine) is **complete, merged, and released** — commit 0's spike + 10 numbered commits + 2 disclosed fix commits done, tested (328/328), verified against real files (`npm run verify-server` + `npm run verify-real-export`, 16/16 checks), merged via PR #11 (`eb05beb`), tagged `v0.7.0-alpha`. Two real bugs found and fixed during real-file verification (ADR-0031). See the COMPLETED section below and `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md` / `ReleaseNotes.md` for full detail. `feature/sprint-6-professional-layout-engine` deleted (local + remote).
 
@@ -168,6 +170,7 @@ Sprint 4 (Typography Engine) is **complete, merged, and released** — all 11 co
 - [ ] Translation assistance
 - [ ] Custom plugins system
 - [ ] Kindle / Kobo / Lulu / IngramSpark / Amazon KDP export targets
+- [ ] **Professional editorial fixture library** (CTO proposal, 2026-07-17, post-Sprint-6) — a permanent `fixtures/` repository of real-shaped manuscripts (`novels/`, `technical/`, `academic/`, `magazine/`, `bible/`, `children/`, `poetry/`, `cookbook/`), each a standing regression fixture exercised by every renderer (DOCX/PDF/EPUB). **Deliberately deferred until Sprint 7's scope is decided** (see IN PROGRESS above) — not started, no directory created yet, so fixtures aren't built for a sprint whose perimeter isn't fixed.
 
 ---
 

@@ -92,11 +92,13 @@ src/
 
 ## Permanent Verification Policy (Real Export Checklist)
 
-This project has already missed multiple real bugs that synthetic fixtures did not detect: PDF "Page 6 of 4" (ADR-0019 finding 6C), a completely empty EPUB (ADR-0020 addendum), and PDFKit infinite pagination (ADR-0019 finding 6B). All three were caught only by exporting a real manuscript through the running HTTP API and visually inspecting the output — never by a green `npm test` alone. A separate incident (2026-07-17) showed the verification step itself can silently give a false read too: a real-export check was reported against the wrong port, never actually checked against the server's own startup log — see the Server Verification Policy below, added for exactly this reason.
+This project has already missed multiple real bugs that synthetic fixtures did not detect: PDF "Page 6 of 4" (ADR-0019 finding 6C), a completely empty EPUB (ADR-0020 addendum), PDFKit infinite pagination (ADR-0019 finding 6B), and a permanently empty Table of Contents on every real DOCX import (ADR-0031 bug 2, formalized as a standing rule in ADR-0032). All four were caught only by exporting a real manuscript through the running HTTP API (or, where the HTTP round trip structurally can't reach the changed field, a direct real-pipeline composition against real fixture content) and inspecting the actual output — never by a green `npm test` alone. A separate incident (2026-07-17) showed the verification step itself can silently give a false read too: a real-export check was reported against the wrong port, never actually checked against the server's own startup log — see the Server Verification Policy below, added for exactly this reason.
 
 **Rule:** any change touching `DOCXRenderer`, `PDFRenderer`, `EPUBRenderer`, `ThemeEngine`, `LayoutEngine`, `TypographyResolver`, the `Renderer` port, or `ExportManuscriptUseCase` must complete `docs/REAL_EXPORT_CHECKLIST.md` before the task is considered done — unit tests and E2E tests passing is necessary but never sufficient on its own for this category of change. No sprint touching the rendering pipeline is complete until the canonical fixture (see Real Export Policy below) has been exported (all applicable formats) through `POST /api/manuscripts/export` and inspected — not by calling a renderer class directly in a script.
 
-This is enforced at merge time via `docs/MERGE_CHECKLIST.md`'s own gate for this category of change. It applies automatically in every session touching the rendering pipeline, without needing to be re-requested.
+**`docs/REAL_FIXTURE_POLICY.md` broadens this trigger list** (2026-07-17, post-Sprint-6) beyond the rendering pipeline to also cover the import pipeline (`MammothParser`, `HtmlNormalizer`, `ASTBuilder`, `ImportManuscriptUseCase`) and Table of Contents generation/consumption specifically — read that policy for the full scope and for how to handle fields with no real DOCX-native signal to trigger them from.
+
+This is enforced at merge time via `docs/MERGE_CHECKLIST.md`'s own gate for this category of change, and per-commit via `docs/QUALITY_GATE.md`'s "Real Fixture Verification PASS" item. It applies automatically in every session touching the rendering or import pipeline, without needing to be re-requested.
 
 ## Server Verification Policy
 
@@ -134,3 +136,9 @@ This ensures the same known documents are used for verification every session, r
 - Update CURRENT_STATE.md after each sprint
 - Update ROADMAP.md if timelines change
 - Keep docs/architecture/diagrams/ current
+
+## Quality Gate, Testing Strategy, Real Fixture Policy (added post-Sprint-6)
+
+- `docs/QUALITY_GATE.md` — the per-commit checklist (build/lint/tests/coverage/verify-server/verify-real-export/Real Fixture Verification/no stray TODOs/ADRs synced/docs synced/public API unchanged), and the three validation levels (Development/Product/Release)
+- `docs/TESTING_STRATEGY.md` — functional-vs-rendering and structural(Level 1)-vs-rendering(Level 2) test taxonomies, for triage once the suite is large
+- `docs/REAL_FIXTURE_POLICY.md` — broadens real-fixture verification beyond the rendering pipeline (see Permanent Verification Policy above)

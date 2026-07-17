@@ -749,3 +749,20 @@ So this is one precisely-located gap: `MammothParser.ts`'s `mammoth.convertToHtm
 - `Chapter.openingPageStyle`/`startPageNumber`/`Book.frontMatter.toc.generateAutomatically` remain **not reachable through the real HTTP import→export round trip** — `ASTBuilder` has no DOCX-native signal to populate any of the three from real content (same category of gap as Sprint 5's finding that `ASTBuilder.buildMetadata()` never sets `isbn`/`description`/`coverImage`). Verified instead via direct real-pipeline composition using real fixture content with only those three unreachable fields set programmatically — disclosed in `docs/REAL_EXPORT_CHECKLIST.md`'s Sprint 6 instance rather than silently skipped or claimed as full HTTP-round-trip coverage it isn't. A future "Import Fidelity" sprint (already scoped in `docs/TODO.md` for unrelated reasons) is the natural place to revisit whether any of these three ever gets a real DOCX-native signal to key off.
 
 **Related:** ADR-0023 (bug-fixed-as-refactor-side-effect precedent), ADR-0026 (Sprint 4's real content-fidelity bugs, same discipline), ADR-0029 (the Sprint 6 design these bugs were found implementing), `docs/REAL_EXPORT_CHECKLIST.md` (the process that caught bug 2), `docs/TODO.md`'s Import Fidelity backlog item
+
+---
+
+## ADR-0032: Table of Contents Generation Follows Structural Document Hierarchy, Never Heading Blocks
+
+**Status:** APPROVED
+**Date:** 2026-07-17
+**Decision:** `LayoutEngine.buildTableOfContents()` MUST derive TOC entries from `Chapter.title` and `Section.title` — the structural hierarchy of the `Book` AST — as its primary and authoritative source. It MAY additionally include literal content-level `Heading` blocks (for hand-built `Book` models or a future import-pipeline change), but a future implementation MUST NOT treat `Heading` blocks as the primary or sole source of TOC entries.
+
+**Rationale (formalizing ADR-0031 bug 2 as a standing rule, not just a retrospective bug report):** real DOCX imports never produce a content-level `Heading` block — `ASTBuilder` structurally consumes every real heading into a `Chapter`/`Section` boundary (its `title` field) during import; the `convertHeading()` method that *can* produce a `Heading` block is only reachable for node types other than `'heading'`, since heading nodes are always routed into `openChapter()`/`openSection()` instead. An implementation that walks only `Heading` blocks produces a **permanently empty TOC on every real import** — not a rare edge case, the universal case for anything derived from an uploaded `.docx`. This was caught once during Sprint 6 real-file verification (ADR-0031) precisely because a synthetic test fixture (hand-built `Chapter`/`Heading` objects matching the `Book` type's own shape) could not have exposed it — only real imported content could. This ADR exists so a future session, refactoring or extending `buildTableOfContents()` without re-reading ADR-0031's narrative, cannot silently reintroduce the same defect by "simplifying" back to a `Heading`-only walk.
+
+**Consequences:**
+- Any future change to `LayoutEngine.buildTableOfContents()` (or a successor) must preserve the `Chapter`/`Section`-title-primary behavior; a code review or test suite change that drops this without discussion should be treated as reintroducing a known, previously-shipped-and-fixed defect, not a stylistic simplification.
+- `TOCEntry.headingId` continues to reference either a `Heading.id` (when one exists) or the owning `Chapter`/`Section`'s own id (the common, real-import case) — documented on the type itself in `Book.ts`, not just in this ADR.
+- This is a Real Fixture Policy example case (see `docs/REAL_FIXTURE_POLICY.md`): any future TOC-adjacent change should be re-verified against a real multi-chapter fixture (`backend/verification/large-book.docx`), not synthetic fixtures alone, before being considered done.
+
+**Related:** ADR-0031 (the real-file-verification finding this ADR formalizes into a standing rule), `docs/REAL_FIXTURE_POLICY.md` (the governance policy this decision is a worked example of), `backend/src/domain/services/LayoutEngine.ts` (`buildTableOfContents()`)

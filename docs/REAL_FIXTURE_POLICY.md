@@ -1,0 +1,54 @@
+# Real Fixture Policy
+
+## Why this exists
+
+`docs/CLAUDE.md`'s existing "Permanent Verification Policy" already mandates real-file verification for the rendering pipeline (`DOCXRenderer`, `PDFRenderer`, `EPUBRenderer`, `ThemeEngine`, `LayoutEngine`, `TypographyResolver`, the `Renderer` port, `ExportManuscriptUseCase`) — written after this project missed three real bugs (ADR-0019 findings 6B/6C, ADR-0020 addendum) that synthetic fixtures alone never caught. Sprint 6 added a fourth: automatic TOC generation shipped against synthetic fixtures alone, passed 328/328 tests, and would have produced a permanently empty TOC on every real DOCX import — caught only when real-file verification was actually run against `large-book.docx` (ADR-0031 bug 2, formalized as a standing rule in ADR-0032).
+
+Four misses in one project, all with the same shape: a synthetic fixture built directly as domain objects doesn't reproduce a real quirk of how the import pipeline actually shapes real content. This policy generalizes the trigger condition beyond "rendering pipeline only" to close that gap.
+
+## The policy
+
+**Any feature or change touching import, pagination, Table of Contents, a renderer, or publishing/packaging must, where applicable, be validated against at least one real fixture from `backend/verification/`** — not only against objects constructed by hand in a test file.
+
+"Where applicable" excludes changes with no real-file-observable effect: a pure type-signature change, a comment, a test-only refactor with no behavior change. It does **not** exclude "I'm confident this is correct" — ADR-0031 and ADR-0032 both happened to code that was fully covered by synthetic-fixture unit tests and still shipped broken.
+
+**In scope (broader than the existing rendering-pipeline trigger list in `docs/CLAUDE.md`):**
+
+- The rendering pipeline (unchanged from the existing policy): `DOCXRenderer`, `PDFRenderer`, `EPUBRenderer`, `ThemeEngine`, `LayoutEngine`, `TypographyResolver`, the `Renderer` port, `ExportManuscriptUseCase`
+- The import pipeline: `MammothParser`, `HtmlNormalizer`, `ASTBuilder`, the `DocumentParser`/`DocumentNormalizer` ports, `ImportManuscriptUseCase`
+- Table of Contents generation and consumption, specifically (its own line item — this is exactly where ADR-0031 bug 2 lived, and it cuts across both import and layout)
+- Any future Publishing Engine work (platform packaging, KDP/Kobo/Apple Books/Google Play Books targets)
+
+**Not in scope:** Validation Engine's rules (already governed by ADR-0027's read-only boundary and its own per-rule test discipline), pure Domain types with no I/O or rendering surface, presentation-layer DTOs/mappers with no format-specific behavior.
+
+## Real Fixture Verification as a Definition-of-Done criterion
+
+`docs/REAL_EXPORT_CHECKLIST.md` remains the canonical *process* for a real-file pass (which fixture, which port-verification steps, which checklist template). This policy makes completing it — or an equivalent real-pipeline-composition check where the full HTTP round trip can't reach the changed code (see below) — an explicit, named Definition-of-Done item, not just a merge-time gate:
+
+```
+□ Build PASS
+□ Lint PASS
+□ Tests PASS
+□ Coverage PASS
+□ Real Fixture Verification PASS (where applicable)
+□ verify-server PASS
+□ verify-real-export PASS
+□ Documentation synchronized
+□ ADRs synchronized
+```
+
+## When the real HTTP round trip can't reach the changed field
+
+Some fields have no real-world way to be set from an actual DOCX upload — `Chapter.openingPageStyle`/`startPageNumber`, `Book.frontMatter.toc.generateAutomatically` (Sprint 6), and `BookMetadata.isbn`/`description`/`coverImage` (Sprint 5) are all confirmed examples: `ASTBuilder` has no DOCX-native signal for any of them. In that case, "Real Fixture Verification" means composing the real pipeline directly (same components `ExportManuscriptUseCase`/`ImportManuscriptUseCase` wire together, same real fixture content) with only the unreachable field(s) set programmatically — not skipping the check, and not silently claiming full HTTP-round-trip coverage the check doesn't actually have. Disclose the gap explicitly in the completed `docs/REAL_EXPORT_CHECKLIST.md` instance, matching the precedent set in Sprint 6's PR (#11).
+
+## Worked examples
+
+- ADR-0032 (TOC generation must use `Chapter`/`Section` titles, not `Heading` blocks) is a direct product of this policy already having caught one real bug — any future TOC-adjacent change should be re-verified against `backend/verification/large-book.docx` (a real multi-chapter fixture), not synthetic fixtures alone.
+- A future change to `MammothParser`'s heading-detection logic, or to how `ASTBuilder` decides `Chapter` vs `Section` boundaries, is import-pipeline scope under this policy even though it touches neither a renderer nor `LayoutEngine` directly.
+
+## Related
+
+- `docs/CLAUDE.md` — "Permanent Verification Policy," "Server Verification Policy," "Real Export Policy" (this policy extends the first's trigger scope; the port/fixture-selection mechanics are unchanged)
+- `docs/REAL_EXPORT_CHECKLIST.md` — the checklist template and process this policy makes mandatory for a broader set of changes
+- `docs/QUALITY_GATE.md` — the per-commit gate this policy's checklist item feeds into
+- ADR-0019/ADR-0020 (the first three real bugs this project's real-file discipline was built to catch), ADR-0031/ADR-0032 (the fourth, and the reason this policy's scope was broadened beyond rendering)
