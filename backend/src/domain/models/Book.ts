@@ -464,8 +464,21 @@ export interface QualityMetrics {
 
   // Typography issues
   widowsAndOrphans: number;
+  // Functional definition is intentionally general - "blocks whose explicit style
+  // overrides a theme-resolved value" - so future style dimensions (alignment,
+  // indentation, color, font) can be folded in later without renaming or
+  // resemanticizing this field. Sprint 4's BookMetricsCalculator implementation
+  // checks spacing overrides only (spaceBefore/spaceAfter/lineHeight).
   inconsistentSpacing: number;
   emptyHeadings: number;
+
+  // Added Sprint 4 (Typography Engine, commit 9) - functional definitions locked
+  // in the Design Review (docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md, CTO Final
+  // Decision 4). Populated by BookMetricsCalculator.calculateQualityMetrics().
+  averageHeadingDepth: number; // mean of Heading.level across all Heading blocks (1-6); 0 if none
+  paragraphDensity: number; // Paragraph block count / PaginatedBook.pages.length
+  lineDensity: number; // estimated total lines across all Paragraph blocks (LayoutEngine's WORDS_PER_LINE heuristic) / Paragraph block count
+  dropCaps: number; // count of blocks where TypographyResolver resolved dropCap: true
 }
 
 // ============================================================================

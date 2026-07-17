@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 (Sprint 4, commits 1-8 complete and verified)
+**Last Updated:** July 17, 2026 (Sprint 4, commits 1-9 complete and verified)
 
 ---
 
@@ -12,7 +12,7 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-**Sprint 4 (Typography Engine)** — branch `feature/sprint-4-typography-engine`, pushed to `origin` 2026-07-17. Design Review approved (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`, 11-commit plan). **Commits 1-8 done, tested (182/182), and verified against real files** (`npm run verify-server` + `npm run verify-real-export`, 16/16 checks). **Commit 9 is next** (not started).
+**Sprint 4 (Typography Engine)** — branch `feature/sprint-4-typography-engine`, pushed to `origin` 2026-07-17. Design Review approved (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`, 11-commit plan). **Commits 1-9 done, tested (186/186), and verified against real files** (`npm run verify-server` + `npm run verify-real-export`, 16/16 checks). **Commit 10 is next** (not started).
 
 - [x] Commit 1: `ResolvedTypography`/`TypeRun` domain types + additive `StyledBook.blockTypography`
 - [x] Commit 2: `TypographyResolver.resolve()` — inline run parsing
@@ -22,8 +22,8 @@ None currently.
 - [x] Commit 6: real font embedding — Gelasio/Inter/JetBrains Mono (SIL OFL) in `PDFRenderer` (resolves the ADR-0021 font-embedding open item); `PdfFontRegistry` role-based API refactor (`resolveBody`/`resolveHeading`/`resolveMonospace`/`resolveDefault`) folded into this commit, audited to contain zero PDF-rendering logic
 - [x] Commit 7: `DOCXRenderer` consumes `TypeRun` spans + theme-driven heading styles
 - [x] Commit 8: `EPUBRenderer` consumes `TypeRun` spans + real CSS drop cap; ADR-0025 (Mammoth underline-drop limitation) documented alongside, with a regression test, per explicit CTO direction not to modify the import pipeline this sprint
-- [ ] Commit 9: `BookMetricsCalculator` populates `QualityMetrics` (widow/orphan/spacing/heading fields + `averageHeadingDepth`/`paragraphDensity`/`lineDensity`/`dropCaps`) — **next task**
-- [ ] Commit 10: E2E real-file verification pass
+- [x] Commit 9: `BookMetricsCalculator` populates `QualityMetrics` (widow/orphan/spacing/heading fields + `averageHeadingDepth`/`paragraphDensity`/`lineDensity`/`dropCaps`) — new additive `calculateQualityMetrics(paginated: PaginatedBook): QualityMetrics` method (does not touch the existing `calculate(book: Book): Book`); `widowsAndOrphans`/`inconsistentSpacing`/`emptyHeadings` formulas were not locked by the Design Review, so definitions were proposed and confirmed before implementation (see commit message / session record) — `inconsistentSpacing`'s functional definition is deliberately general ("a block whose explicit style overrides a theme-resolved value"), Sprint 4 checks spacing only. Not wired into `ExportManuscriptUseCase` or any route this commit (out of scope — that's `ValidatorEngine` work); 4 new tests, 186/186 passing, 90.23% global / 92.81% domain coverage, `npm run verify-server` + `npm run verify-real-export` both green (16/16)
+- [ ] Commit 10: E2E real-file verification pass — **next task**
 - [ ] Commit 11: ADR-0022 (Typography Resolution Pipeline), ADR-0023 (Font Embedding), ADR-0024 (Hyphenation/smart-quotes-v2-deferred) + final `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` pass
 - [ ] Open the Sprint 4 PR — only once commit 11 is done and re-verified (per CTO instruction: PR only once the whole sprint is done and verified)
 
@@ -50,6 +50,7 @@ None currently.
 - [ ] AI features (explicitly deferred — architecture should stay extensible for these, not build them now)
 - [ ] **Editorial AI Engine** (new, 2026-07-17 — see `docs/VISION.md`'s dedicated section) — independent module, own pipeline stage between Normalizer and Theme Engine, entirely separate from rendering so the rendering pipeline stays deterministic. Humanization, grammar/style correction, accept/reject suggestions, readability analysis, manuscript consistency checks, AI writing assistant. Realistically its own Sprint 6/7. **Not scoped, not designed, no code/ADR/Design Review yet** — explicitly deferred until Sprint 4 and the rendering pipeline it stabilizes are fully merged and verified.
 - [ ] **Import Fidelity** (new, 2026-07-17 — see ADR-0025) — a dedicated future sprint to improve or replace what `MammothParser`/mammoth actually preserves from a real DOCX. Confirmed gap: underline formatting is silently dropped by mammoth's default behavior (ADR-0025 — a documented, verified workaround exists via mammoth's own `styleMap` option, not applied during Sprint 4). Candidates to evaluate with real spike evidence, matching ADR-0019/ADR-0020's precedent: highlight, track changes, comments, text boxes, SmartArt, floating images, nested tables, DrawingML — none of these individually verified yet, named from the CTO's proposed backlog only. **Not scoped, not designed** — explicitly deferred until after Sprint 4 (Typography Engine) merges; Sprint 4 does not modify the import pipeline.
+- [ ] **Documentation & Learning Platform** (new, 2026-07-17 — proposed by the CTO after Sprint 4 commit 8) — a dedicated future phase covering: (1) a full documentation strategy, (2) user/developer/admin documentation infrastructure, (3) a training academy (guides, tutorials, videos, certification), (4) an in-app Learning Center, (5) a knowledge base to underpin the future AI Assistant. Proposed strategic docs: `PRODUCT_VISION.md`, `PRODUCT_REQUIREMENTS.md`, `DOCUMENTATION_MASTER_PLAN.md`, `TRAINING_MASTER_PLAN.md`, `AI_KNOWLEDGE_BASE.md`, `CERTIFICATION_PROGRAM.md`, `LEARNING_CENTER_SPEC.md`, `VIDEO_PRODUCTION_GUIDE.md`. CTO's own proposed commit breakdown (10 commits): product vision → product requirements → documentation master plan → learning center → video academy → certification → AI knowledge base → documentation templates → example projects → final validation — same per-commit rigor (Design Review, ADR where warranted, docs, verification) as the rendering-pipeline sprints. **Naming conflict to resolve when this is actually scoped:** the CTO referred to this as "Sprint 5," but `docs/VERSIONS.md` already assigns Sprint 5 → `v0.6.0-alpha` (Premium UI/UX); this item does not yet have a version/sprint slot reserved and should not silently claim "Sprint 5" without reconciling that. **Not scoped, not designed, no ADR/Design Review yet** — explicitly deferred until Sprint 4 (Typography Engine) is fully complete (commits 9-11) and merged, per explicit CTO instruction not to mix this with rendering-pipeline work in progress.
 - [ ] Licensing/subscription model, observability/telemetry (also explicitly deferred — no DB/auth exists yet)
 
 **CTO priority order for Sprint 4+ (2026-07-17):** 1) Typography Engine (in progress), 2) `ValidatorEngine`, 3) Plugin system, 4) Premium UI, 5) AI features / Editorial AI Engine.
@@ -147,7 +148,7 @@ None currently.
 
 ## 💡 TECHNICAL DEBT
 
-- `QualityMetrics` interface declared but its widow/orphan/spacing/heading/density fields are still unpopulated — this is Sprint 4 commit 9 (`BookMetricsCalculator`), next task.
+- `QualityMetrics` is now computable via `BookMetricsCalculator.calculateQualityMetrics(paginated)` (Sprint 4 commit 9) but not yet surfaced through any HTTP route/DTO — deliberately out of commit 9's scope; wiring it into a response is `ValidatorEngine` work (Sprint 4+ priority #2, CTO priority order).
 - ADR-0022 (Typography Resolution Pipeline) and ADR-0023 (Font Embedding) not yet formally written — deferred to Sprint 4 commit 11, once the code state is final.
 - `docs/architecture/diagrams/BASELINE_v0.1.md` staleness corrected via ADR-0010 (status annotation added, content not rewritten).
 - `errorHandler.ts` passes multer's own error message straight to the client for non-size-limit errors (low severity — multer's built-in messages are generic, not stack traces/paths — but not a hardcoded message like the size-limit case).
@@ -159,6 +160,6 @@ None currently.
 
 - **Test Coverage:** Domain >90% stmts, global >80% stmts (both re-verified via `npm run test:coverage` before every Sprint 4 commit; exact percentages to be reconciled and recorded in commit 11's docs pass)
 - **Code Quality:** TypeScript strict mode ✅, ESLint **0 errors / 0 warnings**, Prettier applied
-- **Tests:** 182 passing, 0 failing
-- **Architecture Debt:** see Technical Debt above (`QualityMetrics` population pending commit 9, ADR-0022/0023 pending commit 11)
-- **Documentation:** Reconciled with actual code as of 2026-07-17 (Sprint 4, commits 1-8)
+- **Tests:** 186 passing, 0 failing
+- **Architecture Debt:** see Technical Debt above (`QualityMetrics` computable but not HTTP-wired pending `ValidatorEngine`, ADR-0022/0023 pending commit 11)
+- **Documentation:** Reconciled with actual code as of 2026-07-17 (Sprint 4, commits 1-9)
