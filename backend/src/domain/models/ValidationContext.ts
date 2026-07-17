@@ -2,12 +2,17 @@ import type { Book, QualityMetrics } from './Book';
 import type { PaginatedBook } from './PaginatedBook';
 import type { Theme } from './Theme';
 
+// TRANSITIONAL: Record<string, unknown> is a placeholder, not the final shape.
 // Reserved for future per-platform/per-profile rule configuration - no rule
-// reads this yet (docs/architecture/diagrams/VALIDATION_ENGINE.md §6).
+// reads this yet (docs/architecture/diagrams/VALIDATION_ENGINE.md §6). Replace
+// with a dedicated interface once a real rule needs specific fields here -
+// don't add fields to this type speculatively in the meantime.
 export type ValidationProfileConfig = Record<string, unknown>;
 
+// TRANSITIONAL: Record<string, unknown> is a placeholder, not the final shape.
 // Reserved for future rules that need to know what the target Renderer
 // supports (e.g. embedded fonts, real pagination) - no rule reads this yet.
+// Replace with a dedicated interface once a real rule needs specific fields.
 export type RendererCapabilities = Record<string, unknown>;
 
 /**
