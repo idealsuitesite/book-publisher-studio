@@ -485,3 +485,43 @@ For the first implementation, pagination is heuristic, not exact: each block typ
 - `PDFRenderer`/`ClassicTheme` still render Georgia-by-name-heuristic until Sprint 4 actually embeds Gelasio — this ADR does not change current PDF output, only the plan for it
 
 **Related:** ADR-0011, ADR-0019, ADR-0020, `docs/VERSIONS.md`, `docs/TODO.md`
+
+---
+
+## ADR-0025: Mammoth Drops DOCX Underline Formatting by Default (Import Pipeline Limitation)
+
+**Status:** APPROVED — documented and deferred, not fixed
+**Date:** 2026-07-17
+**Decision:** A real, verified limitation surfaced while real-export-verifying Sprint 4 commit 7 (`npm run verify-real-export` against `backend/verification/typography-test.docx`). Explicit CTO triage: this belongs to the **import** pipeline (`MammothParser`), not the **rendering** pipeline Sprint 4 is building — document it now, do not modify `MammothParser` or any import-side code this sprint. Tracked for a future dedicated "Import Fidelity" sprint instead.
+
+**What's lost:** Underline formatting (`<u>` in Word) on inline text is silently dropped during `MammothParser`'s DOCX→HTML conversion. The underlined *word* survives; only the underline *styling* is lost. No error, no warning — the round trip DOCX → Book AST → export (DOCX/PDF/EPUB) produces text that reads correctly but has silently lost that emphasis.
+
+**Evidence (mammoth's own documentation, not assumed):**
+> "By default, the underlining of any text is ignored since underlining can be confused with links in HTML documents." — `node_modules/mammoth/README.md`, "Underline" section
+
+Confirmed empirically against a real document, not just the docs: `MammothParser.parse()`'s raw HTML output for `backend/verification/typography-test.docx` (authored with an explicit underlined run via the `docx` package) contains the word "underlined" as plain, untagged text — no `<u>` anywhere — while the *same paragraph's* bold/italic/strikethrough runs correctly produce `<strong>`, `<em>`, `<s>`. This confirms mammoth's underline-dropping is a deliberate default specific to underline, not a general inline-formatting failure — bold/italic/strikethrough all round-trip correctly today, confirmed by `MammothParser.test.ts`.
+
+The rest of the pipeline already fully supports underline — confirmed by reading the code, not assumed:
+- `HtmlNormalizer.ts:126`: `else if (tag === 'u') inlines.push({ type: 'underline', text });`
+- `ASTBuilder.ts:274-275`: `case 'underline': return { type: 'underline' as const, text: inline.text };`
+- `TypographyResolver`/`PDFRenderer`/`DOCXRenderer` (Sprint 4 commits 2-7) all correctly render an `UnderlineText` `InlineElement` when the Book AST actually has one (both renderers' test suites include passing underline cases against hand-built fixtures).
+
+So this is one precisely-located gap: `MammothParser.ts`'s `mammoth.convertToHtml({ buffer })` call passes no `styleMap` option, so mammoth's underline-ignoring default applies. Everything downstream of that call is already correct and ready.
+
+**User impact:** Any real DOCX containing underlined text (a common choice, especially in legal/academic/business documents) silently loses that formatting on import, with no error surfaced.
+
+**Documented, verified workaround — not implemented this sprint:** mammoth supports exactly this case via a `styleMap` option: `styleMap: ["u => u"]` passed to `mammoth.convertToHtml()` would map Word's underline run style onto an HTML `<u>` tag, which `HtmlNormalizer`/`ASTBuilder` already correctly convert into an `UnderlineText` inline element — closing the gap with what reads like a one-line change to `MammothParser.ts`. Deliberately not applied now: Sprint 4 does not touch the import pipeline, even for a small, well-understood fix — that is Import Fidelity sprint scope, not Rendering (Sprint 4) scope.
+
+**Alternative libraries — named as candidates for a future spike, not evaluated with real evidence here (that's Import Fidelity sprint work, matching the ADR-0019/ADR-0020 spike-before-decide precedent):**
+- Mammoth's own `styleMap` option (above) — smallest possible change, keeps the already-adopted, already-verified library
+- `docx4js` — an alternative DOCX parser more OOXML-structure-aware than mammoth's HTML-semantic focus; maintenance/license status not checked
+- Hand-rolling a minimal OOXML run-property reader against `word/document.xml` via `jszip` (already a project dependency) for just the formatting flags mammoth currently drops — bypasses HTML entirely for this narrow purpose; more code to own, full control (same reasoning pattern as ADR-0018's docx-generation choice)
+
+**Other known mammoth-default-drops worth the same future sprint's attention (named, not yet individually verified):** highlight, track changes, comments, text boxes, SmartArt, floating images, nested tables, DrawingML.
+
+**Consequences:**
+- No import-pipeline code change this sprint
+- `MammothParser.test.ts` gains a regression test asserting this AS the current, correct, documented behavior (word present, `<u>` absent) — so a future engineer (or session) never mistakes this for a Sprint 4 typography regression, and so a future fix (e.g. adding the `styleMap`) shows up as an intentional, visible test change rather than silently flipping an unguarded assertion
+- Tracked for a dedicated future "Import Fidelity" sprint (post-Sprint-4): underline (this ADR) plus highlight, track changes, comments, text boxes, SmartArt, floating images, nested tables, DrawingML — evaluate mammoth `styleMap` options and/or alternative libraries with real spike evidence before deciding, matching this project's established discipline
+
+**Related:** ADR-0019, ADR-0020 (spike-before-decide precedent), Sprint 4 Typography Engine design review, `docs/TODO.md` (Import Fidelity backlog entry)
