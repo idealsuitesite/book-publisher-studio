@@ -647,6 +647,8 @@ So this is one precisely-located gap: `MammothParser.ts`'s `mammoth.convertToHtm
 - `ValidationEngine.validate()`'s return type (`ValidationReport`) contains only diagnostics (`issues`, `errors`, `warnings`, `score`) — it never returns a `Book`, unlike `ThemeEngine.applyTheme()`/`TypographyResolver.resolve()`/`LayoutEngine.paginate()`, which all return a new, richer version of what they were given. This is a deliberate, visible asymmetry with those three services, not an inconsistency — they *transform* the book toward its rendered form; Validation Engine only *observes* it.
 - If a future sprint finds a genuine need for Validation Engine to suggest a fix (not just flag a problem), that capability belongs in Editorial AI Engine consuming Validation Engine's diagnostics (already the fixed dependency direction, `PLATFORM_ARCHITECTURE_ROADMAP.md` §3) — not a carve-out in this ADR.
 
+**Related:** `docs/architecture/diagrams/VALIDATION_ENGINE.md` (Sprint 5 Design Review this ADR constrains), `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` (Level 1 — Validation Engine → Editorial AI Engine dependency), ADR-0001 (immutable updates only), ADR-0022 (`TypographyResolver`'s own immutability precedent)
+
 ---
 
 ## ADR-0028: Validation Engine Rule Design Principles
@@ -671,4 +673,28 @@ So this is one precisely-located gap: `MammothParser.ts`'s `mammoth.convertToHtm
 
 **Related:** `docs/architecture/diagrams/VALIDATION_ENGINE.md` (the rules these principles were extracted from), ADR-0027 (the read-only boundary these principles operate within), `docs/releases/v0.6.0-alpha/SPRINT_5_FINAL_REPORT.md`
 
-**Related:** `docs/architecture/diagrams/VALIDATION_ENGINE.md` (Sprint 5 Design Review this ADR constrains), `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` (Level 1 — Validation Engine → Editorial AI Engine dependency), ADR-0001 (immutable updates only), ADR-0022 (`TypographyResolver`'s own immutability precedent)
+---
+
+## ADR-0029: Professional Layout Engine — Extension Strategy, RunningHead, and LayoutSelector
+
+**Status:** APPROVED
+**Date:** 2026-07-17
+**Decision:** Three related architectural choices for Sprint 6 (Professional Layout Engine), decided together since each depends on the others reading correctly:
+
+1. **`LayoutEngine` is extended, not replaced by a new class.** Running headers, footers, page numbering, automatic Table of Contents generation, and `Chapter.openingPageStyle`/`startPageNumber` handling are all computed *during* pagination, from data pagination already produces — they are not a structurally different kind of transform the way inline-run resolution (`TypographyResolver`) was from visual-style resolution (`ThemeEngine`). `LayoutEngine.paginate()`'s public signature is unchanged; its internals gain these responsibilities.
+2. **Header/footer presentation lives on `Theme`, as a `RunningHead` sub-structure** (`show`, `position`, `content`, `pageNumber`, `separator`, `uppercase`, `font`, `size`) — a theme already owns every other visual decision (fonts, colors, spacing, heading styles); running-head presentation is the same category of decision, not a page-geometry concern (`PageLayout`) or a new parallel type. Deliberately more detailed than a minimal on/off flag, specifically so future themes (Classic, Minimal, Academic, Novel, a Bible/Theology-oriented theme) can each present a genuinely different running head without any `LayoutEngine` change — only `ClassicTheme` populates it in Sprint 6; the shape is what makes later themes free to differ.
+3. **`LayoutSelector` is introduced now as a port, with exactly one real implementation (`ManualLayoutSelector`), so a future automatic-selection heuristic (`AutomaticLayoutSelector`) can be added later without an API change.** No automatic *selection* logic (content-driven layout choice by language, page count, binding type, etc.) is built in Sprint 6 — `ManualLayoutSelector` only wraps today's existing caller-supplied-by-name behavior. `AutomaticLayoutSelector` is named and documented as the intended second implementation, not built.
+
+**Rationale:**
+- Decision 1 follows the same test Sprint 4's Design Review already applied when it *rejected* folding `TypographyResolver` into `ThemeEngine`: is this a genuinely different responsibility, or the same one going deeper? Inline-run resolution failed that test (genuinely different) and got its own class; header/footer/TOC/page-numbering pass the test the other way (same responsibility, more of it) and stay inside `LayoutEngine`.
+- Decision 2's extra structural depth (8 fields, not a single toggle) is a direct CTO addition beyond the Design Review's own round-1 default (which had proposed a flatter `{ show, content, customText }' shape) — justified by a concrete near-term need (`docs/VISION.md` already names Classic/Modern/Academic/Novel/Minimal/Premium/Dark/Theology as planned themes) rather than speculative over-design.
+- Decision 3 is deliberately distinguished from ADR-0028 principle 1 (don't register a rule that never fires): `LayoutSelector` is a **port** with one fully real, in-use adapter today (`ManualLayoutSelector`) — the same shape `Renderer<TOutput>` already has (one port, multiple adapters added over time, ADR-0012). `AutomaticLayoutSelector` is a *documented future adapter*, never registered or called, not a no-op instance sitting in a registry pretending to do something. The distinction is real: a no-op rule silently misrepresents coverage that's supposedly happening now; an unbuilt future adapter to a port claims nothing about the present.
+
+**Consequences:**
+- `PaginatedBook` and `Theme` both gain additive-only fields (`tableOfContents?`, `runningHead?`) — no existing consumer of either type breaks, matching the pattern ADR-0022/ADR-0027 already established for `StyledBook.blockTypography?` and `ValidationContext`.
+- `ExportController`'s hardcoded `LetterPageLayout` constant is replaced by a `LayoutSelector.select()` call — the only caller-facing change in Sprint 6, and it preserves today's exact behavior through `ManualLayoutSelector`.
+- The Sprint 6 Design Review (`docs/architecture/diagrams/PROFESSIONAL_LAYOUT_ENGINE.md`) also disclosed and resolved a real, pre-existing defect found while gathering evidence for this ADR: `PDFRenderer`'s running head was a hardcoded literal string (`'Book Publisher Studio'`), never the actual book's title — fixed as a direct consequence of Decision 2 (once `runningHead.content` is real, the hardcoded string is structurally impossible to keep), not filed as a separate ticket, matching the ADR-0023 precedent (a bug found and fixed as a refactor side effect, disclosed in the commit, not hidden).
+- `AutomaticLayoutSelector` not existing yet is a real, accepted risk (same category as `ValidationContext`'s unused reserved fields, Sprint 5) — worth revisiting if no second `LayoutSelector` implementation ever materializes.
+- Exact KDP/platform trim-size values are explicitly not decided by this ADR — they require a real spike against each platform's own published specs (ADR-0019/0020 precedent) before any new `PageLayout` preset ships.
+
+**Related:** `docs/architecture/diagrams/PROFESSIONAL_LAYOUT_ENGINE.md` (the Sprint 6 Design Review this ADR formalizes), `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` (Level 1), ADR-0012 (`Renderer` port precedent for `LayoutSelector`), ADR-0013 (pagination-is-a-heuristic, EPUB-excluded precedent), ADR-0022/ADR-0027 (additive-field pattern), ADR-0023 (bug-fixed-as-refactor-side-effect precedent), ADR-0028 (the no-op-rule principle Decision 3 is deliberately distinguished from)
