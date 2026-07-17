@@ -1,6 +1,6 @@
 # Typography Resolution Pipeline — Design Review (Sprint 4)
 
-**Status:** DRAFT v2 — revised after CTO review (2026-07-17). Not yet approved, no ADR numbers final, no implementation code written. v1 of this review proposed a `TypographyEngine` + new `TypesetBook` type; the CTO approved the pipeline position and responsibility split but rejected the `TypesetBook` rename and the `LayoutEngine` signature change as unnecessarily large blast radius. This v2 keeps the same architecture with a smaller footprint (see §CTO Review Outcomes below).
+**Status:** ✅ APPROVED (2026-07-17) — all open questions resolved, ready for implementation. ADR numbers below are still to be written into `DECISIONS.md` (happens as commit 11 of the plan, §8), but no further design changes are expected before then. v1 proposed a `TypographyEngine` + new `TypesetBook` type; round 1 of CTO review approved the pipeline position/responsibility split but rejected the `TypesetBook` rename and `LayoutEngine` signature change as unnecessary blast radius (§CTO Review Outcomes). Round 2 resolved the 4 remaining open questions (§14, now folded into the relevant sections and marked DECIDED below).
 **Date:** 2026-07-17
 **Scope:** Sprint 4, priority #1 per CTO direction (`docs/TODO.md`, ADR-0021).
 
@@ -22,6 +22,24 @@
 | 10 | (not in v1) | **New requirement**: formalize the "verify with a real file" discipline this project has already relied on informally 3 times (PDF "Page 6 of 4", empty EPUB, PDFKit infinite pagination) as a **permanent, written governance policy** — not something to re-derive every sprint | New `docs/REAL_EXPORT_CHECKLIST.md`, `docs/MERGE_CHECKLIST.md` gains a mandatory step, `docs/CLAUDE.md` references it (tracked as a separate governance change, not part of the Typography implementation itself — see the companion update in this same session) |
 
 The net effect of decisions 3–4: this sprint's blast radius shrinks substantially. `PaginatedBook`, `Renderer<TOutput>`, and `LayoutEngine`'s public signature are now untouched. Only `StyledBook` gains one additive optional field, and `LayoutEngine`'s *internals* (not its signature) read it.
+
+## CTO Final Decisions — Round 2 (2026-07-17, resolves §14's 4 open questions)
+
+Explicitly framed by the CTO as keeping Sprint 4 focused and avoiding scope creep:
+
+| # | Question | Decision | Rationale |
+|---|---|---|---|
+| 1 | Block-type typography rules (e.g. quote italics) — `Theme`-configurable this sprint, or internal default? | **Internal default in `TypographyResolver` for v1. `Theme` gains no new fields this sprint** (the `Theme.blockRules`/`Theme.typography` additions proposed in v2's §5 are dropped — see below) | Sprint 4's goal is centralizing typography, not making it configurable. Configurability is a distinct, later feature; today's internal-default design doesn't block adding it later without breaking the architecture |
+| 2 | Font embedding scope | **Three families, not one: Gelasio (serif, replaces Georgia), Inter (sans-serif), JetBrains Mono (monospace)** — replacing all of `PDFRenderer`'s current standard-14 fallbacks (Helvetica, Courier), not just the serif/Georgia gap | Technical documents routinely contain code (monospace) and the current Courier fallback reads as unpolished; Inter/JetBrains Mono are both professional, widely-used, redistributable (SIL OFL / Apache 2.0) choices — no reason to leave two of the three font categories on bare PDFKit standard-14 substitutes while fixing only the third |
+| 3 | RTL/multi-script support | **Confirmed out of scope for Sprint 4.** Not touched. | Real, separate, project-sized work (ADR-0019 finding 2) — already flagged, stays flagged, not pulled into this sprint |
+| 4 | Exact formulas for `averageHeadingDepth`/`paragraphDensity`/`lineDensity` | **Functional definitions locked now (below); exact arithmetic finalized during implementation (commit 9), optimized later alongside `ValidatorEngine`** | Sprint 4 needs these fields to exist and mean the right thing; tuning their precision is better scoped with the `ValidatorEngine` work that will actually consume them (Sprint 4 priority #2, `docs/TODO.md`) |
+
+**Functional definitions (decision 4), locked for implementation:**
+- **`averageHeadingDepth`** — the mean of `Heading.level` across every `Heading` block in the book (1–6). Represents how deeply nested the book's structure typically is; `0` if there are no headings.
+- **`paragraphDensity`** — count of `Paragraph` blocks divided by `PaginatedBook.pages.length` (the number of pages `LayoutEngine.paginate()` produced). Represents how many paragraphs a reader encounters per page on average.
+- **`lineDensity`** — total estimated lines across all `Paragraph` blocks (using `LayoutEngine`'s existing `WORDS_PER_LINE` word-count heuristic — the same one `estimateBlockHeight()` already applies) divided by the count of `Paragraph` blocks. Represents average lines per paragraph.
+
+Edge cases (division by zero when there are no pages/paragraphs, whether `Section`-only "preamble" content counts, exact rounding) are implementation details for commit 9, not fixed by this review.
 
 ---
 
@@ -83,14 +101,14 @@ Book → ThemeEngine.applyTheme() → StyledBook (blockStyles only)
 ## 4. Functional Specifications
 
 1. **Inline run resolution** — `Block.inlines` (or plain-text fallback) → ordered list of styled runs (bold/italic/underline/strikethrough/superscript/subscript/small-caps/link), computed once instead of three renderers each needing their own walk.
-2. **Font resolution policy** — `theme.fonts.{heading,body}` + run bold/italic → one logical font descriptor (family + weight + style), replacing `PDFRenderer`'s private `resolveFont()` heuristic and `DOCXRenderer`'s implicit reliance on `docx`'s default heading styles. (Actual font-*file* embedding stays an Infrastructure concern per ADR-0002 — `TypographyResolver` picks logical names, it doesn't touch `.ttf` bytes.)
+2. **Font resolution policy** — `theme.fonts.{heading,body}` + run bold/italic → one logical font descriptor (family + weight + style), replacing `PDFRenderer`'s private `resolveFont()` heuristic and `DOCXRenderer`'s implicit reliance on `docx`'s default heading styles. **DECIDED: the logical family set is Gelasio (serif) / Inter (sans-serif) / JetBrains Mono (monospace)** — `PDFRenderer`'s current `SERIF_PATTERN`/`MONO_PATTERN` regex-to-PDFKit-standard-14 mapping is replaced by a mapping onto these three embedded families instead, closing the fallback gap for all three categories, not just serif/Georgia. (Actual font-*file* embedding stays an Infrastructure concern per ADR-0002 — `TypographyResolver` picks logical names, it doesn't touch `.ttf` bytes.)
 3. **Heading size resolution** — `theme.fontSizes.h1-h6` becomes the single source of truth for all three renderers.
 4. **Drop caps** — `Paragraph.dropCap` becomes a real, renderer-consumed instruction (currently unread by all three).
 5. **Smart quotes — DECIDED: English-only in v1.** Straight `" '` → curly `" " ' '` substitution, theme-level on/off flag. Locale-aware quoting (French `« »`, German `„ "`, etc.) is explicit, tracked future work, not silently wrong — `Book.metadata.language` already carries the ISO 639-1 code this will key off of later.
 6. **Widow/orphan avoidance** — `LayoutEngine.paginate()` consults a per-block "orphan risk" flag (last line of a paragraph estimated to land alone at a page boundary) and nudges the break. Best-effort, given `paginate()` is already a heuristic estimate (ADR-0013) — not a hard guarantee (see Risk 1). No signature change (§3).
 7. **Hyphenation — DECIDED: deferred to v2.** Real (language-aware, dictionary-based) hyphenation is a materially bigger scope than every other item on this list combined; confirmed out of Sprint 4.
 8. **Alignment consistency** — `block.align` respected identically by all three renderers (closes `DOCXRenderer`'s current silent drop).
-9. **Quote/Scripture italics as a declared rule** — moves from three independent hardcodes to one `Theme`-level (or `TypographyResolver`-default) rule. Same visual output today, but now traceable to one decision instead of accidental agreement.
+9. **Quote/Scripture italics as a declared rule — DECIDED: `TypographyResolver`-internal default, not `Theme`-configurable in v1** (CTO Final Decision 1). Moves from three independent per-renderer hardcodes to one internal rule inside `TypographyResolver`. Same visual output today, but now traceable to one decision instead of accidental agreement — and structured so a later sprint can lift it into `Theme` without an architecture change, just an added field.
 10. **`QualityMetrics` activation and expansion** (see §5 for the full field list) — `widowsAndOrphans`, `inconsistentSpacing`, `emptyHeadings` (declared since ADR-0008) plus newly added `averageHeadingDepth`, `paragraphDensity`, `lineDensity`, `dropCaps` become real computed values, feeding future Validator/AI-quality-scoring work per the CTO's stated rationale.
 
 ---
@@ -136,9 +154,13 @@ Book → ThemeEngine.applyTheme() → StyledBook (blockStyles only)
 
 - **Modify:** all three renderers — consume `styled.blockTypography?.[block.id]?.runs` instead of `block.text` directly; delete each renderer's private font/heading-size/italic-hardcode logic.
 
-- **`PDFRenderer` additionally:** embed Gelasio (resolves ADR-0021). New asset files `backend/assets/fonts/Gelasio-{Regular,Bold,Italic,BoldItalic}.ttf` (SIL OFL, redistributable), loaded via `doc.registerFont()`.
+- **`PDFRenderer` additionally:** embed 3 font families (resolves ADR-0021, expanded by CTO Final Decision 2):
+  - `backend/assets/fonts/Gelasio-{Regular,Bold,Italic,BoldItalic}.ttf` (SIL OFL) — serif, replaces Georgia/Times fallback
+  - `backend/assets/fonts/Inter-{Regular,Bold,Italic,BoldItalic}.ttf` (SIL OFL) — sans-serif, replaces Helvetica fallback
+  - `backend/assets/fonts/JetBrainsMono-{Regular,Bold,Italic,BoldItalic}.ttf` (Apache 2.0) — monospace, replaces Courier fallback
+  All loaded via `doc.registerFont()`; `resolveFont()`'s regex-based family detection is kept (still needed to decide *which* of the 3 families a given theme font name maps to) but its output changes from a PDFKit standard-14 name to one of these 3 registered family names.
 
-- **`Theme` interface** — additive fields only: `blockRules?: { quote?: { italic?: boolean } }`, `typography?: { smartQuotes?: boolean; dropCapsEnabled?: boolean }`.
+- **`Theme` interface — NO CHANGES this sprint** (CTO Final Decision 1). The v2 draft's proposed `blockRules`/`typography` additive fields are dropped; block-type rules (quote italics, smart-quote on/off, drop-cap on/off) are `TypographyResolver`-internal defaults/constructor options (§6's `TypographyOptions`) for v1, not `Theme` data. This can be lifted into `Theme` later without an architecture change.
 
 - **Modify:** `backend/src/domain/models/Book.ts` — `QualityMetrics` gains 4 fields beyond what ADR-0008 already declared:
   ```ts
@@ -147,14 +169,14 @@ Book → ThemeEngine.applyTheme() → StyledBook (blockStyles only)
     widowsAndOrphans: number;
     inconsistentSpacing: number;
     emptyHeadings: number;
-    // New, added this sprint:
-    averageHeadingDepth: number;   // mean nesting level across Chapter.sections/Section.subsections
-    paragraphDensity: number;      // paragraphs per page (uses LayoutEngine's page estimate)
-    lineDensity: number;           // estimated lines per paragraph (uses the same word/line heuristic LayoutEngine already has, WORDS_PER_LINE)
+    // New, added this sprint (functional definitions locked, CTO Final Decision 4):
+    averageHeadingDepth: number;   // mean of Heading.level across all Heading blocks (1-6); 0 if none
+    paragraphDensity: number;      // Paragraph block count / PaginatedBook.pages.length
+    lineDensity: number;           // estimated total lines across all Paragraph blocks (LayoutEngine's WORDS_PER_LINE heuristic) / Paragraph block count
     dropCaps: number;              // count of blocks where TypographyResolver resolved dropCap: true
   }
   ```
-  Exact formulas are a `BookMetricsCalculator` implementation detail to finalize during commit 9 (§8), not fixed by this review — the review's job is to name the fields and their data source, not derive the final arithmetic.
+  Functional definitions are locked (see "CTO Final Decisions — Round 2" above); exact rounding/edge-case handling (division by zero, etc.) is a `BookMetricsCalculator` implementation detail for commit 9 (§8), refined further alongside `ValidatorEngine`.
 
 ---
 
@@ -168,8 +190,12 @@ export class TypographyResolver {
 
 export interface TypographyOptions {
   smartQuotes?: boolean;  // default true (English-only substitution, §4 item 5)
-  dropCaps?: boolean;     // default follows theme.typography?.dropCapsEnabled
+  dropCaps?: boolean;     // default true; per-call override, not a Theme field (CTO Final Decision 1)
 }
+// Block-type rules (e.g. quote/scripture italics) are NOT part of this options
+// surface in v1 - they're internal TypographyResolver defaults, not caller-configurable
+// at all yet (CTO Final Decision 1). Only smartQuotes/dropCaps are exposed as options,
+// and only because ExportManuscriptUseCase already needs an on/off switch for them today.
 
 // domain/services/LayoutEngine.ts — UNCHANGED
 export class LayoutEngine {
@@ -212,7 +238,7 @@ Its own public shape (`UseCase<ExportRequest, Buffer>`) is unchanged — no HTTP
   ```
   Decision: `TypographyResolver` is a concrete Domain class (not a port — same rule as `ThemeEngine`/`LayoutEngine`, exactly one correct resolution for our own Book model). It enriches `StyledBook` in place (new object, same type) rather than introducing a new pipeline type, keeping `LayoutEngine`, `PaginatedBook`, and `Renderer<TOutput>` signature-stable. Named "Resolver" rather than "Engine" because its job is resolving font/size/weight/dropCap *decisions* per block from `Theme` + `Block`, not performing any drawing/rendering itself — the renderers remain the only components that draw.
 
-- **ADR-0023 (draft): Gelasio Font Embedding** — resolves ADR-0021's deferred implementation; records the actual asset source/version/license and `PDFRenderer.registerFont()` integration.
+- **ADR-0023 (draft): Font Embedding — Gelasio, Inter, JetBrains Mono** — resolves ADR-0021's deferred implementation, expanded by CTO Final Decision 2 to all 3 logical font categories (serif/sans-serif/monospace) rather than serif alone; records the actual asset sources/versions/licenses (SIL OFL for Gelasio and Inter, Apache 2.0 for JetBrains Mono) and `PDFRenderer.registerFont()` integration.
 
 - **ADR-0024 (draft): Hyphenation and Locale-Aware Smart Quotes Deferred to v2** — explicit scope cut, not a silent gap. Records both the hyphenation deferral and the smart-quotes-English-only-v1 decision in one place, since they're the same category of "real, scoped-out work" decision.
 
@@ -235,7 +261,7 @@ Same discipline as Sprint 2/3: small atomic commits, green build/tests before ea
 3. `domain(typography): TypographyResolver — drop caps, smart quotes (English v1), block-type rules` — unit tests
 4. `domain(layout): LayoutEngine reads blockTypography for orphan-risk nudge` — **no signature change**, update `LayoutEngine.test.ts` with new fixtures only
 5. `infra(pdf): PDFRenderer consumes TypeRun spans, deletes private resolveFont()` — update `PDFRenderer.test.ts`
-6. `infra(pdf): embed Gelasio font asset (resolves ADR-0021)` — add `.ttf` files + `registerFont()`, visual smoke check
+6. `infra(pdf): embed Gelasio/Inter/JetBrains Mono font assets (resolves ADR-0021)` — add `.ttf` files (12 total: 3 families × 4 weight/style combinations) + `registerFont()` calls, visual smoke check across all 3 families
 7. `infra(docx): DOCXRenderer consumes TypeRun spans + theme-driven heading sizes` — update `DOCXRenderer.test.ts`
 8. `infra(epub): EPUBRenderer consumes TypeRun spans (→ <strong>/<em>/...)` — update `EPUBRenderer.test.ts`
 9. `domain(metrics): BookMetricsCalculator populates QualityMetrics widow/orphan/spacing/heading fields + averageHeadingDepth/paragraphDensity/lineDensity/dropCaps` — resolves ADR-0008's deferred item, implements §5's expanded metric list
@@ -249,7 +275,7 @@ Same discipline as Sprint 2/3: small atomic commits, green build/tests before ea
 - All 133 existing tests still pass, plus new tests for `TypographyResolver`/`LayoutEngine`/each renderer's changed behavior
 - A real DOCX from `backend/uploads/` containing at least one bold/italic run, one `dropCap` paragraph, and one long paragraph near a page boundary, exported to `.docx`/`.pdf`/`.epub` via the running dev server, visually shows: bold/italic actually rendered (not flattened to plain text) in all 3 formats; drop cap applied where marked; no widowed single line at a PDF/DOCX page top
 - `QualityMetrics.widowsAndOrphans`/`dropCaps`/etc. (all 4 new + 3 ADR-0008 fields) return real, non-hardcoded-zero numbers on a fixture with known issues
-- `PDFRenderer`'s `ClassicTheme` output uses embedded Gelasio, verifiable via extracted font name in the generated PDF (extending `extractPdfText.ts`)
+- `PDFRenderer`'s `ClassicTheme` output uses embedded Gelasio/Inter/JetBrains Mono as appropriate per block (not a PDFKit standard-14 substitute for any of the 3 categories), verifiable via extracted font name in the generated PDF (extending `extractPdfText.ts`)
 - Global coverage stays >80%, Domain coverage stays >90% (ADR-0006 gates, unchanged)
 - 0 ESLint errors/warnings maintained
 - `docs/REAL_EXPORT_CHECKLIST.md` filled out and attached to the PR before merge (companion governance policy, this session)
@@ -289,8 +315,8 @@ Same discipline as Sprint 2/3: small atomic commits, green build/tests before ea
 
 ## 13. Documentation Updates
 
-- This document flips `DRAFT` → `APPROVED` once the CTO signs off, matching `RENDERING_PIPELINE.md`'s own status-line pattern
-- `docs/DECISIONS.md` — add ADR-0022/0023/0024 at approval time
+- This document is now `APPROVED` (matching `RENDERING_PIPELINE.md`'s own status-line pattern)
+- `docs/DECISIONS.md` — add ADR-0022/0023/0024 as commit 11 of the plan (§8), once implementation is underway rather than before — matches this project's own precedent of writing ADRs alongside the work they govern (ADR-0019/0020 were written as implementation findings accumulated, not purely up front)
 - `docs/architecture/diagrams/RENDERING_PIPELINE.md` — annotate Step 2's typography seam note as resolved (pointer, not rewrite — ADR-0007/0010 precedent)
 - `docs/CURRENT_STATE.md` — new Sprint 4 section once implementation starts
 - `docs/TODO.md` — move Typography Engine from Low Priority backlog to an active IN PROGRESS entry once the branch opens
@@ -299,9 +325,6 @@ Same discipline as Sprint 2/3: small atomic commits, green build/tests before ea
 
 ---
 
-## 14. Open Questions for the CTO (not resolved by this review)
+## 14. Open Questions — Resolved
 
-1. **`Theme.blockRules` (e.g. quote italics) as a configurable theme field this sprint, or a `TypographyResolver`-internal default for v1** (smaller scope), with theme-configurability deferred to a later sprint?
-2. **Font embedding scope** — Gelasio only (serif, replaces Georgia — the only gap ADR-0019/0021 actually flagged), or also a sans-serif + monospace pairing for theme fonts currently falling back to PDFKit's Helvetica/Courier? Expanding scope is a bigger, undecided ask beyond what was already flagged.
-3. **RTL/multi-script support** (ADR-0019 finding 2) — confirmed still out of scope for this sprint (separate, larger, already-flagged work)?
-4. **Exact formulas for `averageHeadingDepth`/`paragraphDensity`/`lineDensity`** (§5) — this review names the fields and their data source but leaves the arithmetic to commit 9; flag now if a specific formula matters for downstream Validator/AI work already being planned, so it's not designed twice.
+All 4 open questions from the previous draft were resolved by the CTO on 2026-07-17 (see "CTO Final Decisions — Round 2" near the top of this document). Nothing outstanding before implementation can start. Remaining decisions are ordinary implementation-time judgment calls (exact rounding, test fixture design, etc.), not design questions.
