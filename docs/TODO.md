@@ -30,9 +30,10 @@ None currently. Sprint 3 ("Professional Export") is fully merged and tagged (`v0
 - [ ] Plugin system
 - [ ] Premium UI/UX (Next.js frontend)
 - [ ] AI features (explicitly deferred — architecture should stay extensible for these, not build them now)
+- [ ] **Editorial AI Engine** (new, 2026-07-17 — see `docs/VISION.md`'s dedicated section) — independent module, own pipeline stage between Normalizer and Theme Engine, entirely separate from rendering so the rendering pipeline stays deterministic. Humanization, grammar/style correction, accept/reject suggestions, readability analysis, manuscript consistency checks, AI writing assistant. Realistically its own Sprint 6/7. **Not scoped, not designed, no code/ADR/Design Review yet** — explicitly deferred until Sprint 4 and the rendering pipeline it stabilizes are fully merged and verified.
 - [ ] Licensing/subscription model, observability/telemetry (also explicitly deferred — no DB/auth exists yet)
 
-**CTO priority order for Sprint 4+ (2026-07-17):** 1) Typography Engine, 2) `ValidatorEngine`, 3) Plugin system, 4) Premium UI, 5) AI features.
+**CTO priority order for Sprint 4+ (2026-07-17):** 1) Typography Engine, 2) `ValidatorEngine`, 3) Plugin system, 4) Premium UI, 5) AI features / Editorial AI Engine.
 
 **Typography Engine Design Review — ✅ APPROVED (2026-07-17)** (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`). Final architecture: `ThemeEngine → TypographyResolver → LayoutEngine → Renderer`, `StyledBook` gains an additive `blockTypography` field (no `TypesetBook`, no `LayoutEngine`/`PaginatedBook`/`Renderer` signature changes). Final scope decisions: block-type typography rules (quote italics, etc.) are `TypographyResolver`-internal defaults, not `Theme`-configurable in v1; fonts are Gelasio (serif) + Inter (sans-serif) + JetBrains Mono (monospace), not Gelasio alone; RTL confirmed out of scope; hyphenation confirmed deferred to v2; smart quotes English-only v1; `QualityMetrics` gains `averageHeadingDepth`/`paragraphDensity`/`lineDensity`/`dropCaps` with functional definitions locked. No implementation branch opened yet — awaiting go-ahead to start commit 1 of the 11-commit plan.
 
