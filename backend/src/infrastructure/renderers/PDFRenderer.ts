@@ -65,7 +65,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         true
       );
 
-      this.drawHeadersAndFooters(doc);
+      this.drawHeadersAndFooters(doc, book);
 
       doc.end();
     });
@@ -90,21 +90,53 @@ export class PDFRenderer implements Renderer<Buffer> {
   // an estimate. No two-pass *render* is needed, just a two-pass *header/footer draw*, and
   // PaginatedBook.pages.length (LayoutEngine's estimate) is no longer used for the displayed
   // total at all.
-  private drawHeadersAndFooters(doc: PDFKit.PDFDocument): void {
+  //
+  // Sprint 6 (ADR-0029 Decision 6): the running-head text is now Theme.runningHead-driven
+  // instead of the hardcoded literal 'Book Publisher Studio' this replaced - a real,
+  // previously-disclosed bug (PROFESSIONAL_LAYOUT_ENGINE.md §2), fixed as a direct consequence
+  // of RunningHead becoming real data, not filed separately. If Theme.runningHead is absent or
+  // show:false, no running head OR page-number footer is drawn at all - previously every export
+  // always got a footer unconditionally; this is a disclosed, intentional behavior change now
+  // gated by theme, matching every other theme decision (fonts, colors) already being
+  // theme-driven. PDFKit's estimated Page[] can have a different length than the real rendered
+  // page count (ADR-0013) - book.pages[i]'s title is looked up with the index clamped to the
+  // last real domain page rather than going out of bounds.
+  //
+  // RunningHead.font and .separator are accepted by the type but not yet consulted here - no
+  // theme populates them yet (only ClassicTheme exists, and it leaves both unset), so there is
+  // no real usage to validate against (ADR-0029 Risk 5, same disclosed-not-hidden category as
+  // ValidationContext's reserved fields, Sprint 5). Revisit when a real theme needs them.
+  private drawHeadersAndFooters(doc: PDFKit.PDFDocument, book: PaginatedBook): void {
+    const runningHead = book.styledBook.theme.runningHead;
     const range = doc.bufferedPageRange();
+
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
       const { width, height, margins } = doc.page;
       const contentWidth = width - margins.left - margins.right;
       const savedBottom = margins.bottom;
       doc.page.margins.bottom = 0;
-      doc.font(this.fonts.resolveDefault(false, false)).fontSize(9).fillColor('#000');
-      doc.text('Book Publisher Studio', margins.left, 40, { width: contentWidth, align: 'left', lineBreak: false });
-      doc.text(`Page ${i + 1} of ${range.count}`, margins.left, height - 50, {
-        width: contentWidth,
-        align: 'center',
-        lineBreak: false,
-      });
+
+      if (runningHead?.show) {
+        const domainPage = book.pages[Math.min(i, book.pages.length - 1)];
+        const title = domainPage?.headerFooterTitle;
+        if (title) {
+          const text = runningHead.uppercase ? title.toUpperCase() : title;
+          const align = runningHead.position === 'left' ? 'left' : 'right';
+          doc.font(this.fonts.resolveDefault(false, false)).fontSize(runningHead.size ?? 9).fillColor('#000');
+          doc.text(text, margins.left, 40, { width: contentWidth, align, lineBreak: false });
+        }
+
+        if (runningHead.pageNumber) {
+          doc.font(this.fonts.resolveDefault(false, false)).fontSize(runningHead.size ?? 9).fillColor('#000');
+          doc.text(`Page ${i + 1} of ${range.count}`, margins.left, height - 50, {
+            width: contentWidth,
+            align: 'center',
+            lineBreak: false,
+          });
+        }
+      }
+
       doc.page.margins.bottom = savedBottom;
     }
   }

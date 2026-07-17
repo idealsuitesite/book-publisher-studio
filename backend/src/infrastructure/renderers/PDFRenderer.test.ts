@@ -7,6 +7,7 @@ import { ClassicTheme } from '../../domain/themes/ClassicTheme';
 import { createBook } from '../../domain/models/Book';
 import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement } from '../../domain/models/Book';
 import type { PageLayout } from '../../domain/models/PageLayout';
+import type { Theme } from '../../domain/models/Theme';
 import { extractPdfText, extractPdfRuns, countPdfPages } from '../../test-utils/extractPdfText';
 import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
 
@@ -45,9 +46,9 @@ function chapter(
   };
 }
 
-function paginate(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT) {
+function paginate(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT, theme: Theme = ClassicTheme) {
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
-  const styled = new ThemeEngine().applyTheme(book, ClassicTheme);
+  const styled = new ThemeEngine().applyTheme(book, theme);
   return new LayoutEngine().paginate(styled, layout);
 }
 
@@ -301,5 +302,55 @@ describe('PDFRenderer', () => {
     // PaginatedBook.pages.length (LayoutEngine's estimate) - real content can exceed the estimate.
     expect(text).toContain(`Page 1 of ${actualPageCount}`);
     expect(text).toContain(`Page ${actualPageCount} of ${actualPageCount}`);
+  });
+
+  // Sprint 6 (ADR-0029 Decision 6): running head is now Theme.runningHead-driven.
+  describe('running head (Theme.runningHead)', () => {
+    it("shows the real book's title in the running head, not the old hardcoded 'Book Publisher Studio' string", async () => {
+      const paginated = paginate([chapter([paragraph('p-1')])]);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).toContain('T'); // paginate()'s book title
+      expect(text).not.toContain('Book Publisher Studio');
+    });
+
+    it('draws no running head and no page-number footer when runningHead.show is false', async () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, show: false } };
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).not.toMatch(/Page \d+ of \d+/);
+    });
+
+    it('draws no running head or footer at all when the theme has no runningHead', async () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: undefined };
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).not.toMatch(/Page \d+ of \d+/);
+    });
+
+    it('uppercases the running head title when runningHead.uppercase is true', async () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, uppercase: true } };
+      // paginate()'s fixture book title is 'T', already uppercase either way - use a
+      // distinctive lowercase title to make the transform observable.
+      const book = createBook({ title: 'lowercase title', author: 'A', language: 'en' }, [
+        chapter([paragraph('p-1')]),
+      ]);
+      const styled = new ThemeEngine().applyTheme(book, theme);
+      const paginated = new LayoutEngine().paginate(styled, LETTER_LAYOUT);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).toContain('LOWERCASE TITLE');
+      expect(text).not.toContain('lowercase title');
+    });
   });
 });
