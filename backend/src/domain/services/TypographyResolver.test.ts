@@ -28,6 +28,10 @@ function paragraph(id: string, text = 'Some body text.', inlines?: InlineElement
   return { type: 'paragraph', id, text, inlines };
 }
 
+function dropCapParagraph(id: string, text: string, dropCap: boolean): Paragraph {
+  return { type: 'paragraph', id, text, dropCap };
+}
+
 function quote(id: string, text = 'A quote.', inlines?: InlineElement[]): Quote {
   return { type: 'quote', id, text, inlines };
 }
@@ -145,6 +149,69 @@ describe('TypographyResolver', () => {
     expect(result.blockTypography?.['q-1']?.runs[0].text).toBe('A quote.');
     expect(result.blockTypography?.['s-1']?.runs[0].text).toBe('Verse.');
     expect(result.blockTypography?.['f-1']?.runs[0].text).toBe('Note.');
+  });
+
+  it('forces italic on quote and scripture runs as a declared internal rule, even for an explicit bold run', () => {
+    const inlines: InlineElement[] = [{ type: 'bold', text: 'emphasized' }];
+    const styled = styledBookFrom([chapter([quote('q-1', 'ignored', inlines), scripture('s-1', 'Verse.')])]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['q-1']?.runs).toEqual([
+      { text: 'emphasized', bold: true, italic: true, underline: false, strikethrough: false, superscript: false, subscript: false, smallCaps: false, linkUrl: undefined },
+    ]);
+    expect(result.blockTypography?.['s-1']?.runs[0].italic).toBe(true);
+  });
+
+  it('does not force italic on heading, paragraph, footnote, or list blocks', () => {
+    const styled = styledBookFrom([chapter([heading('h-1'), paragraph('p-1'), footnote('f-1'), list('l-1', ['Item'])])]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['h-1']?.runs[0].italic).toBe(false);
+    expect(result.blockTypography?.['p-1']?.runs[0].italic).toBe(false);
+    expect(result.blockTypography?.['f-1']?.runs[0].italic).toBe(false);
+    expect(result.blockTypography?.['l-1::item-0']?.runs[0].italic).toBe(false);
+  });
+
+  it('converts straight quotes to curly quotes by default (English-only smart quotes)', () => {
+    const styled = styledBookFrom([chapter([paragraph('p-1', `She said "hello" and it's "hers".`)])]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['p-1']?.runs[0].text).toBe('She said “hello” and it’s “hers”.');
+  });
+
+  it('leaves straight quotes untouched when smartQuotes: false is passed', () => {
+    const styled = styledBookFrom([chapter([paragraph('p-1', `"quoted"`)])]);
+
+    const result = resolver.resolve(styled, { smartQuotes: false });
+
+    expect(result.blockTypography?.['p-1']?.runs[0].text).toBe('"quoted"');
+  });
+
+  it('resolves Paragraph.dropCap to dropCap: true by default', () => {
+    const styled = styledBookFrom([chapter([dropCapParagraph('p-1', 'First para.', true)])]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['p-1']?.dropCap).toBe(true);
+  });
+
+  it('does not set dropCap when the paragraph does not request one', () => {
+    const styled = styledBookFrom([chapter([paragraph('p-1')])]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['p-1']?.dropCap).toBe(false);
+  });
+
+  it('suppresses drop caps entirely when dropCaps: false is passed, even if the paragraph requests one', () => {
+    const styled = styledBookFrom([chapter([dropCapParagraph('p-1', 'First para.', true)])]);
+
+    const result = resolver.resolve(styled, { dropCaps: false });
+
+    expect(result.blockTypography?.['p-1']?.dropCap).toBe(false);
   });
 
   it('produces an empty-runs entry for table, image, page-break, and divider blocks', () => {
