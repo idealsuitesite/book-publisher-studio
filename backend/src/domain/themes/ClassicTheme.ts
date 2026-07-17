@@ -25,4 +25,15 @@ export const ClassicTheme: Theme = {
     headingSpacing: 16,
     lineHeight: 1.4,
   },
+  // Matches today's pre-Sprint-6 PDF running-head/footer defaults (top running head, "Page N
+  // of TOTAL" footer, size-9 default font) minus the hardcoded 'Book Publisher Studio' literal
+  // it's replacing (ADR-0029 Decision 6) - content is now the book's real title.
+  runningHead: {
+    show: true,
+    position: 'right',
+    content: 'bookTitle',
+    pageNumber: true,
+    uppercase: false,
+    size: 9,
+  },
 };
