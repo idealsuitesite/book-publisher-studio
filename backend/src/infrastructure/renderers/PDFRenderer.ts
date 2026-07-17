@@ -1,15 +1,12 @@
 import PDFDocument from 'pdfkit';
 import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
-import type { PaginatedBook } from '../../domain/models/PaginatedBook';
+import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
-import type { Content, Block, Chapter, Section } from '../../domain/models/Book';
+import type { Content, Block, Chapter, Section, TOCEntry } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
-
-const PAGE_SIZE: PDFKit.PDFDocumentOptions['size'] = 'LETTER';
-const MARGIN = 72;
 
 // Simple v1 drop-cap approximation: render the paragraph's first character at a larger
 // size inline, with no text wrap-around (a real drop cap needs line-aware layout, which
@@ -20,6 +17,14 @@ const DROP_CAP_SCALE = 2.5;
 
 /** Resolves which registered font to use for a run, given its bold/italic flags. */
 type FontResolver = (bold: boolean, italic: boolean) => string;
+
+// A real-PDFKit-page-index's owner: a domain Page (render its title/header/footer normally),
+// the literal string 'blank' (an intentionally blank page from Chapter.openingPageStyle - draw
+// nothing at all on it, matching real print convention), or undefined (pagination-estimate
+// drift, ADR-0013/ADR-0019 finding 6C - PDFKit auto-paginated internally beyond what
+// LayoutEngine estimated, so there's no reliable title, but the page number still falls back to
+// the physical index rather than showing nothing).
+type PageOwner = Page | 'blank' | undefined;
 
 export class PDFRenderer implements Renderer<Buffer> {
   // compress defaults to true for real output; tests pass false so the content stream stays
@@ -35,9 +40,10 @@ export class PDFRenderer implements Renderer<Buffer> {
     return new Promise((resolve, reject) => {
       // bufferPages defers writing pages to the output stream until flushed - see
       // drawHeadersAndFooters() below for why this is the right approach here.
+      const { width, height, marginTop, marginBottom, marginLeft, marginRight } = book.pageLayout;
       const doc = new PDFDocument({
-        size: PAGE_SIZE,
-        margin: MARGIN,
+        size: [width, height],
+        margins: { top: marginTop, bottom: marginBottom, left: marginLeft, right: marginRight },
         bufferPages: true,
         compress: this.options.compress ?? true,
         info: {
@@ -53,9 +59,34 @@ export class PDFRenderer implements Renderer<Buffer> {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', (err: unknown) => reject(err instanceof Error ? err : new Error(String(err))));
 
-      const pageStartBlockIds = new Set(
-        book.pages.slice(1).map((page) => page.blocks[0]).filter((id): id is string => Boolean(id))
-      );
+      // Maps a page-starting block's id to the domain Page it starts (blankPagesBefore, for
+      // Chapter.openingPageStyle, is 0/undefined on every page except a chapter start -
+      // LayoutEngine only computes it there).
+      const pageStarts = new Map<string, Page>();
+      for (const page of book.pages.slice(1)) {
+        const firstId = page.blocks[0];
+        if (firstId) pageStarts.set(firstId, page);
+      }
+
+      // Real-PDFKit-page-index -> owning domain Page, built up as addPage() actually happens
+      // below (not assumed 1:1 with book.pages - both pagination-estimate drift, ADR-0013, and
+      // this commit's own blank pages, which own no domain Page at all, break that assumption).
+      // drawHeadersAndFooters() reads this instead of indexing into book.pages directly.
+      //
+      // Sprint 6 commit 10: a generated TOC (book.tableOfContents) renders as its own
+      // unnumbered front-matter page(s) before body content, matching real print convention
+      // (front matter is typically unnumbered or uses a separate roman-numeral sequence, out of
+      // scope here) - it deliberately does NOT participate in the body's own page-number
+      // sequence, which LayoutEngine already computed without reserving room for a TOC page (a
+      // real, disclosed simplification: a very long TOC that overflows onto extra physical
+      // pages falls into the same pagination-estimate-drift bucket as any other overflow).
+      const pageOwners: PageOwner[] = [];
+      if (book.tableOfContents && book.tableOfContents.length > 0) {
+        this.renderTableOfContents(doc, book.tableOfContents, book.styledBook.theme);
+        pageOwners.push('blank');
+        doc.addPage();
+      }
+      pageOwners.push(book.pages[0]);
 
       this.renderContent(
         doc,
@@ -63,11 +94,12 @@ export class PDFRenderer implements Renderer<Buffer> {
         book.styledBook.theme,
         book.styledBook.blockStyles,
         book.styledBook.blockTypography,
-        pageStartBlockIds,
+        pageStarts,
+        pageOwners,
         true
       );
 
-      this.drawHeadersAndFooters(doc);
+      this.drawHeadersAndFooters(doc, book, pageOwners);
 
       doc.end();
     });
@@ -92,20 +124,67 @@ export class PDFRenderer implements Renderer<Buffer> {
   // an estimate. No two-pass *render* is needed, just a two-pass *header/footer draw*, and
   // PaginatedBook.pages.length (LayoutEngine's estimate) is no longer used for the displayed
   // total at all.
-  private drawHeadersAndFooters(doc: PDFKit.PDFDocument): void {
+  //
+  // Sprint 6 (ADR-0029 Decision 6): the running-head text is now Theme.runningHead-driven
+  // instead of the hardcoded literal 'Book Publisher Studio' this replaced - a real,
+  // previously-disclosed bug (PROFESSIONAL_LAYOUT_ENGINE.md §2), fixed as a direct consequence
+  // of RunningHead becoming real data, not filed separately. If Theme.runningHead is absent or
+  // show:false, no running head OR page-number footer is drawn at all - previously every export
+  // always got a footer unconditionally; this is a disclosed, intentional behavior change now
+  // gated by theme, matching every other theme decision (fonts, colors) already being
+  // theme-driven. PDFKit's estimated Page[] can have a different length than the real rendered
+  // page count (ADR-0013) - book.pages[i]'s title is looked up with the index clamped to the
+  // last real domain page rather than going out of bounds.
+  //
+  // RunningHead.font and .separator are accepted by the type but not yet consulted here - no
+  // theme populates them yet (only ClassicTheme exists, and it leaves both unset), so there is
+  // no real usage to validate against (ADR-0029 Risk 5, same disclosed-not-hidden category as
+  // ValidationContext's reserved fields, Sprint 5). Revisit when a real theme needs them.
+  //
+  // Sprint 6 commit 8: an intentionally blank page (Chapter.openingPageStyle) is pageOwners[i]
+  // === 'blank' - nothing is drawn on it at all, matching real print convention.
+  // Sprint 6 commit 9: the page-number NUMERATOR now reads the resolved domain Page's own
+  // `.number` (honors Chapter.startPageNumber) instead of the raw physical index - the whole
+  // point of startPageNumber is to make the displayed number diverge from physical order. The
+  // "of TOTAL" DENOMINATOR still uses the real PDFKit page count (ADR-0019 finding 6C, unchanged
+  // - an estimate could show a factually wrong total). For a pagination-estimate-drift tail page
+  // (pageOwners[i] === undefined, ADR-0013) there is no resolved Page to read a number from, so
+  // the numerator falls back to the physical index too, same as every page did before this
+  // commit - no regression for the drift case that finding 6C's own test already covers.
+  private drawHeadersAndFooters(doc: PDFKit.PDFDocument, book: PaginatedBook, pageOwners: PageOwner[]): void {
+    const runningHead = book.styledBook.theme.runningHead;
     const range = doc.bufferedPageRange();
+
     for (let i = range.start; i < range.start + range.count; i++) {
+      const owner = pageOwners[i];
+      if (owner === 'blank') continue;
+
       doc.switchToPage(i);
-      const { width, height } = doc.page;
-      const savedBottom = doc.page.margins.bottom;
+      const { width, height, margins } = doc.page;
+      const contentWidth = width - margins.left - margins.right;
+      const savedBottom = margins.bottom;
       doc.page.margins.bottom = 0;
-      doc.font(this.fonts.resolveDefault(false, false)).fontSize(9).fillColor('#000');
-      doc.text('Book Publisher Studio', MARGIN, 40, { width: width - MARGIN * 2, align: 'left', lineBreak: false });
-      doc.text(`Page ${i + 1} of ${range.count}`, MARGIN, height - 50, {
-        width: width - MARGIN * 2,
-        align: 'center',
-        lineBreak: false,
-      });
+
+      if (runningHead?.show) {
+        const title = owner?.headerFooterTitle;
+        if (title) {
+          const text = runningHead.uppercase ? title.toUpperCase() : title;
+          const align = runningHead.position === 'left' ? 'left' : 'right';
+          doc.font(this.fonts.resolveDefault(false, false)).fontSize(runningHead.size ?? 9).fillColor('#000');
+          doc.text(text, margins.left, 40, { width: contentWidth, align, lineBreak: false });
+        }
+
+        if (runningHead.pageNumber) {
+          const displayNumber = owner?.number ?? i + 1;
+          doc.font(this.fonts.resolveDefault(false, false)).fontSize(runningHead.size ?? 9).fillColor('#000');
+          doc.text(`Page ${displayNumber} of ${range.count}`, margins.left, height - 50, {
+            width: contentWidth,
+            align: 'center',
+            lineBreak: false,
+          });
+        }
+      }
+
       doc.page.margins.bottom = savedBottom;
     }
   }
@@ -116,26 +195,53 @@ export class PDFRenderer implements Renderer<Buffer> {
     theme: Theme,
     blockStyles: Record<string, ResolvedBlockStyle>,
     blockTypography: Record<string, ResolvedTypography> | undefined,
-    pageStartBlockIds: Set<string>,
+    pageStarts: Map<string, Page>,
+    pageOwners: PageOwner[],
     isTopLevel: boolean
   ): void {
     for (const content of contents) {
       const firstBlockId = content.content[0]?.id;
-      const breaksPage = isTopLevel && content.type === 'chapter' && firstBlockId !== undefined && pageStartBlockIds.has(firstBlockId);
-      if (breaksPage && firstBlockId) pageStartBlockIds.delete(firstBlockId);
+      const ownerPage = isTopLevel && content.type === 'chapter' && firstBlockId !== undefined ? pageStarts.get(firstBlockId) : undefined;
+      if (ownerPage && firstBlockId) pageStarts.delete(firstBlockId);
 
-      if (breaksPage) doc.addPage();
+      // Blank pages (Chapter.openingPageStyle) are genuinely empty physical pages - each
+      // addPage() here is immediately followed by another with nothing drawn in between,
+      // then the real content page below starts normally.
+      for (let i = 0; i < (ownerPage?.blankPagesBefore ?? 0); i++) {
+        doc.addPage();
+        pageOwners.push('blank');
+      }
+      if (ownerPage) {
+        doc.addPage();
+        pageOwners.push(ownerPage);
+      }
       this.renderTitle(doc, content, theme);
 
       for (const block of content.content) {
-        this.renderBlock(doc, block, theme, blockStyles[block.id], blockTypography, pageStartBlockIds);
+        this.renderBlock(doc, block, theme, blockStyles[block.id], blockTypography, pageStarts, pageOwners);
       }
 
       if (content.type === 'chapter' && content.sections) {
-        this.renderContent(doc, content.sections, theme, blockStyles, blockTypography, pageStartBlockIds, false);
+        this.renderContent(doc, content.sections, theme, blockStyles, blockTypography, pageStarts, pageOwners, false);
       } else if (content.type === 'section' && content.subsections) {
-        this.renderContent(doc, content.subsections, theme, blockStyles, blockTypography, pageStartBlockIds, false);
+        this.renderContent(doc, content.subsections, theme, blockStyles, blockTypography, pageStarts, pageOwners, false);
       }
+    }
+  }
+
+  // Functional Spec item 7 / Architecture Impact §4: PDFRenderer becomes a consumer of
+  // paginated.tableOfContents, the same way it already consumes resolved header/footer data.
+  // Each entry indents by its heading level and shows "Title    N" - no dotted-leader styling
+  // (a cosmetic detail the design doesn't specify), title left, page number appended inline.
+  private renderTableOfContents(doc: PDFKit.PDFDocument, entries: TOCEntry[], theme: Theme): void {
+    doc.font(this.fonts.resolveHeading(1, theme, true, false)).fontSize(24).fillColor('#000').text('Table of Contents');
+    doc.moveDown();
+
+    for (const entry of entries) {
+      const indent = (entry.level - 1) * 18;
+      const pageLabel = entry.pageNumber !== undefined ? `    ${entry.pageNumber}` : '';
+      doc.font(this.fonts.resolveBody(theme, false, false)).fontSize(11).fillColor('#000');
+      doc.text(`${entry.title}${pageLabel}`, doc.page.margins.left + indent, doc.y);
     }
   }
 
@@ -156,11 +262,16 @@ export class PDFRenderer implements Renderer<Buffer> {
     theme: Theme,
     style: ResolvedBlockStyle | undefined,
     blockTypography: Record<string, ResolvedTypography> | undefined,
-    pageStartBlockIds: Set<string>
+    pageStarts: Map<string, Page>,
+    pageOwners: PageOwner[]
   ): void {
-    if (pageStartBlockIds.has(block.id)) {
+    const ownerPage = pageStarts.get(block.id);
+    if (ownerPage) {
+      // Never carries blankPagesBefore - that only applies at a chapter's own opening break,
+      // handled in renderContent above. This is an overflow-triggered continuation page.
       doc.addPage();
-      pageStartBlockIds.delete(block.id);
+      pageOwners.push(ownerPage);
+      pageStarts.delete(block.id);
     }
 
     const fontSize = style?.fontSize ?? 11;
@@ -227,7 +338,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       case 'image':
         if (block.base64) {
           doc.image(Buffer.from(block.base64, 'base64'), {
-            fit: [doc.page.width - MARGIN * 2, block.height ?? 300],
+            fit: [doc.page.width - doc.page.margins.left - doc.page.margins.right, block.height ?? 300],
           });
         } else {
           // No embedded data - never fetch remote URLs at render time (no hidden network I/O
@@ -355,7 +466,7 @@ export class PDFRenderer implements Renderer<Buffer> {
     const columnCount = headers.length > 0 ? headers.length : (rows[0]?.length ?? 0);
     if (columnCount === 0) return;
 
-    const usableWidth = doc.page.width - MARGIN * 2;
+    const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     const colWidth = usableWidth / columnCount;
     const cellPad = 4;
     const startX = doc.x;

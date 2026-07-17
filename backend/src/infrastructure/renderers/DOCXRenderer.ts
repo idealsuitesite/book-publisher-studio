@@ -9,15 +9,19 @@ import {
   TableRow,
   TableCell,
   ImageRun,
+  Header,
+  Footer,
+  PageNumber,
+  AlignmentType,
   type ISectionOptions,
   type IStylesOptions,
   type ParagraphChild,
 } from 'docx';
 import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
-import type { PaginatedBook } from '../../domain/models/PaginatedBook';
+import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
-import type { Content, Block, Chapter, Section } from '../../domain/models/Book';
+import type { Content, Block, Chapter, Section, TOCEntry } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 
@@ -126,23 +130,124 @@ function buildRunsWithDropCap(
   return [dropCapRun, ...buildRuns(remainingRuns, font, size, color)];
 }
 
+// Sprint 6 (ADR-0029 Decision 6, Functional Spec item 9): DOCX gains header/footer support -
+// a genuinely new capability, DOCXRenderer had none before this. A single Header/Footer applies
+// to the whole document (docx's own per-section header/footer model would need splitting the
+// single ISectionOptions this renderer builds into one section per top-level Chapter/Section to
+// alternate a 'chapterTitle' running head per chapter - not built this sprint, a real, disclosed
+// limitation; ClassicTheme's own 'bookTitle' content is constant document-wide regardless, so
+// this doesn't affect the one populated theme that exists). The title used for 'chapterTitle'
+// content is the first page's resolved title (Page.headerFooterTitle, LayoutEngine) - the best
+// single value available without per-section splitting.
+//
+// The footer's page number uses docx's own PageNumber.CURRENT/TOTAL_PAGES fields (not a
+// pre-computed string like PDFRenderer's) - Word recalculates these live as the document
+// reflows, which is the structurally correct choice for a format that isn't fixed-layout the
+// way rendered PDF pages are (ADR-0013 already treats our own Page[] as an estimate).
+function buildHeaderFooter(book: PaginatedBook): { headers?: ISectionOptions['headers']; footers?: ISectionOptions['footers'] } {
+  const runningHead = book.styledBook.theme.runningHead;
+  if (!runningHead?.show) return {};
+
+  const alignment = runningHead.position === 'left' ? AlignmentType.LEFT : AlignmentType.RIGHT;
+  const title = book.pages[0]?.headerFooterTitle;
+  const headerText = title ? (runningHead.uppercase ? title.toUpperCase() : title) : undefined;
+
+  const headers = headerText
+    ? { default: new Header({ children: [new Paragraph({ alignment, children: [new TextRun({ text: headerText, size: (runningHead.size ?? 9) * 2 })] })] }) }
+    : undefined;
+
+  const footers = runningHead.pageNumber
+    ? {
+        default: new Footer({
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({ text: 'Page ', size: (runningHead.size ?? 9) * 2 }),
+                new TextRun({ children: [PageNumber.CURRENT], size: (runningHead.size ?? 9) * 2 }),
+                new TextRun({ text: ' of ', size: (runningHead.size ?? 9) * 2 }),
+                new TextRun({ children: [PageNumber.TOTAL_PAGES], size: (runningHead.size ?? 9) * 2 }),
+              ],
+            }),
+          ],
+        }),
+      }
+    : undefined;
+
+  return { headers, footers };
+}
+
+// Functional Spec item 7 / Architecture Impact §4: DOCXRenderer becomes a consumer of
+// paginated.tableOfContents, mirroring PDFRenderer's Sprint 6 wiring. Rendered as literal
+// paragraphs from our own precomputed entries (title indented by level, page number appended
+// inline) rather than docx's native TableOfContents field - a real Word TOC field requires
+// Word to "update fields" before showing real text, which would make this unverifiable by real
+// text extraction (this project's Real Export Policy, docs/CLAUDE.md) the same way every other
+// renderer output already is; consistency with PDFRenderer's own literal-paragraph approach was
+// also preferred over introducing a second rendering strategy for the same data.
+function buildTableOfContentsParagraphs(entries: TOCEntry[], theme: Theme): Paragraph[] {
+  const paragraphs: Paragraph[] = [
+    new Paragraph({ heading: HeadingLevel.HEADING_1, text: 'Table of Contents' }),
+  ];
+  for (const entry of entries) {
+    paragraphs.push(
+      new Paragraph({
+        indent: { left: (entry.level - 1) * 360 }, // 360 twips = 0.25in per level
+        children: [
+          new TextRun({ text: entry.title, font: theme.fonts.body }),
+          ...(entry.pageNumber !== undefined ? [new TextRun({ text: `\t${entry.pageNumber}`, font: theme.fonts.body })] : []),
+        ],
+      })
+    );
+  }
+  return paragraphs;
+}
+
 export class DOCXRenderer implements Renderer<Buffer> {
   async render(book: PaginatedBook, _context: RenderContext): Promise<Buffer> {
-    const pageStartBlockIds = new Set(
-      book.pages.slice(1).map((page) => page.blocks[0]).filter((id): id is string => Boolean(id))
-    );
+    const pageStarts = new Map<string, Page>();
+    for (const page of book.pages.slice(1)) {
+      const firstId = page.blocks[0];
+      if (firstId) pageStarts.set(firstId, page);
+    }
 
-    const children: (Paragraph | Table)[] = [];
+    const tocEntries = book.tableOfContents ?? [];
+    const children: (Paragraph | Table)[] = tocEntries.length > 0 ? buildTableOfContentsParagraphs(tocEntries, book.styledBook.theme) : [];
     this.renderContent(
       book.styledBook.book.mainContent,
       book.styledBook.blockStyles,
       book.styledBook.blockTypography,
-      pageStartBlockIds,
+      pageStarts,
       true,
-      children
+      children,
+      tocEntries.length > 0
     );
 
-    const section: ISectionOptions = { children };
+    // docx measures page geometry in twips (1pt = 20 twips) - PageLayout is in points
+    // throughout the rest of the domain (matches PDFKit's own unit), converted here at
+    // the render boundary only. Sprint 6: previously this section had no `page` property
+    // at all, so every export silently used docx's own library default (Letter-equivalent)
+    // regardless of which PageLayout was actually selected - see PaginatedBook.pageLayout's
+    // doc comment for the full disclosure.
+    const { width, height, marginTop, marginBottom, marginLeft, marginRight } = book.pageLayout;
+    const TWIPS_PER_POINT = 20;
+    const { headers, footers } = buildHeaderFooter(book);
+    const section: ISectionOptions = {
+      properties: {
+        page: {
+          size: { width: width * TWIPS_PER_POINT, height: height * TWIPS_PER_POINT },
+          margin: {
+            top: marginTop * TWIPS_PER_POINT,
+            bottom: marginBottom * TWIPS_PER_POINT,
+            left: marginLeft * TWIPS_PER_POINT,
+            right: marginRight * TWIPS_PER_POINT,
+          },
+        },
+      },
+      headers,
+      footers,
+      children,
+    };
     const doc = new Document({
       styles: { default: buildHeadingStyles(book.styledBook.theme) },
       sections: [section],
@@ -155,25 +260,39 @@ export class DOCXRenderer implements Renderer<Buffer> {
     contents: Content[],
     blockStyles: Record<string, ResolvedBlockStyle>,
     blockTypography: Record<string, ResolvedTypography> | undefined,
-    pageStartBlockIds: Set<string>,
+    pageStarts: Map<string, Page>,
     isTopLevel: boolean,
-    out: (Paragraph | Table)[]
+    out: (Paragraph | Table)[],
+    forceBreakOnFirst = false
   ): void {
+    let isFirstContent = true;
     for (const content of contents) {
       const firstBlockId = content.content[0]?.id;
-      const breaksPage = isTopLevel && content.type === 'chapter' && firstBlockId !== undefined && pageStartBlockIds.has(firstBlockId);
-      if (breaksPage && firstBlockId) pageStartBlockIds.delete(firstBlockId);
+      const ownerPage = isTopLevel && content.type === 'chapter' && firstBlockId !== undefined ? pageStarts.get(firstBlockId) : undefined;
+      if (ownerPage && firstBlockId) pageStarts.delete(firstBlockId);
 
+      // Blank pages (Chapter.openingPageStyle, Sprint 6 commit 8): an empty paragraph forcing
+      // its own page break creates one genuinely blank physical page each, before the title
+      // paragraph's own pageBreakBefore starts the chapter's real content page.
+      for (let i = 0; i < (ownerPage?.blankPagesBefore ?? 0); i++) {
+        out.push(new Paragraph({ pageBreakBefore: true, children: [] }));
+      }
+
+      // A generated TOC (commit 10) was prepended to `out` before this call - the very first
+      // top-level content needs its own forced break to separate it from the TOC, even though
+      // it's normally the one case that never breaks (it's the document's own first content).
+      const breaksPage = ownerPage !== undefined || (isTopLevel && isFirstContent && forceBreakOnFirst);
       out.push(this.renderTitle(content, breaksPage));
+      isFirstContent = false;
 
       for (const block of content.content) {
-        out.push(...this.renderBlock(block, blockStyles[block.id], blockTypography, pageStartBlockIds));
+        out.push(...this.renderBlock(block, blockStyles[block.id], blockTypography, pageStarts));
       }
 
       if (content.type === 'chapter' && content.sections) {
-        this.renderContent(content.sections, blockStyles, blockTypography, pageStartBlockIds, false, out);
+        this.renderContent(content.sections, blockStyles, blockTypography, pageStarts, false, out);
       } else if (content.type === 'section' && content.subsections) {
-        this.renderContent(content.subsections, blockStyles, blockTypography, pageStartBlockIds, false, out);
+        this.renderContent(content.subsections, blockStyles, blockTypography, pageStarts, false, out);
       }
     }
   }
@@ -197,9 +316,9 @@ export class DOCXRenderer implements Renderer<Buffer> {
     block: Block,
     style: ResolvedBlockStyle | undefined,
     blockTypography: Record<string, ResolvedTypography> | undefined,
-    pageStartBlockIds: Set<string>
+    pageStarts: Map<string, Page>
   ): (Paragraph | Table)[] {
-    const pageBreakBefore = pageStartBlockIds.has(block.id);
+    const pageBreakBefore = pageStarts.has(block.id);
     const font = style?.fontFamily;
     const size = style ? Math.round(style.fontSize * 2) : undefined; // docx sizes are in half-points
     const color = style?.color?.replace(/^#/, '');

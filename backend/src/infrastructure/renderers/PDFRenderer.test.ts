@@ -5,8 +5,9 @@ import { LayoutEngine } from '../../domain/services/LayoutEngine';
 import { TypographyResolver } from '../../domain/services/TypographyResolver';
 import { ClassicTheme } from '../../domain/themes/ClassicTheme';
 import { createBook } from '../../domain/models/Book';
-import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement } from '../../domain/models/Book';
+import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement, TableOfContents } from '../../domain/models/Book';
 import type { PageLayout } from '../../domain/models/PageLayout';
+import type { Theme } from '../../domain/models/Theme';
 import { extractPdfText, extractPdfRuns, countPdfPages } from '../../test-utils/extractPdfText';
 import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
 
@@ -45,10 +46,16 @@ function chapter(
   };
 }
 
-function paginate(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT) {
+function paginate(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT, theme: Theme = ClassicTheme) {
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
-  const styled = new ThemeEngine().applyTheme(book, ClassicTheme);
+  const styled = new ThemeEngine().applyTheme(book, theme);
   return new LayoutEngine().paginate(styled, layout);
+}
+
+function paginateWithToc(chapters: Chapter[], toc: TableOfContents) {
+  const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
+  const styled = new ThemeEngine().applyTheme({ ...book, frontMatter: { toc } }, ClassicTheme);
+  return new LayoutEngine().paginate(styled, LETTER_LAYOUT);
 }
 
 // Chains TypographyResolver after ThemeEngine, so blockTypography (inline runs, drop
@@ -191,6 +198,54 @@ describe('PDFRenderer', () => {
     expect(countPdfPages(buffer)).toBeGreaterThan(1);
   });
 
+  // Sprint 6 (ADR-0029, Functional Spec item 6): Chapter.startPageNumber.
+  it('shows the resolved (possibly reset) page number in the footer, not the raw physical page index', async () => {
+    const paginated = paginate([
+      chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1 }),
+      chapter([paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2, startPageNumber: 101 }),
+    ]);
+    expect(paginated.pages.map((p) => p.number)).toEqual([1, 101]);
+
+    const buffer = await renderer.render(paginated, {});
+    const text = extractPdfText(buffer);
+
+    expect(text).toContain('Page 1 of');
+    expect(text).toContain('Page 101 of');
+    expect(text).not.toContain('Page 2 of');
+  });
+
+  // Sprint 6 (ADR-0029, Functional Spec item 5): Chapter.openingPageStyle blank-page insertion.
+  it("inserts a real, genuinely blank physical page for a chapter with openingPageStyle:'right' after an odd-ending chapter", async () => {
+    const paginated = paginate([
+      chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1 }),
+      chapter([paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2, openingPageStyle: 'right' }),
+    ]);
+    expect(paginated.pages.map((p) => p.number)).toEqual([1, 3]);
+
+    const buffer = await renderer.render(paginated, {});
+    const text = extractPdfText(buffer);
+
+    // 3 physical pages: chapter 1's content, one genuinely blank page, chapter 2's content.
+    expect(countPdfPages(buffer)).toBe(3);
+    expect(text).toContain('Hello one.');
+    expect(text).toContain('Hello two.');
+  });
+
+  // Sprint 6: PDFRenderer previously hardcoded Letter-equivalent geometry regardless of the
+  // PaginatedBook it was given - a real gap found while wiring PageLayout selection through
+  // to actual rendered output (see PaginatedBook.pageLayout's doc comment). This asserts the
+  // real PDF's own /MediaBox reflects the selected layout, not just that pagination math used it.
+  it('renders the PDF at the selected PageLayout size, not a hardcoded Letter default', async () => {
+    const a4Layout: PageLayout = { ...LETTER_LAYOUT, pageSize: 'a4', width: 595.28, height: 841.89 };
+    const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], a4Layout);
+
+    const buffer = await renderer.render(paginated, {});
+    const raw = buffer.toString('latin1');
+
+    expect(raw).toContain('/MediaBox [0 0 595.28 841.89]');
+    expect(raw).not.toContain('/MediaBox [0 0 612 792]');
+  });
+
   it('falls back to a text placeholder for images without embedded base64 data', async () => {
     const image: Image = { type: 'image', id: 'img-1', url: 'https://example.com/a.png', caption: 'A cover' };
     const paginated = paginate([chapter([image])]);
@@ -286,5 +341,96 @@ describe('PDFRenderer', () => {
     // PaginatedBook.pages.length (LayoutEngine's estimate) - real content can exceed the estimate.
     expect(text).toContain(`Page 1 of ${actualPageCount}`);
     expect(text).toContain(`Page ${actualPageCount} of ${actualPageCount}`);
+  });
+
+  // Sprint 6 (ADR-0029 Decision 6): running head is now Theme.runningHead-driven.
+  describe('running head (Theme.runningHead)', () => {
+    it("shows the real book's title in the running head, not the old hardcoded 'Book Publisher Studio' string", async () => {
+      const paginated = paginate([chapter([paragraph('p-1')])]);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).toContain('T'); // paginate()'s book title
+      expect(text).not.toContain('Book Publisher Studio');
+    });
+
+    it('draws no running head and no page-number footer when runningHead.show is false', async () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, show: false } };
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).not.toMatch(/Page \d+ of \d+/);
+    });
+
+    it('draws no running head or footer at all when the theme has no runningHead', async () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: undefined };
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).not.toMatch(/Page \d+ of \d+/);
+    });
+
+    it('uppercases the running head title when runningHead.uppercase is true', async () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, uppercase: true } };
+      // paginate()'s fixture book title is 'T', already uppercase either way - use a
+      // distinctive lowercase title to make the transform observable.
+      const book = createBook({ title: 'lowercase title', author: 'A', language: 'en' }, [
+        chapter([paragraph('p-1')]),
+      ]);
+      const styled = new ThemeEngine().applyTheme(book, theme);
+      const paginated = new LayoutEngine().paginate(styled, LETTER_LAYOUT);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).toContain('LOWERCASE TITLE');
+      expect(text).not.toContain('lowercase title');
+    });
+  });
+
+  // Sprint 6 (Functional Spec item 7, Architecture Impact §4): PDFRenderer consumes
+  // paginated.tableOfContents.
+  describe('table of contents (PaginatedBook.tableOfContents)', () => {
+    it('renders a real TOC page with entry titles and resolved page numbers, as its own front-matter page before body content', async () => {
+      const paginated = paginateWithToc(
+        [
+          chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1, title: 'Chapter One' }),
+          chapter([paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2, title: 'Chapter Two' }),
+        ],
+        { generateAutomatically: true, entries: [] }
+      );
+      // Real-file verification finding (Sprint 6 commit 11): a real DOCX import never produces
+      // a content-level Heading block - every real heading becomes a Chapter/Section title
+      // instead (see LayoutEngine.ts's buildTableOfContents doc comment). Entries are keyed by
+      // the owning Chapter/Section's own id here, not a Heading.id.
+      expect(paginated.tableOfContents).toEqual([
+        { level: 1, title: 'Chapter One', pageNumber: 1, headingId: 'c-1' },
+        { level: 1, title: 'Chapter Two', pageNumber: 2, headingId: 'c-2' },
+      ]);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).toContain('Table of Contents');
+      expect(text).toContain('Chapter One');
+      expect(text).toContain('Chapter Two');
+      // 3 physical pages: the TOC page + 2 body content pages (one per chapter).
+      expect(countPdfPages(buffer)).toBe(3);
+    });
+
+    it('renders no TOC page when tableOfContents is absent (generateAutomatically not set)', async () => {
+      const paginated = paginate([chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1')])]);
+
+      const buffer = await renderer.render(paginated, {});
+      const text = extractPdfText(buffer);
+
+      expect(text).not.toContain('Table of Contents');
+      expect(countPdfPages(buffer)).toBe(1);
+    });
   });
 });

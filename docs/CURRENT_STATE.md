@@ -1,8 +1,8 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 (Sprint 5 merged and tagged `v0.6.0-alpha` — sprint fully closed)
-**Sprint:** Sprint 4 ("Typography Engine") **✅ COMPLETE AND RELEASED** (PR #9, merge commit `27a4347`, tag `v0.5.0-alpha`, 195/195 tests at release). Sprint 5 ("Validation Engine") **✅ COMPLETE AND RELEASED** — `ValidationEngine` orchestrating a `RuleRegistry` of 8 pure `ValidationRule`s (`StructuralRule`, `MetadataRule`, `HeadingRule`, `MissingRequiredStyleRule`, `TypographyRule`, `ImageRule`, `HyperlinkRule`, `ComplianceRule`), wired into `ImportManuscriptUseCase`. Two-level Design Review (`docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` + `VALIDATION_ENGINE.md`) approved before any code; a "Document Intelligence Engine" sixth candidate was proposed and explicitly withdrawn. ADR-0027 (read-only) and ADR-0028 (rule design principles) written. Merged via PR #10 (merge commit `3032d70`), re-verified on `main` (282/282 tests), tagged `v0.6.0-alpha`. `docs/releases/v0.6.0-alpha/ReleaseNotes.md` and `SPRINT_5_FINAL_REPORT.md` record the release and full retrospective. `feature/sprint-5-validation-engine` deleted (local + remote). **Sprint 6 ("Professional Layout Engine") Design Review ✅ APPROVED** (`docs/architecture/diagrams/PROFESSIONAL_LAYOUT_ENGINE.md`, ADR-0029, `docs/architecture/diagrams/SPRINT_6_KICKOFF.md`) — chosen from the 4 remaining Level-1-mapped engines for its lowest-risk profile. No code yet, no branch yet — awaiting explicit go-ahead.
-**Branch:** `main`, at `46c9dd1` (post-merge docs/release commit), tag `v0.6.0-alpha`. No open feature branches.
+**Last Updated:** July 17, 2026 (Sprint 6 implementation complete on its feature branch, real-file verified — PR not yet opened)
+**Sprint:** Sprint 5 ("Validation Engine") **✅ COMPLETE AND RELEASED**, tagged `v0.6.0-alpha` (see prior entries below for full detail). **Sprint 6 ("Professional Layout Engine") ✅ IMPLEMENTATION COMPLETE**, real-file verified, on `feature/sprint-6-professional-layout-engine` — `LayoutEngine` extended (not replaced, ADR-0029) with real `PageLayout` presets (A4/A5/KDP 5x8/5.5x8.5/6x9, ADR-0030), `LayoutSelector` port + `ManualLayoutSelector`, `Theme.runningHead` (`ClassicTheme` populated, replaces the old hardcoded PDF running-head string), real header/footer in `PDFRenderer`/`DOCXRenderer`, `Chapter.openingPageStyle`/`startPageNumber` honored, automatic Table of Contents generation (rendered as real front-matter content in both PDF and DOCX). Two real bugs found and fixed during real-file verification (ADR-0031): neither renderer had ever consumed `PageLayout` at all; TOC generation originally walked only `Heading` blocks, which real DOCX imports never produce (real headings become `Chapter`/`Section` titles instead). 328/328 tests, `npm run verify-server`/`verify-real-export` both green. Full detail: `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md`. **PR not yet opened** — awaiting explicit go-ahead to push the branch and open it.
+**Branch:** `feature/sprint-6-professional-layout-engine` (based on `main` at `46c9dd1`, tag `v0.6.0-alpha`). `main` itself is unchanged from Sprint 5's merge — no direct commits to `main` this sprint (ADR-0017).
 
 ---
 
@@ -198,6 +198,48 @@ All three were fixed by the `bufferPages` redesign above.
 
 ---
 
+## Sprint 6: Professional Layout Engine ✅ IMPLEMENTATION COMPLETE (on `feature/sprint-6-professional-layout-engine`, PR not yet opened)
+
+**Design Review completed and approved before any implementation code** (`docs/architecture/diagrams/PROFESSIONAL_LAYOUT_ENGINE.md`, ADR-0029, `docs/architecture/diagrams/SPRINT_6_KICKOFF.md`) — chosen from the 4 remaining Level-1-mapped engines for its lowest-risk profile (no external vendor, no UI requirement, extends existing `LayoutEngine`). A real KDP/platform trim-size spike (`backend/spikes/kdp-trim-size-spike.ts`, ADR-0030) was completed as commit 0, before any preset code, matching the ADR-0019/0020 precedent.
+
+**Domain (new):**
+- ✅ `A4PageLayout`/`A5PageLayout`/`KDP5x8PageLayout`/`KDP5_5x8_5PageLayout`/`KDP6x9PageLayout` (`domain/layouts/`) — real dimensions from the commit-0 spike, not guessed; `PageLayout.pageSize` union extended additively
+- ✅ `LayoutSelector` port (`domain/ports/`) + `ManualLayoutSelector` (`domain/services/`) — only implementation this sprint, wraps today's caller-by-name behavior, defaults to Letter; `AutomaticLayoutSelector` named and designed for (ADR-0029 Decision 5) but not built
+- ✅ `RunningHead` type on `Theme` (additive) — `show`/`position`/`content`/`pageNumber`/`separator`/`uppercase`/`font`/`size`; `ClassicTheme` gets a real populated value
+- ✅ `PaginatedBook.pageLayout` (additive) — the `PageLayout` `paginate()` actually computed pages against; a real gap found and fixed as a direct prerequisite (ADR-0031 bug 1) since neither renderer had ever consumed a `PageLayout` at all before this sprint
+- ✅ `Page.headerFooterTitle`/`.blankPagesBefore` (additive) — per-page resolved running-head title and `Chapter.openingPageStyle` blank-page count, both computed during `LayoutEngine.paginate()`
+- ✅ `LayoutEngine` honors `Chapter.openingPageStyle` (`'right'`/`'left'` blank-page insertion, standard recto/verso convention) and `Chapter.startPageNumber` (resets the displayed page-number sequence, composes with `openingPageStyle`'s parity check)
+- ✅ `PaginatedBook.tableOfContents` (additive) — automatic TOC generation from `Chapter`/`Section` titles (the real-world path, ADR-0031 bug 2) and literal `Heading` blocks (the synthetic/future path), only when `Book.frontMatter.toc.generateAutomatically` is true; Book itself is never mutated (ADR-0001), so a manually-authored `frontMatter.toc.entries` is never touched
+
+**Infrastructure:**
+- ✅ `PDFRenderer` — reads `book.pageLayout` for real page geometry (was hardcoded Letter); consumes resolved header/footer, drops the hardcoded `'Book Publisher Studio'` string (ADR-0029 Decision 6); renders real blank pages for `openingPageStyle`; footer numerator uses the resolved (possibly `startPageNumber`-reset) page number, not the raw physical index; renders a real, unnumbered front-matter TOC page
+- ✅ `DOCXRenderer` — reads `book.pageLayout` for real `<w:pgSz>`/`<w:pgMar>` (was hardcoded default); gains real header/footer support (new capability, none existed before) using live `PageNumber.CURRENT`/`TOTAL_PAGES` Word fields; renders real blank pages for `openingPageStyle`; renders a real TOC as literal front-matter paragraphs
+- ✅ EPUB confirmed unaffected (ADR-0029 Decision 3) — `EPUBRenderer` never references `pageLayout`, `runningHead`, or `tableOfContents`
+
+**Application/Presentation:**
+- ✅ `ExportController` calls `LayoutSelector.select()` instead of hardcoding `LetterPageLayout`; `POST /api/manuscripts/export` gains an optional `layout` field (mirrors `theme`); unknown names return 400 via `UnknownLayoutError`
+
+**Two real bugs found and fixed during real-file verification, ADR-0031 (not deferred, matching ADR-0019/0020/0026 precedent):**
+1. Neither renderer had ever consumed `PageLayout` at all — every new preset from commit 1 would have had zero effect on real rendered output. Found before any real-file test, while wiring `RunningHead` support.
+2. Automatic TOC generation produced a permanently empty TOC on every real import — real DOCX headings become `Chapter`/`Section` boundaries, never content-level `Heading` blocks. Found during commit 11's real-file verification against `large-book.docx` (15 real chapters); fixed and re-verified against the same fixture.
+
+**Verified with real files:** `npm run verify-server` + `npm run verify-real-export` (16/16) green throughout. Real HTTP exports of `typography-test.docx` confirmed A4/KDP-6x9 PDF `/MediaBox` and A5 DOCX `<w:pgSz>` match the selected layout exactly; unknown `layout` returns real HTTP 400. `Chapter.openingPageStyle`/`startPageNumber`/`generateAutomatically` have no DOCX-native signal `ASTBuilder` can set from real content (same category as Sprint 5's `isbn`/`description`/`coverImage` finding) — disclosed, not silently skipped, and verified instead via real-pipeline composition with real fixture content (`large-book.docx`) and only those three fields set programmatically.
+
+**328 total tests passing** (up from 282), 92.78% global / 93.75% domain coverage, 0 ESLint warnings.
+
+**Full retrospective:** `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md` (objectives, ADRs created, design-review gaps found and fixed, final metrics, deferred items, residual risks, lessons learned).
+
+**Closure pass (this update):**
+- [x] ADR-0031 written (the two real-file-verification bugs)
+- [x] `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md` written
+- [x] Final `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` reconciliation pass (this update)
+- [x] `VERSIONS.md` renumbered: `v0.7.0-alpha` corrected from a superseded "Premium UI/UX" placeholder to the actual Professional Layout Engine milestone; every subsequent never-released row shifted down one version accordingly
+- [ ] Open the Sprint 6 PR — not yet done, awaiting explicit go-ahead (pushing a branch and opening a PR are both actions requiring explicit user confirmation)
+- [ ] Tag `v0.7.0-alpha`, write `docs/releases/v0.7.0-alpha/ReleaseNotes.md`, flip `VERSIONS.md`'s row to Released — deferred until after the PR actually merges, matching this project's own "tag only after the tag is pushed" rule
+- [ ] Delete `feature/sprint-6-professional-layout-engine` (local + remote) — after merge
+
+---
+
 ## Test Summary
 
 Exact counts (via vitest's own JSON reporter, not hand-counted):
@@ -215,11 +257,11 @@ Exact counts (via vitest's own JSON reporter, not hand-counted):
 | Manuscript import route (E2E) | 5 | |
 | ThemeEngine | 4 | |
 | getTheme | 2 | |
-| LayoutEngine | 10 | |
-| DOCXRenderer | 9 | |
+| LayoutEngine | 29 | Sprint 6: +19 (headerFooterTitle resolution, openingPageStyle, startPageNumber, automatic TOC generation) |
+| DOCXRenderer | 17 | Sprint 6: +8 (real PageLayout geometry, header/footer, openingPageStyle blank pages, TOC) |
 | ExportManuscriptUseCase | 7 | |
-| Manuscript export route (E2E) | 10 | |
-| PDFRenderer | 16 | |
+| Manuscript export route (E2E) | 12 | Sprint 6: +2 (unknown layout 400, explicit KDP layout) |
+| PDFRenderer | 25 | Sprint 6: +9 (real PageLayout geometry, running head, openingPageStyle blank pages, startPageNumber footer, TOC) |
 | EPUBRenderer | 11 | |
 | TypographyResolver | 17 | |
 | PdfFontRegistry | 7 | |
@@ -235,7 +277,8 @@ Exact counts (via vitest's own JSON reporter, not hand-counted):
 | **ImageRule** | **8** | Sprint 5, new |
 | **HyperlinkRule** | **13** | Sprint 5, new (includes an `it.each` over 2 URL cases) |
 | **ComplianceRule** | **7** | Sprint 5, new |
-| **Total** | **282** | up from 195 at Sprint 5 start (+87) |
+| **ManualLayoutSelector** | **8** | Sprint 6, new |
+| **Total** | **328** | up from 282 at Sprint 6 start (+46) |
 
 ---
 
@@ -247,14 +290,15 @@ Exact counts (via vitest's own JSON reporter, not hand-counted):
 | Application depends only on interfaces (ports live in Domain) | ✅ |
 | No Domain objects in DTOs | ✅ |
 | Dependency Inversion enforced (constructor injection throughout) | ✅ |
-| All tests passing | ✅ (282/282) |
+| All tests passing | ✅ (328/328) |
 | No circular dependencies | ✅ |
 | TypeScript strict mode | ✅ |
 | Controller contains no business logic | ✅ |
-| Domain coverage >90% | ✅ 93.06% statements (`domain/services`, `npm run test:coverage`, final Sprint 5 run) |
-| Global coverage >80% | ✅ 91.77% statements (`npm run test:coverage`, final Sprint 5 run) |
+| Domain coverage >90% | ✅ 93.75% statements (`domain/services`, `npm run test:coverage`, final Sprint 6 run) |
+| Global coverage >80% | ✅ 92.78% statements (`npm run test:coverage`, final Sprint 6 run) |
 | Renderer is a port; ThemeEngine/LayoutEngine are concrete classes | ✅ (Design Review decision, ADR-0012 addendum) |
 | ValidationEngine is a concrete class; ValidationRule is the swappable unit (RuleRegistry holds instances, not classes) | ✅ (Sprint 5 Design Review decision, ADR-0027/0028) |
+| LayoutSelector is a port; ManualLayoutSelector is its only implementation (AutomaticLayoutSelector named, not built) | ✅ (Sprint 6 Design Review decision, ADR-0029 Decision 5) |
 | Zero ESLint warnings | ✅ (0 errors, 0 warnings — held since Quality Sprint, PR #2) |
 
 ---
@@ -269,6 +313,8 @@ Exact counts (via vitest's own JSON reporter, not hand-counted):
 - `epub-gen-memory` (ADR-0020) is a smaller-community fork (58 GitHub stars) of a more popular but unmaintained parent (`epub-gen`, 458 stars) — worth watching at upgrade time, not a reason to avoid it now.
 - **`TypographyRule` is currently a no-op on every real import** (Sprint 5) — `ValidationContext.metrics` is never populated on the import path (no `PaginatedBook` exists there), so its 3 real checks (empty headings, inconsistent spacing, drop-cap ratio) never fire in production today, only in its own unit tests. Disclosed consequence of Sprint 5's "import path only" wiring scope, not a defect.
 - **`MetadataRule`/`ComplianceRule` flag nearly every real DOCX import** (Sprint 5) — `ASTBuilder.buildMetadata()` never sets `isbn`/`description`/`coverImage` from DOCX content, confirmed by reading the code. Accurate, not a false positive, but a UI consuming `ImportReportDTO` should expect this, not be surprised by it.
+- **`Chapter.openingPageStyle`/`startPageNumber`/`Book.frontMatter.toc.generateAutomatically` have no DOCX-native signal `ASTBuilder` can set from real content** (Sprint 6) — same category of gap as the `MetadataRule` finding above. A real DOCX uploaded through `POST /api/manuscripts/export` can never trigger blank-page insertion, page-number resets, or automatic TOC generation end-to-end today, since nothing in the import pipeline populates the fields that gate them. All three are fully implemented and verified against real rendering libraries (not mocks) via direct pipeline composition with programmatic field overrides; disclosed in `docs/REAL_EXPORT_CHECKLIST.md`'s Sprint 6 instance, not silently skipped. Natural home to close: the already-scoped future "Import Fidelity" sprint.
+- **DOCX header/footer is document-wide, not per-chapter** (Sprint 6) — `RunningHead.content: 'chapterTitle'` and `Chapter.startPageNumber` both need real per-chapter behavior in a `.docx`, which requires splitting the single Word section `DOCXRenderer` builds into one section per top-level `Chapter`/`Section`. Not built this sprint (disclosed in both `DOCXRenderer.ts` and ADR-0029's Related section); doesn't affect `ClassicTheme`, whose `'bookTitle'` content is constant document-wide regardless.
 
 ---
 
@@ -282,6 +328,10 @@ Exact counts (via vitest's own JSON reporter, not hand-counted):
 - Hyphenation and non-English smart quotes are deliberately deferred to v2 (ADR-0024, written commit 11).
 - `EPUBRenderer`'s `page-break` block renders a CSS `page-break-before` hint, not a real page break — EPUB is reflowable (ADR-0013), and reading systems vary in whether they honor the hint at all. Documented, not a silent gap.
 - `docs/architecture/diagrams/BASELINE_v0.1.md`'s "86/86 tests" claim was corrected via ADR-0010 (status annotation only, content not rewritten, per the doc's own frozen/ADR-only change rule).
+- **`AutomaticLayoutSelector` is named and designed for but not built** (Sprint 6, ADR-0029 Decision 5) — `ManualLayoutSelector` is the only `LayoutSelector` implementation; a real, accepted risk (same category as `ValidationContext`'s reserved fields) worth revisiting if no second implementation ever materializes.
+- **`RunningHead`'s 8 fields have no consumer variety to validate the shape against** (Sprint 6, ADR-0029 Risk 5) — only `ClassicTheme` populates it; `position`/`separator`/`uppercase`/`font`/`size` are exercised by only one real theme so far.
+- **A generated TOC's page is deliberately excluded from the body's own page-number sequence** (Sprint 6) — `LayoutEngine` computed body page numbers without reserving room for a TOC page; a very long TOC overflowing its own PDF page falls into the same pagination-estimate-drift bucket as any other PDFKit overflow (ADR-0013), not specially handled.
+- **`ManualLayoutSelector`'s registry has no compile-time link to `PageLayout.pageSize`'s union type** (Sprint 6) — a future preset added without updating both would silently 400 via `UnknownLayoutError` rather than fail at compile time. Same category of risk as `ValidationEngine`'s `RULE_CATEGORY` lookup above.
 
 ---
 
@@ -291,15 +341,15 @@ Exact counts (via vitest's own JSON reporter, not hand-counted):
 
 **Sprint 4 is complete, merged, and tagged.** PR #9 merged (`27a4347`), `v0.5.0-alpha` tagged and pushed, `feature/sprint-4-typography-engine` deleted (local + remote).
 
-**Sprint 5 is complete, merged, and tagged.** PR #10 merged (`3032d70`), `v0.6.0-alpha` tagged and pushed, `feature/sprint-5-validation-engine` deleted (local + remote). Work happens on `main` now — there is no active feature branch.
+**Sprint 5 is complete, merged, and tagged.** PR #10 merged (`3032d70`), `v0.6.0-alpha` tagged and pushed, `feature/sprint-5-validation-engine` deleted (local + remote).
 
-**Sprint 6 (Professional Layout Engine) has an approved Design Review, no code yet.** Chosen from the 4 remaining Level-1-mapped engines (Editorial AI Engine, Plugin System, Professional Layout Engine, Publishing Engine) for its lowest-risk profile (no external vendor dependency, no UI requirement, extends existing code) — same reasoning that selected Validation Engine for Sprint 5. Full design: `docs/architecture/diagrams/PROFESSIONAL_LAYOUT_ENGINE.md` (✅ APPROVED, round 2), ADR-0029, `docs/architecture/diagrams/SPRINT_6_KICKOFF.md`. **A real spike into KDP/platform trim sizes is a hard prerequisite for commit 1** — not guessed, matching ADR-0019/0020. When implementation starts, branch from `main` per ADR-0017. Editorial AI Engine, Plugin System, and Publishing Engine remain mapped at Level 1 only, no Sprint assignment.
+**Sprint 6 (Professional Layout Engine) implementation is complete on `feature/sprint-6-professional-layout-engine`, real-file verified, PR not yet opened.** All 10 numbered commits + commit 0's spike + 2 disclosed fix commits landed, each with its own green build/lint/test before the next started (328/328 final). Two real bugs found and fixed during real-file verification (ADR-0031). Full design: `docs/architecture/diagrams/PROFESSIONAL_LAYOUT_ENGINE.md`, ADR-0029/0030/0031, `docs/architecture/diagrams/SPRINT_6_KICKOFF.md`. Full retrospective: `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md`. **Opening the PR (pushing the branch, creating the PR) is deliberately left for explicit user go-ahead** — both are actions this session's operating rules require confirmation for, distinct from local commits. Editorial AI Engine, Plugin System, and Publishing Engine remain mapped at Level 1 only, no Sprint assignment.
 
-**Quick Start:**
+**Quick Start (on the Sprint 6 branch, before it merges):**
 ```bash
 cd "D:\Book Publisher Studio\backend"
-git checkout main && git pull
-npm test               # Verify all 282 tests pass
+git checkout feature/sprint-6-professional-layout-engine
+npm test               # Verify all 328 tests pass
 npm run build          # Verify TypeScript compilation
 npm run lint            # Verify 0 ESLint errors
 npm run test:coverage   # Verify coverage thresholds
@@ -332,8 +382,9 @@ npm run verify-real-export   # Verify real import + export-docx/pdf/epub against
 
 ## Git Status
 
-**Branch:** `main`, at `46c9dd1` (post-merge docs/release commit), tag `v0.6.0-alpha`. No open feature branches.
-**`main` history (most recent first):** `46c9dd1` (release docs + `VERSIONS.md` flip) → `3032d70` (**merge PR #10** — Sprint 5, Validation Engine, squash of `0280ae0`...`f6bee88`, 11 implementation commits + 1 governance-closure commit) → `599e297` (Sprint 5 Design Review/Kickoff docs, committed directly to `main`) → `27a4347` (merge PR #9 — Sprint 4, Typography Engine) → further back per prior entries.
+**Current branch:** `feature/sprint-6-professional-layout-engine`, based on `main` at `46c9dd1`. Not yet pushed to the remote; PR not yet opened.
+**`main`:** unchanged from Sprint 5's merge, still at `46c9dd1`, tag `v0.6.0-alpha`. No direct commits to `main` this sprint (ADR-0017).
+**Sprint 6 branch history (most recent first, local only):** docs reconciliation (this pass, pending commit) → TOC real-import fix (ADR-0031 bug 2) → commit 10 (automatic TOC generation) → commit 9 (`Chapter.startPageNumber`) → commit 8 (`Chapter.openingPageStyle`) → commit 7 (DOCXRenderer header/footer) → commit 6 (PDFRenderer header/footer) → commit 5 (LayoutEngine header/footer resolution) → commit 4 (`Theme.runningHead`) → `PageLayout`-consumption fix (ADR-0031 bug 1) → commit 3 (`ExportController` uses `LayoutSelector`) → commit 2 (`LayoutSelector` port + `ManualLayoutSelector`) → commit 1 (A4/A5/KDP `PageLayout` presets) → commit 0 (KDP trim-size spike) → branched from `main` at `46c9dd1`.
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
-**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha`, `v0.4.1-alpha` (EPUB export — see `docs/releases/v0.4.1-alpha/ReleaseNotes.md`), `v0.5.0-alpha` (Typography Engine — see `docs/releases/v0.5.0-alpha/ReleaseNotes.md`), **`v0.6.0-alpha`** (Validation Engine, cut 2026-07-17, PR #10 — see `docs/VERSIONS.md` and `docs/releases/v0.6.0-alpha/ReleaseNotes.md`).
-**Open branches:** none — `feature/sprint-5-validation-engine` deleted (local + remote) after PR #10 merged.
+**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha`, `v0.4.1-alpha` (EPUB export — see `docs/releases/v0.4.1-alpha/ReleaseNotes.md`), `v0.5.0-alpha` (Typography Engine — see `docs/releases/v0.5.0-alpha/ReleaseNotes.md`), `v0.6.0-alpha` (Validation Engine, cut 2026-07-17, PR #10 — see `docs/VERSIONS.md` and `docs/releases/v0.6.0-alpha/ReleaseNotes.md`). **`v0.7.0-alpha` not yet cut** — Sprint 6 (Professional Layout Engine) is implementation-complete but not yet merged.
+**Open branches:** `feature/sprint-6-professional-layout-engine` (local only, not pushed) — Sprint 6 implementation, complete and real-file verified, awaiting PR.

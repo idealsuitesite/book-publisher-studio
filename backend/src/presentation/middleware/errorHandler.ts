@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { DocumentParseError } from '../../shared/errors/DocumentParseError';
 import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
+import { UnknownLayoutError } from '../../shared/errors/UnknownLayoutError';
 
 export function errorHandler(err: unknown, _req: Request, res: Response, next: NextFunction): void {
   if (res.headersSent) {
@@ -26,6 +27,11 @@ export function errorHandler(err: unknown, _req: Request, res: Response, next: N
   }
 
   if (err instanceof UnknownThemeError) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof UnknownLayoutError) {
     res.status(400).json({ error: err.message });
     return;
   }

@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { ExportManuscriptUseCase } from '../../application/use-cases/ExportManuscriptUseCase';
-import { LetterPageLayout } from '../../domain/layouts/LetterPageLayout';
+import type { LayoutSelector } from '../../domain/ports/LayoutSelector';
 
 // ExportManuscriptUseCase is already renderer-agnostic (constructor-injected Renderer<Buffer>,
 // per ADR-0012) - PDF and EPUB support needed no new Use Case classes, just additional instances
@@ -28,7 +28,10 @@ function resolveFormat(value: unknown): ExportFormat {
 }
 
 export class ExportController {
-  constructor(private useCases: ExportUseCasesByFormat) {}
+  constructor(
+    private useCases: ExportUseCasesByFormat,
+    private layoutSelector: LayoutSelector
+  ) {}
 
   exportManuscript = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!req.file) {
@@ -38,13 +41,16 @@ export class ExportController {
 
     const themeName = typeof req.body.theme === 'string' && req.body.theme.length > 0 ? req.body.theme : 'classic';
     const format = resolveFormat(req.body.format);
+    const requestedLayoutName =
+      typeof req.body.layout === 'string' && req.body.layout.length > 0 ? req.body.layout : undefined;
 
     try {
+      const pageLayout = this.layoutSelector.select({ requestedLayoutName });
       const buffer = await this.useCases[format].execute({
         buffer: req.file.buffer,
         filename: req.file.originalname,
         themeName,
-        pageLayout: LetterPageLayout,
+        pageLayout,
       });
 
       res.setHeader('Content-Type', CONTENT_TYPE[format]);

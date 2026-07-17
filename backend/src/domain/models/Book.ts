@@ -413,7 +413,11 @@ export interface TOCEntry {
   level: number; // 1-6
   title: string;
   pageNumber?: number;
-  headingId: string; // Links back to Heading.id
+  // Links back to a Heading.id when a literal Heading block exists, or a Chapter/Section's own
+  // id otherwise (LayoutEngine.buildTableOfContents, Sprint 6: real DOCX imports structurally
+  // consume every heading into a Chapter/Section boundary, never a content-level Heading block -
+  // confirmed against a real fixture, not assumed).
+  headingId: string;
   children?: TOCEntry[];
 }
 

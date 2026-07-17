@@ -6,8 +6,9 @@ import { LayoutEngine } from '../../domain/services/LayoutEngine';
 import { TypographyResolver } from '../../domain/services/TypographyResolver';
 import { ClassicTheme } from '../../domain/themes/ClassicTheme';
 import { createBook } from '../../domain/models/Book';
-import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement } from '../../domain/models/Book';
+import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement, TableOfContents } from '../../domain/models/Book';
 import type { PageLayout } from '../../domain/models/PageLayout';
+import type { Theme } from '../../domain/models/Theme';
 
 const LETTER_LAYOUT: PageLayout = {
   pageSize: 'letter',
@@ -51,9 +52,15 @@ async function extractDocumentXml(buffer: Buffer): Promise<string> {
   return doc.async('string');
 }
 
-function paginate(chapters: Chapter[]) {
+function paginate(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT, theme: Theme = ClassicTheme) {
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
-  const styled = new ThemeEngine().applyTheme(book, ClassicTheme);
+  const styled = new ThemeEngine().applyTheme(book, theme);
+  return new LayoutEngine().paginate(styled, layout);
+}
+
+function paginateWithToc(chapters: Chapter[], toc: TableOfContents) {
+  const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
+  const styled = new ThemeEngine().applyTheme({ ...book, frontMatter: { toc } }, ClassicTheme);
   return new LayoutEngine().paginate(styled, LETTER_LAYOUT);
 }
 
@@ -78,6 +85,98 @@ describe('DOCXRenderer', () => {
     expect(buffer.length).toBeGreaterThan(0);
     const xml = await extractDocumentXml(buffer);
     expect(xml).toContain('Hello world.');
+  });
+
+  // Sprint 6: DOCXRenderer previously emitted no <w:pgSz>/<w:pgMar> at all, so every export
+  // silently used docx's own library default (Letter-equivalent) regardless of the selected
+  // PageLayout - a real gap found while wiring PageLayout selection through to actual
+  // rendered output (see PaginatedBook.pageLayout's doc comment). Values are in twips
+  // (1pt = 20 twips): A4's 595.28x841.89pt -> 11905.6x16837.8 twips, truncated by docx's
+  // own integer rounding.
+  it('renders the DOCX at the selected PageLayout size, not a hardcoded Letter default', async () => {
+    const a4Layout: PageLayout = { ...LETTER_LAYOUT, pageSize: 'a4', width: 595.28, height: 841.89 };
+    const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], a4Layout);
+
+    const buffer = await renderer.render(paginated, {});
+    const xml = await extractDocumentXml(buffer);
+
+    expect(xml).toMatch(/<w:pgSz[^>]*w:w="11905"[^>]*w:h="16837"/);
+  });
+
+  // Sprint 6 (ADR-0029, Functional Spec item 5): Chapter.openingPageStyle blank-page insertion.
+  describe('Chapter.openingPageStyle blank-page insertion', () => {
+    it("inserts an extra blank page (an empty paragraph forcing its own page break) for 'right'", async () => {
+      const paginated = paginate([
+        chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1 }),
+        chapter([paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2, openingPageStyle: 'right' }),
+      ]);
+
+      const buffer = await renderer.render(paginated, {});
+      const xml = await extractDocumentXml(buffer);
+
+      const pageBreakCount = (xml.match(/<w:pageBreakBefore\/>/g) ?? []).length;
+      // 1 for chapter 2's title paragraph (chapters always start a new page) + 1 for the
+      // inserted blank page = 2. Without openingPageStyle this would be 1.
+      expect(pageBreakCount).toBe(2);
+      expect(xml).toContain('Hello one.');
+      expect(xml).toContain('Hello two.');
+    });
+
+    it('does not insert an extra blank page for a first chapter (nothing to break from)', async () => {
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1, openingPageStyle: 'right' })]);
+
+      const buffer = await renderer.render(paginated, {});
+      const xml = await extractDocumentXml(buffer);
+
+      expect((xml.match(/<w:pageBreakBefore\/>/g) ?? []).length).toBe(0);
+    });
+  });
+
+  // Sprint 6 (ADR-0029, Functional Spec item 9): DOCXRenderer gains header/footer support -
+  // a genuinely new capability, none existed before this.
+  describe('header/footer (Theme.runningHead)', () => {
+    it("writes a real header part with the book's title and a footer part with a live PAGE/NUMPAGES field", async () => {
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])]);
+
+      const buffer = await renderer.render(paginated, {});
+      const zip = await JSZip.loadAsync(buffer);
+      const headerFile = Object.keys(zip.files).find((f) => /word\/header\d+\.xml/.test(f));
+      const footerFile = Object.keys(zip.files).find((f) => /word\/footer\d+\.xml/.test(f));
+
+      expect(headerFile).toBeDefined();
+      expect(footerFile).toBeDefined();
+
+      const headerXml = await zip.file(headerFile!)!.async('string');
+      const footerXml = await zip.file(footerFile!)!.async('string');
+
+      expect(headerXml).toContain('T'); // paginate()'s book title
+      expect(footerXml).toContain('PAGE');
+      expect(footerXml).toContain('NUMPAGES');
+    });
+
+    it('writes no header/footer parts when runningHead.show is false', async () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, show: false } };
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
+
+      const buffer = await renderer.render(paginated, {});
+      const zip = await JSZip.loadAsync(buffer);
+      const headerFile = Object.keys(zip.files).find((f) => /word\/header\d+\.xml/.test(f));
+      const footerFile = Object.keys(zip.files).find((f) => /word\/footer\d+\.xml/.test(f));
+
+      expect(headerFile).toBeUndefined();
+      expect(footerFile).toBeUndefined();
+    });
+
+    it('writes no header/footer parts when the theme has no runningHead at all', async () => {
+      const theme: Theme = { ...ClassicTheme, runningHead: undefined };
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
+
+      const buffer = await renderer.render(paginated, {});
+      const zip = await JSZip.loadAsync(buffer);
+      const headerFile = Object.keys(zip.files).find((f) => /word\/header\d+\.xml/.test(f));
+
+      expect(headerFile).toBeUndefined();
+    });
   });
 
   it('includes chapter titles as headings', async () => {
@@ -198,5 +297,44 @@ describe('DOCXRenderer', () => {
     expect(xml).toContain('O');
     expect(xml).toContain('nce upon a time.');
     expect((xml.match(/Once upon a time\./g) ?? []).length).toBe(0); // never appears whole in one run
+  });
+
+  // Sprint 6 (Functional Spec item 7, Architecture Impact §4): DOCXRenderer consumes
+  // paginated.tableOfContents.
+  describe('table of contents (PaginatedBook.tableOfContents)', () => {
+    it('renders a real TOC with entry titles and resolved page numbers before body content, on its own page', async () => {
+      // Real-file verification finding (Sprint 6 commit 11): a real DOCX import never produces
+      // a content-level Heading block - every real heading becomes a Chapter title instead
+      // (see LayoutEngine.ts's buildTableOfContents doc comment). No literal heading() blocks
+      // here, matching that real-world shape.
+      const paginated = paginateWithToc(
+        [
+          chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1, title: 'Chapter One' }),
+          chapter([paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2, title: 'Chapter Two' }),
+        ],
+        { generateAutomatically: true, entries: [] }
+      );
+
+      const buffer = await renderer.render(paginated, {});
+      const xml = await extractDocumentXml(buffer);
+
+      expect(xml).toContain('Table of Contents');
+      expect(xml).toContain('Chapter One');
+      expect(xml).toContain('Chapter Two');
+      // The TOC's own heading + chapter 1's title both carry a page break: one separating
+      // the TOC page from body content, one starting chapter 2 (chapter 1 is the document's
+      // own first real page after the TOC, so it needs the forced break; chapter 2 gets its
+      // normal chapter-start break).
+      expect((xml.match(/<w:pageBreakBefore\/>/g) ?? []).length).toBe(2);
+    });
+
+    it('renders no TOC when tableOfContents is absent (generateAutomatically not set)', async () => {
+      const paginated = paginate([chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1')])]);
+
+      const buffer = await renderer.render(paginated, {});
+      const xml = await extractDocumentXml(buffer);
+
+      expect(xml).not.toContain('Table of Contents');
+    });
   });
 });

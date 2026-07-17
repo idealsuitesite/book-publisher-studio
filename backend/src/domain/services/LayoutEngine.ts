@@ -1,11 +1,20 @@
 import type { StyledBook } from '../models/Theme';
 import type { PageLayout } from '../models/PageLayout';
 import type { Page, PaginatedBook } from '../models/PaginatedBook';
-import type { Content, Block } from '../models/Book';
+import type { Content, Block, TOCEntry } from '../models/Book';
 import { countWords } from '../../shared/utils/textMetrics';
 
 const WORDS_PER_LINE = 12;
 const DEFAULT_IMAGE_HEIGHT = 200;
+
+// Standard print-publishing convention (not guessed): recto/right-hand pages are
+// odd-numbered, verso/left-hand pages are even-numbered, page 1 always being a right page.
+function blankPagesNeededFor(style: 'right' | 'left' | 'any' | undefined, nextPageNumber: number): number {
+  const isOdd = nextPageNumber % 2 === 1;
+  if (style === 'right' && !isOdd) return 1;
+  if (style === 'left' && isOdd) return 1;
+  return 0;
+}
 
 export class LayoutEngine {
   paginate(styled: StyledBook, layout: PageLayout): PaginatedBook {
@@ -15,10 +24,36 @@ export class LayoutEngine {
     let currentPageHeights: number[] = [];
     let currentHeight = 0;
     let pageNumber = 1;
+    // Whichever top-level Chapter/Section's blocks are being added when a page is flushed -
+    // the only piece of running-head resolution only LayoutEngine can compute (see
+    // Page.headerFooterTitle's doc comment). Chapters always start a new page (existing rule
+    // below), so in practice this is exact for chapter-content pages; top-level Sections can
+    // share a page, matching this pipeline's existing "best-effort, not guaranteed" pagination
+    // philosophy (ADR-0013).
+    let currentTopLevelTitle: string | undefined;
+    // Set right before the chapter's first block is added (after any blank pages this
+    // chapter needed have already had their own numbers reserved) - consumed and reset by
+    // the next flushPage(), which will be this chapter's own first page. Blank pages
+    // themselves are never given their own Page entry (no content, no running head/footer
+    // makes sense for them) - just a count the renderer inserts extra doc.addPage() calls
+    // for immediately before breaking to this page's first block.
+    let pendingBlankPagesBefore = 0;
+
+    const resolveHeaderFooterTitle = (): string | undefined => {
+      const runningHead = styled.theme.runningHead;
+      if (!runningHead?.show) return undefined;
+      return runningHead.content === 'bookTitle' ? styled.book.metadata.title : currentTopLevelTitle;
+    };
 
     const flushPage = (): void => {
       if (currentPageBlocks.length === 0) return;
-      pages.push({ number: pageNumber, blocks: currentPageBlocks });
+      pages.push({
+        number: pageNumber,
+        blocks: currentPageBlocks,
+        headerFooterTitle: resolveHeaderFooterTitle(),
+        blankPagesBefore: pendingBlankPagesBefore || undefined,
+      });
+      pendingBlankPagesBefore = 0;
       pageNumber += 1;
       currentPageBlocks = [];
       currentPageHeights = [];
@@ -70,7 +105,28 @@ export class LayoutEngine {
         const startsChapter = isTopLevel && content.type === 'chapter';
         let isFirstBlock = true;
         for (const block of content.content) {
-          addBlock(block, isFirstBlock && startsChapter);
+          const forceNewPage = isFirstBlock && startsChapter;
+          // Flush (attributing the closing page to the OLD currentTopLevelTitle) before
+          // reassigning - reassigning first would mislabel the page that's closing right now
+          // as belonging to the chapter that's only just starting.
+          if (forceNewPage) {
+            flushPage();
+            if (content.type === 'chapter') {
+              // startPageNumber is applied before the openingPageStyle parity check, so an
+              // explicit odd/even startPageNumber and 'right'/'left' agree without inserting
+              // an unwanted blank page. If they genuinely conflict (e.g. an even
+              // startPageNumber paired with openingPageStyle:'right'), the blank page still
+              // gets inserted and the chapter's actual displayed number ends up one past what
+              // startPageNumber requested - a real, disclosed edge case (PROFESSIONAL_LAYOUT_
+              // ENGINE.md doesn't specify this interaction), not silently resolved.
+              if (content.startPageNumber !== undefined) pageNumber = content.startPageNumber;
+              const needed = blankPagesNeededFor(content.openingPageStyle, pageNumber);
+              pendingBlankPagesBefore = needed;
+              pageNumber += needed;
+            }
+          }
+          if (isTopLevel) currentTopLevelTitle = content.title;
+          addBlock(block, false);
           isFirstBlock = false;
         }
         if (content.type === 'chapter' && content.sections) {
@@ -83,7 +139,68 @@ export class LayoutEngine {
     walkContent(styled.book.mainContent, true);
     flushPage();
 
-    return { styledBook: styled, pages };
+    return { styledBook: styled, pages, pageLayout: layout, tableOfContents: this.buildTableOfContents(styled, pages) };
+  }
+
+  // Functional Spec item 7: walks headings in document order, post-pagination (so each entry's
+  // pageNumber can be resolved), only when Book.frontMatter.toc.generateAutomatically is true -
+  // Book is never mutated (ADR-0001), so this never touches a manually-authored
+  // frontMatter.toc.entries at all; the two are entirely separate fields. A flat, level-annotated
+  // list, not a nested tree - see PaginatedBook.tableOfContents's doc comment for why nesting is
+  // deliberately out of scope rather than guessed.
+  //
+  // Real-file verification finding (Sprint 6 commit 11, fixed here as a direct scope exception -
+  // ADR-0019/0020/0026 precedent, not deferred): the design's own wording ("walks all Heading
+  // blocks") assumed content-level Heading blocks are how a real book's heading hierarchy shows
+  // up. Reading ASTBuilder.ts and testing against a real DOCX (large-book.docx) confirmed
+  // otherwise - every real heading in an imported document is structurally consumed into a
+  // Chapter/Section boundary (its `title` field), never emitted as a Heading block inside
+  // `content[]`. Walking only Heading blocks (the original implementation) produced a
+  // *permanently empty TOC on every real import* - a real, would-have-shipped-broken bug, not a
+  // hypothetical. Fixed to walk Chapter/Section titles as the primary, real-world path
+  // (headingId repurposed to the owning Chapter/Section's own id, since no Heading.id exists to
+  // link back to for these); literal Heading blocks are still included too, for hand-built Book
+  // models or a future import-pipeline change that starts emitting them.
+  private buildTableOfContents(styled: StyledBook, pages: Page[]): TOCEntry[] | undefined {
+    const toc = styled.book.frontMatter.toc;
+    if (!toc?.generateAutomatically) return undefined;
+
+    const pageNumberByBlockId = new Map<string, number>();
+    for (const page of pages) {
+      for (const blockId of page.blocks) {
+        if (!pageNumberByBlockId.has(blockId)) pageNumberByBlockId.set(blockId, page.number);
+      }
+    }
+
+    const entries: TOCEntry[] = [];
+    const addEntry = (level: number, title: string, headingId: string, firstBlockId: string | undefined): void => {
+      if (toc.maxDepth !== undefined && level > toc.maxDepth) return;
+      entries.push({ level, title, pageNumber: firstBlockId ? pageNumberByBlockId.get(firstBlockId) : undefined, headingId });
+    };
+
+    const walk = (contents: Content[]): void => {
+      for (const content of contents) {
+        // The primary, real-world case: a Chapter/Section's own title (an untitled preamble
+        // Section, ADR-0020 addendum, is skipped - an empty-title entry is never useful).
+        if (content.title) {
+          const level = content.type === 'chapter' ? 1 : content.level;
+          addEntry(level, content.title, content.id, content.content[0]?.id);
+        }
+        for (const block of content.content) {
+          // The synthetic/future case: a literal Heading block genuinely present in content.
+          if (block.type === 'heading') {
+            addEntry(block.level, block.text, block.id, block.id);
+          }
+        }
+        if (content.type === 'chapter' && content.sections) {
+          walk(content.sections as unknown as Content[]);
+        } else if (content.type === 'section' && content.subsections) {
+          walk(content.subsections as unknown as Content[]);
+        }
+      }
+    };
+    walk(styled.book.mainContent);
+    return entries;
   }
 
   private estimateBlockHeight(block: Block, styled: StyledBook): number {
