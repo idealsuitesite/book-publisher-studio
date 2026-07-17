@@ -12,25 +12,55 @@ export class LayoutEngine {
     const usableHeight = layout.height - layout.marginTop - layout.marginBottom;
     const pages: Page[] = [];
     let currentPageBlocks: string[] = [];
+    let currentPageHeights: number[] = [];
     let currentHeight = 0;
     let pageNumber = 1;
 
-    const startNewPage = (): void => {
+    const flushPage = (): void => {
       if (currentPageBlocks.length === 0) return;
       pages.push({ number: pageNumber, blocks: currentPageBlocks });
       pageNumber += 1;
       currentPageBlocks = [];
+      currentPageHeights = [];
       currentHeight = 0;
+    };
+
+    // Ends the current page on overflow. If its last block asked to stay with what
+    // follows (StyledBook.blockTypography[...].staysWithNext - currently set for
+    // Heading blocks only, design review §4 item 6/9's "widow/orphan avoidance"),
+    // that last block is carried onto the new page too instead of being left alone
+    // at the bottom of the closing one. Best-effort nudge (ADR-0013), not a
+    // guarantee, and only looks at the single block immediately before the break -
+    // this pagination model never splits a block's own content across pages, so
+    // there is no line-level widow/orphan to detect, only this block-level one.
+    const breakPageKeepingLastBlockTogether = (): void => {
+      const lastId = currentPageBlocks[currentPageBlocks.length - 1];
+      const staysWithNext = lastId !== undefined && (styled.blockTypography?.[lastId]?.staysWithNext ?? false);
+
+      if (staysWithNext && currentPageBlocks.length > 1) {
+        const carriedId = currentPageBlocks.pop() as string;
+        const carriedHeight = currentPageHeights.pop() as number;
+        flushPage();
+        currentPageBlocks = [carriedId];
+        currentPageHeights = [carriedHeight];
+        currentHeight = carriedHeight;
+      } else {
+        flushPage();
+      }
     };
 
     const addBlock = (block: Block, forceNewPage: boolean): void => {
       const blockHeight = this.estimateBlockHeight(block, styled);
+      const overflow = currentHeight + blockHeight > usableHeight && currentPageBlocks.length > 0;
 
-      if (forceNewPage || (currentHeight + blockHeight > usableHeight && currentPageBlocks.length > 0)) {
-        startNewPage();
+      if (forceNewPage) {
+        flushPage();
+      } else if (overflow) {
+        breakPageKeepingLastBlockTogether();
       }
 
       currentPageBlocks.push(block.id);
+      currentPageHeights.push(blockHeight);
       currentHeight += blockHeight;
     };
 
@@ -51,7 +81,7 @@ export class LayoutEngine {
       }
     };
     walkContent(styled.book.mainContent, true);
-    startNewPage();
+    flushPage();
 
     return { styledBook: styled, pages };
   }

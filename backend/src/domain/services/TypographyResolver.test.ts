@@ -105,7 +105,7 @@ describe('TypographyResolver', () => {
         },
       ],
       dropCap: false,
-      orphanRisk: false,
+      staysWithNext: false,
     });
   });
 
@@ -214,13 +214,35 @@ describe('TypographyResolver', () => {
     expect(result.blockTypography?.['p-1']?.dropCap).toBe(false);
   });
 
+  it('sets staysWithNext: true only for heading blocks', () => {
+    const styled = styledBookFrom([
+      chapter([
+        heading('h-1'),
+        paragraph('p-1'),
+        quote('q-1'),
+        scripture('s-1'),
+        footnote('f-1'),
+        list('l-1', ['Item']),
+      ]),
+    ]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['h-1']?.staysWithNext).toBe(true);
+    expect(result.blockTypography?.['p-1']?.staysWithNext).toBe(false);
+    expect(result.blockTypography?.['q-1']?.staysWithNext).toBe(false);
+    expect(result.blockTypography?.['s-1']?.staysWithNext).toBe(false);
+    expect(result.blockTypography?.['f-1']?.staysWithNext).toBe(false);
+    expect(result.blockTypography?.['l-1::item-0']?.staysWithNext).toBe(false);
+  });
+
   it('produces an empty-runs entry for table, image, page-break, and divider blocks', () => {
     const styled = styledBookFrom([chapter([table('t-1'), image('img-1'), pageBreak('pb-1'), divider('d-1')])]);
 
     const result = resolver.resolve(styled);
 
     for (const id of ['t-1', 'img-1', 'pb-1', 'd-1']) {
-      expect(result.blockTypography?.[id]).toEqual({ runs: [], dropCap: false, orphanRisk: false });
+      expect(result.blockTypography?.[id]).toEqual({ runs: [], dropCap: false, staysWithNext: false });
     }
   });
 

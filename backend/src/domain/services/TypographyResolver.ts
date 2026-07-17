@@ -103,7 +103,11 @@ export class TypographyResolver {
   // gets its own key instead (listItemTypographyKey) - see
   // shared/utils/typographyKeys.ts and docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md
   // for the rationale. Table/image/page-break/divider have no inline text at all.
-  // Orphan-risk resolution lands in a later commit (design review §4 item 6).
+  //
+  // staysWithNext: true only for Heading blocks - a heading is always a candidate for
+  // being left alone at the bottom of a page while its following content moves to the
+  // next one. LayoutEngine (commit 4) does the actual look-ahead/carry-over; this is
+  // purely the content-intrinsic signal, computed with no page-layout knowledge.
   private resolveBlockTypography(
     block: Block,
     smartQuotes: boolean,
@@ -115,7 +119,7 @@ export class TypographyResolver {
           [blockTypographyKey(block.id)]: {
             runs: resolveRuns(block.text, block.inlines, smartQuotes),
             dropCap: false,
-            orphanRisk: false,
+            staysWithNext: true,
           },
         };
       case 'paragraph':
@@ -123,7 +127,7 @@ export class TypographyResolver {
           [blockTypographyKey(block.id)]: {
             runs: resolveRuns(block.text, block.inlines, smartQuotes),
             dropCap: dropCaps && block.dropCap === true,
-            orphanRisk: false,
+            staysWithNext: false,
           },
         };
       case 'quote':
@@ -132,7 +136,7 @@ export class TypographyResolver {
           [blockTypographyKey(block.id)]: {
             runs: forceItalic(resolveRuns(block.text, block.inlines, smartQuotes)),
             dropCap: false,
-            orphanRisk: false,
+            staysWithNext: false,
           },
         };
       case 'footnote':
@@ -140,7 +144,7 @@ export class TypographyResolver {
           [blockTypographyKey(block.id)]: {
             runs: resolveRuns(block.content, block.inlines, smartQuotes),
             dropCap: false,
-            orphanRisk: false,
+            staysWithNext: false,
           },
         };
       case 'list': {
@@ -149,7 +153,7 @@ export class TypographyResolver {
           entries[listItemTypographyKey(block.id, index)] = {
             runs: resolveRuns(item, block.inlines?.[index], smartQuotes),
             dropCap: false,
-            orphanRisk: false,
+            staysWithNext: false,
           };
         });
         return entries;
@@ -158,7 +162,7 @@ export class TypographyResolver {
       case 'image':
       case 'page-break':
       case 'divider':
-        return { [blockTypographyKey(block.id)]: { runs: [], dropCap: false, orphanRisk: false } };
+        return { [blockTypographyKey(block.id)]: { runs: [], dropCap: false, staysWithNext: false } };
       default: {
         const _exhaustive: never = block;
         throw new Error(`Unsupported block type: ${JSON.stringify(_exhaustive)}`);
