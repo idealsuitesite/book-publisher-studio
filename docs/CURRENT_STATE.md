@@ -213,4 +213,4 @@ npm run test:coverage  # Verify coverage thresholds
 **`main` synced with `origin/main` at:** `5eb71c4` (PR #5 merge — legacy `/api/upload` removal; on top of governance commit `e512ee7`, PR #4 merge `a7a38a0`, PR #3 `820f1ef`, PR #2 `c507f5d`, PR #1 `32ac220`)
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
 **Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha`, **`v0.4.1-alpha`** (EPUB export, cut 2026-07-17 per ADR-0021 — see `docs/VERSIONS.md` and `docs/releases/v0.4.1-alpha/ReleaseNotes.md`)
-**Open branches:** none awaiting review. **Cleanup note:** `feature/sprint-3a-pdf-export`, `feature/sprint-3b-epub-export`, and `chore/remove-legacy-upload-route` are all fully merged but were found still present on `origin` (contradicting this file's prior claim that merged branches are deleted remotely) — housekeeping only, no functional impact; flagged for deletion.
+**Open branches:** none — the 3 stale merged branches found still on `origin` (see prior note) were deleted locally and remotely 2026-07-17.
