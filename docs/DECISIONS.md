@@ -460,3 +460,28 @@ For the first implementation, pagination is heuristic, not exact: each block typ
 - `epub-gen-memory` becomes a new runtime dependency; its own dependency tree should be watched at upgrade time given it's a smaller-community fork (58 stars) of a more popular but unmaintained parent (458 stars) — not a reason to avoid it now, but a reason not to assume it's risk-free forever
 
 **Related:** ADR-0012, ADR-0013, ADR-0015 (resolved by this ADR), ADR-0018 (same rationale pattern — verify a library choice with evidence, same as the `docx` package decision), Sprint 3B (EPUB export)
+
+---
+
+## ADR-0021: Post-Sprint-3 Governance Decisions
+
+**Status:** APPROVED
+**Date:** 2026-07-17
+**Decision:** Four small governance items were left open after Sprint 3B merged (PR #4, `a7a38a0`). CTO direction resolves all four before Sprint 4 design work starts:
+
+1. **Tag `v0.4.1-alpha` now.** EPUB export is merged, tested (133/133), and verified against a real file on `main` — nothing left to gate the tag per `docs/VERSIONS.md`'s own rule ("Released only after the tag is actually pushed").
+2. **Remove the legacy `/api/upload` route now**, not deferred further. Resolves ADR-0011's scheduled-for-Sprint-3 removal: `POST /api/upload` (`presentation/app.ts`), `parseDocxFile` (`services/docxParser.ts`), and the disk-based multer config are deleted outright, not just left `@deprecated`. Sprint 3 ("Professional Export") is complete, satisfying ADR-0011's own precondition ("after Sprint 2's rendering/export work lands").
+3. **Font policy: Gelasio.** Resolves the open item from ADR-0019 finding 1 (Georgia is Microsoft-licensed, not redistributable, and PDFKit ships no font data). Gelasio is a SIL Open Font License serif metrically compatible with Georgia — closest visual match available under a redistributable license. This ADR records the **choice only**; embedding the actual `.ttf` assets into `PDFRenderer`/`ClassicTheme` is implementation work, deferred to Sprint 4 (natural fit for the Typography Engine, which will own font/size/weight/style resolution — see the forthcoming Sprint 4 Design Review) rather than done as a standalone patch.
+4. **`backend/uploads/` git history: keep as-is, no purge.** Resolves the open decision tracked in `docs/TODO.md` since the 2026-07-16 reality check. The directory is untracked going forward (`.gitignore` + `git rm --cached`, already done); a `git filter-repo` history rewrite is a destructive, hash-rewriting operation whose only benefit is cosmetic (old blobs no longer added to) — not worth the coordination cost (force-push, every clone/fork needing to re-clone) for a repository with a small, known set of collaborators.
+
+**Rationale:**
+- Items 1, 2, and 4 were already fully specified by earlier ADRs (`docs/VERSIONS.md`'s tagging rule, ADR-0011, and the reality-check follow-up respectively) — this ADR is the actual go/no-go call those were waiting on, not new design
+- Item 3 follows the same "record the decision, defer the implementation" pattern already used for library choices (ADR-0014, ADR-0018, ADR-0020) — picking Gelasio doesn't require writing renderer code today
+- Bundling four small, independent governance calls into one ADR (rather than four) matches their actual size — none individually warrants a full Design Review
+
+**Consequences:**
+- `docs/VERSIONS.md`'s `v0.4.1-alpha` row moves to ✅ Released once the tag is pushed
+- `docs/TODO.md`'s legacy-route and uploads-history open items close; the font item moves from "undecided" to "decided, not yet implemented"
+- `PDFRenderer`/`ClassicTheme` still render Georgia-by-name-heuristic until Sprint 4 actually embeds Gelasio — this ADR does not change current PDF output, only the plan for it
+
+**Related:** ADR-0011, ADR-0019, ADR-0020, `docs/VERSIONS.md`, `docs/TODO.md`
