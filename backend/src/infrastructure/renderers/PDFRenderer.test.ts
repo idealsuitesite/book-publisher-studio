@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { PDFRenderer } from './PDFRenderer';
 import { ThemeEngine } from '../../domain/services/ThemeEngine';
 import { LayoutEngine } from '../../domain/services/LayoutEngine';
+import { TypographyResolver } from '../../domain/services/TypographyResolver';
 import { ClassicTheme } from '../../domain/themes/ClassicTheme';
 import { createBook } from '../../domain/models/Book';
-import type { Chapter, Heading, Paragraph, Table, Image } from '../../domain/models/Book';
+import type { Chapter, Heading, Paragraph, Table, Image, List, InlineElement } from '../../domain/models/Book';
 import type { PageLayout } from '../../domain/models/PageLayout';
 import { extractPdfText, countPdfPages } from '../../test-utils/extractPdfText';
 
@@ -27,7 +28,7 @@ function paragraph(id: string, text = 'Some body text.'): Paragraph {
 }
 
 function chapter(
-  content: (Heading | Paragraph | Table | Image)[],
+  content: (Heading | Paragraph | Table | Image | List)[],
   overrides: Partial<Chapter> = {}
 ): Chapter {
   const now = new Date();
@@ -47,6 +48,16 @@ function paginate(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT) {
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
   const styled = new ThemeEngine().applyTheme(book, ClassicTheme);
   return new LayoutEngine().paginate(styled, layout);
+}
+
+// Chains TypographyResolver after ThemeEngine, so blockTypography (inline runs, drop
+// caps) is actually populated - paginate() above deliberately does not do this, so the
+// existing pre-commit-5 test cases keep exercising the plain-text fallback path.
+function paginateWithTypography(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT) {
+  const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
+  const styled = new ThemeEngine().applyTheme(book, ClassicTheme);
+  const typeset = new TypographyResolver().resolve(styled);
+  return new LayoutEngine().paginate(typeset, layout);
 }
 
 describe('PDFRenderer', () => {
@@ -186,6 +197,65 @@ describe('PDFRenderer', () => {
     const text = extractPdfText(buffer);
 
     expect(text).toContain('A cover');
+  });
+
+  it('renders bold and italic inline runs, using the correct PDFKit font per run', async () => {
+    const inlines: InlineElement[] = [
+      { type: 'text', text: 'Plain ' },
+      { type: 'bold', text: 'bold ' },
+      { type: 'italic', text: 'italic.' },
+    ];
+    const para: Paragraph = { type: 'paragraph', id: 'p-1', text: 'ignored when inlines present', inlines };
+    const paginated = paginateWithTypography([chapter([para])]);
+
+    const buffer = await renderer.render(paginated, {});
+    const text = extractPdfText(buffer);
+    const raw = buffer.toString('latin1');
+
+    expect(text).toContain('Plain bold italic.');
+    // ClassicTheme's body font is Georgia, which maps onto the Times family (resolveFont).
+    expect(raw).toContain('/Times-Bold');
+    expect(raw).toContain('/Times-Italic');
+  });
+
+  it('sizes a level-1 heading from theme.fontSizes.h1, not the old hardcoded per-level formula', async () => {
+    const paginated = paginateWithTypography([chapter([heading(1, 'h-1', 'Big Title')])]);
+
+    const buffer = await renderer.render(paginated, {});
+    const raw = buffer.toString('latin1');
+
+    // ClassicTheme.fontSizes.h1 = 28. The formula this replaced (max(12, 28 - level*3))
+    // would have produced 25 for a level-1 heading - asserting its absence catches a
+    // regression back to the hardcoded formula, not just the presence of *a* size.
+    expect(raw).toMatch(/\b28 Tf\b/);
+    expect(raw).not.toMatch(/\b25 Tf\b/);
+  });
+
+  it('renders per-item inline runs within a list', async () => {
+    const inlinesPerItem: InlineElement[][] = [[{ type: 'text', text: 'First' }], [{ type: 'bold', text: 'Second' }]];
+    const list: List = { type: 'list', id: 'l-1', ordered: false, items: ['ignored', 'ignored'], inlines: inlinesPerItem };
+    const paginated = paginateWithTypography([chapter([list])]);
+
+    const buffer = await renderer.render(paginated, {});
+    const text = extractPdfText(buffer);
+    const raw = buffer.toString('latin1');
+
+    expect(text).toContain('First');
+    expect(text).toContain('Second');
+    expect(raw).toContain('/Times-Bold');
+  });
+
+  it("applies a drop cap by enlarging the paragraph's first character, without losing or duplicating text", async () => {
+    const para: Paragraph = { type: 'paragraph', id: 'p-1', text: 'Once upon a time.', dropCap: true };
+    const paginated = paginateWithTypography([chapter([para])]);
+
+    const buffer = await renderer.render(paginated, {});
+    const text = extractPdfText(buffer);
+    const raw = buffer.toString('latin1');
+
+    expect(text).toContain('Once upon a time.');
+    // ClassicTheme body fontSize is 11; DROP_CAP_SCALE (2.5) makes the first letter 27.5pt.
+    expect(raw).toMatch(/\b27\.5 Tf\b/);
   });
 
   it('stamps every page with an accurate running "Page N of TOTAL" footer', async () => {

@@ -2,15 +2,29 @@ import PDFDocument from 'pdfkit';
 import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
 import type { PaginatedBook } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle } from '../../domain/models/Theme';
+import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
 import type { Content, Block, Chapter, Section } from '../../domain/models/Book';
+import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 
 const PAGE_SIZE: PDFKit.PDFDocumentOptions['size'] = 'LETTER';
 const MARGIN = 72;
 
-// PDFKit ships only the 14 standard PDF fonts (Helvetica/Times/Courier + variants) - no
-// theme font (e.g. Georgia) actually exists as embeddable glyph data yet (ADR-0019, finding 1;
-// a real font asset to ship is an open TODO). Until then, map theme font family names onto the
-// closest standard family by name heuristic, matching bold/italic combinations PDFKit ships.
+// Simple v1 drop-cap approximation: render the paragraph's first character at a larger
+// size inline, with no text wrap-around (a real drop cap needs line-aware layout, which
+// this heuristic renderer does not do - matches the "best-effort, not authoritative"
+// framing already established for pagination, ADR-0013). Documented simplification, not
+// a silent gap.
+const DROP_CAP_SCALE = 2.5;
+
+// This mapping is an Infrastructure concern (ADR-0002: Domain has zero infra deps), not
+// something TypographyResolver could own - PDFKit ships only the 14 standard PDF fonts
+// (Helvetica/Times/Courier + variants); no theme font (e.g. Georgia) exists as embeddable
+// glyph data yet (ADR-0019, finding 1; shipping a real font asset is ADR-0021/0023,
+// Sprint 4 commit 6). Until then, map theme font family names onto the closest standard
+// family by name heuristic. TypographyResolver resolves *which* runs are bold/italic
+// (Domain, content-only); this function resolves what concrete PDFKit font that maps to
+// (Infrastructure) - same division of responsibility ResolvedBlockStyle.fontFamily
+// already has across all three renderers.
 const SERIF_PATTERN = /times|georgia|serif|garamond|palatino|cambria|book antiqua|minion/i;
 const MONO_PATTERN = /courier|mono|consolas/i;
 
@@ -31,6 +45,27 @@ function resolveFont(fontFamily: string, bold: boolean, italic: boolean): string
   if (bold) return 'Helvetica-Bold';
   if (italic) return 'Helvetica-Oblique';
   return 'Helvetica';
+}
+
+function plainTypeRun(text: string): TypeRun {
+  return {
+    text,
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+    superscript: false,
+    subscript: false,
+    smallCaps: false,
+  };
+}
+
+// blockTypography is populated by TypographyResolver, but stays optional on StyledBook
+// (commit 1) so any caller that hasn't run it yet (or a hand-built test fixture) still
+// renders the block's plain text, unstyled - same defensive-optional pattern LayoutEngine
+// already uses for blockTypography?.[...]?.staysWithNext.
+function runsOrPlainFallback(entry: ResolvedTypography | undefined, fallbackText: string): TypeRun[] {
+  return entry && entry.runs.length > 0 ? entry.runs : [plainTypeRun(fallbackText)];
 }
 
 export class PDFRenderer implements Renderer<Buffer> {
@@ -65,7 +100,14 @@ export class PDFRenderer implements Renderer<Buffer> {
         book.pages.slice(1).map((page) => page.blocks[0]).filter((id): id is string => Boolean(id))
       );
 
-      this.renderContent(doc, book.styledBook.book.mainContent, book.styledBook.blockStyles, pageStartBlockIds, true);
+      this.renderContent(
+        doc,
+        book.styledBook.book.mainContent,
+        book.styledBook.blockStyles,
+        book.styledBook.blockTypography,
+        pageStartBlockIds,
+        true
+      );
 
       this.drawHeadersAndFooters(doc);
 
@@ -114,6 +156,7 @@ export class PDFRenderer implements Renderer<Buffer> {
     doc: PDFKit.PDFDocument,
     contents: Content[],
     blockStyles: Record<string, ResolvedBlockStyle>,
+    blockTypography: Record<string, ResolvedTypography> | undefined,
     pageStartBlockIds: Set<string>,
     isTopLevel: boolean
   ): void {
@@ -126,13 +169,13 @@ export class PDFRenderer implements Renderer<Buffer> {
       this.renderTitle(doc, content);
 
       for (const block of content.content) {
-        this.renderBlock(doc, block, blockStyles[block.id], pageStartBlockIds);
+        this.renderBlock(doc, block, blockStyles[block.id], blockTypography, pageStartBlockIds);
       }
 
       if (content.type === 'chapter' && content.sections) {
-        this.renderContent(doc, content.sections, blockStyles, pageStartBlockIds, false);
+        this.renderContent(doc, content.sections, blockStyles, blockTypography, pageStartBlockIds, false);
       } else if (content.type === 'section' && content.subsections) {
-        this.renderContent(doc, content.subsections, blockStyles, pageStartBlockIds, false);
+        this.renderContent(doc, content.subsections, blockStyles, blockTypography, pageStartBlockIds, false);
       }
     }
   }
@@ -147,6 +190,7 @@ export class PDFRenderer implements Renderer<Buffer> {
     doc: PDFKit.PDFDocument,
     block: Block,
     style: ResolvedBlockStyle | undefined,
+    blockTypography: Record<string, ResolvedTypography> | undefined,
     pageStartBlockIds: Set<string>
   ): void {
     if (pageStartBlockIds.has(block.id)) {
@@ -161,34 +205,45 @@ export class PDFRenderer implements Renderer<Buffer> {
 
     switch (block.type) {
       case 'heading': {
-        const headingSize = Math.max(12, 28 - block.level * 3);
-        doc.font(resolveFont(fontFamily, true, false)).fontSize(headingSize).fillColor(color).text(block.text);
+        const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
+        // Headings are always bold at the PDFRenderer level (a rendering choice, same as
+        // before this commit) - each run's own italic flag (inline emphasis within the
+        // heading) is still respected. Size now comes from the theme (style.fontSize,
+        // theme.fontSizes.h1-h6 via ThemeEngine) instead of a hardcoded per-level formula -
+        // design review §4 item 3.
+        this.renderRuns(doc, runs, fontFamily, fontSize, color, {}, undefined, true);
         doc.moveDown(0.5);
         return;
       }
 
-      case 'paragraph':
-        doc.font(resolveFont(fontFamily, false, false)).fontSize(fontSize).fillColor(color).text(block.text, {
-          align: block.align === 'justify' ? 'justify' : (block.align ?? 'left'),
-        });
+      case 'paragraph': {
+        const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
+        const dropCap = blockTypography?.[block.id]?.dropCap ?? false;
+        const options: PDFKit.Mixins.TextOptions = { align: block.align === 'justify' ? 'justify' : (block.align ?? 'left') };
+        if (dropCap) {
+          this.renderRunsWithDropCap(doc, runs, fontFamily, fontSize, color, options);
+        } else {
+          this.renderRuns(doc, runs, fontFamily, fontSize, color, options);
+        }
         doc.moveDown(spaceAfter / fontSize);
         return;
+      }
 
       case 'quote':
-      case 'scripture':
-        doc
-          .font(resolveFont(fontFamily, false, true))
-          .fontSize(fontSize)
-          .fillColor(color)
-          .text(block.text, { indent: 36 });
+      case 'scripture': {
+        // Italics are already forced onto every run by TypographyResolver
+        // (design review §4 item 9) - no block-level italic override needed here anymore.
+        const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
+        this.renderRuns(doc, runs, fontFamily, fontSize, color, { indent: 36 });
         doc.moveDown(spaceAfter / fontSize);
         return;
+      }
 
       case 'list':
-        doc.font(resolveFont(fontFamily, false, false)).fontSize(fontSize).fillColor(color);
         block.items.forEach((item, index) => {
           const prefix = block.ordered ? `${index + 1}. ` : '• ';
-          doc.text(`${prefix}${item}`, { indent: 18 });
+          const itemRuns = runsOrPlainFallback(blockTypography?.[listItemTypographyKey(block.id, index)], item);
+          this.renderRuns(doc, itemRuns, fontFamily, fontSize, color, { indent: 18 }, prefix);
         });
         doc.moveDown(spaceAfter / fontSize);
         return;
@@ -197,13 +252,11 @@ export class PDFRenderer implements Renderer<Buffer> {
         this.renderTable(doc, block.headers, block.rows, fontSize);
         return;
 
-      case 'footnote':
-        doc
-          .font(resolveFont(fontFamily, false, false))
-          .fontSize(Math.max(7, fontSize - 2))
-          .fillColor(color)
-          .text(`[${block.number}] ${block.content}`);
+      case 'footnote': {
+        const runs = runsOrPlainFallback(blockTypography?.[block.id], block.content);
+        this.renderRuns(doc, runs, fontFamily, Math.max(7, fontSize - 2), color, {}, `[${block.number}] `);
         return;
+      }
 
       case 'image':
         if (block.base64) {
@@ -231,6 +284,89 @@ export class PDFRenderer implements Renderer<Buffer> {
         const _exhaustive: never = block;
         throw new Error(`Unsupported block type: ${JSON.stringify(_exhaustive)}`);
       }
+    }
+  }
+
+  // Renders a sequence of TypeRun spans as one flowing PDFKit paragraph, using continued
+  // text so font/color/decoration can change mid-line without breaking the line - this is
+  // what lets bold/italic/underline/strikethrough/links actually appear now (previously,
+  // no renderer read Block.inlines at all). Superscript/subscript/small-caps are resolved
+  // by TypographyResolver but PDFKit has no built-in primitive for baseline shifting or
+  // small-caps glyph substitution (unlike underline/strike, which are native text options) -
+  // rendered as plain-sized text for v1, a documented gap matching this codebase's existing
+  // precedent of accepting a library capability limit rather than hand-rolling risky
+  // absolute positioning (ADR-0019 finding 6's cursor-stranding lesson).
+  //
+  // leadingPlainText (list "1. "/"• " prefixes, footnote "[n] " prefixes) renders in the
+  // block's plain (non-bold, non-italic) style before the real runs, on the same line.
+  // forceBold applies to every run in this call (headings only, a PDFRenderer-level
+  // rendering choice - not a Domain rule).
+  private renderRuns(
+    doc: PDFKit.PDFDocument,
+    runs: TypeRun[],
+    fontFamily: string,
+    fontSize: number,
+    color: string,
+    paragraphOptions: PDFKit.Mixins.TextOptions = {},
+    leadingPlainText?: string,
+    forceBold = false
+  ): void {
+    const segments: Array<{ text: string; bold: boolean; italic: boolean; underline?: boolean; strike?: boolean; link?: string }> = [];
+    if (leadingPlainText) {
+      segments.push({ text: leadingPlainText, bold: forceBold, italic: false });
+    }
+    for (const run of runs) {
+      segments.push({
+        text: run.text,
+        bold: forceBold || run.bold,
+        italic: run.italic,
+        underline: run.underline || undefined,
+        strike: run.strikethrough || undefined,
+        link: run.linkUrl,
+      });
+    }
+    if (segments.length === 0) return;
+
+    segments.forEach((seg, index) => {
+      const isFirst = index === 0;
+      const isLast = index === segments.length - 1;
+      doc.font(resolveFont(fontFamily, seg.bold, seg.italic)).fontSize(fontSize).fillColor(color);
+      doc.text(seg.text, {
+        ...(isFirst ? paragraphOptions : {}),
+        continued: !isLast,
+        underline: seg.underline,
+        strike: seg.strike,
+        link: seg.link,
+      });
+    });
+  }
+
+  // Drop-cap v1 approximation (see DROP_CAP_SCALE above): splits the first character off
+  // the paragraph's very first run and renders it at a larger size, inline, before the
+  // rest of the paragraph's runs render normally via renderRuns().
+  private renderRunsWithDropCap(
+    doc: PDFKit.PDFDocument,
+    runs: TypeRun[],
+    fontFamily: string,
+    fontSize: number,
+    color: string,
+    paragraphOptions: PDFKit.Mixins.TextOptions
+  ): void {
+    const [firstRun, ...restRuns] = runs;
+    if (!firstRun || firstRun.text.length === 0) {
+      this.renderRuns(doc, runs, fontFamily, fontSize, color, paragraphOptions);
+      return;
+    }
+
+    const dropCapChar = firstRun.text[0];
+    const remainderOfFirstRun = firstRun.text.slice(1);
+    const remainingRuns: TypeRun[] = remainderOfFirstRun ? [{ ...firstRun, text: remainderOfFirstRun }, ...restRuns] : restRuns;
+
+    doc.font(resolveFont(fontFamily, true, firstRun.italic)).fontSize(fontSize * DROP_CAP_SCALE).fillColor(color);
+    doc.text(dropCapChar, { ...paragraphOptions, continued: remainingRuns.length > 0 });
+
+    if (remainingRuns.length > 0) {
+      this.renderRuns(doc, remainingRuns, fontFamily, fontSize, color, {});
     }
   }
 
