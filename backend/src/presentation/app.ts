@@ -16,6 +16,7 @@ import { ThemeEngine } from '../domain/services/ThemeEngine';
 import { LayoutEngine } from '../domain/services/LayoutEngine';
 import { DOCXRenderer } from '../infrastructure/renderers/DOCXRenderer';
 import { PDFRenderer } from '../infrastructure/renderers/PDFRenderer';
+import { EPUBRenderer } from '../infrastructure/renderers/EPUBRenderer';
 import { ManuscriptController } from './controllers/ManuscriptController';
 import { ExportController } from './controllers/ExportController';
 import { manuscriptRoutes } from './routes/manuscripts';
@@ -42,6 +43,7 @@ export function createApp(): Express {
 
   // Sprint 2: Rendering pipeline (Theme Engine, Layout Engine, DOCX export)
   // Sprint 3A: PDF export reuses the same renderer-agnostic use case with PDFRenderer instead
+  // Sprint 3B: EPUB export reuses it again with EPUBRenderer
   const exportDocxUseCase = new ExportManuscriptUseCase(
     new MammothParser(),
     new HtmlNormalizer(),
@@ -58,7 +60,19 @@ export function createApp(): Express {
     new LayoutEngine(),
     new PDFRenderer()
   );
-  const exportController = new ExportController({ docx: exportDocxUseCase, pdf: exportPdfUseCase });
+  const exportEpubUseCase = new ExportManuscriptUseCase(
+    new MammothParser(),
+    new HtmlNormalizer(),
+    new ASTBuilder(),
+    new ThemeEngine(),
+    new LayoutEngine(),
+    new EPUBRenderer()
+  );
+  const exportController = new ExportController({
+    docx: exportDocxUseCase,
+    pdf: exportPdfUseCase,
+    epub: exportEpubUseCase,
+  });
   app.use('/api/manuscripts', exportRoutes(exportController));
 
   // --- Legacy pipeline (kept as-is, unrelated decision pending) ---

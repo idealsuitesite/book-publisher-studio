@@ -3,22 +3,28 @@ import type { ExportManuscriptUseCase } from '../../application/use-cases/Export
 import { LetterPageLayout } from '../../domain/layouts/LetterPageLayout';
 
 // ExportManuscriptUseCase is already renderer-agnostic (constructor-injected Renderer<Buffer>,
-// per ADR-0012) - PDF support needed no new Use Case class, just a second instance configured
-// with PDFRenderer instead of DOCXRenderer. The controller picks between them by format.
-export type ExportFormat = 'docx' | 'pdf';
+// per ADR-0012) - PDF and EPUB support needed no new Use Case classes, just additional instances
+// configured with PDFRenderer/EPUBRenderer instead of DOCXRenderer. The controller picks between
+// them by format.
+export type ExportFormat = 'docx' | 'pdf' | 'epub';
 
 export interface ExportUseCasesByFormat {
   docx: ExportManuscriptUseCase;
   pdf: ExportManuscriptUseCase;
+  epub: ExportManuscriptUseCase;
 }
 
 const CONTENT_TYPE: Record<ExportFormat, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   pdf: 'application/pdf',
+  epub: 'application/epub+zip',
 };
 
+const VALID_FORMATS = new Set<ExportFormat>(['docx', 'pdf', 'epub']);
+
 function resolveFormat(value: unknown): ExportFormat {
-  return typeof value === 'string' && value.toLowerCase() === 'pdf' ? 'pdf' : 'docx';
+  const normalized = typeof value === 'string' ? value.toLowerCase() : '';
+  return VALID_FORMATS.has(normalized as ExportFormat) ? (normalized as ExportFormat) : 'docx';
 }
 
 export class ExportController {
