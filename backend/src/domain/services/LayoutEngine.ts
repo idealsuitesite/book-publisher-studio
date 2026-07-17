@@ -83,7 +83,7 @@ export class LayoutEngine {
     walkContent(styled.book.mainContent, true);
     flushPage();
 
-    return { styledBook: styled, pages };
+    return { styledBook: styled, pages, pageLayout: layout };
   }
 
   private estimateBlockHeight(block: Block, styled: StyledBook): number {

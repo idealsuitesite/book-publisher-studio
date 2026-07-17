@@ -191,6 +191,21 @@ describe('PDFRenderer', () => {
     expect(countPdfPages(buffer)).toBeGreaterThan(1);
   });
 
+  // Sprint 6: PDFRenderer previously hardcoded Letter-equivalent geometry regardless of the
+  // PaginatedBook it was given - a real gap found while wiring PageLayout selection through
+  // to actual rendered output (see PaginatedBook.pageLayout's doc comment). This asserts the
+  // real PDF's own /MediaBox reflects the selected layout, not just that pagination math used it.
+  it('renders the PDF at the selected PageLayout size, not a hardcoded Letter default', async () => {
+    const a4Layout: PageLayout = { ...LETTER_LAYOUT, pageSize: 'a4', width: 595.28, height: 841.89 };
+    const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], a4Layout);
+
+    const buffer = await renderer.render(paginated, {});
+    const raw = buffer.toString('latin1');
+
+    expect(raw).toContain('/MediaBox [0 0 595.28 841.89]');
+    expect(raw).not.toContain('/MediaBox [0 0 612 792]');
+  });
+
   it('falls back to a text placeholder for images without embedded base64 data', async () => {
     const image: Image = { type: 'image', id: 'img-1', url: 'https://example.com/a.png', caption: 'A cover' };
     const paginated = paginate([chapter([image])]);

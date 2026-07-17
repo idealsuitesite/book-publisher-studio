@@ -51,10 +51,10 @@ async function extractDocumentXml(buffer: Buffer): Promise<string> {
   return doc.async('string');
 }
 
-function paginate(chapters: Chapter[]) {
+function paginate(chapters: Chapter[], layout: PageLayout = LETTER_LAYOUT) {
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
   const styled = new ThemeEngine().applyTheme(book, ClassicTheme);
-  return new LayoutEngine().paginate(styled, LETTER_LAYOUT);
+  return new LayoutEngine().paginate(styled, layout);
 }
 
 // Chains TypographyResolver after ThemeEngine, so blockTypography (inline runs, drop
@@ -78,6 +78,22 @@ describe('DOCXRenderer', () => {
     expect(buffer.length).toBeGreaterThan(0);
     const xml = await extractDocumentXml(buffer);
     expect(xml).toContain('Hello world.');
+  });
+
+  // Sprint 6: DOCXRenderer previously emitted no <w:pgSz>/<w:pgMar> at all, so every export
+  // silently used docx's own library default (Letter-equivalent) regardless of the selected
+  // PageLayout - a real gap found while wiring PageLayout selection through to actual
+  // rendered output (see PaginatedBook.pageLayout's doc comment). Values are in twips
+  // (1pt = 20 twips): A4's 595.28x841.89pt -> 11905.6x16837.8 twips, truncated by docx's
+  // own integer rounding.
+  it('renders the DOCX at the selected PageLayout size, not a hardcoded Letter default', async () => {
+    const a4Layout: PageLayout = { ...LETTER_LAYOUT, pageSize: 'a4', width: 595.28, height: 841.89 };
+    const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], a4Layout);
+
+    const buffer = await renderer.render(paginated, {});
+    const xml = await extractDocumentXml(buffer);
+
+    expect(xml).toMatch(/<w:pgSz[^>]*w:w="11905"[^>]*w:h="16837"/);
   });
 
   it('includes chapter titles as headings', async () => {

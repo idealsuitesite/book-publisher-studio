@@ -8,9 +8,6 @@ import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
 
-const PAGE_SIZE: PDFKit.PDFDocumentOptions['size'] = 'LETTER';
-const MARGIN = 72;
-
 // Simple v1 drop-cap approximation: render the paragraph's first character at a larger
 // size inline, with no text wrap-around (a real drop cap needs line-aware layout, which
 // this heuristic renderer does not do - matches the "best-effort, not authoritative"
@@ -35,9 +32,10 @@ export class PDFRenderer implements Renderer<Buffer> {
     return new Promise((resolve, reject) => {
       // bufferPages defers writing pages to the output stream until flushed - see
       // drawHeadersAndFooters() below for why this is the right approach here.
+      const { width, height, marginTop, marginBottom, marginLeft, marginRight } = book.pageLayout;
       const doc = new PDFDocument({
-        size: PAGE_SIZE,
-        margin: MARGIN,
+        size: [width, height],
+        margins: { top: marginTop, bottom: marginBottom, left: marginLeft, right: marginRight },
         bufferPages: true,
         compress: this.options.compress ?? true,
         info: {
@@ -96,13 +94,14 @@ export class PDFRenderer implements Renderer<Buffer> {
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
-      const { width, height } = doc.page;
-      const savedBottom = doc.page.margins.bottom;
+      const { width, height, margins } = doc.page;
+      const contentWidth = width - margins.left - margins.right;
+      const savedBottom = margins.bottom;
       doc.page.margins.bottom = 0;
       doc.font(this.fonts.resolveDefault(false, false)).fontSize(9).fillColor('#000');
-      doc.text('Book Publisher Studio', MARGIN, 40, { width: width - MARGIN * 2, align: 'left', lineBreak: false });
-      doc.text(`Page ${i + 1} of ${range.count}`, MARGIN, height - 50, {
-        width: width - MARGIN * 2,
+      doc.text('Book Publisher Studio', margins.left, 40, { width: contentWidth, align: 'left', lineBreak: false });
+      doc.text(`Page ${i + 1} of ${range.count}`, margins.left, height - 50, {
+        width: contentWidth,
         align: 'center',
         lineBreak: false,
       });
@@ -227,7 +226,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       case 'image':
         if (block.base64) {
           doc.image(Buffer.from(block.base64, 'base64'), {
-            fit: [doc.page.width - MARGIN * 2, block.height ?? 300],
+            fit: [doc.page.width - doc.page.margins.left - doc.page.margins.right, block.height ?? 300],
           });
         } else {
           // No embedded data - never fetch remote URLs at render time (no hidden network I/O
@@ -355,7 +354,7 @@ export class PDFRenderer implements Renderer<Buffer> {
     const columnCount = headers.length > 0 ? headers.length : (rows[0]?.length ?? 0);
     if (columnCount === 0) return;
 
-    const usableWidth = doc.page.width - MARGIN * 2;
+    const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     const colWidth = usableWidth / columnCount;
     const cellPad = 4;
     const startX = doc.x;

@@ -142,7 +142,28 @@ export class DOCXRenderer implements Renderer<Buffer> {
       children
     );
 
-    const section: ISectionOptions = { children };
+    // docx measures page geometry in twips (1pt = 20 twips) - PageLayout is in points
+    // throughout the rest of the domain (matches PDFKit's own unit), converted here at
+    // the render boundary only. Sprint 6: previously this section had no `page` property
+    // at all, so every export silently used docx's own library default (Letter-equivalent)
+    // regardless of which PageLayout was actually selected - see PaginatedBook.pageLayout's
+    // doc comment for the full disclosure.
+    const { width, height, marginTop, marginBottom, marginLeft, marginRight } = book.pageLayout;
+    const TWIPS_PER_POINT = 20;
+    const section: ISectionOptions = {
+      properties: {
+        page: {
+          size: { width: width * TWIPS_PER_POINT, height: height * TWIPS_PER_POINT },
+          margin: {
+            top: marginTop * TWIPS_PER_POINT,
+            bottom: marginBottom * TWIPS_PER_POINT,
+            left: marginLeft * TWIPS_PER_POINT,
+            right: marginRight * TWIPS_PER_POINT,
+          },
+        },
+      },
+      children,
+    };
     const doc = new Document({
       styles: { default: buildHeadingStyles(book.styledBook.theme) },
       sections: [section],
