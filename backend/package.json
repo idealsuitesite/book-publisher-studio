@@ -12,7 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src",
     "format": "prettier --write src",
-    "verify-server": "tsx scripts/verify-server.ts"
+    "verify-server": "tsx scripts/verify-server.ts",
+    "verify-real-export": "tsx scripts/verify-real-export.ts"
   },
   "keywords": [],
   "author": "Alexandre",
