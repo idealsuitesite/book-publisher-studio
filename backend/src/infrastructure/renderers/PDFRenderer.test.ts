@@ -192,6 +192,23 @@ describe('PDFRenderer', () => {
     expect(countPdfPages(buffer)).toBeGreaterThan(1);
   });
 
+  // Sprint 6 (ADR-0029, Functional Spec item 5): Chapter.openingPageStyle blank-page insertion.
+  it("inserts a real, genuinely blank physical page for a chapter with openingPageStyle:'right' after an odd-ending chapter", async () => {
+    const paginated = paginate([
+      chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1 }),
+      chapter([paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2, openingPageStyle: 'right' }),
+    ]);
+    expect(paginated.pages.map((p) => p.number)).toEqual([1, 3]);
+
+    const buffer = await renderer.render(paginated, {});
+    const text = extractPdfText(buffer);
+
+    // 3 physical pages: chapter 1's content, one genuinely blank page, chapter 2's content.
+    expect(countPdfPages(buffer)).toBe(3);
+    expect(text).toContain('Hello one.');
+    expect(text).toContain('Hello two.');
+  });
+
   // Sprint 6: PDFRenderer previously hardcoded Letter-equivalent geometry regardless of the
   // PaginatedBook it was given - a real gap found while wiring PageLayout selection through
   // to actual rendered output (see PaginatedBook.pageLayout's doc comment). This asserts the

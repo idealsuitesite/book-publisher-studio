@@ -97,6 +97,35 @@ describe('DOCXRenderer', () => {
     expect(xml).toMatch(/<w:pgSz[^>]*w:w="11905"[^>]*w:h="16837"/);
   });
 
+  // Sprint 6 (ADR-0029, Functional Spec item 5): Chapter.openingPageStyle blank-page insertion.
+  describe('Chapter.openingPageStyle blank-page insertion', () => {
+    it("inserts an extra blank page (an empty paragraph forcing its own page break) for 'right'", async () => {
+      const paginated = paginate([
+        chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1 }),
+        chapter([paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2, openingPageStyle: 'right' }),
+      ]);
+
+      const buffer = await renderer.render(paginated, {});
+      const xml = await extractDocumentXml(buffer);
+
+      const pageBreakCount = (xml.match(/<w:pageBreakBefore\/>/g) ?? []).length;
+      // 1 for chapter 2's title paragraph (chapters always start a new page) + 1 for the
+      // inserted blank page = 2. Without openingPageStyle this would be 1.
+      expect(pageBreakCount).toBe(2);
+      expect(xml).toContain('Hello one.');
+      expect(xml).toContain('Hello two.');
+    });
+
+    it('does not insert an extra blank page for a first chapter (nothing to break from)', async () => {
+      const paginated = paginate([chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1, openingPageStyle: 'right' })]);
+
+      const buffer = await renderer.render(paginated, {});
+      const xml = await extractDocumentXml(buffer);
+
+      expect((xml.match(/<w:pageBreakBefore\/>/g) ?? []).length).toBe(0);
+    });
+  });
+
   // Sprint 6 (ADR-0029, Functional Spec item 9): DOCXRenderer gains header/footer support -
   // a genuinely new capability, none existed before this.
   describe('header/footer (Theme.runningHead)', () => {

@@ -13,6 +13,12 @@ export interface Page {
   // they read Theme.runningHead directly too (commits 6/7), keeping this field to only the
   // one piece only LayoutEngine can compute.
   headerFooterTitle?: string;
+  // Sprint 6: number of blank pages Chapter.openingPageStyle requires immediately before this
+  // page's first block (e.g. an odd running page count when a chapter needs 'right'). Blank
+  // pages never get their own Page entry (no content, no meaningful running head/footer) -
+  // renderers insert this many extra page breaks right before breaking to this page's first
+  // block. undefined/0 means no blank page is needed here.
+  blankPagesBefore?: number;
 }
 
 export interface PaginatedBook {

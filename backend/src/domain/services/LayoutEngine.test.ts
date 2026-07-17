@@ -246,4 +246,60 @@ describe('LayoutEngine', () => {
       expect(result.pages[0].headerFooterTitle).toBeUndefined();
     });
   });
+
+  // Sprint 6 (Professional Layout Engine): Chapter.openingPageStyle blank-page insertion.
+  // Standard print convention: page 1 is always a right/recto (odd-numbered) page.
+  describe("Chapter.openingPageStyle ('right'/'left' blank-page insertion)", () => {
+    it("inserts one blank page when 'right' would otherwise start on an even page", () => {
+      const styled = styledBookFrom([
+        chapter([paragraph('p-1')], { id: 'c-1', number: 1 }),
+        chapter([paragraph('p-2')], { id: 'c-2', number: 2, openingPageStyle: 'right' }),
+      ]);
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      // Chapter 1 -> page 1. Chapter 2 would naturally land on page 2 (even), but 'right'
+      // requires odd - one blank page is inserted, pushing it to page 3.
+      expect(result.pages.map((p) => p.number)).toEqual([1, 3]);
+      expect(result.pages[0].blankPagesBefore).toBeUndefined();
+      expect(result.pages[1].blankPagesBefore).toBe(1);
+      expect(result.pages[1].blocks).toEqual(['p-2']);
+    });
+
+    it("does not insert a blank page when 'right' already lands on an odd page", () => {
+      const styled = styledBookFrom([chapter([paragraph('p-1')], { id: 'c-1', number: 1, openingPageStyle: 'right' })]);
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      expect(result.pages.map((p) => p.number)).toEqual([1]);
+      expect(result.pages[0].blankPagesBefore).toBeUndefined();
+    });
+
+    it("inserts one blank page when 'left' would otherwise start on an odd page", () => {
+      const styled = styledBookFrom([
+        chapter([paragraph('p-1')], { id: 'c-1', number: 1 }),
+        chapter([paragraph('p-2')], { id: 'c-2', number: 2 }),
+        chapter([paragraph('p-3')], { id: 'c-3', number: 3, openingPageStyle: 'left' }),
+      ]);
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      // Chapters 1, 2 -> pages 1, 2. Chapter 3 would naturally land on page 3 (odd), but
+      // 'left' requires even - one blank page is inserted, pushing it to page 4.
+      expect(result.pages.map((p) => p.number)).toEqual([1, 2, 4]);
+      expect(result.pages[2].blankPagesBefore).toBe(1);
+    });
+
+    it("'any' and unset keep today's behavior (no blank page ever inserted)", () => {
+      const styled = styledBookFrom([
+        chapter([paragraph('p-1')], { id: 'c-1', number: 1 }),
+        chapter([paragraph('p-2')], { id: 'c-2', number: 2, openingPageStyle: 'any' }),
+      ]);
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      expect(result.pages.map((p) => p.number)).toEqual([1, 2]);
+      expect(result.pages.every((p) => p.blankPagesBefore === undefined)).toBe(true);
+    });
+  });
 });

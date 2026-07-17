@@ -1,6 +1,6 @@
 import PDFDocument from 'pdfkit';
 import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
-import type { PaginatedBook } from '../../domain/models/PaginatedBook';
+import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
 import type { Content, Block, Chapter, Section } from '../../domain/models/Book';
@@ -51,9 +51,20 @@ export class PDFRenderer implements Renderer<Buffer> {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', (err: unknown) => reject(err instanceof Error ? err : new Error(String(err))));
 
-      const pageStartBlockIds = new Set(
-        book.pages.slice(1).map((page) => page.blocks[0]).filter((id): id is string => Boolean(id))
-      );
+      // Maps a page-starting block's id to the domain Page it starts (blankPagesBefore, for
+      // Chapter.openingPageStyle, is 0/undefined on every page except a chapter start -
+      // LayoutEngine only computes it there).
+      const pageStarts = new Map<string, Page>();
+      for (const page of book.pages.slice(1)) {
+        const firstId = page.blocks[0];
+        if (firstId) pageStarts.set(firstId, page);
+      }
+
+      // Real-PDFKit-page-index -> owning domain Page, built up as addPage() actually happens
+      // below (not assumed 1:1 with book.pages - both pagination-estimate drift, ADR-0013, and
+      // this commit's own blank pages, which own no domain Page at all, break that assumption).
+      // drawHeadersAndFooters() reads this instead of indexing into book.pages directly.
+      const pageOwners: (Page | undefined)[] = [book.pages[0]];
 
       this.renderContent(
         doc,
@@ -61,11 +72,12 @@ export class PDFRenderer implements Renderer<Buffer> {
         book.styledBook.theme,
         book.styledBook.blockStyles,
         book.styledBook.blockTypography,
-        pageStartBlockIds,
+        pageStarts,
+        pageOwners,
         true
       );
 
-      this.drawHeadersAndFooters(doc, book);
+      this.drawHeadersAndFooters(doc, book, pageOwners);
 
       doc.end();
     });
@@ -106,7 +118,11 @@ export class PDFRenderer implements Renderer<Buffer> {
   // theme populates them yet (only ClassicTheme exists, and it leaves both unset), so there is
   // no real usage to validate against (ADR-0029 Risk 5, same disclosed-not-hidden category as
   // ValidationContext's reserved fields, Sprint 5). Revisit when a real theme needs them.
-  private drawHeadersAndFooters(doc: PDFKit.PDFDocument, book: PaginatedBook): void {
+  //
+  // Sprint 6 commit 8: blank pages (Chapter.openingPageStyle) own no domain Page - pageOwners[i]
+  // is undefined for them, so no running head or page number is drawn on a blank page (matches
+  // real print convention: a blank leaf inserted to force a recto/verso start is truly blank).
+  private drawHeadersAndFooters(doc: PDFKit.PDFDocument, book: PaginatedBook, pageOwners: (Page | undefined)[]): void {
     const runningHead = book.styledBook.theme.runningHead;
     const range = doc.bufferedPageRange();
 
@@ -118,7 +134,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       doc.page.margins.bottom = 0;
 
       if (runningHead?.show) {
-        const domainPage = book.pages[Math.min(i, book.pages.length - 1)];
+        const domainPage = pageOwners[i];
         const title = domainPage?.headerFooterTitle;
         if (title) {
           const text = runningHead.uppercase ? title.toUpperCase() : title;
@@ -127,7 +143,7 @@ export class PDFRenderer implements Renderer<Buffer> {
           doc.text(text, margins.left, 40, { width: contentWidth, align, lineBreak: false });
         }
 
-        if (runningHead.pageNumber) {
+        if (domainPage && runningHead.pageNumber) {
           doc.font(this.fonts.resolveDefault(false, false)).fontSize(runningHead.size ?? 9).fillColor('#000');
           doc.text(`Page ${i + 1} of ${range.count}`, margins.left, height - 50, {
             width: contentWidth,
@@ -147,25 +163,37 @@ export class PDFRenderer implements Renderer<Buffer> {
     theme: Theme,
     blockStyles: Record<string, ResolvedBlockStyle>,
     blockTypography: Record<string, ResolvedTypography> | undefined,
-    pageStartBlockIds: Set<string>,
+    pageStarts: Map<string, Page>,
+    pageOwners: (Page | undefined)[],
     isTopLevel: boolean
   ): void {
     for (const content of contents) {
       const firstBlockId = content.content[0]?.id;
-      const breaksPage = isTopLevel && content.type === 'chapter' && firstBlockId !== undefined && pageStartBlockIds.has(firstBlockId);
-      if (breaksPage && firstBlockId) pageStartBlockIds.delete(firstBlockId);
+      const ownerPage = isTopLevel && content.type === 'chapter' && firstBlockId !== undefined ? pageStarts.get(firstBlockId) : undefined;
+      if (ownerPage && firstBlockId) pageStarts.delete(firstBlockId);
 
-      if (breaksPage) doc.addPage();
+      // Blank pages (Chapter.openingPageStyle) are genuinely empty physical pages - each
+      // addPage() here is immediately followed by another with nothing drawn in between,
+      // then the real content page below starts normally. They own no domain Page (pushed as
+      // undefined), so drawHeadersAndFooters() never puts a running head/footer on one.
+      for (let i = 0; i < (ownerPage?.blankPagesBefore ?? 0); i++) {
+        doc.addPage();
+        pageOwners.push(undefined);
+      }
+      if (ownerPage) {
+        doc.addPage();
+        pageOwners.push(ownerPage);
+      }
       this.renderTitle(doc, content, theme);
 
       for (const block of content.content) {
-        this.renderBlock(doc, block, theme, blockStyles[block.id], blockTypography, pageStartBlockIds);
+        this.renderBlock(doc, block, theme, blockStyles[block.id], blockTypography, pageStarts, pageOwners);
       }
 
       if (content.type === 'chapter' && content.sections) {
-        this.renderContent(doc, content.sections, theme, blockStyles, blockTypography, pageStartBlockIds, false);
+        this.renderContent(doc, content.sections, theme, blockStyles, blockTypography, pageStarts, pageOwners, false);
       } else if (content.type === 'section' && content.subsections) {
-        this.renderContent(doc, content.subsections, theme, blockStyles, blockTypography, pageStartBlockIds, false);
+        this.renderContent(doc, content.subsections, theme, blockStyles, blockTypography, pageStarts, pageOwners, false);
       }
     }
   }
@@ -187,11 +215,16 @@ export class PDFRenderer implements Renderer<Buffer> {
     theme: Theme,
     style: ResolvedBlockStyle | undefined,
     blockTypography: Record<string, ResolvedTypography> | undefined,
-    pageStartBlockIds: Set<string>
+    pageStarts: Map<string, Page>,
+    pageOwners: (Page | undefined)[]
   ): void {
-    if (pageStartBlockIds.has(block.id)) {
+    const ownerPage = pageStarts.get(block.id);
+    if (ownerPage) {
+      // Never carries blankPagesBefore - that only applies at a chapter's own opening break,
+      // handled in renderContent above. This is an overflow-triggered continuation page.
       doc.addPage();
-      pageStartBlockIds.delete(block.id);
+      pageOwners.push(ownerPage);
+      pageStarts.delete(block.id);
     }
 
     const fontSize = style?.fontSize ?? 11;

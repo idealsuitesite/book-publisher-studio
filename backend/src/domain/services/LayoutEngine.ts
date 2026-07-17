@@ -7,6 +7,15 @@ import { countWords } from '../../shared/utils/textMetrics';
 const WORDS_PER_LINE = 12;
 const DEFAULT_IMAGE_HEIGHT = 200;
 
+// Standard print-publishing convention (not guessed): recto/right-hand pages are
+// odd-numbered, verso/left-hand pages are even-numbered, page 1 always being a right page.
+function blankPagesNeededFor(style: 'right' | 'left' | 'any' | undefined, nextPageNumber: number): number {
+  const isOdd = nextPageNumber % 2 === 1;
+  if (style === 'right' && !isOdd) return 1;
+  if (style === 'left' && isOdd) return 1;
+  return 0;
+}
+
 export class LayoutEngine {
   paginate(styled: StyledBook, layout: PageLayout): PaginatedBook {
     const usableHeight = layout.height - layout.marginTop - layout.marginBottom;
@@ -22,6 +31,13 @@ export class LayoutEngine {
     // share a page, matching this pipeline's existing "best-effort, not guaranteed" pagination
     // philosophy (ADR-0013).
     let currentTopLevelTitle: string | undefined;
+    // Set right before the chapter's first block is added (after any blank pages this
+    // chapter needed have already had their own numbers reserved) - consumed and reset by
+    // the next flushPage(), which will be this chapter's own first page. Blank pages
+    // themselves are never given their own Page entry (no content, no running head/footer
+    // makes sense for them) - just a count the renderer inserts extra doc.addPage() calls
+    // for immediately before breaking to this page's first block.
+    let pendingBlankPagesBefore = 0;
 
     const resolveHeaderFooterTitle = (): string | undefined => {
       const runningHead = styled.theme.runningHead;
@@ -31,7 +47,13 @@ export class LayoutEngine {
 
     const flushPage = (): void => {
       if (currentPageBlocks.length === 0) return;
-      pages.push({ number: pageNumber, blocks: currentPageBlocks, headerFooterTitle: resolveHeaderFooterTitle() });
+      pages.push({
+        number: pageNumber,
+        blocks: currentPageBlocks,
+        headerFooterTitle: resolveHeaderFooterTitle(),
+        blankPagesBefore: pendingBlankPagesBefore || undefined,
+      });
+      pendingBlankPagesBefore = 0;
       pageNumber += 1;
       currentPageBlocks = [];
       currentPageHeights = [];
@@ -87,7 +109,14 @@ export class LayoutEngine {
           // Flush (attributing the closing page to the OLD currentTopLevelTitle) before
           // reassigning - reassigning first would mislabel the page that's closing right now
           // as belonging to the chapter that's only just starting.
-          if (forceNewPage) flushPage();
+          if (forceNewPage) {
+            flushPage();
+            if (content.type === 'chapter') {
+              const needed = blankPagesNeededFor(content.openingPageStyle, pageNumber);
+              pendingBlankPagesBefore = needed;
+              pageNumber += needed;
+            }
+          }
           if (isTopLevel) currentTopLevelTitle = content.title;
           addBlock(block, false);
           isFirstBlock = false;

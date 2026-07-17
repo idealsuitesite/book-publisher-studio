@@ -18,7 +18,7 @@ import {
   type ParagraphChild,
 } from 'docx';
 import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
-import type { PaginatedBook } from '../../domain/models/PaginatedBook';
+import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
 import type { Content, Block, Chapter, Section } from '../../domain/models/Book';
@@ -179,16 +179,18 @@ function buildHeaderFooter(book: PaginatedBook): { headers?: ISectionOptions['he
 
 export class DOCXRenderer implements Renderer<Buffer> {
   async render(book: PaginatedBook, _context: RenderContext): Promise<Buffer> {
-    const pageStartBlockIds = new Set(
-      book.pages.slice(1).map((page) => page.blocks[0]).filter((id): id is string => Boolean(id))
-    );
+    const pageStarts = new Map<string, Page>();
+    for (const page of book.pages.slice(1)) {
+      const firstId = page.blocks[0];
+      if (firstId) pageStarts.set(firstId, page);
+    }
 
     const children: (Paragraph | Table)[] = [];
     this.renderContent(
       book.styledBook.book.mainContent,
       book.styledBook.blockStyles,
       book.styledBook.blockTypography,
-      pageStartBlockIds,
+      pageStarts,
       true,
       children
     );
@@ -230,25 +232,32 @@ export class DOCXRenderer implements Renderer<Buffer> {
     contents: Content[],
     blockStyles: Record<string, ResolvedBlockStyle>,
     blockTypography: Record<string, ResolvedTypography> | undefined,
-    pageStartBlockIds: Set<string>,
+    pageStarts: Map<string, Page>,
     isTopLevel: boolean,
     out: (Paragraph | Table)[]
   ): void {
     for (const content of contents) {
       const firstBlockId = content.content[0]?.id;
-      const breaksPage = isTopLevel && content.type === 'chapter' && firstBlockId !== undefined && pageStartBlockIds.has(firstBlockId);
-      if (breaksPage && firstBlockId) pageStartBlockIds.delete(firstBlockId);
+      const ownerPage = isTopLevel && content.type === 'chapter' && firstBlockId !== undefined ? pageStarts.get(firstBlockId) : undefined;
+      if (ownerPage && firstBlockId) pageStarts.delete(firstBlockId);
 
-      out.push(this.renderTitle(content, breaksPage));
+      // Blank pages (Chapter.openingPageStyle, Sprint 6 commit 8): an empty paragraph forcing
+      // its own page break creates one genuinely blank physical page each, before the title
+      // paragraph's own pageBreakBefore starts the chapter's real content page.
+      for (let i = 0; i < (ownerPage?.blankPagesBefore ?? 0); i++) {
+        out.push(new Paragraph({ pageBreakBefore: true, children: [] }));
+      }
+
+      out.push(this.renderTitle(content, ownerPage !== undefined));
 
       for (const block of content.content) {
-        out.push(...this.renderBlock(block, blockStyles[block.id], blockTypography, pageStartBlockIds));
+        out.push(...this.renderBlock(block, blockStyles[block.id], blockTypography, pageStarts));
       }
 
       if (content.type === 'chapter' && content.sections) {
-        this.renderContent(content.sections, blockStyles, blockTypography, pageStartBlockIds, false, out);
+        this.renderContent(content.sections, blockStyles, blockTypography, pageStarts, false, out);
       } else if (content.type === 'section' && content.subsections) {
-        this.renderContent(content.subsections, blockStyles, blockTypography, pageStartBlockIds, false, out);
+        this.renderContent(content.subsections, blockStyles, blockTypography, pageStarts, false, out);
       }
     }
   }
@@ -272,9 +281,9 @@ export class DOCXRenderer implements Renderer<Buffer> {
     block: Block,
     style: ResolvedBlockStyle | undefined,
     blockTypography: Record<string, ResolvedTypography> | undefined,
-    pageStartBlockIds: Set<string>
+    pageStarts: Map<string, Page>
   ): (Paragraph | Table)[] {
-    const pageBreakBefore = pageStartBlockIds.has(block.id);
+    const pageBreakBefore = pageStarts.has(block.id);
     const font = style?.fontFamily;
     const size = style ? Math.round(style.fontSize * 2) : undefined; // docx sizes are in half-points
     const color = style?.color?.replace(/^#/, '');
