@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 (Sprint 4 complete — all 11 commits, PR pending)
+**Last Updated:** July 17, 2026 (Sprint 4 merged and released as `v0.5.0-alpha`)
 
 ---
 
@@ -12,7 +12,7 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-None currently. Sprint 4 (Typography Engine) is **complete** — all 11 commits done, tested (195/195), verified against real files (`npm run verify-server` + `npm run verify-real-export`, 16/16 checks). See the COMPLETED section below for the summary and `docs/releases/v0.5.0-alpha/SPRINT_4_FINAL_REPORT.md` for the full sprint retrospective (objectives, ADRs, bugs found/fixed, metrics, deferred items, risks, lessons learned). **Next action: open the Sprint 4 PR** (`feature/sprint-4-typography-engine` → `main`) — pending explicit go-ahead, not yet done.
+None currently. Sprint 4 (Typography Engine) is **complete, merged, and released** — all 11 commits done, tested (195/195), verified against real files (`npm run verify-server` + `npm run verify-real-export`, 16/16 checks), merged via PR #9 (`27a4347`), tagged `v0.5.0-alpha`. See the COMPLETED section below for the summary and `docs/releases/v0.5.0-alpha/SPRINT_4_FINAL_REPORT.md` / `ReleaseNotes.md` for full detail. `feature/sprint-4-typography-engine` deleted (local + remote). **Sprint 5 not yet scoped** — needs its own Design Review; see the competing priority proposals noted below.
 
 **Reference notes carried over from Sprint 4 (still live, not sprint-specific status):**
 
@@ -111,7 +111,7 @@ None currently. Sprint 4 (Typography Engine) is **complete** — all 11 commits 
 - ✅ Font policy decided: Gelasio (SIL OFL) — decision only, embedding deferred to Sprint 4
 - ✅ `backend/uploads/` git history: kept as-is, no purge
 
-### Sprint 4 - Typography Engine (all 11 commits done on `feature/sprint-4-typography-engine`; PR not yet opened, target tag `v0.5.0-alpha`)
+### Sprint 4 - Typography Engine (merged via PR #9, `27a4347`; tagged `v0.5.0-alpha`)
 
 - ✅ `TypographyResolver` (new concrete Domain service) — inline run resolution (`Block.inlines` → `TypeRun[]`), drop caps, English-only smart quotes, forced quote/scripture italics, heading `staysWithNext` keep-with-next signal (ADR-0022)
 - ✅ `StyledBook.blockTypography?` — additive field, no signature change to `LayoutEngine.paginate()`, `PaginatedBook`, or `Renderer<TOutput>` (the larger `TypesetBook` proposal was reviewed and rejected for blast radius before any code was written)

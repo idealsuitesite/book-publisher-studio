@@ -1,15 +1,15 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 17, 2026 (Sprint 4, commits 1-11 complete — sprint closed, PR not yet opened)
-**Sprint:** Sprint 4 ("Typography Engine") **complete** on `feature/sprint-4-typography-engine`. Design Review approved (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`, 11-commit plan) and fully executed — all 11 commits implemented, tested, and verified against real files. ADR-0022/0023/0024/0025/0026 written; `docs/releases/v0.5.0-alpha/SPRINT_4_FINAL_REPORT.md` records the full sprint retrospective. **Next action is opening the Sprint 4 PR** (pending explicit go-ahead — PR creation is a shared-state action).
-**Branch:** `feature/sprint-4-typography-engine` (branched from `main` at `5eb71c4`, rebased once onto `main` after PR #7/#8 merged, pushed to `origin` for the first time 2026-07-17). `main` itself has PR #1-#5 merged plus `fix/pdf-table-without-header` (PR #8) and the server-verification tooling (PR #6/#7) — no other open feature branches.
+**Last Updated:** July 17, 2026 (Sprint 4 merged and tagged `v0.5.0-alpha` — sprint fully closed)
+**Sprint:** Sprint 4 ("Typography Engine") **✅ COMPLETE AND RELEASED**. Design Review approved (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`, 11-commit plan), fully executed (all 11 commits), merged via PR #9 (merge commit `27a4347`), re-verified on `main` (195/195 tests), and tagged `v0.5.0-alpha`. ADR-0022/0023/0024/0025/0026 written; `docs/releases/v0.5.0-alpha/ReleaseNotes.md` and `SPRINT_4_FINAL_REPORT.md` record the release and full sprint retrospective. `feature/sprint-4-typography-engine` deleted (local + remote) after merge. **Next: Sprint 5 scope is not yet decided** — see `docs/TODO.md`'s backlog notes on the two competing priority proposals; needs its own Design Review before any implementation starts.
+**Branch:** `main`, at `01c5c39` (post-merge docs/release commit), tag `v0.5.0-alpha`. No open feature branches.
 
 ---
 
 ## Summary
 
 **Completed (Sprint 4, all 11 commits):** Domain types (`ResolvedTypography`/`TypeRun`), additive `StyledBook.blockTypography`, `TypographyResolver` (inline run resolution, drop caps, English-only smart quotes, forced quote/scripture italics, heading `staysWithNext`), `LayoutEngine` keep-with-next pagination support, real font embedding (Gelasio/Inter/JetBrains Mono, SIL OFL, 12 `.ttf` files in `backend/assets/fonts/`) with a role-based `PdfFontRegistry` API (`resolveBody`/`resolveHeading`/`resolveMonospace`/`resolveDefault`), full `TypeRun` rendering support in `PDFRenderer`/`DOCXRenderer`/`EPUBRenderer`, `BookMetricsCalculator.calculateQualityMetrics(paginated: PaginatedBook): QualityMetrics` activating all 7 `QualityMetrics` fields with real computed values, a completed E2E real-file verification pass (commit 10) that found and fixed 3 real content-fidelity bugs in the import pipeline (ADR-0026), and a final docs/ADR pass (commit 11: ADR-0022/0023/0024, `docs/releases/v0.5.0-alpha/SPRINT_4_FINAL_REPORT.md`). 195 tests passing ✅, 90.49% global / 92.57% domain coverage, 0 ESLint warnings, re-verified before every commit via `npm run build`, `npm run lint`, `npm test`, `npm run verify-server`, and `npm run verify-real-export` (16/16 checks: 4 fixtures × import + export-docx/pdf/epub).
-**Next:** Open the Sprint 4 PR (`feature/sprint-4-typography-engine` → `main`) — the whole sprint is now done and verified, satisfying the "PR only once the whole sprint is done and verified" rule. PR creation itself is a shared-state action requiring explicit user go-ahead in this session before it happens.
+**Next:** Sprint 4 is merged (PR #9, `27a4347`) and tagged `v0.5.0-alpha`. Sprint 5 scope is **not yet decided** — see `docs/TODO.md`'s backlog notes on two competing priority proposals raised during Sprint 4 (the existing CTO priority order vs. a newer Editorial AI Engine/Professional Layout Engine/Validation Engine/Publishing Engine ordering). Per the CTO's own recommendation, Sprint 5 should get its own dedicated Design Review before implementation starts, matching the discipline used for every prior sprint — do not assume an ordering.
 
 **Design-review gap found and resolved during commit 9:** the Design Review (`docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md`) locked exact formulas for `averageHeadingDepth`/`paragraphDensity`/`lineDensity`/`dropCaps` (CTO Final Decision 4) but left the 3 pre-existing ADR-0008 fields (`widowsAndOrphans`/`inconsistentSpacing`/`emptyHeadings`) with no formula — only "activate them, the resolver already computes the underlying data." Flagged and confirmed before implementation rather than guessed silently: `widowsAndOrphans` = count of blocks where `TypographyResolver` resolved `staysWithNext: true` (currently all headings); `emptyHeadings` = `Heading.text.trim() === ''`; `inconsistentSpacing` = count of `Paragraph` blocks whose explicit `spaceBefore`/`spaceAfter`/`lineHeight` diverges from the theme-resolved value — functional definition deliberately kept general ("a block whose explicit style overrides a theme-resolved value") per the CTO's direction, so future style dimensions (alignment, indentation, color, font) can be folded in later without resemanticizing the field; Sprint 4's implementation checks spacing only. Also confirmed: `calculateQualityMetrics` is a new method operating on `PaginatedBook` (needs `blockTypography` + real page count, both unavailable on a bare `Book`), not wired into `ExportManuscriptUseCase` or any route this commit — that wiring is explicitly `ValidatorEngine` scope, not Sprint 4.
 
@@ -152,7 +152,9 @@ All three were fixed by the `bufferPages` redesign above.
 - [x] ADR-0022 (Typography Resolution Pipeline), ADR-0023 (PDF Font Embedding), ADR-0024 (Hyphenation/Locale-Aware Smart Quotes Deferred to v2) — all written with full evidence of what was actually built, not just the original Design Review plan
 - [x] `docs/releases/v0.5.0-alpha/SPRINT_4_FINAL_REPORT.md` — objectives, delivered features, ADRs created, historical bugs found/fixed, final metrics, deferred items, residual risks, lessons learned
 - [x] Final `CURRENT_STATE.md`/`TODO.md`/`VERSIONS.md` reconciliation pass (this update) — exact per-file test counts, exact coverage percentages
-- [ ] Open the Sprint 4 PR — sprint is done and re-verified; **pending explicit go-ahead**
+- [x] Open the Sprint 4 PR (#9) — merged, merge commit `27a4347`, re-verified on `main` (195/195)
+- [x] Tag `v0.5.0-alpha`, write `docs/releases/v0.5.0-alpha/ReleaseNotes.md`, flip `VERSIONS.md`'s row to Released
+- [x] Delete `feature/sprint-4-typography-engine` (local + remote), matching the cleanup pattern used after every prior sprint merge
 
 ---
 
@@ -231,14 +233,14 @@ Exact counts, reconciled in commit 11 (previous versions of this table used `~` 
 
 **To resume work:** say "Read docs/SESSION_BOOTSTRAP.md and follow it" — it fixes the reading order (`START_HERE.md` → `CURRENT_STATE.md` → `TODO.md` → `DECISIONS.md` → `VERSIONS.md`) and requires a summary + explicit approval before any code is written.
 
-**Sprint 4 is complete.** All 11 commits done, tested, and verified. The next action is opening the Sprint 4 PR (`feature/sprint-4-typography-engine` → `main`) — this needs explicit user go-ahead in-session (PR creation is a shared-state action), not something to do automatically on session resume. If a new session starts before that PR is opened, check `git log origin/main..HEAD` on this branch first to see whether it happened in the meantime.
+**Sprint 4 is complete, merged, and tagged.** PR #9 merged (`27a4347`), `v0.5.0-alpha` tagged and pushed, `feature/sprint-4-typography-engine` deleted (local + remote). Work happens on `main` now — there is no active feature branch.
 
-**After the PR merges:** per the CTO's stated recommendation (2026-07-17, not yet a formal decision), freeze new feature work briefly and treat Sprint 5 as its own from-scratch project with a dedicated Design Review — do not start Sprint 5 implementation without one, matching the discipline already used for Sprints 2/3A/3B/4. Sprint 5's actual priority order is explicitly **not yet decided** (see `docs/TODO.md`'s backlog notes on the competing proposals raised 2026-07-17: the existing recorded "CTO priority order" vs. a newer proposed Editorial AI Engine/Professional Layout Engine/Validation Engine/Publishing Engine ordering) — resolve that as part of the Design Review, not by assumption.
+**Before starting Sprint 5:** per the CTO's stated recommendation (2026-07-17, not yet a formal decision), freeze new feature work briefly and treat Sprint 5 as its own from-scratch project with a dedicated Design Review — do not start Sprint 5 implementation without one, matching the discipline already used for Sprints 2/3A/3B/4. Sprint 5's actual priority order is explicitly **not yet decided** (see `docs/TODO.md`'s backlog notes on the competing proposals raised 2026-07-17: the existing recorded "CTO priority order" vs. a newer proposed Editorial AI Engine/Professional Layout Engine/Validation Engine/Publishing Engine ordering) — resolve that as part of the Design Review, not by assumption. When Sprint 5 actually starts, branch from `main` per ADR-0017 (no direct-to-`main` implementation work — the docs/release commits made directly to `main` after Sprint 4's merge are the established exception for pure documentation, not a precedent for code).
 
 **Quick Start:**
 ```bash
 cd "D:\Book Publisher Studio\backend"
-git checkout feature/sprint-4-typography-engine && git pull
+git checkout main && git pull
 npm test               # Verify all 195 tests pass
 npm run build          # Verify TypeScript compilation
 npm run lint            # Verify 0 ESLint errors
@@ -272,10 +274,8 @@ npm run verify-real-export   # Verify real import + export-docx/pdf/epub against
 
 ## Git Status
 
-**Branch:** `feature/sprint-4-typography-engine` at `961cbbb` (commit 11, "ADR-0022/0023/0024, Sprint 4 Final Report, final reconciliation" — **Sprint 4 complete**), on top of `4925aec` (commit 10 + its Git Status docs touch-up) and `8ab6ffb` (docs consolidation after commits 1-8). Commit 11 is local, pending push (commits 1-10 and the docs consolidation were pushed 2026-07-17).
-**Branched from / rebased onto `main` at:** `4f488ad` (PR #8 merge — `fix/pdf-table-without-header`; `main` also has PR #7 `39b173f` and PR #6 `33b9b0f`, the server-verification tooling, both merged before Sprint 4 resumed).
-**Sprint 4 commits on this branch (1-11, oldest first):** `ea6df67` → `5b550cf` → `0a1a0c7` → `a045f21` → `d17555e` → `041319e` → `36692a9` → `9be7325` → `0f4a750` → `e2973cc` (ADR-0025) → `77ab1c2` → `8ab6ffb` (docs consolidation) → `c87d72b` (commit 9) → `e0e22b3` (docs touch-up) → `8a6422e` (commit 10 / ADR-0026) → `4925aec` (docs touch-up) → `961cbbb` (commit 11, sprint close).
-**`main` synced with `origin/main` at:** `4f488ad` (see PR #5 `5eb71c4`, governance commit `e512ee7`, PR #4 `a7a38a0`, PR #3 `820f1ef`, PR #2 `c507f5d`, PR #1 `32ac220` further back in history).
+**Branch:** `main`, at `01c5c39` ("docs(release): post-merge state update for PR #9") — the only branch, no open feature branches. `feature/sprint-4-typography-engine` deleted (local + remote) after PR #9 merged.
+**`main` history (most recent first):** `01c5c39` (release docs + `VERSIONS.md` flip) → `27a4347` (**merge PR #9** — Sprint 4, Typography Engine, squash of `ea6df67`...`15a1b7b`, 11 commits + 3 docs touch-ups) → `4f488ad` (PR #8 merge — `fix/pdf-table-without-header`; also has PR #7 `39b173f`, PR #6 `33b9b0f`, PR #5 `5eb71c4`, governance commit `e512ee7`, PR #4 `a7a38a0`, PR #3 `820f1ef`, PR #2 `c507f5d`, PR #1 `32ac220` further back).
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
-**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha`, **`v0.4.1-alpha`** (EPUB export, cut 2026-07-17 per ADR-0021 — see `docs/VERSIONS.md` and `docs/releases/v0.4.1-alpha/ReleaseNotes.md`)
+**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha`, `v0.4.1-alpha` (EPUB export — see `docs/releases/v0.4.1-alpha/ReleaseNotes.md`), **`v0.5.0-alpha`** (Typography Engine, cut 2026-07-17, PR #9 — see `docs/VERSIONS.md` and `docs/releases/v0.5.0-alpha/ReleaseNotes.md`)
 **Open branches:** none — the 3 stale merged branches found still on `origin` (see prior note) were deleted locally and remotely 2026-07-17.
