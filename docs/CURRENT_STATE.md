@@ -51,7 +51,7 @@ All 37 `@typescript-eslint/no-explicit-any` warnings eliminated — no behavior 
 
 **Nothing outstanding from Sprint 2 or the Quality Sprint** — both fully merged and verified on `main`.
 
-## Sprint 3A: PDF Export ✅ COMPLETE (merged to `main` via PR #3, `820f1ef`)
+## Sprint 3A: PDF Export ✅ COMPLETE (merged to `main` via PR #3, `820f1ef`; tagged `v0.4.0-alpha`)
 
 **PDFKit spike + ADR-0019 completed before any renderer code was written** (`backend/spikes/pdfkit-spike.ts`, gitignored output in `spikes/output/`) — fonts, Unicode, images, tables, page breaks, headers/footers, bleed, and crop marks all verified against real PDFKit output first.
 
@@ -187,5 +187,5 @@ npm run test:coverage  # Verify coverage thresholds
 **Branch:** `main`
 **`main` synced with `origin/main` at:** `820f1ef` (PR #3 merge commit — `feature/sprint-3a-pdf-export` → `main`; PR #2 `c507f5d` and PR #1 `32ac220` merged earlier in the same history)
 **Remote:** https://github.com/idealsuitesite/book-publisher-studio
-**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha` (v0.4.0-alpha for PDF export not yet cut — see `docs/VERSIONS.md`)
+**Tags:** `v0.1.0-alpha.1`, `v0.2.0-alpha`, `v0.3.0-alpha`, `v0.4.0-alpha` (PDF export — see `docs/VERSIONS.md` and `docs/releases/v0.4.0-alpha/ReleaseNotes.md`)
 **Open branches:** none — all merged feature branches deleted locally and remotely after merge
