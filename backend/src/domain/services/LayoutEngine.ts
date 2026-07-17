@@ -142,12 +142,25 @@ export class LayoutEngine {
     return { styledBook: styled, pages, pageLayout: layout, tableOfContents: this.buildTableOfContents(styled, pages) };
   }
 
-  // Functional Spec item 7: walks every Heading block in document order, post-pagination (so
-  // each entry's pageNumber can be resolved), only when Book.frontMatter.toc.generateAutomatically
-  // is true - Book is never mutated (ADR-0001), so this never touches a manually-authored
+  // Functional Spec item 7: walks headings in document order, post-pagination (so each entry's
+  // pageNumber can be resolved), only when Book.frontMatter.toc.generateAutomatically is true -
+  // Book is never mutated (ADR-0001), so this never touches a manually-authored
   // frontMatter.toc.entries at all; the two are entirely separate fields. A flat, level-annotated
   // list, not a nested tree - see PaginatedBook.tableOfContents's doc comment for why nesting is
   // deliberately out of scope rather than guessed.
+  //
+  // Real-file verification finding (Sprint 6 commit 11, fixed here as a direct scope exception -
+  // ADR-0019/0020/0026 precedent, not deferred): the design's own wording ("walks all Heading
+  // blocks") assumed content-level Heading blocks are how a real book's heading hierarchy shows
+  // up. Reading ASTBuilder.ts and testing against a real DOCX (large-book.docx) confirmed
+  // otherwise - every real heading in an imported document is structurally consumed into a
+  // Chapter/Section boundary (its `title` field), never emitted as a Heading block inside
+  // `content[]`. Walking only Heading blocks (the original implementation) produced a
+  // *permanently empty TOC on every real import* - a real, would-have-shipped-broken bug, not a
+  // hypothetical. Fixed to walk Chapter/Section titles as the primary, real-world path
+  // (headingId repurposed to the owning Chapter/Section's own id, since no Heading.id exists to
+  // link back to for these); literal Heading blocks are still included too, for hand-built Book
+  // models or a future import-pipeline change that starts emitting them.
   private buildTableOfContents(styled: StyledBook, pages: Page[]): TOCEntry[] | undefined {
     const toc = styled.book.frontMatter.toc;
     if (!toc?.generateAutomatically) return undefined;
@@ -160,16 +173,23 @@ export class LayoutEngine {
     }
 
     const entries: TOCEntry[] = [];
+    const addEntry = (level: number, title: string, headingId: string, firstBlockId: string | undefined): void => {
+      if (toc.maxDepth !== undefined && level > toc.maxDepth) return;
+      entries.push({ level, title, pageNumber: firstBlockId ? pageNumberByBlockId.get(firstBlockId) : undefined, headingId });
+    };
+
     const walk = (contents: Content[]): void => {
       for (const content of contents) {
+        // The primary, real-world case: a Chapter/Section's own title (an untitled preamble
+        // Section, ADR-0020 addendum, is skipped - an empty-title entry is never useful).
+        if (content.title) {
+          const level = content.type === 'chapter' ? 1 : content.level;
+          addEntry(level, content.title, content.id, content.content[0]?.id);
+        }
         for (const block of content.content) {
-          if (block.type === 'heading' && (toc.maxDepth === undefined || block.level <= toc.maxDepth)) {
-            entries.push({
-              level: block.level,
-              title: block.text,
-              pageNumber: pageNumberByBlockId.get(block.id),
-              headingId: block.id,
-            });
+          // The synthetic/future case: a literal Heading block genuinely present in content.
+          if (block.type === 'heading') {
+            addEntry(block.level, block.text, block.id, block.id);
           }
         }
         if (content.type === 'chapter' && content.sections) {

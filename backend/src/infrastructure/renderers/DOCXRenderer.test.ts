@@ -303,10 +303,14 @@ describe('DOCXRenderer', () => {
   // paginated.tableOfContents.
   describe('table of contents (PaginatedBook.tableOfContents)', () => {
     it('renders a real TOC with entry titles and resolved page numbers before body content, on its own page', async () => {
+      // Real-file verification finding (Sprint 6 commit 11): a real DOCX import never produces
+      // a content-level Heading block - every real heading becomes a Chapter title instead
+      // (see LayoutEngine.ts's buildTableOfContents doc comment). No literal heading() blocks
+      // here, matching that real-world shape.
       const paginated = paginateWithToc(
         [
-          chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1 }),
-          chapter([heading(1, 'h-2', 'Chapter Two'), paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2 }),
+          chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1, title: 'Chapter One' }),
+          chapter([paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2, title: 'Chapter Two' }),
         ],
         { generateAutomatically: true, entries: [] }
       );

@@ -4,7 +4,7 @@ import { ThemeEngine } from './ThemeEngine';
 import { TypographyResolver } from './TypographyResolver';
 import { ClassicTheme } from '../themes/ClassicTheme';
 import { createBook } from '../models/Book';
-import type { Chapter, Section, Heading, Paragraph, Image, List, Table, Footnote, Block, TableOfContents } from '../models/Book';
+import type { Chapter, Section, Heading, Paragraph, Image, List, Table, Footnote, Block, TableOfContents, Content } from '../models/Book';
 import type { PageLayout } from '../models/PageLayout';
 import type { Theme } from '../models/Theme';
 
@@ -66,8 +66,8 @@ function styledBookFromWithTheme(chapters: Chapter[], theme: Theme) {
   return new ThemeEngine().applyTheme(book, theme);
 }
 
-function styledBookFromWithToc(chapters: Chapter[], toc: TableOfContents) {
-  const book = createBook({ title: 'T', author: 'A', language: 'en' }, chapters);
+function styledBookFromWithToc(mainContent: Content[], toc: TableOfContents) {
+  const book = createBook({ title: 'T', author: 'A', language: 'en' }, mainContent);
   return new ThemeEngine().applyTheme({ ...book, frontMatter: { toc } }, ClassicTheme);
 }
 
@@ -350,7 +350,7 @@ describe('LayoutEngine', () => {
   // Sprint 6 (Functional Spec item 7): automatic Table of Contents generation.
   describe('automatic Table of Contents generation', () => {
     it('is undefined when frontMatter.toc is absent', () => {
-      const styled = styledBookFrom([chapter([heading(1, 'h-1', 'Intro'), paragraph('p-1')])]);
+      const styled = styledBookFrom([chapter([paragraph('p-1')], { title: 'Intro' })]);
 
       const result = engine.paginate(styled, LETTER_LAYOUT);
 
@@ -358,9 +358,9 @@ describe('LayoutEngine', () => {
     });
 
     it('is undefined when generateAutomatically is false, even with manually-authored entries present', () => {
-      const styled = styledBookFromWithToc([chapter([heading(1, 'h-1', 'Intro'), paragraph('p-1')])], {
+      const styled = styledBookFromWithToc([chapter([paragraph('p-1')], { title: 'Intro' })], {
         generateAutomatically: false,
-        entries: [{ level: 1, title: 'Manually Authored', headingId: 'h-1' }],
+        entries: [{ level: 1, title: 'Manually Authored', headingId: 'x' }],
       });
 
       const result = engine.paginate(styled, LETTER_LAYOUT);
@@ -368,11 +368,15 @@ describe('LayoutEngine', () => {
       expect(result.tableOfContents).toBeUndefined();
     });
 
-    it('walks every Heading in document order with a resolved page number, when generateAutomatically is true', () => {
+    // Real-file verification finding (Sprint 6 commit 11): a real DOCX import never produces a
+    // content-level Heading block - ASTBuilder structurally consumes every heading into a
+    // Chapter/Section boundary (its `title`). This is the primary, real-world case: Chapter/
+    // Section titles themselves become TOC entries, keyed by the owning content's own id.
+    it("walks Chapter/Section titles in document order with a resolved page number, when generateAutomatically is true (the real-import case)", () => {
       const styled = styledBookFromWithToc(
         [
-          chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1')], { id: 'c-1', number: 1 }),
-          chapter([heading(1, 'h-2', 'Chapter Two'), paragraph('p-2')], { id: 'c-2', number: 2 }),
+          chapter([paragraph('p-1')], { id: 'c-1', number: 1, title: 'Chapter One' }),
+          chapter([paragraph('p-2')], { id: 'c-2', number: 2, title: 'Chapter Two' }),
         ],
         { generateAutomatically: true, entries: [] }
       );
@@ -380,57 +384,101 @@ describe('LayoutEngine', () => {
       const result = engine.paginate(styled, LETTER_LAYOUT);
 
       expect(result.tableOfContents).toEqual([
-        { level: 1, title: 'Chapter One', pageNumber: 1, headingId: 'h-1' },
-        { level: 1, title: 'Chapter Two', pageNumber: 2, headingId: 'h-2' },
+        { level: 1, title: 'Chapter One', pageNumber: 1, headingId: 'c-1' },
+        { level: 1, title: 'Chapter Two', pageNumber: 2, headingId: 'c-2' },
       ]);
     });
 
-    it('respects maxDepth, excluding headings deeper than it', () => {
+    // The synthetic/future case: a literal Heading block genuinely present in content (not
+    // produced by any real import today, but a valid, supported Book shape - e.g. hand-built
+    // fixtures, or a future import-pipeline change).
+    it('also includes literal Heading blocks found within content, alongside the owning Chapter/Section title', () => {
       const styled = styledBookFromWithToc(
-        [chapter([heading(1, 'h-1', 'H1'), heading(2, 'h-2', 'H2'), heading(3, 'h-3', 'H3')])],
+        [chapter([heading(2, 'h-1', 'An In-Body Heading'), paragraph('p-1')], { id: 'c-1', number: 1, title: 'Chapter One' })],
+        { generateAutomatically: true, entries: [] }
+      );
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      expect(result.tableOfContents).toEqual([
+        { level: 1, title: 'Chapter One', pageNumber: 1, headingId: 'c-1' },
+        { level: 2, title: 'An In-Body Heading', pageNumber: 1, headingId: 'h-1' },
+      ]);
+    });
+
+    it('skips an untitled preamble Section (ADR-0020 addendum) rather than adding an empty-title entry', () => {
+      const now = new Date();
+      const preamble: Section = {
+        type: 'section',
+        id: 'pre-1',
+        title: '',
+        content: [paragraph('p-1')],
+        level: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const styled = styledBookFromWithToc([preamble], { generateAutomatically: true, entries: [] });
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      expect(result.tableOfContents).toEqual([]);
+    });
+
+    it('respects maxDepth, excluding entries deeper than it', () => {
+      const now = new Date();
+      const deepSection: Section = {
+        type: 'section',
+        id: 'sec-2',
+        title: 'Level 3',
+        content: [],
+        level: 3,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const midSection: Section = {
+        type: 'section',
+        id: 'sec-1',
+        title: 'Level 2',
+        content: [],
+        level: 2,
+        createdAt: now,
+        updatedAt: now,
+        subsections: [deepSection],
+      };
+      const styled = styledBookFromWithToc(
+        [chapter([paragraph('p-1')], { title: 'Level 1', sections: [midSection] })],
         { generateAutomatically: true, entries: [], maxDepth: 2 }
       );
 
       const result = engine.paginate(styled, LETTER_LAYOUT);
 
-      expect(result.tableOfContents?.map((e) => e.headingId)).toEqual(['h-1', 'h-2']);
+      expect(result.tableOfContents?.map((e) => e.title)).toEqual(['Level 1', 'Level 2']);
     });
 
-    it('includes every heading level when maxDepth is unset', () => {
-      const styled = styledBookFromWithToc([chapter([heading(1, 'h-1', 'H1'), heading(6, 'h-6', 'H6')])], {
+    it('resolves entries nested in sections/subsections too', () => {
+      const now = new Date();
+      const section: Section = {
+        type: 'section',
+        id: 'sec-1',
+        title: 'Section A',
+        content: [paragraph('p-sec')],
+        level: 2,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const styled = styledBookFromWithToc([chapter([paragraph('p-1')], { title: 'Chapter One', sections: [section] })], {
         generateAutomatically: true,
         entries: [],
       });
 
       const result = engine.paginate(styled, LETTER_LAYOUT);
 
-      expect(result.tableOfContents?.map((e) => e.headingId)).toEqual(['h-1', 'h-6']);
-    });
-
-    it('resolves headings nested in sections/subsections too', () => {
-      const now = new Date();
-      const section: Section = {
-        type: 'section',
-        id: 'sec-1',
-        title: 'Section A',
-        content: [heading(2, 'h-sec', 'A Subheading')],
-        level: 2,
-        createdAt: now,
-        updatedAt: now,
-      };
-      const styled = styledBookFromWithToc(
-        [chapter([heading(1, 'h-1', 'Chapter One')], { sections: [section] })],
-        { generateAutomatically: true, entries: [] }
-      );
-
-      const result = engine.paginate(styled, LETTER_LAYOUT);
-
-      expect(result.tableOfContents?.map((e) => e.headingId)).toEqual(['h-1', 'h-sec']);
+      expect(result.tableOfContents?.map((e) => e.headingId)).toEqual(['c-1', 'sec-1']);
     });
 
     it('never overwrites the manually-authored frontMatter.toc.entries (Book is never mutated)', () => {
       const manualEntries = [{ level: 1, title: 'Manually Authored', headingId: 'x' }];
-      const styled = styledBookFromWithToc([chapter([heading(1, 'h-1', 'Intro')])], {
+      const styled = styledBookFromWithToc([chapter([paragraph('p-1')], { title: 'Intro' })], {
         generateAutomatically: true,
         entries: manualEntries,
       });

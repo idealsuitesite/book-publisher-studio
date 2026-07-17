@@ -399,14 +399,18 @@ describe('PDFRenderer', () => {
     it('renders a real TOC page with entry titles and resolved page numbers, as its own front-matter page before body content', async () => {
       const paginated = paginateWithToc(
         [
-          chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1 }),
-          chapter([heading(1, 'h-2', 'Chapter Two'), paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2 }),
+          chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1, title: 'Chapter One' }),
+          chapter([paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2, title: 'Chapter Two' }),
         ],
         { generateAutomatically: true, entries: [] }
       );
+      // Real-file verification finding (Sprint 6 commit 11): a real DOCX import never produces
+      // a content-level Heading block - every real heading becomes a Chapter/Section title
+      // instead (see LayoutEngine.ts's buildTableOfContents doc comment). Entries are keyed by
+      // the owning Chapter/Section's own id here, not a Heading.id.
       expect(paginated.tableOfContents).toEqual([
-        { level: 1, title: 'Chapter One', pageNumber: 1, headingId: 'h-1' },
-        { level: 1, title: 'Chapter Two', pageNumber: 2, headingId: 'h-2' },
+        { level: 1, title: 'Chapter One', pageNumber: 1, headingId: 'c-1' },
+        { level: 1, title: 'Chapter Two', pageNumber: 2, headingId: 'c-2' },
       ]);
 
       const buffer = await renderer.render(paginated, {});
