@@ -192,6 +192,22 @@ describe('PDFRenderer', () => {
     expect(countPdfPages(buffer)).toBeGreaterThan(1);
   });
 
+  // Sprint 6 (ADR-0029, Functional Spec item 6): Chapter.startPageNumber.
+  it('shows the resolved (possibly reset) page number in the footer, not the raw physical page index', async () => {
+    const paginated = paginate([
+      chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1 }),
+      chapter([paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2, startPageNumber: 101 }),
+    ]);
+    expect(paginated.pages.map((p) => p.number)).toEqual([1, 101]);
+
+    const buffer = await renderer.render(paginated, {});
+    const text = extractPdfText(buffer);
+
+    expect(text).toContain('Page 1 of');
+    expect(text).toContain('Page 101 of');
+    expect(text).not.toContain('Page 2 of');
+  });
+
   // Sprint 6 (ADR-0029, Functional Spec item 5): Chapter.openingPageStyle blank-page insertion.
   it("inserts a real, genuinely blank physical page for a chapter with openingPageStyle:'right' after an odd-ending chapter", async () => {
     const paginated = paginate([

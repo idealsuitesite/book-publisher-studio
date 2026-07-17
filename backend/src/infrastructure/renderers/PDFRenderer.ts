@@ -18,6 +18,14 @@ const DROP_CAP_SCALE = 2.5;
 /** Resolves which registered font to use for a run, given its bold/italic flags. */
 type FontResolver = (bold: boolean, italic: boolean) => string;
 
+// A real-PDFKit-page-index's owner: a domain Page (render its title/header/footer normally),
+// the literal string 'blank' (an intentionally blank page from Chapter.openingPageStyle - draw
+// nothing at all on it, matching real print convention), or undefined (pagination-estimate
+// drift, ADR-0013/ADR-0019 finding 6C - PDFKit auto-paginated internally beyond what
+// LayoutEngine estimated, so there's no reliable title, but the page number still falls back to
+// the physical index rather than showing nothing).
+type PageOwner = Page | 'blank' | undefined;
+
 export class PDFRenderer implements Renderer<Buffer> {
   // compress defaults to true for real output; tests pass false so the content stream stays
   // plain text and its rendered text can be extracted for assertions (see
@@ -64,7 +72,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       // below (not assumed 1:1 with book.pages - both pagination-estimate drift, ADR-0013, and
       // this commit's own blank pages, which own no domain Page at all, break that assumption).
       // drawHeadersAndFooters() reads this instead of indexing into book.pages directly.
-      const pageOwners: (Page | undefined)[] = [book.pages[0]];
+      const pageOwners: PageOwner[] = [book.pages[0]];
 
       this.renderContent(
         doc,
@@ -119,14 +127,24 @@ export class PDFRenderer implements Renderer<Buffer> {
   // no real usage to validate against (ADR-0029 Risk 5, same disclosed-not-hidden category as
   // ValidationContext's reserved fields, Sprint 5). Revisit when a real theme needs them.
   //
-  // Sprint 6 commit 8: blank pages (Chapter.openingPageStyle) own no domain Page - pageOwners[i]
-  // is undefined for them, so no running head or page number is drawn on a blank page (matches
-  // real print convention: a blank leaf inserted to force a recto/verso start is truly blank).
-  private drawHeadersAndFooters(doc: PDFKit.PDFDocument, book: PaginatedBook, pageOwners: (Page | undefined)[]): void {
+  // Sprint 6 commit 8: an intentionally blank page (Chapter.openingPageStyle) is pageOwners[i]
+  // === 'blank' - nothing is drawn on it at all, matching real print convention.
+  // Sprint 6 commit 9: the page-number NUMERATOR now reads the resolved domain Page's own
+  // `.number` (honors Chapter.startPageNumber) instead of the raw physical index - the whole
+  // point of startPageNumber is to make the displayed number diverge from physical order. The
+  // "of TOTAL" DENOMINATOR still uses the real PDFKit page count (ADR-0019 finding 6C, unchanged
+  // - an estimate could show a factually wrong total). For a pagination-estimate-drift tail page
+  // (pageOwners[i] === undefined, ADR-0013) there is no resolved Page to read a number from, so
+  // the numerator falls back to the physical index too, same as every page did before this
+  // commit - no regression for the drift case that finding 6C's own test already covers.
+  private drawHeadersAndFooters(doc: PDFKit.PDFDocument, book: PaginatedBook, pageOwners: PageOwner[]): void {
     const runningHead = book.styledBook.theme.runningHead;
     const range = doc.bufferedPageRange();
 
     for (let i = range.start; i < range.start + range.count; i++) {
+      const owner = pageOwners[i];
+      if (owner === 'blank') continue;
+
       doc.switchToPage(i);
       const { width, height, margins } = doc.page;
       const contentWidth = width - margins.left - margins.right;
@@ -134,8 +152,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       doc.page.margins.bottom = 0;
 
       if (runningHead?.show) {
-        const domainPage = pageOwners[i];
-        const title = domainPage?.headerFooterTitle;
+        const title = owner?.headerFooterTitle;
         if (title) {
           const text = runningHead.uppercase ? title.toUpperCase() : title;
           const align = runningHead.position === 'left' ? 'left' : 'right';
@@ -143,9 +160,10 @@ export class PDFRenderer implements Renderer<Buffer> {
           doc.text(text, margins.left, 40, { width: contentWidth, align, lineBreak: false });
         }
 
-        if (domainPage && runningHead.pageNumber) {
+        if (runningHead.pageNumber) {
+          const displayNumber = owner?.number ?? i + 1;
           doc.font(this.fonts.resolveDefault(false, false)).fontSize(runningHead.size ?? 9).fillColor('#000');
-          doc.text(`Page ${i + 1} of ${range.count}`, margins.left, height - 50, {
+          doc.text(`Page ${displayNumber} of ${range.count}`, margins.left, height - 50, {
             width: contentWidth,
             align: 'center',
             lineBreak: false,
@@ -164,7 +182,7 @@ export class PDFRenderer implements Renderer<Buffer> {
     blockStyles: Record<string, ResolvedBlockStyle>,
     blockTypography: Record<string, ResolvedTypography> | undefined,
     pageStarts: Map<string, Page>,
-    pageOwners: (Page | undefined)[],
+    pageOwners: PageOwner[],
     isTopLevel: boolean
   ): void {
     for (const content of contents) {
@@ -174,11 +192,10 @@ export class PDFRenderer implements Renderer<Buffer> {
 
       // Blank pages (Chapter.openingPageStyle) are genuinely empty physical pages - each
       // addPage() here is immediately followed by another with nothing drawn in between,
-      // then the real content page below starts normally. They own no domain Page (pushed as
-      // undefined), so drawHeadersAndFooters() never puts a running head/footer on one.
+      // then the real content page below starts normally.
       for (let i = 0; i < (ownerPage?.blankPagesBefore ?? 0); i++) {
         doc.addPage();
-        pageOwners.push(undefined);
+        pageOwners.push('blank');
       }
       if (ownerPage) {
         doc.addPage();
@@ -216,7 +233,7 @@ export class PDFRenderer implements Renderer<Buffer> {
     style: ResolvedBlockStyle | undefined,
     blockTypography: Record<string, ResolvedTypography> | undefined,
     pageStarts: Map<string, Page>,
-    pageOwners: (Page | undefined)[]
+    pageOwners: PageOwner[]
   ): void {
     const ownerPage = pageStarts.get(block.id);
     if (ownerPage) {

@@ -302,4 +302,43 @@ describe('LayoutEngine', () => {
       expect(result.pages.every((p) => p.blankPagesBefore === undefined)).toBe(true);
     });
   });
+
+  // Sprint 6 (Professional Layout Engine): Chapter.startPageNumber.
+  describe('Chapter.startPageNumber', () => {
+    it("resets the displayed page-number sequence starting at that chapter", () => {
+      const styled = styledBookFrom([
+        chapter([paragraph('p-1')], { id: 'c-1', number: 1 }),
+        chapter([paragraph('p-2'), paragraph('p-3')], { id: 'c-2', number: 2, startPageNumber: 101 }),
+      ]);
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      expect(result.pages.map((p) => p.number)).toEqual([1, 101]);
+    });
+
+    it('subsequent pages/chapters keep incrementing from the reset value without needing their own startPageNumber', () => {
+      const styled = styledBookFrom([
+        chapter([paragraph('p-1')], { id: 'c-1', number: 1, startPageNumber: 5 }),
+        chapter([paragraph('p-2')], { id: 'c-2', number: 2 }),
+      ]);
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      expect(result.pages.map((p) => p.number)).toEqual([5, 6]);
+    });
+
+    it('composes with openingPageStyle when startPageNumber already satisfies the requested parity', () => {
+      const styled = styledBookFrom([
+        chapter([paragraph('p-1')], { id: 'c-1', number: 1 }),
+        chapter([paragraph('p-2')], { id: 'c-2', number: 2, startPageNumber: 101, openingPageStyle: 'right' }),
+      ]);
+
+      const result = engine.paginate(styled, LETTER_LAYOUT);
+
+      // 101 is already odd/right - no blank page needed even though the chapter's natural
+      // (pre-reset) position would have been page 2 (even).
+      expect(result.pages.map((p) => p.number)).toEqual([1, 101]);
+      expect(result.pages[1].blankPagesBefore).toBeUndefined();
+    });
+  });
 });
