@@ -15,6 +15,7 @@ import { ExportManuscriptUseCase } from '../application/use-cases/ExportManuscri
 import { ThemeEngine } from '../domain/services/ThemeEngine';
 import { LayoutEngine } from '../domain/services/LayoutEngine';
 import { DOCXRenderer } from '../infrastructure/renderers/DOCXRenderer';
+import { PDFRenderer } from '../infrastructure/renderers/PDFRenderer';
 import { ManuscriptController } from './controllers/ManuscriptController';
 import { ExportController } from './controllers/ExportController';
 import { manuscriptRoutes } from './routes/manuscripts';
@@ -40,7 +41,8 @@ export function createApp(): Express {
   app.use('/api/manuscripts', manuscriptRoutes(manuscriptController));
 
   // Sprint 2: Rendering pipeline (Theme Engine, Layout Engine, DOCX export)
-  const exportManuscriptUseCase = new ExportManuscriptUseCase(
+  // Sprint 3A: PDF export reuses the same renderer-agnostic use case with PDFRenderer instead
+  const exportDocxUseCase = new ExportManuscriptUseCase(
     new MammothParser(),
     new HtmlNormalizer(),
     new ASTBuilder(),
@@ -48,7 +50,15 @@ export function createApp(): Express {
     new LayoutEngine(),
     new DOCXRenderer()
   );
-  const exportController = new ExportController(exportManuscriptUseCase);
+  const exportPdfUseCase = new ExportManuscriptUseCase(
+    new MammothParser(),
+    new HtmlNormalizer(),
+    new ASTBuilder(),
+    new ThemeEngine(),
+    new LayoutEngine(),
+    new PDFRenderer()
+  );
+  const exportController = new ExportController({ docx: exportDocxUseCase, pdf: exportPdfUseCase });
   app.use('/api/manuscripts', exportRoutes(exportController));
 
   // --- Legacy pipeline (kept as-is, unrelated decision pending) ---

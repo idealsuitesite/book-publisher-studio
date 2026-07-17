@@ -12,19 +12,32 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-None currently — Quality Sprint is complete, Sprint 3 hasn't started.
+**Sprint 3A (PDF export) — implementation complete on `feature/sprint-3a-pdf-export`, not yet reviewed/merged/tagged.** Per ADR-0017, this stays IN PROGRESS (not COMPLETED) until it's actually merged to `main` — moving it to Completed before that would repeat the `159a49b3` failure mode this project's discipline exists to prevent.
 
-### Medium Priority (Sprint 3 — "Professional Export", planned commit sequence agreed 2026-07-17, not started)
+### Medium Priority (Sprint 3 — "Professional Export", planned commit sequence agreed 2026-07-17)
 
 Same discipline as Sprint 2: Design Review → ADR → small atomic commits → green build/tests → PR → merge → tag.
 
-1. PDF Renderer (PDFKit, ADR-0014 already decided)
-2. `ExportPDFUseCase`
-3. PDF endpoint (`POST /api/manuscripts/export?format=pdf` or equivalent — exact route shape is a Design Review question, not decided yet)
-4. EPUB library spike + ADR (ADR-0015 — `epub-gen` vs. hand-rolled OOXML via `jszip`)
-5. EPUB Renderer
-6. EPUB endpoint
-7. Verification pass (`docs/MERGE_CHECKLIST.md`)
+**Sprint 3A (PDF export, priority — CTO-directed re-sequencing, 2026-07-17):**
+
+1. ✅ PDFKit spike + ADR-0019 (`backend/spikes/pdfkit-spike.ts`) — fonts, Unicode, images, tables, page breaks, headers/footers, bleed, crop marks all verified against real output before writing `PDFRenderer`
+2. ✅ `PDFRenderer` (`backend/src/infrastructure/renderers/PDFRenderer.ts`) — mirrors `DOCXRenderer`'s block coverage; built on `bufferPages: true` after two rounds of real bugs found and fixed (ADR-0019 finding 6: stack overflow, cursor-strand page blowup, wrong "Page N of TOTAL" caught against a real DOCX)
+3. ✅ PDF export reuses `ExportManuscriptUseCase` as-is (already renderer-agnostic per ADR-0012) — no separate `ExportPDFUseCase` class needed, just a second instance configured with `PDFRenderer`
+4. ✅ PDF endpoint — existing `POST /api/manuscripts/export` gained a `format` field (`docx` default, `pdf`), not a new route
+5. ✅ Tests — 6 `PDFRenderer.test.ts` cases + 1 E2E `format=pdf` case in `export.test.ts`; 125/125 total tests passing, 84.47% global coverage
+6. ✅ Verification pass — build/lint/test/coverage all green; also exported a real DOCX from `backend/uploads/` to PDF through the running dev server (not just fixtures), which is what caught the "Page N of TOTAL" bug in step 2
+
+**Still open before merge:** PR not yet opened — waiting on go-ahead.
+
+**Sprint 3B (EPUB, after 3A ships):**
+
+1. EPUB library spike + ADR (ADR-0015 — `epub-gen` vs. hand-rolled OOXML via `jszip`)
+2. EPUB Renderer
+3. EPUB endpoint
+4. Verification pass (`docs/MERGE_CHECKLIST.md`)
+
+- [ ] **Font asset for PDF/theme rendering** (surfaced by ADR-0019): Georgia (`ClassicTheme`) is a Microsoft-licensed font, not redistributable, and PDFKit ships no font data at all — production needs an openly-licensed font file shipped with the app, not an OS font lookup. Not yet decided which font or license.
+- [ ] **RTL / multi-script text support** (surfaced by ADR-0019): no single embedded font covers every script (verified: Arabic renders as blank boxes, Greek dropped a glyph), and PDFKit does no bidi reordering or Arabic contextual shaping. Real work, not a font swap — flagged, not scheduled.
 
 - [ ] **Remove legacy `/api/upload` route** (`docxParser.ts`, disk-based multer) — both now marked `@deprecated`; confirm nothing depends on the raw-paragraph response shape first (ADR-0011)
 
