@@ -1,0 +1,21 @@
+{
+  "name": "shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical TypeScript type/DTO definitions shared between backend and frontend (Sprint 7, ADR-0033). Types only, zero runtime dependencies.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src"
+  },
+  "author": "Alexandre",
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.7.0",
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.64.0"
+  }
+}
