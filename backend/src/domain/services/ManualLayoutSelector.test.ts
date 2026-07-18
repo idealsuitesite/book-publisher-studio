@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ManualLayoutSelector } from './ManualLayoutSelector';
+import { ManualLayoutSelector, listLayoutNames } from './ManualLayoutSelector';
 import { LetterPageLayout } from '../layouts/LetterPageLayout';
 import { A4PageLayout } from '../layouts/A4PageLayout';
 import { A5PageLayout } from '../layouts/A5PageLayout';
@@ -40,5 +40,23 @@ describe('ManualLayoutSelector', () => {
 
   it('throws UnknownLayoutError for an unrecognized name', () => {
     expect(() => selector.select({ requestedLayoutName: 'nonexistent' })).toThrow(/Unknown page layout/);
+  });
+});
+
+describe('listLayoutNames', () => {
+  const selector = new ManualLayoutSelector();
+
+  it('returns every name select() itself recognizes, and nothing it does not', () => {
+    const names = listLayoutNames();
+    for (const name of names) {
+      expect(() => selector.select({ requestedLayoutName: name })).not.toThrow();
+    }
+    expect(() => selector.select({ requestedLayoutName: 'nonexistent' })).toThrow(/Unknown page layout/);
+  });
+
+  it('includes every Sprint 6 preset', () => {
+    expect(listLayoutNames()).toEqual(
+      expect.arrayContaining(['letter', 'a4', 'a5', 'kdp-5x8', 'kdp-5.5x8.5', 'kdp-6x9'])
+    );
   });
 });

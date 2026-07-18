@@ -17,8 +17,10 @@ import { PDFRenderer } from '../infrastructure/renderers/PDFRenderer';
 import { EPUBRenderer } from '../infrastructure/renderers/EPUBRenderer';
 import { ManuscriptController } from './controllers/ManuscriptController';
 import { ExportController } from './controllers/ExportController';
+import { ManuscriptOptionsController } from './controllers/ManuscriptOptionsController';
 import { manuscriptRoutes } from './routes/manuscripts';
 import { exportRoutes } from './routes/export';
+import { optionsRoutes } from './routes/options';
 import { errorHandler } from './middleware/errorHandler';
 
 export function createApp(): Express {
@@ -87,6 +89,12 @@ export function createApp(): Express {
     new ManualLayoutSelector()
   );
   app.use('/api/manuscripts', exportRoutes(exportController));
+
+  // Sprint 7 commit 2 (Decision 5): a real discovery endpoint, additive to Presentation only -
+  // no Domain/Application change beyond the two additive, read-only list functions the
+  // registries themselves now expose (getTheme.ts/ManualLayoutSelector.ts).
+  const manuscriptOptionsController = new ManuscriptOptionsController();
+  app.use('/api/manuscripts', optionsRoutes(manuscriptOptionsController));
 
   app.get('/api/health', (req: Request, res: Response) => {
     res.json({ status: 'OK', message: 'Backend is running!' });

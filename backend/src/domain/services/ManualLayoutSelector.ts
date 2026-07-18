@@ -31,3 +31,11 @@ export class ManualLayoutSelector implements LayoutSelector {
     return layout;
   }
 }
+
+// Additive, read-only (Sprint 7 commit 2, Decision 5) - exposes the same registry select()
+// already looks up by name, so a discovery endpoint can enumerate real layout names instead of
+// hand-duplicating this list in Presentation. No new business logic, no behavior change to
+// ManualLayoutSelector itself.
+export function listLayoutNames(): string[] {
+  return Object.keys(LAYOUTS);
+}
