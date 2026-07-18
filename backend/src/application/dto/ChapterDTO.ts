@@ -1,12 +1,2 @@
-import type { BlockDTO } from './BlockDTO';
-import type { SectionDTO } from './SectionDTO';
-
-export interface ChapterDTO {
-  type: 'chapter';
-  id: string;
-  number: number;
-  title: string;
-  subtitle?: string;
-  content: BlockDTO[];
-  sections?: SectionDTO[];
-}
+// Re-export shim (Sprint 7 commit 3, ADR-0033) - see InlineDTO.ts for the pattern.
+export type { ChapterDTO } from 'shared-types';

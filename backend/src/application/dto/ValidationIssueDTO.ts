@@ -1,7 +1,2 @@
-export interface ValidationIssueDTO {
-  code: string;
-  message: string;
-  location: string;
-  severity: 'ERROR' | 'WARNING' | 'INFO' | 'SUGGESTION';
-  suggestion?: string;
-}
+// Re-export shim (Sprint 7 commit 3, ADR-0033) - see InlineDTO.ts for the pattern.
+export type { ValidationIssueDTO } from 'shared-types';

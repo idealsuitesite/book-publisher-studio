@@ -1,14 +1,2 @@
-import type { MetadataDTO } from './MetadataDTO';
-import type { ChapterDTO } from './ChapterDTO';
-import type { SectionDTO } from './SectionDTO';
-
-export type ContentDTO = ChapterDTO | SectionDTO;
-
-export interface BookDTO {
-  id: string;
-  metadata: MetadataDTO;
-  mainContent: ContentDTO[];
-  wordCount?: number;
-  pageCount?: number;
-  readingTime?: number;
-}
+// Re-export shim (Sprint 7 commit 3, ADR-0033) - see InlineDTO.ts for the pattern.
+export type { BookDTO, ContentDTO } from 'shared-types';

@@ -1,12 +1,2 @@
-export interface MetadataDTO {
-  title: string;
-  subtitle?: string;
-  author: string;
-  publisher?: string;
-  isbn?: string;
-  language: string;
-  description?: string;
-  keywords?: string[];
-  copyright?: string;
-  publicationDate?: string;
-}
+// Re-export shim (Sprint 7 commit 3, ADR-0033) - see InlineDTO.ts for the pattern.
+export type { MetadataDTO } from 'shared-types';

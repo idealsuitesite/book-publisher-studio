@@ -1,7 +1,2 @@
-import type { BookDTO } from './BookDTO';
-import type { ImportReportDTO } from './ImportReportDTO';
-
-export interface ImportResponseDTO {
-  book: BookDTO;
-  report: ImportReportDTO;
-}
+// Re-export shim (Sprint 7 commit 3, ADR-0033) - see InlineDTO.ts for the pattern.
+export type { ImportResponseDTO } from 'shared-types';

@@ -8,6 +8,7 @@ Coding conventions and layer rules for Book Publisher Studio. This is reference 
 2. **Application depends only on abstractions.** Use Cases take interfaces (ports) via constructor injection, never concrete Infrastructure classes directly. (ADR-0003)
 3. **Presentation depends on Application, never on Domain directly.** Controllers return DTOs, never Domain objects. Mappers convert Domain → DTO. (Core Principle 3, `docs/CLAUDE.md`)
 4. **No cyclic dependencies, ever**, in any direction.
+5. **`packages/shared-types` is transport contracts only — interfaces, types, enums, nothing else.** No Mappers, Validators, business rules, or Services, ever (CTO direction, Sprint 7 commit 3, ADR-0033 addendum). It sits on the direct import path of both `backend/` and `frontend/`, outside the layers rule 1-4 above already govern — if something would do anything at runtime, it belongs in Domain/Application/Infrastructure, not here. See `packages/shared-types/README.md` for the one-sentence version.
 
 ## Dependency Inversion
 
