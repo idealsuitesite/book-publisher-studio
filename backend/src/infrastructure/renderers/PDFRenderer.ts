@@ -3,7 +3,15 @@ import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
 import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
-import type { Content, Block, Chapter, Section, TOCEntry } from '../../domain/models/Book';
+import type {
+  Content,
+  Block,
+  Chapter,
+  Section,
+  TOCEntry,
+  TitlePage,
+  CopyrightPage,
+} from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
@@ -81,6 +89,29 @@ export class PDFRenderer implements Renderer<Buffer> {
       // real, disclosed simplification: a very long TOC that overflows onto extra physical
       // pages falls into the same pagination-estimate-drift bucket as any other overflow).
       const pageOwners: PageOwner[] = [];
+
+      // Front matter renders first, before the TOC and body, matching real print convention:
+      // half-title/title page, then copyright (traditionally on the verso), then contents.
+      //
+      // Until now `Book.frontMatter` was fully typed and entirely unrendered except for `toc`,
+      // so every exported book opened directly on Chapter 1 - no title page, no copyright, no
+      // ISBN, no rights notice. That is the difference between a converted document and a
+      // publishable book. Like the TOC above, these pages sit outside the body's page-number
+      // sequence, which LayoutEngine computed without reserving room for them.
+      const frontMatter = book.styledBook.book.frontMatter;
+
+      if (frontMatter.titlePage) {
+        this.renderTitlePage(doc, frontMatter.titlePage, book.styledBook.theme);
+        pageOwners.push('blank');
+        doc.addPage();
+      }
+
+      if (frontMatter.copyrightPage) {
+        this.renderCopyrightPage(doc, frontMatter.copyrightPage, book.styledBook.theme);
+        pageOwners.push('blank');
+        doc.addPage();
+      }
+
       if (book.tableOfContents && book.tableOfContents.length > 0) {
         this.renderTableOfContents(doc, book.tableOfContents, book.styledBook.theme);
         pageOwners.push('blank');
@@ -233,6 +264,61 @@ export class PDFRenderer implements Renderer<Buffer> {
   // paginated.tableOfContents, the same way it already consumes resolved header/footer data.
   // Each entry indents by its heading level and shows "Title    N" - no dotted-leader styling
   // (a cosmetic detail the design doesn't specify), title left, page number appended inline.
+  /**
+   * A title page is mostly whitespace by design — the title sits roughly a third down the page,
+   * the author near the foot. Centring everything in a block at the top would read as a heading,
+   * not as a title page.
+   */
+  private renderTitlePage(doc: PDFKit.PDFDocument, page: TitlePage, theme: Theme): void {
+    const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const top = doc.page.margins.top + (doc.page.height - doc.page.margins.top - doc.page.margins.bottom) * 0.28;
+
+    doc.font(this.fonts.resolveHeading(1, theme, true, false)).fontSize(32).fillColor('#000');
+    doc.text(page.title, doc.page.margins.left, top, { width: usableWidth, align: 'center' });
+
+    if (page.subtitle) {
+      doc.moveDown(0.5);
+      doc.font(this.fonts.resolveHeading(2, theme, false, true)).fontSize(16).fillColor('#333');
+      doc.text(page.subtitle, doc.page.margins.left, doc.y, { width: usableWidth, align: 'center' });
+    }
+
+    if (page.tagline) {
+      doc.moveDown(1);
+      doc.font(this.fonts.resolveBody(theme, false, true)).fontSize(11).fillColor('#555');
+      doc.text(page.tagline, doc.page.margins.left, doc.y, { width: usableWidth, align: 'center' });
+    }
+
+    doc.font(this.fonts.resolveBody(theme, false, false)).fontSize(14).fillColor('#000');
+    doc.text(page.author, doc.page.margins.left, doc.page.height - doc.page.margins.bottom - 80, {
+      width: usableWidth,
+      align: 'center',
+    });
+  }
+
+  /**
+   * Set small and low on the page, as printed books do. Every line is conditional: a copyright
+   * page that prints an empty "ISBN:" label looks authored and wrong, so a missing field is
+   * simply absent.
+   */
+  private renderCopyrightPage(doc: PDFKit.PDFDocument, page: CopyrightPage, theme: Theme): void {
+    const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const lines = [
+      page.text,
+      page.copyrightText && page.copyrightText !== page.text ? page.copyrightText : undefined,
+      page.legalNotice,
+      page.isbn ? `ISBN: ${page.isbn}` : undefined,
+      page.printingInfo,
+    ].filter((line): line is string => Boolean(line));
+
+    doc.font(this.fonts.resolveBody(theme, false, false)).fontSize(9).fillColor('#000');
+    let y = doc.page.height - doc.page.margins.bottom - lines.length * 14 - 40;
+
+    for (const line of lines) {
+      doc.text(line, doc.page.margins.left, y, { width: usableWidth, align: 'left' });
+      y = doc.y + 2;
+    }
+  }
+
   private renderTableOfContents(doc: PDFKit.PDFDocument, entries: TOCEntry[], theme: Theme): void {
     doc.font(this.fonts.resolveHeading(1, theme, true, false)).fontSize(24).fillColor('#000').text('Table of Contents');
     doc.moveDown();

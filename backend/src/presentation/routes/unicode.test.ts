@@ -46,9 +46,11 @@ describe('Unicode integrity across the import boundary', () => {
       .attach('file', FIXTURE, { filename, contentType: DOCX_MIME });
 
     expect(response.status).toBe(200);
-    // The filename becomes the title when the DOCX has none of its own, so this asserts the
-    // whole decode path, not just the multipart header.
-    expect(response.body.book.metadata.title).toBe(filename);
+    // The filename becomes the title when the DOCX carries none of its own — minus its
+    // extension (see titleFromFileName), since a title page reading "….docx" is not something
+    // a published book does. Asserting on the title exercises the whole decode path, not just
+    // the multipart header.
+    expect(response.body.book.metadata.title).toBe(filename.replace(/\.docx$/, ''));
   });
 
   it('preserves non-ASCII through a real export, not only through import', async () => {
@@ -79,12 +81,10 @@ describe('Unicode integrity across the import boundary', () => {
   });
 
   it('does not mangle a filename that is already pure ASCII', async () => {
-    const filename = 'plain-ascii-book.docx';
-
     const response = await request(app)
       .post('/api/manuscripts/import')
-      .attach('file', FIXTURE, { filename, contentType: DOCX_MIME });
+      .attach('file', FIXTURE, { filename: 'plain-ascii-book.docx', contentType: DOCX_MIME });
 
-    expect(response.body.book.metadata.title).toBe(filename);
+    expect(response.body.book.metadata.title).toBe('plain-ascii-book');
   });
 });

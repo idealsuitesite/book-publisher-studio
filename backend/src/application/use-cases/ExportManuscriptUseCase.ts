@@ -6,6 +6,7 @@ import type { ASTBuilder } from '../../domain/services/ASTBuilder';
 import type { ThemeEngine } from '../../domain/services/ThemeEngine';
 import type { TypographyResolver } from '../../domain/services/TypographyResolver';
 import type { LayoutEngine } from '../../domain/services/LayoutEngine';
+import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 import type { PageLayout } from '../../domain/models/PageLayout';
 import { getTheme } from '../../domain/themes/getTheme';
 
@@ -24,13 +25,21 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
     private themeEngine: ThemeEngine,
     private typographyResolver: TypographyResolver,
     private layoutEngine: LayoutEngine,
-    private renderer: Renderer<Buffer>
+    private renderer: Renderer<Buffer>,
+    private frontMatterBuilder: FrontMatterBuilder = new FrontMatterBuilder()
   ) {}
 
   async execute(request: ExportRequest): Promise<Buffer> {
     const raw = await this.parser.parse(request.buffer);
     const normalized = this.normalizer.normalize(raw.html, { fileName: request.filename });
-    const book = this.builder.build(normalized);
+    const built = this.builder.build(normalized);
+
+    // ASTBuilder sets `frontMatter: {}` on every import, so until now every exported book
+    // opened directly on Chapter 1 - no title page, no copyright page, no ISBN. Generated here
+    // rather than inside ASTBuilder because it is a presentation decision about the finished
+    // book, not a fact recovered from the source document; the import path (which feeds the
+    // structure view and validation) is deliberately left untouched.
+    const book = { ...built, frontMatter: this.frontMatterBuilder.build(built) };
 
     const theme = getTheme(request.themeName);
     const styled = this.themeEngine.applyTheme(book, theme);

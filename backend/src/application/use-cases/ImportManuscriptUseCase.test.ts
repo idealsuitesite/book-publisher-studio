@@ -149,7 +149,11 @@ describe('ImportManuscriptUseCase', () => {
         mimeType: 'x',
       });
 
-      expect(response.book.metadata.title).toBe('my-manuscript.docx');
+      // The extension is stripped: a DOCX rarely carries its own title, so the filename stands
+      // in, and once front matter started rendering a title page reading "my-manuscript.docx"
+      // was visibly wrong. Only the extension goes — underscores and casing are left alone,
+      // since inferring an author's intended punctuation produces confident nonsense.
+      expect(response.book.metadata.title).toBe('my-manuscript');
     });
 
     it('compte correctement les chapitres', async () => {

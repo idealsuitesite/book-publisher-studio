@@ -97,7 +97,25 @@ describe('KDPTarget - is a consumer, never a replacement (CTO requirement, Commi
 
     target.prepare(book, renderedOutputs);
 
-    expect(receivedBundle).toEqual(realPackaging.assemble(book, renderedOutputs));
+    // Compares everything except `manifest.assembledAt`, deliberately.
+    //
+    // This assertion originally read `toEqual(realPackaging.assemble(...))`, which assembled a
+    // SECOND bundle at a different moment and compared the two. Both stamp `new Date()`, so the
+    // test failed whenever the two calls straddled a millisecond boundary - passing perhaps
+    // nineteen runs in twenty. That intermittent failure was observed on 2026-07-18 and could
+    // not be reproduced across nine subsequent runs; this is it.
+    //
+    // The intent was never "the timestamps match" - it is "the validator received the bundle
+    // Packaging produced, not one KDPTarget rebuilt itself". Asserting that directly makes the
+    // test both correct and deterministic.
+    const expected = realPackaging.assemble(book, renderedOutputs);
+    const { manifest: receivedManifest, ...receivedRest } = receivedBundle!;
+    const { manifest: expectedManifest, ...expectedRest } = expected;
+
+    expect(receivedRest).toEqual(expectedRest);
+    expect(receivedManifest.formatsIncluded).toEqual(expectedManifest.formatsIncluded);
+    expect(receivedManifest.hasCover).toBe(expectedManifest.hasCover);
+    expect(receivedManifest.assembledAt).toBeInstanceOf(Date);
   });
 
   it('uses SubmissionValidator\'s findings verbatim - never adds, drops, or re-derives an issue', () => {

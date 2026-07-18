@@ -309,7 +309,7 @@ export class ASTBuilder {
 
   private buildMetadata(doc: NormalizedDocument): BookMetadata {
     return {
-      title: doc.metadata.title ?? doc.metadata.fileName,
+      title: doc.metadata.title ?? titleFromFileName(doc.metadata.fileName) ?? '',
       author: doc.metadata.author ?? 'Unknown',
       language: 'fr',
     };
@@ -330,4 +330,23 @@ export class ASTBuilder {
       footnote: createIdGenerator('footnote'),
     };
   }
+}
+
+/**
+ * Turns a source filename into something usable as a book title.
+ *
+ * A DOCX rarely carries its own title, so the filename stands in — and it was being used
+ * verbatim, extension included. That was invisible while the title only appeared in a
+ * structure panel, and became glaring once front matter started rendering: title pages read
+ * "Le Guide de Jean — Édition Spéciale.docx", which no published book does.
+ *
+ * Only the extension is stripped. Underscores are not turned into spaces and words are not
+ * re-capitalised: guessing at an author's intended punctuation produces confident nonsense,
+ * and the author can set a real title once metadata is editable. Removing an extension is a
+ * fact; inferring a title is not.
+ */
+export function titleFromFileName(fileName: string | undefined): string | undefined {
+  if (!fileName) return undefined;
+  const withoutExtension = fileName.replace(/\.[^./\\]+$/, '');
+  return withoutExtension.trim() || fileName;
 }
