@@ -1,15 +1,91 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+ * AppTheme — interface design tokens (Sprint 9 Commit 1, UI_FOUNDATION.md Decision 2)
+ *
+ * Named AppTheme, never Theme: `Theme` already means "the visual style of a produced
+ * book" in this codebase (ClassicTheme, ThemeEngine, getTheme). The two are unrelated
+ * and must never be conflated.
+ *
+ * Every value references Tailwind's own palette variable rather than a copied oklch
+ * literal, so these tokens cannot drift from the palette the components already use,
+ * and there is no transcription risk.
+ *
+ * The light/dark pairs are not invented — they are the pairs already hand-repeated
+ * across the 7 existing components, measured at Commit 0: text-zinc-900/text-zinc-50
+ * 23 times each, text-zinc-500/text-zinc-400 18 and 20 times, and
+ * border-zinc-300/border-zinc-700 8 times each. Tokenizing them is what stops dark mode
+ * being maintained by hand in every component.
+ *
+ * NOTHING CONSUMES THESE TOKENS YET. Commit 1 is appearance-neutral by Decision 3 — the
+ * components keep their literal Tailwind classes and render identically. Commit 5
+ * refactors them onto these tokens. Defining the layer first is what makes that refactor
+ * a mechanical substitution rather than a redesign.
+ * ------------------------------------------------------------------------- */
+
+:root {
+  /* Surfaces */
+  --app-surface: var(--color-white);
+  --app-surface-raised: var(--color-zinc-100);
+
+  /* Text */
+  --app-text: var(--color-zinc-900);
+  --app-text-muted: var(--color-zinc-500);
+
+  /* Borders */
+  --app-border: var(--color-zinc-300);
+  --app-border-strong: var(--color-zinc-900);
+
+  /* Severity — mirrors ValidationSummary's existing ERROR/WARNING/INFO/SUGGESTION set
+   * and PublishingReport's ERROR/WARNING, so one token set serves both. */
+  --app-error: var(--color-red-600);
+  --app-warning: var(--color-amber-600);
+  --app-info: var(--color-blue-600);
+  --app-success: var(--color-emerald-600);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --app-surface: var(--color-zinc-950);
+    --app-surface-raised: var(--color-zinc-900);
+
+    --app-text: var(--color-zinc-50);
+    --app-text-muted: var(--color-zinc-400);
+
+    --app-border: var(--color-zinc-700);
+    --app-border-strong: var(--color-zinc-50);
+
+    --app-error: var(--color-red-400);
+    --app-warning: var(--color-amber-400);
+    --app-info: var(--color-blue-400);
+    --app-success: var(--color-emerald-400);
+  }
+}
+
+/* Exposes the tokens above as real Tailwind utilities (bg-app-surface, text-app-text,
+ * border-app-border, …). `inline` so each resolves at use-time to whichever :root value
+ * the active colour scheme set — the same mechanism the original scaffold used for
+ * --color-background/--color-foreground. */
+@theme inline {
+  --color-app-surface: var(--app-surface);
+  --color-app-surface-raised: var(--app-surface-raised);
+  --color-app-text: var(--app-text);
+  --color-app-text-muted: var(--app-text-muted);
+  --color-app-border: var(--app-border);
+  --color-app-border-strong: var(--app-border-strong);
+  --color-app-error: var(--app-error);
+  --color-app-warning: var(--app-warning);
+  --color-app-info: var(--app-info);
+  --color-app-success: var(--app-success);
+}
+
+/* Retained from the original scaffold: `body` below still consumes these two, so removing
+ * them would be a visible change, which Decision 3 forbids at this commit. They are
+ * superseded by --app-surface/--app-text above and should be removed at Commit 5, once
+ * body itself is moved onto the token layer. */
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,6 +95,15 @@
   }
 }
 
+/* The rendered font stack is deliberately unchanged.
+ *
+ * Commit 0 confirmed a real defect: layout.tsx downloaded Geist and Geist Mono on every
+ * page load while this rule rendered everything in Arial, and nothing anywhere used the
+ * font-sans/font-mono classes that would have applied them. The fix at this commit is to
+ * stop the wasted download (layout.tsx), NOT to start using Geist — switching the
+ * typeface would change every glyph on every screen, which Decision 3 forbids until
+ * Commit 8. Choosing this product's actual typeface is a design decision, and belongs in
+ * the commit designed for design decisions. */
 body {
   background: var(--background);
   color: var(--foreground);

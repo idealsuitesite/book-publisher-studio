@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-07-18T16:49:38.774Z",
+  "capturedAt": "2026-07-18T17:07:08.187Z",
   "totalViolations": 11,
   "totalNodes": 44,
   "screens": [
@@ -7,7 +7,7 @@
       "screen": "01-landing",
       "viewport": "desktop",
       "file": "01-landing--desktop.png",
-      "bytes": 29736,
+      "bytes": 27318,
       "status": "captured",
       "violations": [
         {
@@ -28,7 +28,7 @@
       "screen": "02-imported",
       "viewport": "desktop",
       "file": "02-imported--desktop.png",
-      "bytes": 94698,
+      "bytes": 92337,
       "status": "captured",
       "violations": [
         {
@@ -55,7 +55,7 @@
       "screen": "03-layout-kdp",
       "viewport": "desktop",
       "file": "03-layout-kdp--desktop.png",
-      "bytes": 94006,
+      "bytes": 91655,
       "status": "captured",
       "violations": [
         {
@@ -82,7 +82,7 @@
       "screen": "04-preview",
       "viewport": "desktop",
       "file": "04-preview--desktop.png",
-      "bytes": 93632,
+      "bytes": 91276,
       "status": "captured",
       "violations": [
         {

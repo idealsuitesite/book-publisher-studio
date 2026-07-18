@@ -60,6 +60,20 @@ Per `UI_FOUNDATION.md` Decision 3: **Commits 1–7 must leave every `--desktop` 
 
 A `--check` failure during Commits 1–7 means a real regression, not a stale baseline.
 
+## Baseline correction at Commit 1 — the harness was photographing dev tooling
+
+**The images in this directory were re-captured at Commit 1.** The original Commit 0 set was subtly wrong, and the way it surfaced is worth recording.
+
+Commit 1's `--check` reported drift on exactly one screen, `04-preview--mobile`, by **4 bytes**. Two further runs reproduced it identically, so it was not random. Stashing the Commit 1 changes and re-running restored a clean result, which appeared to prove the font change had caused it.
+
+Rather than accept that, the differing pixels were located: **29 pixels out of 996,375 (0.0029%), in a 28×28 box at the bottom-left**. Cropping and magnifying that box showed it was **Next.js's development indicator badge** — dev-only tooling that never ships to production, being captured as though it were product UI.
+
+Fixed with `devIndicators: false` in `next.config.ts`, which removes it at source. All 12 images were then re-captured (every one is smaller now, the badge being gone) and Commit 1's changes verified byte-identical against the corrected set.
+
+**Why this mattered:** a baseline that photographs dev-server chrome will drift whenever that chrome changes — on a Next.js upgrade, a build-state change, or a route count change — and each drift would be reported as a product regression. Combined with the animation defect found at Commit 0, this is the second time the enforcement mechanism itself needed fixing before it could be trusted. Both would have degraded Decision 3 into noise that gets ignored.
+
+`scripts/diff-png.mjs` was written during this investigation and kept: `--check` says *that* a screen changed, and it says *where*.
+
 ## Environment note
 
 Sprint 7 Commit 12 recorded that this environment could not persist screenshots to disk and returned blank captures once a page was scrolled. Playwright resolves both: real PNG files, full-page captures independent of scroll position, reproducible on any machine (ADR-0040 Correction 2). The Commit-0 blocker risk that decision flagged did not materialize.
