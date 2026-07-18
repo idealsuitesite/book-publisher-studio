@@ -7,14 +7,62 @@ import type { ImportResponseDTO, ManuscriptOptionsDTO } from 'shared-types';
 // NEXT_PUBLIC_API_BASE_URL, never hardcoded as the only option.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:5000';
 
+/**
+ * Every request is bounded. Without a timeout a hung connection leaves the UI waiting forever
+ * with a spinner and no way out - the user cannot tell a slow export from a dead server.
+ *
+ * Export and publish are deliberately given far longer than import: they run the real
+ * rendering pipeline, and a real 39,913-word manuscript took ~600ms to export while a much
+ * larger one could take many seconds. A limit that is too tight would abort work that was
+ * about to succeed, which is worse than waiting.
+ */
+const IMPORT_TIMEOUT_MS = 60_000;
+const OPTIONS_TIMEOUT_MS = 10_000;
+const EXPORT_TIMEOUT_MS = 180_000;
+
+export class RequestTimeoutError extends Error {
+  constructor(operation: string, timeoutMs: number) {
+    super(`${operation} timed out after ${Math.round(timeoutMs / 1000)}s. The server may be busy or unreachable.`);
+    this.name = 'RequestTimeoutError';
+  }
+}
+
+export class NetworkError extends Error {
+  constructor(operation: string) {
+    super(`${operation} could not reach the server. Check that the backend is running.`);
+    this.name = 'NetworkError';
+  }
+}
+
+/**
+ * Distinguishes the three failure modes a caller genuinely needs to tell apart: the request
+ * timed out, the network never delivered it, or the server answered with an error. Previously
+ * an offline server surfaced as a raw "Failed to fetch", which tells a user nothing.
+ */
+async function request(url: string, init: RequestInit, operation: string, timeoutMs: number) {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      throw new RequestTimeoutError(operation, timeoutMs);
+    }
+    if (error instanceof TypeError) {
+      throw new NetworkError(operation);
+    }
+    throw error;
+  }
+}
+
 export async function importManuscript(file: File): Promise<ImportResponseDTO> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${API_BASE_URL}/api/manuscripts/import`, {
-    method: 'POST',
-    body: formData,
-  });
+  const response = await request(
+    `${API_BASE_URL}/api/manuscripts/import`,
+    { method: 'POST', body: formData },
+    'Import',
+    IMPORT_TIMEOUT_MS
+  );
 
   // ManuscriptController returns a real ImportResponseDTO body on BOTH 200 (report.status ===
   // 'success') and 422 (report.status === 'error', e.g. an empty DOCX) - the import pipeline
@@ -29,7 +77,12 @@ export async function importManuscript(file: File): Promise<ImportResponseDTO> {
 }
 
 export async function getManuscriptOptions(): Promise<ManuscriptOptionsDTO> {
-  const response = await fetch(`${API_BASE_URL}/api/manuscripts/options`);
+  const response = await request(
+    `${API_BASE_URL}/api/manuscripts/options`,
+    {},
+    'Fetching options',
+    OPTIONS_TIMEOUT_MS
+  );
 
   if (!response.ok) {
     throw new Error(`Fetching options failed: ${response.status} ${response.statusText}`);
@@ -47,20 +100,30 @@ export interface ExportManuscriptRequest {
   layout?: string;
 }
 
-export async function exportManuscript({ file, theme, format, layout }: ExportManuscriptRequest): Promise<Blob> {
+export async function exportManuscript({
+  file,
+  theme,
+  format,
+  layout,
+}: ExportManuscriptRequest): Promise<Blob> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('format', format);
   if (theme) formData.append('theme', theme);
   if (layout) formData.append('layout', layout);
 
-  const response = await fetch(`${API_BASE_URL}/api/manuscripts/export`, {
-    method: 'POST',
-    body: formData,
-  });
+  const response = await request(
+    `${API_BASE_URL}/api/manuscripts/export`,
+    { method: 'POST', body: formData },
+    'Export',
+    EXPORT_TIMEOUT_MS
+  );
 
   if (!response.ok) {
-    throw new Error(`Export failed: ${response.status} ${response.statusText}`);
+    // The backend returns a JSON { error } body for 400s (unknown theme, unknown layout,
+    // corrupt file). Surfacing it beats a bare status code the user cannot act on.
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Export failed: ${response.status} ${response.statusText}`);
   }
 
   return response.blob();

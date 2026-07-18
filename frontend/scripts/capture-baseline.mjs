@@ -117,25 +117,12 @@ async function runDemoScript(browser, viewport) {
 
   // Step 2-4 - import the real canonical fixture, then structure + validation appear.
   //
-  // Note this cannot use setInputFiles(): UploadDropzone has NO file input at all - it is a
-  // bare <div> with only onDragOver/onDragLeave/onDrop, no tabIndex, no role, no keyboard
-  // handler. Import is therefore drag-and-drop-only, which is a real accessibility defect
-  // (see baseline/FINDINGS.md) - not a limitation of this script. A real drop event is
-  // synthesized here so the baseline reflects the application as it actually is today.
-  const buffer = readFileSync(FIXTURE);
-  const dataTransfer = await page.evaluateHandle(
-    ({ data, name }) => {
-      const dt = new DataTransfer();
-      dt.items.add(
-        new File([new Uint8Array(data)], name, {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        })
-      );
-      return dt;
-    },
-    { data: Array.from(buffer), name: 'large-book.docx' }
-  );
-  await page.locator('.border-dashed').first().dispatchEvent('drop', { dataTransfer });
+  // Uses the real file input. At Commit 0 this had to synthesize a DataTransfer drop event,
+  // because UploadDropzone had no input at all - only onDrop - which meant keyboard and screen
+  // reader users could not import at all. That defect is fixed, so the baseline now drives the
+  // same control a real user does, and the fact that setInputFiles() works is itself evidence
+  // the fix holds.
+  await page.setInputFiles('input[type="file"]', FIXTURE);
 
   await waitForText(page, 'Structure');
   await scan(page, '02-imported', viewport.name);

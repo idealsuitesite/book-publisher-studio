@@ -154,7 +154,14 @@ export function UploadDropzone() {
   }
 
   return (
-    <div
+    // A <label> wrapping a real file input, not a bare <div>.
+    //
+    // Before this fix the dropzone had no input, no tabIndex, no role and no keyboard handler -
+    // only onDrop. Importing is this application's single entry point, so keyboard users,
+    // screen reader users, and anyone who clicks instead of dragging could not use the product
+    // at all (found by Sprint 9 Commit 0's accessibility baseline). Drag-and-drop is retained
+    // as an additional convenience, not as the only way in.
+    <label
       onDragOver={(event) => {
         event.preventDefault();
         setIsDragging(true);
@@ -166,14 +173,29 @@ export function UploadDropzone() {
         const file = event.dataTransfer.files[0];
         if (file) void handleFile(file);
       }}
-      className={`${CARD_CLASSES} border-dashed ${
+      className={`${CARD_CLASSES} cursor-pointer border-dashed focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900 dark:focus-within:outline-zinc-50 ${
         isDragging
           ? 'border-zinc-900 bg-zinc-100 dark:border-zinc-50 dark:bg-zinc-900'
           : 'border-zinc-300 dark:border-zinc-700'
       }`}
     >
-      <p className="text-lg font-medium text-zinc-900 dark:text-zinc-50">Drop your DOCX here</p>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">.docx manuscripts only</p>
-    </div>
+      <input
+        type="file"
+        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        // sr-only rather than hidden or display:none: the input must stay focusable and
+        // announced. Hiding it outright would recreate the very defect this fixes.
+        className="sr-only"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void handleFile(file);
+          // Reset so selecting the same file twice in a row still fires onChange.
+          event.target.value = '';
+        }}
+      />
+      <span className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+        Drop your DOCX here, or choose a file
+      </span>
+      <span className="text-sm text-zinc-500 dark:text-zinc-400">.docx manuscripts only</span>
+    </label>
   );
 }

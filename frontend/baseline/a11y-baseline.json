@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-07-18T17:07:08.187Z",
+  "capturedAt": "2026-07-18T18:02:00.181Z",
   "totalViolations": 11,
   "totalNodes": 44,
   "screens": [
@@ -7,7 +7,7 @@
       "screen": "01-landing",
       "viewport": "desktop",
       "file": "01-landing--desktop.png",
-      "bytes": 27318,
+      "bytes": 28358,
       "status": "captured",
       "violations": [
         {
