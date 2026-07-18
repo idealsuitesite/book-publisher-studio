@@ -4,12 +4,14 @@ import { useState } from 'react';
 import type { ImportResponseDTO } from 'shared-types';
 import { importManuscript } from '@/lib/api-client';
 import { BookStructureView } from '@/components/BookStructureView';
+import { ValidationSummary } from '@/components/ValidationSummary';
 
 // Sprint 7 commit 5 (docs/architecture/diagrams/SPRINT_7_KICKOFF.md) - the dropzone commit 4
 // shipped as static UI now drives the real ThemeEngine/ASTBuilder pipeline via a real
-// POST /api/manuscripts/import. Commit 6 adds the real book structure view on success
-// (BookStructureView) - the report's validation findings (issues/score) are still deliberately
-// not rendered here, that's commit 7's job.
+// POST /api/manuscripts/import. Commit 6 added the real book structure view on success
+// (BookStructureView). Commit 7 adds the real validation findings (ValidationSummary) below
+// it - format/layout selection (commit 8) and export/preview (commit 9) are still deliberately
+// not wired here.
 type State =
   | { status: 'idle' }
   | { status: 'uploading'; filename: string }
@@ -60,7 +62,12 @@ export function UploadDropzone() {
   }
 
   if (state.status === 'success') {
-    return <BookStructureView book={state.result.book} filename={state.filename} onReset={reset} />;
+    return (
+      <div className="flex w-full max-w-2xl flex-col gap-6">
+        <BookStructureView book={state.result.book} filename={state.filename} onReset={reset} />
+        <ValidationSummary report={state.result.report} />
+      </div>
+    );
   }
 
   if (state.status === 'error') {

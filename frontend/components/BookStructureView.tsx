@@ -1,7 +1,8 @@
 import type { BookDTO } from 'shared-types';
 
 // Sprint 7 commit 6 - renders the real BookDTO a successful import returns. Deliberately no
-// validation findings here (report.issues/.score) - that's commit 7's job.
+// validation findings here (report.issues/.score) - that's ValidationSummary's job (commit 7),
+// rendered as a sibling by UploadDropzone.
 interface BookStructureViewProps {
   book: BookDTO;
   filename: string | null;
