@@ -93,8 +93,8 @@ Per `SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` §6, one responsibility each, green
 1. `chore: convert repo to an npm workspace; scaffold packages/shared-types` — Decision 4's mechanics only, no product feature. Verify `backend/` and `frontend/` both still build/lint/test cleanly under the new structure. Write ADR-0033.
 2. `feat(backend): GET /api/manuscripts/options` (Decision 5) — additive, no Domain/Application change.
 3. `feat(backend): DTOs re-exported from packages/shared-types` — no behavior change, existing test suite stays green.
-4. `feat(frontend): API client typed against packages/shared-types` — `lib/api-client.ts`, no UI yet.
-5. `feat(frontend): upload flow` — drag-and-drop, `POST /api/manuscripts/import`, loading/error states.
+4. `feat(frontend): home screen + API client` — **redefined by CTO direction after Commit 3** from the original "API client, no UI yet" to Book Publisher Studio's actual first screen: `frontend/lib/api-client.ts` (typed against `packages/shared-types`) plus a real `<h1>Book Publisher Studio</h1>` and a static `UploadDropzone` ("Drop your DOCX here", visual drag state only, no backend call yet). The CTO's framing: this is a symbolic moment and the software must finally show something, even if minimal — folding the api-client's quiet plumbing into the same commit as the first visible screen rather than shipping a headless commit first.
+5. `feat(frontend): upload flow` — wires the Commit 4 dropzone to a real `POST /api/manuscripts/import` call via `lib/api-client.ts`, loading/error states. This is where the screen becomes functional, not just visible.
 6. `feat(frontend): book structure view` — render `BookDTO.mainContent`, metadata, word/page/reading-time counters.
 7. `feat(frontend): validation summary` — render `ImportReportDTO.issues`/`.score`.
 8. `feat(frontend): format/layout selector` — populated from Commit 2's endpoint.
