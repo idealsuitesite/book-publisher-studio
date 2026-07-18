@@ -73,7 +73,7 @@ This rule is now also recorded as a durable workflow rule in `docs/DEVELOPMENT_W
 
 ## Reference Documents
 
-- `docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` — the full Design Review (read this before implementing any commit)
+- `docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` — the full Design Review (read this before implementing any commit). Its 5 locked decisions are now formally indexed (CTO direction, added after Commit 1) — cite them as "Decision 1" through "Decision 5" (see that doc's Decision Index, right after the Status line) instead of re-quoting a paragraph.
 - `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` §4a — the proposal this sprint formalizes
 - `docs/product/PRODUCT_DEMO.md` — the official Demo Script, the real-file verification pass (Commit 10) runs through this
 - `docs/product/PRODUCT_ACCEPTANCE.md` — the non-technical Definition of Done (import/read/understand/change/export)

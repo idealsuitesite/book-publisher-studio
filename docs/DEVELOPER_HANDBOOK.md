@@ -40,7 +40,25 @@ This project has answered this question explicitly, per-component, every time it
 - **Infrastructure:** `HtmlNormalizer`, `MammothParser` — `<Technology/Format><Role>`
 - **Presentation:** `ManuscriptController`, `ManuscriptRoute` — `<Resource><Layer>`
 
-## File structure
+## Repository structure (monorepo, since Sprint 7 commit 1 / ADR-0033)
+
+The repository root is an npm workspace (`package.json`'s `workspaces` field) — not a single `backend/` project anymore. The `src/` tree below this section is `backend/src/`'s own internal layering; this is the level above it:
+
+```
+Book Publisher Studio/                (repo root - npm workspace)
+├── backend/                            (Express API - Domain/Application/Infrastructure/Presentation, see below)
+├── frontend/                           (Next.js 16, App Router - Sprint 7 in progress)
+│   └── app/                              only the create-next-app default page as of Commit 1;
+│                                          upload/structure/format/preview routes land Commits 5-9
+├── packages/
+│   └── shared-types/                   canonical DTO/type definitions, consumed by both backend/
+│                                          and frontend/ - types only, zero runtime dependencies (ADR-0033)
+└── docs/                               governance, product, and technical documentation (this file's own directory)
+```
+
+Each of `backend/`, `frontend/`, `packages/shared-types/` has its own `package.json`, builds/lints/tests independently (`npm run <script> --workspace=<name>` from the root, or `cd` into it directly), and is installed from the single root `package-lock.json` — never its own nested lockfile (removed in ADR-0033).
+
+## File structure (`backend/src/`)
 
 ```
 src/
