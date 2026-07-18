@@ -9,6 +9,8 @@ import { MammothParser } from '../../infrastructure/parsers/MammothParser';
 import { buildTestDocxBuffer } from '../../test-utils/buildTestDocx';
 import type { DocumentParser } from '../../domain/ports/DocumentParser';
 import type { ChapterDTO } from '../dto/ChapterDTO';
+import { ProjectService } from '../../domain/services/ProjectService';
+import { InMemoryProjectRepository } from '../../infrastructure/repositories/InMemoryProjectRepository';
 
 class StubParser implements DocumentParser {
   constructor(private html: string) {}
@@ -222,6 +224,83 @@ describe('ImportManuscriptUseCase', () => {
 
       expect(chapter.type).toBe('chapter');
       expect(chapter.sections?.[0].title).toBe('Section A');
+    });
+  });
+
+  // Sprint 9 detour (PRODUCT_OBJECT_MODEL.md): a successful import IS the creation of a project.
+  describe('Project creation (ADR-0047)', () => {
+    const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    function buildProjectAwareUseCase(repository: InMemoryProjectRepository) {
+      let n = 0;
+      return new ImportManuscriptUseCase(
+        new MammothParser(),
+        new HtmlNormalizer(),
+        new ASTBuilder(),
+        createValidationEngine(),
+        new BookMetricsCalculator(),
+        new BookMapper(),
+        new ProjectService(() => `id-${++n}`),
+        repository
+      );
+    }
+
+    it('creates a project around a successful import and returns its id', async () => {
+      const repository = new InMemoryProjectRepository();
+      const useCase = buildProjectAwareUseCase(repository);
+      const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });
+
+      const response = await useCase.execute({
+        buffer,
+        filename: 'Le Guide de Jean.docx',
+        mimeType: DOCX_MIME,
+      });
+
+      expect(response.projectId).toBeDefined();
+      const project = await repository.findById(response.projectId!);
+      expect(project?.name).toBe(project?.book.metadata.title);
+    });
+
+    it('retains the original upload as the source asset, byte for byte', async () => {
+      const repository = new InMemoryProjectRepository();
+      const useCase = buildProjectAwareUseCase(repository);
+      const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });
+
+      const response = await useCase.execute({
+        buffer,
+        filename: 'Le Guide de Jean.docx',
+        mimeType: DOCX_MIME,
+      });
+
+      const project = await repository.findById(response.projectId!);
+      const source = project?.assets.find((a) => a.id === project.sourceAssetId);
+      expect(source?.kind).toBe('source');
+      expect(source?.filename).toBe('Le Guide de Jean.docx');
+      // Byte-for-byte: this is what lets a future importer fix re-read existing work
+      // (AGGREGATES_AND_PERSISTENCE.md Question 5 - import is lossy today).
+      expect(source?.data?.equals(buffer)).toBe(true);
+    });
+
+    it('creates NO project for a rejected import - a library of orphaned failures helps nobody', async () => {
+      const repository = new InMemoryProjectRepository();
+      const useCase = buildProjectAwareUseCase(repository);
+      const buffer = await buildTestDocxBuffer({}); // empty book -> status 'error'
+
+      const response = await useCase.execute({ buffer, filename: 'empty.docx', mimeType: DOCX_MIME });
+
+      expect(response.report.status).toBe('error');
+      expect(response.projectId).toBeUndefined();
+      expect(await repository.list()).toEqual([]);
+    });
+
+    it('still imports normally when no project collaborators are wired - existing callers unaffected', async () => {
+      const useCase = buildUseCase(); // the original 6-argument construction
+      const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });
+
+      const response = await useCase.execute({ buffer, filename: 'm.docx', mimeType: DOCX_MIME });
+
+      expect(response.report.status).toBe('success');
+      expect(response.projectId).toBeUndefined();
     });
   });
 });

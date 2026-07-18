@@ -28,6 +28,11 @@ import { buildCorsOptions } from './middleware/corsOptions';
 import { PublishingUseCase } from '../application/use-cases/PublishingUseCase';
 import { PublishingReportMapper } from '../application/mappers/PublishingReportMapper';
 import { createKDPTarget } from '../domain/services/publishing/createKDPTarget';
+import { InMemoryProjectRepository } from '../infrastructure/repositories/InMemoryProjectRepository';
+import { ProjectService } from '../domain/services/ProjectService';
+import { ProjectSummaryMapper } from '../application/mappers/ProjectSummaryMapper';
+import { ProjectsController } from './controllers/ProjectsController';
+import { projectRoutes } from './routes/projects';
 
 export function createApp(): Express {
   const app: Express = express();
@@ -35,20 +40,37 @@ export function createApp(): Express {
   app.use(cors(buildCorsOptions()));
   app.use(express.json());
 
+  // The Project store — ONE instance for the whole app, because it IS the app's state.
+  // This is the first place the backend deliberately holds state between requests, by explicit
+  // CTO direction (ADR-0047): Sprint 7 Decision 2 (stateless) is now amended in code, not just
+  // in principle. In-memory means nothing survives a restart — disclosed in the class itself —
+  // and the durable store (SQLite, ADR-0046) stays gated behind Sprint 11's review.
+  const projectRepository = new InMemoryProjectRepository();
+  const projectService = new ProjectService();
+
   // New Application/Presentation pipeline (Book AST-based import)
   // Sprint 5: ValidationEngine (8 rules, docs/architecture/diagrams/
   // VALIDATION_ENGINE.md) replaces the structural-only BookValidator here -
   // BookValidator itself still exists, now used internally by StructuralRule.
+  // Sprint 9 detour: a successful import now creates a Project around the book
+  // (PRODUCT_OBJECT_MODEL.md — the project is the unit of work).
   const importManuscriptUseCase = new ImportManuscriptUseCase(
     new MammothParser(),
     new HtmlNormalizer(),
     new ASTBuilder(),
     createValidationEngine(),
     new BookMetricsCalculator(),
-    new BookMapper()
+    new BookMapper(),
+    projectService,
+    projectRepository
   );
   const manuscriptController = new ManuscriptController(importManuscriptUseCase);
   app.use('/api/manuscripts', manuscriptRoutes(manuscriptController));
+
+  // The author's library — read-only this sprint (see ProjectsController for what is
+  // deliberately absent and why).
+  const projectsController = new ProjectsController(projectRepository, new ProjectSummaryMapper());
+  app.use('/api/projects', projectRoutes(projectsController));
 
   // Sprint 2: Rendering pipeline (Theme Engine, Layout Engine, DOCX export)
   // Sprint 3A: PDF export reuses the same renderer-agnostic use case with PDFRenderer instead

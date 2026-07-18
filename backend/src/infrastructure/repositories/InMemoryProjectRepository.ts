@@ -25,7 +25,7 @@ export class InMemoryProjectRepository implements ProjectRepository {
 
   async findById(id: string): Promise<Project | undefined> {
     const stored = this.projects.get(id);
-    return stored ? structuredClone(stored) : undefined;
+    return stored ? cloneProject(stored) : undefined;
   }
 
   async list(options?: ListProjectsOptions): Promise<ProjectSummary[]> {
@@ -39,7 +39,7 @@ export class InMemoryProjectRepository implements ProjectRepository {
   }
 
   async save(project: Project): Promise<void> {
-    this.projects.set(project.id, structuredClone(project));
+    this.projects.set(project.id, cloneProject(project));
   }
 
   async delete(id: string): Promise<void> {
@@ -50,4 +50,25 @@ export class InMemoryProjectRepository implements ProjectRepository {
   clear(): void {
     this.projects.clear();
   }
+}
+
+/**
+ * `structuredClone` alone silently downgrades Node `Buffer`s to plain `Uint8Array`s — the bytes
+ * survive but the prototype does not, so a caller doing `asset.data.equals(...)` crashes at
+ * runtime on a value the type system swears is a Buffer. Found by the first test that
+ * round-tripped a real source asset (ADR-0047), not by the sixteen tests that came before it.
+ * The clone is still a real deep copy; this only restores the prototype the port's types promise.
+ */
+function cloneProject(project: Project): Project {
+  const cloned = structuredClone(project);
+  return {
+    ...cloned,
+    assets: cloned.assets.map((asset) =>
+      asset.data
+        ? // A view over the clone's own fresh ArrayBuffer, not a second copy — structuredClone
+          // already copied the bytes and nobody else holds this buffer.
+          { ...asset, data: Buffer.from(asset.data.buffer, asset.data.byteOffset, asset.data.byteLength) }
+        : asset
+    ),
+  };
 }

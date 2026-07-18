@@ -1271,3 +1271,24 @@ The two renderers that return `pageCount: undefined` are not gaps - they are the
 **Also real, disclosed:** both candidates need an explicit hydration layer (`Date` and `Buffer` do not survive `JSON.parse` naively — the spike's `hydrate()` is the sketch); `node:sqlite` is the one dependency on Node's own API stability, verified available without flags on v24.18.0 and worth re-verifying in CI's Node version before Sprint 11 wires it.
 
 **Related:** `AGGREGATES_AND_PERSISTENCE.md` Question 6 (answered here), Question 4 (the summary read model this schema makes a `SELECT`), Question 5 (blob separation), ADR-0044 (`archivedAt` as an indexed filter), ADR-0041 Constraint 2 (the governance gate implementation waits behind), ADR-0019/0020/0030/0035 (spike-before-decide precedent), ADR-0045 (the freshest reason this spike used real aggregates), `backend/spikes/persistence-store-spike.ts`
+
+---
+
+## ADR-0047: A Successful Import Creates a Project — Decision 2 Amended in Code, by CTO Direction
+
+**Status:** APPROVED (CTO-directed, 2026-07-18)
+**Date:** 2026-07-18
+**Decision:** `ImportManuscriptUseCase` now creates a `Project` around every successfully imported book, retains the original upload as its `'source'` asset byte for byte, and returns `projectId` on the response (additive, optional). `GET /api/projects` lists the library as `ProjectSummaryDTO`s. One `InMemoryProjectRepository` instance is the app's state.
+
+**This is the moment Sprint 7 Decision 2 (stateless backend) stops being amended "in principle only."** The backend now deliberately holds state between requests, by explicit CTO instruction ("le câblage de Project dans l'import"). The state is in-memory and does not survive a restart — disclosed in the repository class, in `app.ts` at the wiring site, and here. The durable store is chosen (SQLite, ADR-0046) but its wiring stays gated behind Sprint 11's Design Review, which must formally restate Decision 2 (ADR-0041 Constraint 2). Holding state and holding it durably are different promises; this ADR makes only the first.
+
+**Product decisions embedded here, each reversible in one place:**
+- **A rejected import creates no project.** The UI treats 422 as "fix your file and try again"; a library accumulating a project per failed attempt fills with orphans the author never asked to keep. Confined to one block in the use case if real authors prove this wrong.
+- **Default settings are the registries' own defaults** (`letter`/`classic`), the same ones the export path applies when nothing is chosen. The project remembers them from birth so they become editable properties later (Decision 1 of `UI_FOUNDATION.md`: layout/theme are book properties, not workflow steps).
+- **The library endpoint is read-only.** No create (import IS create), no delete (ADR-0044's CTO decision — no UI caller until persistence is real), no archive endpoint yet (the control and its consequence should ship together with the library UI, not as an orphaned endpoint first).
+
+**A real defect found by the wiring's own test:** `InMemoryProjectRepository`'s `structuredClone` silently downgraded `Buffer` to `Uint8Array` — bytes intact, prototype gone, so the first caller invoking `asset.data.equals(...)` crashed on a value the type system swears is a `Buffer`. Sixteen existing repository tests missed it because none round-tripped a real asset payload. Fixed in the clone (a prototype-restoring view over the clone's own fresh memory, not a second copy), locked by a regression test at the class that owns the clone. Note for Sprint 11: the SQLite hydration layer has the same class of problem (ADR-0046 already flags `Date`/`Buffer` revival), and this is the concrete proof it bites.
+
+**Verified end to end against the real server:** import of `typography-test.docx` → `projectId` returned → `GET /api/projects` lists the project with its name, zero versions, no publications. The rejected-import path and the Unicode invariant (`supplémentaire` intact through the whole HTTP loop) are locked by route tests.
+
+**Related:** `PRODUCT_OBJECT_MODEL.md` (the project as unit of work), `AGGREGATES_AND_PERSISTENCE.md` Question 5 (source retention — the byte-for-byte test is its proof), ADR-0044 (why delete/archive are absent from the endpoint), ADR-0046 (the chosen store this deliberately does not wire), ADR-0041 Constraint 2 (the governance gate durability still waits behind), Sprint 7 Decision 2 (the stateless rule this amends in code)

@@ -11,6 +11,8 @@ import type { ImportResponseDTO } from '../dto/ImportResponseDTO';
 import type { ImportReportDTO } from '../dto/ImportReportDTO';
 import type { ValidationIssueDTO } from '../dto/ValidationIssueDTO';
 import type { QualityScoreDTO } from '../dto/QualityScoreDTO';
+import type { ProjectService } from '../../domain/services/ProjectService';
+import type { ProjectRepository } from '../../domain/ports/ProjectRepository';
 
 function toIssueDTO(issue: ValidationIssue): ValidationIssueDTO {
   return {
@@ -33,7 +35,12 @@ export class ImportManuscriptUseCase implements UseCase<ImportRequest, ImportRes
     private builder: ASTBuilder,
     private validator: ValidationEngine,
     private metrics: BookMetricsCalculator,
-    private mapper: BookMapper
+    private mapper: BookMapper,
+    // Optional so existing construction sites and tests keep working; app.ts wires the real
+    // ones. Both or neither: a service without a repository could create projects nobody can
+    // ever find again.
+    private projectService?: ProjectService,
+    private projectRepository?: ProjectRepository
   ) {}
 
   async execute(request: ImportRequest): Promise<ImportResponseDTO> {
@@ -53,7 +60,31 @@ export class ImportManuscriptUseCase implements UseCase<ImportRequest, ImportRes
     const bookDTO = this.mapper.map(enrichedBook);
     const report = this.buildReport(enrichedBook, validation);
 
-    return { book: bookDTO, report };
+    // A successful import IS the creation of a project (PRODUCT_OBJECT_MODEL.md - the project
+    // is the unit of work; the book is content). The original upload is retained as a 'source'
+    // asset because import is lossy today (AGGREGATES_AND_PERSISTENCE.md Question 5).
+    //
+    // A REJECTED import creates no project, deliberately: the UI treats 422 as "fix your file
+    // and try again", and a library that silently accumulates a project per failed attempt
+    // would fill with orphans the author never asked to keep. If that judgment turns out wrong
+    // for real authors, the change is confined to this one block.
+    let projectId: string | undefined;
+    if (report.status === 'success' && this.projectService && this.projectRepository) {
+      let project = this.projectService.create(enrichedBook, {
+        layoutName: 'letter',
+        themeName: 'classic',
+      });
+      project = this.projectService.attachSource(
+        project,
+        request.filename,
+        request.mimeType,
+        request.buffer
+      );
+      await this.projectRepository.save(project);
+      projectId = project.id;
+    }
+
+    return { book: bookDTO, report, projectId };
   }
 
   private buildReport(book: Book, validation: ValidationReport): ImportReportDTO {

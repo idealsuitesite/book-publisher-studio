@@ -100,6 +100,24 @@ describe('InMemoryProjectRepository — whole-aggregate round trip', () => {
   });
 });
 
+describe('InMemoryProjectRepository — asset bytes survive the round trip as real Buffers', () => {
+  it('a source asset comes back as a Buffer, byte for byte', async () => {
+    // structuredClone alone downgrades Buffer to Uint8Array - the bytes survive, the prototype
+    // does not, and the first caller doing .equals() crashes on a value the types call Buffer.
+    // Found by ADR-0047's import wiring, locked here at the class that owns the clone.
+    const bytes = Buffer.from('real docx bytes, not a stand-in');
+    let project = service.create(book('Le Guide'), settings);
+    project = service.attachSource(project, 'g.docx', 'application/octet-stream', bytes);
+    await repo.save(project);
+
+    const loaded = await repo.findById(project.id);
+    const source = loaded?.assets.find((a) => a.id === loaded.sourceAssetId);
+
+    expect(Buffer.isBuffer(source?.data)).toBe(true);
+    expect(source?.data?.equals(bytes)).toBe(true);
+  });
+});
+
 describe('InMemoryProjectRepository — stored state is isolated from callers', () => {
   it('a caller mutating what it saved does not corrupt the store', async () => {
     const project = service.create(book('Le Guide'), settings);
