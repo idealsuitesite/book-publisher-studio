@@ -8,6 +8,7 @@ import { ValidationSummary } from '@/components/ValidationSummary';
 import { FormatSelector } from '@/components/FormatSelector';
 import { PreviewPanel } from '@/components/PreviewPanel';
 import { ExportPanel } from '@/components/ExportPanel';
+import { ProgressStepper } from '@/components/ProgressStepper';
 
 // Sprint 7 commit 5 (docs/architecture/diagrams/SPRINT_7_KICKOFF.md) - the dropzone commit 4
 // shipped as static UI now drives the real ThemeEngine/ASTBuilder pipeline via a real
@@ -15,9 +16,11 @@ import { ExportPanel } from '@/components/ExportPanel';
 // (BookStructureView). Commit 7 added the real validation findings (ValidationSummary).
 // Commit 8 added the format/layout selector (FormatSelector). Commit 9a added the real PDF
 // preview (PreviewPanel) - the success state keeps the real dropped File (not just its name)
-// since the stateless backend needs the real bytes resent for export/preview. Commit 9b adds
+// since the stateless backend needs the real bytes resent for export/preview. Commit 9b added
 // real export/download for all 3 formats (ExportPanel), completing the originally-planned
-// Commit 9.
+// Commit 9. Commit 11 adds ProgressStepper - every step's "done" flag is real state (a real
+// import, a real generated preview, a real completed download), not a fixed/simulated bar -
+// plus human-readable format/theme labels threaded down to PreviewPanel.
 type State =
   | { status: 'idle' }
   | { status: 'uploading'; filename: string }
@@ -33,6 +36,8 @@ export function UploadDropzone() {
   const [options, setOptions] = useState<ManuscriptOptionsDTO | null>(null);
   const [selectedLayout, setSelectedLayout] = useState<string | null>(null);
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [hasPreviewed, setHasPreviewed] = useState(false);
+  const [hasExported, setHasExported] = useState(false);
 
   useEffect(() => {
     if (state.status !== 'success' || options) return;
@@ -71,6 +76,8 @@ export function UploadDropzone() {
     setOptions(null);
     setSelectedLayout(null);
     setSelectedTheme(null);
+    setHasPreviewed(false);
+    setHasExported(false);
   }
 
   if (state.status === 'uploading') {
@@ -83,8 +90,21 @@ export function UploadDropzone() {
   }
 
   if (state.status === 'success') {
+    const layoutLabel = options?.layouts.find((l) => l.name === selectedLayout)?.label ?? selectedLayout ?? '';
+    const themeLabel = options?.themes.find((t) => t.name === selectedTheme)?.label ?? selectedTheme ?? '';
+
     return (
       <div className="flex w-full max-w-2xl flex-col gap-6">
+        <ProgressStepper
+          steps={[
+            { label: 'Import', done: true },
+            { label: 'Structure', done: true },
+            { label: 'Validation', done: true },
+            { label: 'Layout', done: Boolean(selectedLayout && selectedTheme) },
+            { label: 'Preview', done: hasPreviewed },
+            { label: 'Export', done: hasExported },
+          ]}
+        />
         <BookStructureView book={state.result.book} filename={state.file.name} onReset={reset} />
         <ValidationSummary report={state.result.report} />
         {options && selectedLayout && selectedTheme && (
@@ -97,10 +117,22 @@ export function UploadDropzone() {
           />
         )}
         {selectedLayout && selectedTheme && (
-          <PreviewPanel file={state.file} layout={selectedLayout} theme={selectedTheme} />
+          <PreviewPanel
+            file={state.file}
+            layout={selectedLayout}
+            theme={selectedTheme}
+            layoutLabel={layoutLabel}
+            themeLabel={themeLabel}
+            onGenerated={() => setHasPreviewed(true)}
+          />
         )}
         {selectedLayout && selectedTheme && (
-          <ExportPanel file={state.file} layout={selectedLayout} theme={selectedTheme} />
+          <ExportPanel
+            file={state.file}
+            layout={selectedLayout}
+            theme={selectedTheme}
+            onDownloaded={() => setHasExported(true)}
+          />
         )}
       </div>
     );

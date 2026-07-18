@@ -11,10 +11,19 @@ import { exportManuscript } from '@/lib/api-client';
 // output) - not a live per-option estimate in the selector, which would need one export call per
 // layout before the user has even chosen (see docs/TODO.md's Commit 9a note for why that was
 // rejected). Download (commit 9b) is a separate action, not wired here.
+//
+// Commit 11 redesign (CTO direction): shows the real selected format/theme labels up front, so
+// the user knows what will be generated before clicking - "Estimated pages" still only appears
+// once a preview has actually been generated (a real number from a real PDF), never guessed
+// ahead of a real request. onGenerated is a real-completion callback for ProgressStepper, not a
+// simulated "done" flag.
 interface PreviewPanelProps {
   file: File;
   layout: string;
   theme: string;
+  layoutLabel: string;
+  themeLabel: string;
+  onGenerated?: () => void;
 }
 
 type PreviewState =
@@ -29,7 +38,7 @@ function countPdfPages(bytes: ArrayBuffer): number | null {
   return matches ? matches.length : null;
 }
 
-export function PreviewPanel({ file, layout, theme }: PreviewPanelProps) {
+export function PreviewPanel({ file, layout, theme, layoutLabel, themeLabel, onGenerated }: PreviewPanelProps) {
   const [state, setState] = useState<PreviewState>({ status: 'idle' });
   const blobUrlRef = useRef<string | null>(null);
 
@@ -56,6 +65,7 @@ export function PreviewPanel({ file, layout, theme }: PreviewPanelProps) {
       const blobUrl = URL.createObjectURL(blob);
       blobUrlRef.current = blobUrl;
       setState({ status: 'ready', blobUrl, pageCount, layout, theme });
+      onGenerated?.();
     } catch (error) {
       setState({ status: 'error', message: error instanceof Error ? error.message : 'Preview failed.' });
     }
@@ -65,21 +75,31 @@ export function PreviewPanel({ file, layout, theme }: PreviewPanelProps) {
     <div className="flex w-full max-w-2xl flex-col gap-4 rounded-2xl border-2 border-zinc-300 px-8 py-6 text-left dark:border-zinc-700">
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Preview</h3>
-        <div className="flex items-center gap-4">
-          {state.status === 'ready' && state.pageCount != null && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              ≈ {state.pageCount} {state.pageCount === 1 ? 'page' : 'pages'}
-            </p>
-          )}
-          <button
-            onClick={() => void generatePreview()}
-            disabled={state.status === 'loading'}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 transition-colors disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900"
-          >
-            {state.status === 'loading' ? 'Generating…' : state.status === 'ready' ? 'Regenerate Preview' : 'Generate Preview'}
-          </button>
-        </div>
+        <button
+          onClick={() => void generatePreview()}
+          disabled={state.status === 'loading'}
+          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 transition-colors disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900"
+        >
+          {state.status === 'loading' ? 'Generating…' : state.status === 'ready' ? 'Regenerate Preview' : 'Generate Preview'}
+        </button>
       </div>
+
+      <dl className="flex flex-wrap gap-6 text-sm">
+        <div>
+          <dt className="text-zinc-500 dark:text-zinc-400">Format</dt>
+          <dd className="font-medium text-zinc-900 dark:text-zinc-50">{layoutLabel}</dd>
+        </div>
+        <div>
+          <dt className="text-zinc-500 dark:text-zinc-400">Theme</dt>
+          <dd className="font-medium text-zinc-900 dark:text-zinc-50">{themeLabel}</dd>
+        </div>
+        {state.status === 'ready' && state.pageCount != null && (
+          <div>
+            <dt className="text-zinc-500 dark:text-zinc-400">Estimated pages</dt>
+            <dd className="font-medium text-zinc-900 dark:text-zinc-50">{state.pageCount}</dd>
+          </div>
+        )}
+      </dl>
 
       {state.status === 'error' && <p className="text-sm text-red-600 dark:text-red-400">{state.message}</p>}
 

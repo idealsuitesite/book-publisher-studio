@@ -8,11 +8,13 @@ import { exportManuscript, type ExportFormat } from '@/lib/api-client';
 // export-pipeline problem's root cause - document generation vs. download mechanism - is
 // immediately identifiable). Each format is its own independent real round trip against the
 // stateless backend (Sprint 7 Decision 2) - it does not reuse commit 9a's preview blob, even
-// for PDF, so all three formats behave identically.
+// for PDF, so all three formats behave identically. onDownloaded (commit 11) is a
+// real-completion callback for ProgressStepper, fired only after a real successful download.
 interface ExportPanelProps {
   file: File;
   layout: string;
   theme: string;
+  onDownloaded?: () => void;
 }
 
 const FORMATS: { format: ExportFormat; label: string }[] = [
@@ -25,7 +27,7 @@ function baseName(filename: string): string {
   return filename.replace(/\.[^./]+$/, '');
 }
 
-export function ExportPanel({ file, layout, theme }: ExportPanelProps) {
+export function ExportPanel({ file, layout, theme, onDownloaded }: ExportPanelProps) {
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -42,6 +44,7 @@ export function ExportPanel({ file, layout, theme }: ExportPanelProps) {
       link.click();
       link.remove();
       URL.revokeObjectURL(blobUrl);
+      onDownloaded?.();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : `${format.toUpperCase()} export failed.`);
     } finally {
