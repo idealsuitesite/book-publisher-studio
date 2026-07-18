@@ -163,6 +163,27 @@ Per commit, appended below (never edited retroactively — this is a timeline, n
 
 **Bottom line: Sprint 7 is real and reproducible from a cold start.** Every verification used real fixtures and real backend responses — no mocks, no synthetic data, no skipped steps silently marked done. Two honest gaps disclosed rather than hidden: no literal 400-500-page fixture exists (used the largest real one available instead), and one stray tooling-level filename artifact was observed and could not be fully explained (content itself independently verified correct). Commit 11 (Polish UI) and Commit 12 (screenshots, docs/ADR closure) remain — the CTO's own UI feedback from this session (panel reorder, PDF viewer with page navigation/zoom, validation severity relabeling, a progress stepper) is recorded in `docs/TODO.md` as Commit 11's scope, deliberately not implemented during this verification-only commit.
 
+### Commit 11 — `feat(frontend): polish UI` (progress stepper, Preview/Validation redesign)
+
+**Real screenshot captured** — the top of the success view showing the real `ProgressStepper` ("✓ Import → ✓ Structure → ✓ Validation → ✓ Layout → ✓ Preview → ✓ Export"), all six checkmarks real (each earned by an actual completed action, not a fixed decorative bar).
+
+**What's now true, per the CTO's own UI feedback from the Commit 10 session:**
+- **Panel order** — already correct (`BookStructureView` has rendered before `ValidationSummary` since Commit 6/7); no code change needed, disclosed rather than silently re-done.
+- **`ProgressStepper`** (new component) — a real checklist across the whole flow, rendered at the top of the success view. Every step's checkmark is real derived state: Import/Structure/Validation are true the instant a real import succeeds (they come from the same response), Layout once a real selection exists, Preview only after a real `PreviewPanel.onGenerated` fires, Export only after a real `ExportPanel.onDownloaded` fires. Light CSS-only transitions (`transition-colors duration-300`) on the ✓/○ swap — no new dependency.
+- **`PreviewPanel` redesign** — now shows the real selected Format and Theme (human-readable labels, e.g. "US Letter"/"Classic", not raw option names like `letter`/`classic`) before any request fires. "Estimated pages" still only appears after a real preview has actually been generated — the CTO's mockup showed it always visible, but a number can't be shown honestly before a real PDF exists to derive it from; this was flagged and the redesign keeps that constraint rather than fabricating a placeholder number.
+- **`ValidationSummary` relabeling** — severities read as plain title case (`Critical`/`Warning`/`Information`/`Suggestion`) instead of shouty all-caps (`WARNING (4)`), plus a real overall summary line ("N things to improve"). The underlying severities, counts, and messages are unchanged — copy and styling only.
+- **Deliberately not built, disclosed not silently dropped:** a true PDF viewer with page navigation and zoom (the CTO's `[ PDF Viewer ]` mockup) — the current `<embed>` gives no programmatic page/zoom control, so this would need a new dependency (e.g. pdf.js), which this project's own rules require a Design Review for before implementation. Not slipped into this commit.
+
+**Real bug found and fixed during verification, disclosed:** mid-verification, the dev console showed a real Turbopack parse error (`Unexpected token` at a line that no longer existed in the actual file — `ValidationSummary.tsx:92:8`) even though `tsc --noEmit`, `eslint`, and `next build` had all already passed cleanly against the real file on disk (independently re-confirmed via a standalone TypeScript transpile check). This is the same class of stale-HMR-cache issue seen at Commit 9a, not a real code defect — resolved the same way: `rm -rf frontend/.next` + restart, five consecutive clean checks followed, verification then completed without recurrence.
+
+**Confirmed real, not simulated:**
+- `frontend/` `tsc --noEmit` (0 errors), `npm run lint` (0 errors/warnings), `npm run build` clean.
+- A real end-to-end drop of `backend/verification/typography-test.docx`: the stepper correctly showed `✓ Import → ✓ Structure → ✓ Validation → ✓ Layout → ○ Preview → ○ Export` immediately after import (`get_page_text`, not assumed). A real click on "Generate Preview" produced a real `POST .../export → 200 OK`, the stepper's Preview step turned ✓, "Estimated pages: 1" appeared (matching the real PDF's real page count), and the button relabeled to "Regenerate Preview". A real click on "Download PDF" produced another real `200 OK` and the Export step turned ✓ — all six steps real and independently verified, not toggled by a timer or a mock.
+- The Validation panel's real text confirmed: `4 things to improve` / `Warning (4)` (title case) — same real 4 warnings as every prior commit, different copy only.
+- The Preview panel's real text confirmed: `Format` `US Letter` / `Theme` `Classic` shown before generating, `Estimated pages` `1` appearing only after.
+
+**Sprint 7's remaining scope: Commit 12 (curated screenshots, docs/ADR closure, `SPRINT_7_TIMELINE.md`, Sprint 7 Final Report).**
+
 ## Related
 
 - `docs/DEVELOPMENT_WORKFLOW.md` — the durable Visible Increment Rule this log exists to satisfy

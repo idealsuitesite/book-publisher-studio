@@ -76,7 +76,18 @@ None currently.
 - [ ] A true PDF viewer with page navigation and zoom controls — **needs a new dependency (e.g. pdf.js)**, which per this project's own rule requires a Design Review before implementation, not a quiet addition inside Commit 11
 - [ ] A progress stepper across the whole flow (✓ Import → ✓ Structure → ✓ Validation → ✓ Layout → ✓ Preview → ○ Export)
 
-**Next: Commit 11** — Polish UI, incorporating the feedback above.
+**Commit 11 done (2026-07-18): Polish UI.** Implements the CTO's Commit-10-session UI feedback:
+- [x] Panel order — already correct (Structure before Validation since Commits 6/7), no change needed
+- [x] `ProgressStepper` (new component) — real 6-step checklist (Import/Structure/Validation/Layout/Preview/Export), every checkmark real derived state (Preview/Export gated on real `onGenerated`/`onDownloaded` callbacks from `PreviewPanel`/`ExportPanel`), light CSS-only transitions, no new dependency
+- [x] `PreviewPanel` redesign — real human-readable Format/Theme labels shown before generating; "Estimated pages" still only shown after a real generation (kept honest rather than matching the mockup's always-visible placeholder)
+- [x] `ValidationSummary` relabeling — `Critical`/`Warning`/`Information`/`Suggestion` in plain title case, plus a real "N things to improve" summary; severities/counts/messages unchanged
+- [ ] **PDF viewer with page navigation/zoom — still deferred.** Needs a new dependency (e.g. pdf.js); per this project's rule, requires its own Design Review before implementation. Not built in Commit 11.
+
+Verified: `tsc --noEmit`/lint/`next build` clean; a real end-to-end drop + real Generate Preview click + real Download PDF click showed the stepper transition `✓✓✓✓○○ → ✓✓✓✓✓○ → ✓✓✓✓✓✓`, each step backed by a real request, confirmed via a real screenshot. **A real bug found and fixed:** a Turbopack dev-console parse error referenced stale line content no longer in the real file — same class of stale-HMR-cache issue as Commit 9a, resolved the same way (`.next` cache clear + restart), not a real code defect (independently confirmed via a standalone TypeScript transpile of the actual file).
+
+**Sprint 7's remaining scope: Commit 12 only.**
+
+**Next: Commit 12** — curated screenshots (the official Demo Script set), docs/ADR reconciliation, `docs/demo/VISIBLE_INCREMENTS.md` compiled into `SPRINT_7_TIMELINE.md`, Sprint 7 Final Report.
 
 Also post-Sprint-6 (2026-07-17), independent of the Sprint 7 scope question: new governance docs formalizing practices that had previously lived only in ADRs/session discipline — `docs/QUALITY_GATE.md` (per-commit checklist + 3 validation levels: Development/Product/Release), `docs/TESTING_STRATEGY.md` (functional-vs-rendering and structural(L1)-vs-rendering(L2) test taxonomies), `docs/REAL_FIXTURE_POLICY.md` (broadens real-fixture verification beyond the rendering pipeline to also cover import and TOC generation, formalizing the trigger gap ADR-0031 bug 2 exposed). ADR-0032 written (TOC generation must use `Chapter`/`Section` titles, never `Heading` blocks — formalizes ADR-0031 bug 2 as a standing rule so a future session can't silently reintroduce it; also gained a second, project-wide decision the same day, the **Engineering Governance Principle** — no feature is done until validated simultaneously at Code/Product/Documentation levels, per CTO direction to consolidate it into this ADR rather than open a new one, matching ADR-0028's precedent).
 
