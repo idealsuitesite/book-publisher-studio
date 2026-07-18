@@ -76,6 +76,19 @@ Per commit, appended below (never edited retroactively — this is a timeline, n
 - `get_page_text` on the live tab immediately after returned exactly: `Book Publisher Studio` / `Import complete` / `typography-test.docx` / `Unknown · typography-test.docx` / `Import another file` / `Words` `81` / `Pages` `1` / `Reading time` `1 min` / `Chapter 1: Chapter One: A Typography Test` / `A Subsection` — matching, field for field, a direct `curl` of the same real endpoint with the same real fixture (`wordCount:81`, `pageCount:1`, `readingTime:1`, one chapter titled "Chapter One: A Typography Test" with one section "A Subsection").
 - `read_page` confirmed "Import another file" is a real, focusable, interactive `button` element in the live DOM.
 
+### Commit 7 — `feat(frontend): validation summary`
+
+**Screenshot: none captured this entry — disclosed, not worked around.** The Browser pane's pixel-capture action (`computer` screenshot) timed out once after the real interaction had already succeeded — the same transient capture-tooling failure already logged at Commits 5 and 6, unrelated to the app. Per the CTO's standing decision on Commit 4's capture, DOM/network evidence is accepted as sufficient: `get_page_text` and `read_page` both confirmed the real rendered state and a real interactive element, matching the same pattern as the two prior commits.
+
+**What's now true:** the book structure view (Commit 6) is now followed by a real validation summary. `ValidationSummary` (new component, sibling to `BookStructureView`, both rendered by `UploadDropzone` on success) renders the real `ImportReportDTO.score` (overall /100 plus a Structure/Metadata/Typography/Accessibility category breakdown) and the real `ImportReportDTO.issues`, grouped by severity (ERROR/WARNING/INFO/SUGGESTION, only groups that actually have members are shown) with each issue's message and optional suggestion. Format/layout selection (Commit 8) and export/preview (Commit 9) remain deliberately unwired.
+
+**Confirmed real, not simulated:**
+- `frontend/` `tsc --noEmit` (0 errors), `npm run lint` (0 errors/warnings), `npm run build` (`next build`, Turbopack, compiled successfully, static pages generated).
+- A real file drop was exercised end to end using the actual bytes of `backend/verification/typography-test.docx` — fetched same-origin from a temporary `frontend/public/` copy (removed immediately after verification, confirmed absent via `git status`) and dispatched as a real `File` via a synthetic `drop` `DataTransfer` onto the actual dropzone element.
+- `read_network_requests` on the live tab showed the real call: `POST http://localhost:5000/api/manuscripts/import → 200 OK`.
+- `get_page_text` on the live tab immediately after returned the real validation data, matching a direct `curl` of the same endpoint with the same fixture field for field: `Validation` / `60/100` / `Structure 100` / `Metadata 60` / `Typography 100` / `Accessibility 100` / `WARNING (4)` / `Book ISBN is not set` / `Book description is not set` / `Book cover image is not set` / `Amazon KDP requires an ISBN before a book can be published`.
+- `read_page` confirmed "Import another file" remained a real, focusable, interactive `button` element in the live DOM alongside the new validation content.
+
 ## Related
 
 - `docs/DEVELOPMENT_WORKFLOW.md` — the durable Visible Increment Rule this log exists to satisfy
