@@ -24,6 +24,7 @@ import { exportRoutes } from './routes/export';
 import { optionsRoutes } from './routes/options';
 import { publishRoutes } from './routes/publish';
 import { errorHandler } from './middleware/errorHandler';
+import { buildCorsOptions } from './middleware/corsOptions';
 import { PublishingUseCase } from '../application/use-cases/PublishingUseCase';
 import { PublishingReportMapper } from '../application/mappers/PublishingReportMapper';
 import { createKDPTarget } from '../domain/services/publishing/createKDPTarget';
@@ -31,7 +32,7 @@ import { createKDPTarget } from '../domain/services/publishing/createKDPTarget';
 export function createApp(): Express {
   const app: Express = express();
 
-  app.use(cors());
+  app.use(cors(buildCorsOptions()));
   app.use(express.json());
 
   // New Application/Presentation pipeline (Book AST-based import)

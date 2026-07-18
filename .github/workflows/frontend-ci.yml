@@ -1,0 +1,58 @@
+name: Frontend CI
+
+# Added 2026-07-18 after a review found the frontend had no CI at all: its type-check, lint and
+# (as of Sprint 9) its test suite ran only on a developer's machine. Mirrors backend-ci.yml's
+# shape so both pipelines stay recognisable as the same thing.
+#
+# Playwright is deliberately NOT run here. The visual baseline needs both dev servers and a real
+# browser, which is a materially different (and slower) job than type-check/lint/unit tests -
+# it belongs in its own workflow if and when it is automated, not bolted onto this one.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  build-lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies (root workspace)
+        run: npm ci
+
+      # frontend imports `shared-types`, so it must be built first - the exact gap that broke
+      # this branch's first-ever push to origin during Sprint 7.
+      - name: Build shared-types
+        run: npm run build --workspace=shared-types
+
+      - name: Type-check
+        run: npm exec --workspace=frontend -- tsc --noEmit
+
+      - name: Lint
+        run: npm run lint --workspace=frontend
+
+      - name: Test
+        run: npm test --workspace=frontend
+
+      - name: Build
+        run: npm run build --workspace=frontend
