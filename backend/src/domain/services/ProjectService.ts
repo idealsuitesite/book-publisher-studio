@@ -1,0 +1,134 @@
+import type { Book } from '../models/Book';
+import type { PublishingReport } from '../models/PublishingReport';
+import type {
+  Project,
+  ProjectSettings,
+  ProjectAsset,
+  BookVersion,
+  PublicationEvent,
+} from '../models/Project';
+
+/**
+ * Operations on a `Project`.
+ *
+ * Every method returns a **new** Project and never mutates its argument, matching `Book`'s own
+ * immutability rule (ADR-0001). That is not ceremony here: `versions` holds snapshots, and a
+ * snapshot taken from an object that can still change is not a snapshot.
+ *
+ * Deliberately free of persistence. This service decides *what a project becomes*; where it is
+ * stored is Sprint 11's separate decision (PRODUCT_OBJECT_MODEL.md Question 5), and keeping
+ * that out means the storage review can be designed against a real shape rather than an
+ * imagined one.
+ */
+export class ProjectService {
+  constructor(private readonly idGenerator: () => string = defaultIdGenerator) {}
+
+  /**
+   * Creates a project around an imported book.
+   *
+   * The name defaults to the book's own title rather than its filename: the filename already
+   * stands in for a missing title upstream, and repeating that substitution here would make a
+   * single weak signal look like two independent ones.
+   */
+  create(book: Book, settings: ProjectSettings, name?: string): Project {
+    const now = new Date();
+    return {
+      id: this.idGenerator(),
+      name: name?.trim() || book.metadata.title?.trim() || 'Untitled project',
+      book,
+      settings,
+      assets: [],
+      versions: [],
+      publications: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  /** Renames the project without touching the book's own title — see `Project.name`. */
+  rename(project: Project, name: string): Project {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('Project name cannot be empty');
+    return { ...project, name: trimmed, updatedAt: new Date() };
+  }
+
+  /** Replaces the manuscript — a re-import of the same work, not a new project. */
+  replaceBook(project: Project, book: Book): Project {
+    return { ...project, book, updatedAt: new Date() };
+  }
+
+  /** Changes layout/theme. These are book properties, not workflow steps (Decision 1). */
+  updateSettings(project: Project, settings: Partial<ProjectSettings>): Project {
+    return { ...project, settings: { ...project.settings, ...settings }, updatedAt: new Date() };
+  }
+
+  /**
+   * Takes an immutable snapshot of the manuscript **and the settings in force**.
+   *
+   * Both are captured because reproducing a past export needs the layout and theme of that day.
+   * A snapshot of content alone could not regenerate its own PDF.
+   */
+  snapshot(project: Project, label?: string): Project {
+    const version: BookVersion = {
+      id: this.idGenerator(),
+      number: project.versions.length + 1,
+      book: project.book,
+      settings: { ...project.settings },
+      label: label?.trim() || undefined,
+      createdAt: new Date(),
+    };
+    return { ...project, versions: [...project.versions, version], updatedAt: new Date() };
+  }
+
+  /**
+   * Restores a past snapshot as the working manuscript.
+   *
+   * Restoring does **not** delete the versions that came after it. Losing history as a side
+   * effect of looking at it is how authors lose work, and the log is append-only by design.
+   */
+  restoreVersion(project: Project, versionId: string): Project {
+    const version = project.versions.find((candidate) => candidate.id === versionId);
+    if (!version) throw new Error(`No such version: ${versionId}`);
+
+    return {
+      ...project,
+      book: version.book,
+      settings: { ...version.settings },
+      updatedAt: new Date(),
+    };
+  }
+
+  /**
+   * Appends a publication attempt — successful or not.
+   *
+   * Failures are recorded too, on purpose. "I tried to publish to KDP and it was rejected" is
+   * exactly the history an author needs, and a log that only keeps successes cannot show it.
+   */
+  recordPublication(project: Project, report: PublishingReport, versionId?: string): Project {
+    const event: PublicationEvent = {
+      id: this.idGenerator(),
+      target: report.target,
+      versionId,
+      report,
+      occurredAt: report.generatedAt,
+    };
+    return { ...project, publications: [...project.publications, event], updatedAt: new Date() };
+  }
+
+  /** Adds an asset. A project may hold several covers; choosing between them is a UI concern. */
+  addAsset(project: Project, asset: Omit<ProjectAsset, 'id' | 'createdAt'>): Project {
+    const stored: ProjectAsset = { ...asset, id: this.idGenerator(), createdAt: new Date() };
+    return { ...project, assets: [...project.assets, stored], updatedAt: new Date() };
+  }
+
+  /** Removes an asset. Versions that referenced it keep their reference — see below. */
+  removeAsset(project: Project, assetId: string): Project {
+    const assets = project.assets.filter((asset) => asset.id !== assetId);
+    if (assets.length === project.assets.length) throw new Error(`No such asset: ${assetId}`);
+    return { ...project, assets, updatedAt: new Date() };
+  }
+}
+
+function defaultIdGenerator(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}

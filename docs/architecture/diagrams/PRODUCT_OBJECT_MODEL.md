@@ -1,7 +1,10 @@
 # Product Object Model — Level 1 Design Review
 
-**Status:** 🟡 **ROUND 1 — DRAFT. Not approved. No branch, no code.** 7 open questions, each with a recommendation and its reasoning, all left for explicit CTO decision.
-**Date:** 2026-07-18
+**Status:** ✅ **APPROVED (2026-07-18).** All 7 questions resolved by CTO go-ahead, taking each recommendation as locked. §3 records them as decisions; the reasoning behind each is preserved verbatim rather than summarised, because that reasoning is what a future contributor needs.
+
+**What this approval authorizes, and what it does not.** The Domain models — `Project`, `BookVersion`, `PublicationEvent`, `ProjectAsset` — are authorized now: they are pure, testable, and depend on nothing. **Persistence is not authorized by this document.** Question 5 amends Sprint 7 Decision 2 *in principle*; which store, and the migration/backup/deletion semantics that come with it, still needs Sprint 11's own Level 2 review and a spike, per this project's spike-before-decide discipline (ADR-0019/0020/0030/0035). Building models first is deliberate: it is what Sprint 8 did with ports and models before any implementation, and it means the persistence review will have a real shape to design against rather than an imagined one.
+
+**Date:** 2026-07-18 (round 1 drafted) / 2026-07-18 (approved)
 **Trigger:** CTO product review after using the software on a real manuscript. Their own stated priority: *"Je ne développerais pas d'abord de nouvelles fonctionnalités. Je commencerais à réfléchir au modèle objet du produit."*
 
 ---
