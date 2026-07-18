@@ -18,6 +18,7 @@ import { ASTBuilder } from '../src/domain/services/ASTBuilder';
 import { ThemeEngine } from '../src/domain/services/ThemeEngine';
 import { TypographyResolver } from '../src/domain/services/TypographyResolver';
 import { LayoutEngine } from '../src/domain/services/LayoutEngine';
+import { PdfKitTextMeasurer } from '../src/infrastructure/fonts/PdfKitTextMeasurer';
 import { getTheme } from '../src/domain/themes/getTheme';
 import { LetterPageLayout } from '../src/domain/layouts/LetterPageLayout';
 import type { Block, Content } from '../src/domain/models/Book';
@@ -33,6 +34,7 @@ async function main() {
   const styled = new ThemeEngine().applyTheme(book, getTheme('classic'));
   const typeset = new TypographyResolver().resolve(styled);
   const paginated = new LayoutEngine().paginate(typeset, LetterPageLayout);
+  const paginatedMeasured = new LayoutEngine(new PdfKitTextMeasurer()).paginate(typeset, LetterPageLayout);
 
   const layout = LetterPageLayout;
   const usableWidth = layout.width - layout.marginLeft - layout.marginRight;
@@ -102,6 +104,19 @@ async function main() {
   console.log(`  mean real fill: ${(100 * ratios.reduce((a, b) => a + b, 0) / ratios.length).toFixed(0)}%`);
   console.log(`  pages < 70% full: ${under70}/${ratios.length}   pages < 50% full: ${underHalf}/${ratios.length}`);
   console.log(`  worst 8 pages: ${ratios.map((r, i) => [r, i + 1] as const).sort((a, b) => a[0] - b[0]).slice(0, 8).map(([r, p]) => `p${p}:${(100 * r).toFixed(0)}%`).join('  ')}`);
+
+  // 2b. AFTER: the same fill measurement against Decision-6 measured pagination.
+  const ratios2: number[] = [];
+  for (const page of paginatedMeasured.pages) {
+    const realHeight = page.blocks.reduce((s2, id) => {
+      const b = blocks.get(id);
+      return s2 + (b ? real(b) : 0);
+    }, 0);
+    ratios2.push(realHeight / usableHeight);
+  }
+  console.log(
+    `  AFTER (TextMeasurer wired): pages: ${paginatedMeasured.pages.length}   mean real fill: ${(100 * ratios2.reduce((a, b) => a + b, 0) / ratios2.length).toFixed(0)}%`
+  );
 
   // 3. What the estimator never counts
   const chapters = (typeset as unknown as { book: { mainContent: Content[] } }).book.mainContent.filter((c) => c.type === 'chapter');

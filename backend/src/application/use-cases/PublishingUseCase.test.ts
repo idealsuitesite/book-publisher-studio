@@ -7,6 +7,7 @@ import { ASTBuilder } from '../../domain/services/ASTBuilder';
 import { ThemeEngine } from '../../domain/services/ThemeEngine';
 import { TypographyResolver } from '../../domain/services/TypographyResolver';
 import { LayoutEngine } from '../../domain/services/LayoutEngine';
+import { PdfKitTextMeasurer } from '../../infrastructure/fonts/PdfKitTextMeasurer';
 import { HtmlNormalizer } from '../../infrastructure/normalizers/HtmlNormalizer';
 import { MammothParser } from '../../infrastructure/parsers/MammothParser';
 import { PDFRenderer } from '../../infrastructure/renderers/PDFRenderer';
@@ -142,7 +143,7 @@ describe('PublishingUseCase', () => {
         new ASTBuilder(),
         new ThemeEngine(),
         new TypographyResolver(),
-        new LayoutEngine(),
+        new LayoutEngine(new PdfKitTextMeasurer()),
         new PDFRenderer(),
         capturing
       );
@@ -155,7 +156,7 @@ describe('PublishingUseCase', () => {
         new ASTBuilder(),
         new ThemeEngine(),
         new TypographyResolver(),
-        new LayoutEngine(),
+        new LayoutEngine(new PdfKitTextMeasurer()),
         new PDFRenderer()
       );
       const pdf = await exporting.execute(request);

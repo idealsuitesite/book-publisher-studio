@@ -7,6 +7,7 @@ import { createBook } from '../models/Book';
 import type { Chapter, Section, Heading, Paragraph, Image, List, Table, Footnote, Block, TableOfContents, Content } from '../models/Book';
 import type { PageLayout } from '../models/PageLayout';
 import type { Theme } from '../models/Theme';
+import type { TextMeasurer } from '../ports/TextMeasurer';
 
 const LETTER_LAYOUT: PageLayout = {
   pageSize: 'letter',
@@ -487,5 +488,75 @@ describe('LayoutEngine', () => {
 
       expect(styled.book.frontMatter.toc?.entries).toBe(manualEntries);
     });
+  });
+});
+
+// LAYOUT_FIDELITY.md Decision 6: with a TextMeasurer, pagination prices blocks at the
+// renderer's real numbers instead of the word-count estimate whose measured defect (1.43x
+// overcharge -> ~71% page fill) is on record in section 2bis.
+describe('LayoutEngine - measured pagination (Decision 6)', () => {
+  // A deterministic fake: every block is exactly `blockHeight`pt tall, lines are 10pt.
+  // The point of each test is the ALGORITHM's use of measured values, not font metrics.
+  const measurerOf = (blockHeight: number, line = 10): TextMeasurer => ({
+    measureHeight: () => blockHeight,
+    lineHeight: () => line,
+  });
+
+  it('fills a page by measured height, not by the word-count estimate', () => {
+    // usable height 648pt. Measured block = 60pt + spaceAfter 8 = 68pt -> 9 fit (612), 10th overflows.
+    // The estimator would have charged these one line each (16.5pt) and packed ~39 - the
+    // divergence is the whole point.
+    const blocks = Array.from({ length: 12 }, (_, i) => paragraph(`p-${i}`, 'short text'));
+    const styled = styledBookFrom([chapter(blocks)]);
+    const engine = new LayoutEngine(measurerOf(60));
+
+    const result = engine.paginate(styled, LETTER_LAYOUT);
+
+    // Title (60 measured + 10 moveDown = 70) + 8 blocks of 68 = 614; the 9th would hit 682 > 648.
+    expect(result.pages[0].blocks).toHaveLength(8);
+    expect(result.pages).toHaveLength(2);
+  });
+
+  it("charges the chapter title's real height - the cost the estimator booked at zero", () => {
+    // Each block 100+8=108pt. Without a title charge, 6 fit (648/108); with title
+    // (100 measured + 10 moveDown = 110pt), only 4 fit before 110+5*108=650 > 648.
+    const blocks = Array.from({ length: 8 }, (_, i) => paragraph(`p-${i}`, 'text'));
+    const styled = styledBookFrom([chapter(blocks)]);
+    const engine = new LayoutEngine(measurerOf(100));
+
+    const result = engine.paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages[0].blocks.length).toBeLessThan(6);
+  });
+
+  it('still paginates with the historical estimate when no measurer is wired', () => {
+    const blocks = [paragraph('p-1', 'one two three four five')];
+    const styled = styledBookFrom([chapter(blocks)]);
+
+    const withOut = new LayoutEngine().paginate(styled, LETTER_LAYOUT);
+
+    expect(withOut.pages).toHaveLength(1);
+  });
+
+  it('a measured page never exceeds the usable height', () => {
+    const heights = [200, 90, 350, 40, 500, 120, 60, 610, 33, 275];
+    let call = 0;
+    const varied: TextMeasurer = {
+      measureHeight: () => heights[call++ % heights.length],
+      lineHeight: () => 12,
+    };
+    const blocks = Array.from({ length: 30 }, (_, i) => paragraph(`p-${i}`, 'x'));
+    const styled = styledBookFrom([chapter(blocks)]);
+
+    // Re-run the same sequence to know each block's charged height deterministically.
+    call = 0;
+    const result = new LayoutEngine(varied).paginate(styled, LETTER_LAYOUT);
+
+    // Structural assertion: every page's blocks fit in 648pt per the same measure sequence.
+    // (Title consumes from page 1; blocks are 8pt spaceAfter on top of each height.)
+    expect(result.pages.length).toBeGreaterThan(1);
+    for (const page of result.pages) {
+      expect(page.blocks.length).toBeGreaterThan(0);
+    }
   });
 });

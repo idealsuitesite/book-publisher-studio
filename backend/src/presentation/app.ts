@@ -11,6 +11,7 @@ import { ExportManuscriptUseCase } from '../application/use-cases/ExportManuscri
 import { ThemeEngine } from '../domain/services/ThemeEngine';
 import { TypographyResolver } from '../domain/services/TypographyResolver';
 import { LayoutEngine } from '../domain/services/LayoutEngine';
+import { PdfKitTextMeasurer } from '../infrastructure/fonts/PdfKitTextMeasurer';
 import { ManualLayoutSelector } from '../domain/services/ManualLayoutSelector';
 import { DOCXRenderer } from '../infrastructure/renderers/DOCXRenderer';
 import { PDFRenderer } from '../infrastructure/renderers/PDFRenderer';
@@ -48,6 +49,13 @@ export function createApp(): Express {
   const projectRepository = new InMemoryProjectRepository();
   const projectService = new ProjectService();
 
+  // Pagination measures with the renderer's own fonts (LAYOUT_FIDELITY.md Decision 6) - one
+  // measurer, one measured LayoutEngine, shared across every export format exactly as
+  // ThemeEngine/TypographyResolver already are. DOCX and EPUB reuse the PDF-metric pagination
+  // knowingly: Word repaginates on open and EPUB reflows, so PDF is the only format whose
+  // pagination is load-bearing (ADR-0045).
+  const layoutEngine = new LayoutEngine(new PdfKitTextMeasurer());
+
   // New Application/Presentation pipeline (Book AST-based import)
   // Sprint 5: ValidationEngine (8 rules, docs/architecture/diagrams/
   // VALIDATION_ENGINE.md) replaces the structural-only BookValidator here -
@@ -84,7 +92,7 @@ export function createApp(): Express {
     new ASTBuilder(),
     new ThemeEngine(),
     new TypographyResolver(),
-    new LayoutEngine(),
+    layoutEngine,
     new DOCXRenderer()
   );
   const exportPdfUseCase = new ExportManuscriptUseCase(
@@ -93,7 +101,7 @@ export function createApp(): Express {
     new ASTBuilder(),
     new ThemeEngine(),
     new TypographyResolver(),
-    new LayoutEngine(),
+    layoutEngine,
     new PDFRenderer()
   );
   const exportEpubUseCase = new ExportManuscriptUseCase(
@@ -102,7 +110,7 @@ export function createApp(): Express {
     new ASTBuilder(),
     new ThemeEngine(),
     new TypographyResolver(),
-    new LayoutEngine(),
+    layoutEngine,
     new EPUBRenderer()
   );
   // Sprint 6: ExportController resolves page layout via LayoutSelector instead of a
@@ -127,7 +135,7 @@ export function createApp(): Express {
     new ASTBuilder(),
     new ThemeEngine(),
     new TypographyResolver(),
-    new LayoutEngine(),
+    layoutEngine,
     new PDFRenderer(),
     createKDPTarget()
   );

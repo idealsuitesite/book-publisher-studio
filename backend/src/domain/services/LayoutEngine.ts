@@ -3,6 +3,7 @@ import type { PageLayout } from '../models/PageLayout';
 import type { Page, PaginatedBook } from '../models/PaginatedBook';
 import type { Content, Block, TOCEntry } from '../models/Book';
 import { countWords } from '../../shared/utils/textMetrics';
+import type { TextMeasurer } from '../ports/TextMeasurer';
 
 const WORDS_PER_LINE = 12;
 const DEFAULT_IMAGE_HEIGHT = 200;
@@ -17,8 +18,18 @@ function blankPagesNeededFor(style: 'right' | 'left' | 'any' | undefined, nextPa
 }
 
 export class LayoutEngine {
+  /**
+   * With a `TextMeasurer`, pagination *measures* block heights with the renderer's own fonts
+   * and line heights (LAYOUT_FIDELITY.md Decision 6). Without one, the historical word-count
+   * estimate applies — kept as the no-dependency fallback, with its measured defect on record:
+   * it overcharges ~1.43× (§2bis), which capped real pages at ~71% fill because PDFRenderer
+   * enforces these breaks on real text.
+   */
+  constructor(private readonly measurer?: TextMeasurer) {}
+
   paginate(styled: StyledBook, layout: PageLayout): PaginatedBook {
     const usableHeight = layout.height - layout.marginTop - layout.marginBottom;
+    const usableWidth = layout.width - layout.marginLeft - layout.marginRight;
     const pages: Page[] = [];
     let currentPageBlocks: string[] = [];
     let currentPageHeights: number[] = [];
@@ -84,8 +95,27 @@ export class LayoutEngine {
       }
     };
 
+    // The renderer draws a chapter/section title (renderTitle: 24pt for chapters,
+    // max(12, 22 - 2·level) for sections, then a full moveDown) before the content blocks.
+    // Until Decision 6 this cost was booked at ZERO, which is half of the CTO's
+    // title-above-a-void observation — the model believed the page under a title was taller
+    // than it really was. Only chargeable when a measurer exists: the fallback estimator has
+    // no line-height source for heading sizes and inventing one would be a new guess.
+    const chargeTitleHeight = (content: Content): void => {
+      if (!this.measurer || !content.title) return;
+      const size = content.type === 'chapter' ? 24 : Math.max(12, 22 - content.level * 2);
+      const titleHeight =
+        this.measurer.measureHeight(content.title, {
+          fontSize: size,
+          width: usableWidth,
+          heading: true,
+          theme: styled.theme,
+        }) + this.measurer.lineHeight(size); // renderTitle's moveDown()
+      currentHeight += titleHeight;
+    };
+
     const addBlock = (block: Block, forceNewPage: boolean): void => {
-      const blockHeight = this.estimateBlockHeight(block, styled);
+      const blockHeight = this.estimateBlockHeight(block, styled, usableWidth);
       const overflow = currentHeight + blockHeight > usableHeight && currentPageBlocks.length > 0;
 
       if (forceNewPage) {
@@ -126,6 +156,9 @@ export class LayoutEngine {
             }
           }
           if (isTopLevel) currentTopLevelTitle = content.title;
+          // The title is drawn (and now priced) immediately before this content's first block —
+          // after the chapter's own page break, in the flow for sections.
+          if (isFirstBlock) chargeTitleHeight(content);
           addBlock(block, false);
           isFirstBlock = false;
         }
@@ -203,11 +236,50 @@ export class LayoutEngine {
     return entries;
   }
 
-  private estimateBlockHeight(block: Block, styled: StyledBook): number {
+  private estimateBlockHeight(block: Block, styled: StyledBook, usableWidth: number): number {
     const style = styled.blockStyles[block.id];
     const fontSize = style?.fontSize ?? styled.theme.fontSizes.body;
-    const lineHeight = styled.theme.spacing.lineHeight;
-    const linePoints = fontSize * lineHeight;
+
+    // Decision 6: measured heights when a TextMeasurer is wired. Real font, real glyph widths,
+    // natural line height — the renderer's own numbers — plus the spaceAfter the renderer adds
+    // after every block (moveDown(spaceAfter/fontSize)), which the estimate never modelled.
+    if (this.measurer) {
+      const spaceAfter = style?.spaceAfter ?? 8;
+      const measure = (text: string, heading = false): number =>
+        this.measurer!.measureHeight(text, { fontSize, width: usableWidth, heading, theme: styled.theme }) +
+        spaceAfter;
+      const line = this.measurer.lineHeight(fontSize);
+
+      switch (block.type) {
+        case 'heading':
+          return measure(block.text, true);
+        case 'paragraph':
+        case 'quote':
+        case 'scripture':
+          return measure(block.text);
+        case 'list':
+          // Items render as separate lines; measuring them joined by newlines matches the
+          // renderer's per-item text calls to within wrapping.
+          return measure(block.items.join('\n'));
+        case 'table':
+          return (1 + block.rows.length) * line + spaceAfter;
+        case 'footnote':
+          return line + spaceAfter;
+        case 'image':
+          return (block.height ?? DEFAULT_IMAGE_HEIGHT) + spaceAfter;
+        case 'page-break':
+        case 'divider':
+          return line;
+        default: {
+          const _exhaustive: never = block;
+          throw new Error(`Unsupported block type: ${JSON.stringify(_exhaustive)}`);
+        }
+      }
+    }
+
+    // Historical no-measurer fallback. Its defect is measured and on record (LAYOUT_FIDELITY.md
+    // §2bis: ~1.43× overcharge → ~71% page fill): kept only so the engine works standalone.
+    const linePoints = fontSize * styled.theme.spacing.lineHeight;
 
     switch (block.type) {
       case 'heading':
