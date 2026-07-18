@@ -209,7 +209,7 @@ Updates `PLATFORM_ARCHITECTURE_ROADMAP.md` §3's dependency diagram's final stag
 
 ## 5. Functional / Technical Specifications
 
-Structural shapes locked now (they don't depend on any KDP-specific real value); KDP's actual rule *content* (`KDPRuleSet`'s real data) remains pending the Decision-2 spike, per this project's own "confirmed, not guessed" discipline.
+Structural shapes locked now (they don't depend on any KDP-specific real value); KDP's actual rule *content* (`KDPRuleSet`'s real data) was pending the Decision-2 spike — now resolved (Commit 0, ADR-0035, `backend/spikes/kdp-publishing-spike.ts`), per this project's own "confirmed, not guessed" discipline. One structural shape below is corrected as a direct consequence of the spike's findings (see the note after `KDPRuleSet`).
 
 ```typescript
 // Domain port
@@ -242,11 +242,27 @@ interface PostRenderValidationRule {
   evaluate(context: PostRenderValidationContext): PublishingIssue[];
 }
 
-// KDPRuleSet - data, not logic; pending the Decision-2 spike for real values
+// KDPRuleSet - data, not logic. Real values verified by the Commit-0 spike (ADR-0035).
 interface KDPRuleSet {
-  requiredMetadataFields: (keyof BookMetadata)[]; // pending spike
-  coverSpec: { minWidthPx: number; minHeightPx: number; minDpi: number }; // pending spike
-  // further fields pending spike
+  requiredMetadataFields: (keyof BookMetadata)[]; // ['title', 'author', 'isbn', 'language']
+  interiorSpec: {
+    minResolutionDpi: number; // 300
+    bleedIn: number; // 0.125
+    marginsByPageCount: { maxPages: number; gutterIn: number; outsideMinIn: number }[];
+    minPageCount: number; // 24
+    maxPageCount: number; // 828
+  };
+  // Corrected by the Commit-0 spike: the paperback cover has no fixed pixel size - it's PDF,
+  // CMYK, computed from trim size + page count + paper type, unlike the fixed-pixel eBook cover
+  // the original minWidthPx/minHeightPx/minDpi shape assumed.
+  paperbackCoverSpec: {
+    fileFormat: 'PDF';
+    colorMode: 'CMYK';
+    minResolutionDpi: number; // 300
+    bleedIn: number; // 0.125
+    spineWidthInPerPage: Record<string, number>; // by paper/ink type
+    spineTextMinPages: number; // 79
+  };
 }
 ```
 
@@ -257,7 +273,7 @@ interface KDPRuleSet {
 ## 6. Risks
 
 1. **Reversing `VISION.md`'s own original architectural framing (Decision 1) is a bigger call than a typical Level 2 review makes** — flagged explicitly, now locked by explicit CTO decision rather than left as a recommendation.
-2. **No real KDP spike exists yet** — Decision 2 makes this a hard prerequisite, not optional, before `KDPTarget`/`KDPRuleSet` code is written.
+2. ~~No real KDP spike exists yet~~ **Resolved (Commit 0, 2026-07-18, ADR-0035)** — `backend/spikes/kdp-publishing-spike.ts` verified real cover/interior/metadata requirements directly from `kdp.amazon.com`'s own published pages. One shape correction surfaced: `KDPRuleSet.coverSpec` is now `paperbackCoverSpec` (§5), reflecting that paperback cover dimensions are computed, not fixed pixels.
 3. **Scope creep into real automated submission** — closed by Decision 5's explicit, unambiguous boundary.
 4. **`ASTBuilder` still can't populate ISBN/description/cover-image from a real DOCX** — any KDP-readiness check this engine runs against a real imported manuscript will, today, always fail on metadata completeness (same category as Sprint 5/6's own disclosed, unfixed import-pipeline gaps). Real, not a defect this engine introduces.
 5. **KDP's real specifications change over time, independent of this project's release cycle (CTO-added risk).** The engine must never hardcode KDP's current requirements as logic. Decision 6's `KDPRuleSet` isolation (data, not conditionals inside `KDPTarget`/`SubmissionValidator`) is the mitigation — a future spec change is a data update to `KDPRuleSet`, not a code change to the engine. This is now a locked architectural constraint, not just a stated intent, per Decision 6.
@@ -268,7 +284,7 @@ interface KDPRuleSet {
 
 Approved by the CTO as "very prudent," matching their own stated order (Spike → Port → Validation → API → Tests → Documentation). Refined into concrete commits now that Decision 6's decomposition is locked:
 
-1. **Commit 0 — KDP publishing-requirements spike** (`backend/spikes/kdp-publishing-spike.ts`), before any preset/port code — real metadata requirements, real cover spec, real file-naming/submission rules, matching ADR-0019/0020/0030
+1. ✅ **Commit 0 — KDP publishing-requirements spike** (`backend/spikes/kdp-publishing-spike.ts`, 2026-07-18, ADR-0035) — real metadata requirements, real cover spec, real file-naming/submission rules, matching ADR-0019/0020/0030
 2. **Commit 1 — `PublishingTarget` port + `PublishingReport`/`PublishingIssue` models** (Domain)
 3. **Commit 2 — `Packaging`** (assembles book + cover + metadata into a `PublishingBundle`)
 4. **Commit 3 — `SubmissionValidator` + `PostRenderValidationRule` family + `KDPRuleSet`** (real values from the spike, isolated as data per Decision 6/Risk 5)

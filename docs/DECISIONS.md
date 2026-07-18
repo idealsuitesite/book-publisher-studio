@@ -858,4 +858,40 @@ This is the project's first monorepo-structural change — implements Design Rev
 - The PDF-viewer and licensing deferrals (Decisions 2-3) are now findable from `docs/ADR_INDEX.md`'s search path, not only from `docs/TODO.md`'s backlog prose — a future Design Review scoping either feature has a fixed starting citation.
 - Decision 4 sets precedent: a future one-off scale/timing diagnostic may use a real `backend/uploads/` file under the same narrow conditions (measurement only, never adopted as a fixture, disclosed in the same commit's `VISIBLE_INCREMENTS.md` entry) without each future instance re-litigating whether `DEVELOPMENT_WORKFLOW.md`'s rule applies — it does, and this is the documented shape of the narrow exception to it.
 
+---
+
+## ADR-0035: KDP Publishing-Requirements Spike Findings (Sprint 8, Commit 0)
+
+**Status:** APPROVED
+**Date:** 2026-07-18
+**Decision:** Resolves the one item Decision 2 of `docs/architecture/diagrams/PUBLISHING_ENGINE.md` explicitly declined to decide ("a real Commit-0 spike... verifying KDP's actual current metadata requirements, cover image spec, and file-naming/submission rules is required before any `KDPTarget`/`KDPRuleSet` code is written"). Spike script: `backend/spikes/kdp-publishing-spike.ts`, run via `npx tsx spikes/kdp-publishing-spike.ts`, same throwaway/not-in-`src/`/not-test-covered discipline as `pdfkit-spike.ts` (ADR-0019), `epub-library-spike.ts` (ADR-0020), and `kdp-trim-size-spike.ts` (ADR-0030, this spike's direct sibling for the same platform).
+
+**Method:** Not a runtime API/library check — KDP has no submission API to query, and Decision 5 (locked, no reservations) forbids creating an account or calling Amazon this sprint regardless. The real external behavior verified here is KDP's own *documented policy*: five `kdp.amazon.com` help pages fetched directly (Paperback Submission Guidelines `G201857950`, Create a Paperback Cover `G201953020`, Set Trim Size/Bleed/Margins `GVBQ3CMEQW3W2VL6`, Metadata Guidelines `G201097560`, Cover Image Guidelines `G6GTK3T3NUHKLEFX`), not summarized by a third party first. Bleed (0.125in) and the cover-width formula were independently confirmed on two of the five pages and agreed exactly — no discrepancy to disclose this time, unlike `kdp-trim-size-spike.ts`'s real 16th-size disagreement.
+
+**Verified values:**
+
+| Area | Finding |
+|---|---|
+| Interior manuscript formats | PDF/DOC/DOCX/RTF/HTML/TXT without bleed; PDF only if any content bleeds to the edge |
+| Interior bleed | 0.125in (3.2mm) top/bottom/outer edge; bleed PDFs sized +0.25in height / +0.125in width over trim size |
+| Interior margins | Gutter 0.375in–0.875in scaling with page count (24–828 pages, 5 tiers); outside margin ≥0.25in (no bleed) / ≥0.375in (bleed) |
+| Interior resolution | 300 DPI minimum, 600 DPI recommended max (600MB file-size cap) |
+| Page count bounds | 24 minimum, up to 828 maximum (upper bound depends on ink/paper/trim combination) |
+| File naming | No emoji or unsupported special characters in cover/interior file names |
+| Paperback cover | Single PDF (front+spine+back as one image), CMYK, 300 DPI minimum, 650MB max (40MB recommended) — dimensions **computed**, not fixed |
+| Spine width formula | `pageCount × factor`, factor = 0.002252in (B&W white / standard color), 0.0025in (B&W cream), 0.002347in (premium color); no spine text printed below 79 pages |
+| eBook cover (different artifact) | JPEG, RGB (not CMYK), fixed ~2560×1600px, 300 DPI minimum, 5MB max — recorded for disambiguation, not used by this sprint's paperback-only scope (Decision 2) |
+| Metadata, mapped to real `BookMetadata` | `title`/`author`/`isbn`/`language` required; `description`/`keywords` recommended, not required |
+| Metadata gap found | KDP also requires `Categories` (≤3), `Primary Audience` (explicit-content Y/N), and `Primary Marketplace` at submission — none has a `BookMetadata` field today; out of scope to add this sprint (Decision 5), recorded so a future session doesn't rediscover it from scratch |
+
+**A real shape correction this spike surfaces:** `PUBLISHING_ENGINE.md` §5's provisional `KDPRuleSet.coverSpec: {minWidthPx, minHeightPx, minDpi}` assumed a fixed-pixel cover, matching the eBook model. The real paperback cover has no fixed pixel size — width and height are computed from trim size, page count, and paper type via the spine formula above. §5 is corrected to define a `PaperbackCoverSpec` shape instead of forcing a real value into the wrong field, following this project's own "confirmed, not guessed" discipline rather than shipping a plausible-looking but wrong interface.
+
+**Consequences:**
+- `domain/publishing/KDPRuleSet` (Commit 3) is built directly from this table — no further KDP requirements research needed for Sprint 8's acceptance criteria.
+- `PublishingIssue`-producing `PostRenderValidationRule`s (Commit 3) can cite exact real thresholds (e.g. "gutter margin below 0.5in for a 200-page book") instead of placeholder logic.
+- The metadata gap (Categories/Primary Audience/Primary Marketplace) is not blocking Sprint 8 (`PublishingReport` can flag "not verifiable — no BookMetadata field" as a `WARNING`, not silently skip the check) — recorded here so a future `BookMetadata` extension has a citable originating source.
+- If KDP's own published spec changes later, per Risk 5 (`PUBLISHING_ENGINE.md` §6), this same spike script is re-run rather than trusting this ADR's table read in isolation years later.
+
+**Related:** `PUBLISHING_ENGINE.md` Decision 2 (the design decision this spike unblocks) and Decision 6/Risk 5 (KDPRuleSet as isolated data), ADR-0019/ADR-0020/ADR-0030 (spike-before-decide precedent), `backend/spikes/kdp-publishing-spike.ts` (the spike itself)
+
 **Related:** ADR-0021 (post-Sprint-3 governance decisions, the precedent this ADR's grouping follows), ADR-0028 (Validation Engine rule-design principles, the precedent for consolidating multiple CTO-directed rulings into one ADR), ADR-0033 (the npm workspace / `packages/shared-types` decision, Sprint 7's other ADR), `docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` (Decision 3, the minimal-for-demo scope Decision 3 above cites), `docs/DEVELOPMENT_WORKFLOW.md` ("Which fixture to use," the rule Decision 4 narrowly departs from), `docs/REAL_FIXTURE_POLICY.md`, `docs/TODO.md` (the backlog entries for the PDF viewer and licensing proposal), `docs/demo/VISIBLE_INCREMENTS.md` (Commits 9a, 9b, and 10's entries, the real evidence behind Decisions 1 and 4), `docs/releases/v0.8.0-alpha/SPRINT_7_FINAL_REPORT.md`
