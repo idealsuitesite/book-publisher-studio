@@ -1,0 +1,109 @@
+{
+  "capturedAt": "2026-07-18T16:49:38.774Z",
+  "totalViolations": 11,
+  "totalNodes": 44,
+  "screens": [
+    {
+      "screen": "01-landing",
+      "viewport": "desktop",
+      "file": "01-landing--desktop.png",
+      "bytes": 29736,
+      "status": "captured",
+      "violations": [
+        {
+          "id": "landmark-one-main",
+          "impact": "moderate",
+          "nodes": 1,
+          "help": "Document should have one main landmark"
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "nodes": 1,
+          "help": "All page content should be contained by landmarks"
+        }
+      ]
+    },
+    {
+      "screen": "02-imported",
+      "viewport": "desktop",
+      "file": "02-imported--desktop.png",
+      "bytes": 94698,
+      "status": "captured",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": 3,
+          "help": "Elements must meet minimum color contrast ratio thresholds"
+        },
+        {
+          "id": "landmark-one-main",
+          "impact": "moderate",
+          "nodes": 1,
+          "help": "Document should have one main landmark"
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "nodes": 10,
+          "help": "All page content should be contained by landmarks"
+        }
+      ]
+    },
+    {
+      "screen": "03-layout-kdp",
+      "viewport": "desktop",
+      "file": "03-layout-kdp--desktop.png",
+      "bytes": 94006,
+      "status": "captured",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": 3,
+          "help": "Elements must meet minimum color contrast ratio thresholds"
+        },
+        {
+          "id": "landmark-one-main",
+          "impact": "moderate",
+          "nodes": 1,
+          "help": "Document should have one main landmark"
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "nodes": 10,
+          "help": "All page content should be contained by landmarks"
+        }
+      ]
+    },
+    {
+      "screen": "04-preview",
+      "viewport": "desktop",
+      "file": "04-preview--desktop.png",
+      "bytes": 93632,
+      "status": "captured",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": 3,
+          "help": "Elements must meet minimum color contrast ratio thresholds"
+        },
+        {
+          "id": "landmark-one-main",
+          "impact": "moderate",
+          "nodes": 1,
+          "help": "Document should have one main landmark"
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "nodes": 10,
+          "help": "All page content should be contained by landmarks"
+        }
+      ]
+    }
+  ]
+}
