@@ -1,0 +1,194 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { InMemoryProjectRepository } from './InMemoryProjectRepository';
+import { ProjectService } from '../../domain/services/ProjectService';
+import { createBook } from '../../domain/models/Book';
+import type { PublishingReport } from '../../domain/models/PublishingReport';
+
+const settings = { layoutName: 'kdp-6x9', themeName: 'classic' };
+const book = (title: string) => createBook({ title, author: 'Jean Dupont', language: 'fr' });
+
+const report = (target: string, status: 'PASS' | 'FAIL'): PublishingReport => ({
+  status,
+  target,
+  issues: [],
+  warnings: [],
+  artifacts: ['pdf'],
+  generatedAt: new Date('2026-01-01'),
+  duration: 10,
+  summary: `${status} - 0 errors, 0 warnings`,
+});
+
+let repo: InMemoryProjectRepository;
+let service: ProjectService;
+
+beforeEach(() => {
+  repo = new InMemoryProjectRepository();
+  let n = 0;
+  service = new ProjectService(() => `id-${++n}`);
+});
+
+describe('InMemoryProjectRepository — whole-aggregate round trip', () => {
+  it('returns undefined for a project that does not exist', async () => {
+    expect(await repo.findById('nope')).toBeUndefined();
+  });
+
+  it('saves and reloads a project', async () => {
+    const project = service.create(book('Le Guide de Jean'), settings);
+
+    await repo.save(project);
+
+    expect((await repo.findById(project.id))?.name).toBe('Le Guide de Jean');
+  });
+
+  it('returns the WHOLE aggregate — versions, assets and publications all present', async () => {
+    let project = service.create(book('Le Guide'), settings);
+    project = service.snapshot(project, 'first draft');
+    project = service.addAsset(project, {
+      kind: 'cover',
+      filename: 'couverture.png',
+      mimeType: 'image/png',
+      byteSize: 2_400_000,
+    });
+    project = service.recordPublication(project, report('kdp', 'PASS'));
+
+    await repo.save(project);
+    const loaded = await repo.findById(project.id);
+
+    expect(loaded?.versions).toHaveLength(1);
+    expect(loaded?.assets).toHaveLength(1);
+    expect(loaded?.publications).toHaveLength(1);
+  });
+
+  it('preserves Date types through the round trip, not ISO strings', async () => {
+    let project = service.create(book('Le Guide'), settings);
+    project = service.snapshot(project);
+
+    await repo.save(project);
+    const loaded = await repo.findById(project.id);
+
+    expect(loaded?.createdAt).toBeInstanceOf(Date);
+    expect(loaded?.versions[0].createdAt).toBeInstanceOf(Date);
+  });
+
+  it('preserves non-ASCII exactly', async () => {
+    const project = service.create(book('红楼梦'), settings, 'Édition Spéciale');
+
+    await repo.save(project);
+    const loaded = await repo.findById(project.id);
+
+    expect(loaded?.name).toBe('Édition Spéciale');
+    expect(loaded?.book.metadata.title).toBe('红楼梦');
+  });
+
+  it('replaces an existing project rather than duplicating it', async () => {
+    const project = service.create(book('Original'), settings);
+    await repo.save(project);
+
+    await repo.save(service.rename(project, 'Renamed'));
+
+    expect((await repo.findById(project.id))?.name).toBe('Renamed');
+    expect(await repo.list()).toHaveLength(1);
+  });
+
+  it('deletes a project', async () => {
+    const project = service.create(book('Le Guide'), settings);
+    await repo.save(project);
+
+    await repo.delete(project.id);
+
+    expect(await repo.findById(project.id)).toBeUndefined();
+  });
+});
+
+describe('InMemoryProjectRepository — stored state is isolated from callers', () => {
+  it('a caller mutating what it saved does not corrupt the store', async () => {
+    const project = service.create(book('Le Guide'), settings);
+    await repo.save(project);
+
+    // Deliberately reaching through the reference, which a careless caller can do.
+    (project as { name: string }).name = 'Mutated after save';
+
+    expect((await repo.findById(project.id))?.name).toBe('Le Guide');
+  });
+
+  it('a caller mutating what it loaded does not corrupt the store', async () => {
+    const project = service.create(book('Le Guide'), settings);
+    await repo.save(project);
+
+    const loaded = await repo.findById(project.id);
+    (loaded as { name: string }).name = 'Mutated after load';
+
+    expect((await repo.findById(project.id))?.name).toBe('Le Guide');
+  });
+});
+
+describe('InMemoryProjectRepository — library listing', () => {
+  it('returns summaries, not aggregates — no manuscript AST in a library listing', async () => {
+    let project = service.create(book('Le Guide'), settings);
+    project = service.snapshot(project);
+    await repo.save(project);
+
+    const [summary] = await repo.list();
+
+    expect(summary.bookTitle).toBe('Le Guide');
+    expect(summary.versionCount).toBe(1);
+    expect(summary).not.toHaveProperty('book');
+    expect(summary).not.toHaveProperty('versions');
+  });
+
+  it('carries the project name and the book title separately', async () => {
+    const project = service.create(book('Le Guide de Jean'), settings, 'Working draft');
+    await repo.save(project);
+
+    const [summary] = await repo.list();
+
+    expect(summary.name).toBe('Working draft');
+    expect(summary.bookTitle).toBe('Le Guide de Jean');
+  });
+
+  it('derives published targets from the event log, counting only successes', async () => {
+    let project = service.create(book('Le Guide'), settings);
+    project = service.recordPublication(project, report('kdp', 'PASS'));
+    project = service.recordPublication(project, report('kobo', 'FAIL'));
+    await repo.save(project);
+
+    const [summary] = await repo.list();
+
+    expect(summary.publishedTargets).toEqual(['kdp']);
+  });
+
+  it('does not repeat a target published to more than once', async () => {
+    let project = service.create(book('Le Guide'), settings);
+    project = service.recordPublication(project, report('kdp', 'PASS'));
+    project = service.recordPublication(project, report('kdp', 'PASS'));
+    await repo.save(project);
+
+    expect((await repo.list())[0].publishedTargets).toEqual(['kdp']);
+  });
+
+  it('surfaces the cover asset so a library can render a thumbnail', async () => {
+    let project = service.create(book('Le Guide'), settings);
+    project = service.addAsset(project, {
+      kind: 'cover',
+      filename: 'c.png',
+      mimeType: 'image/png',
+      byteSize: 1,
+    });
+    await repo.save(project);
+
+    expect((await repo.list())[0].coverAssetId).toBe(project.assets[0].id);
+  });
+
+  it('lists newest first — a library is browsed by recency', async () => {
+    const older = service.create(book('Older'), settings);
+    await repo.save({ ...older, updatedAt: new Date('2026-01-01') });
+    const newer = service.create(book('Newer'), settings);
+    await repo.save({ ...newer, updatedAt: new Date('2026-06-01') });
+
+    expect((await repo.list()).map((s) => s.bookTitle)).toEqual(['Newer', 'Older']);
+  });
+
+  it('returns an empty list rather than throwing when there are no projects', async () => {
+    expect(await repo.list()).toEqual([]);
+  });
+});

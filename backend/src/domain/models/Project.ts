@@ -41,8 +41,23 @@ export interface Project {
    */
   settings: ProjectSettings;
 
-  /** Cover, fonts, illustrations. Referenced by the book, owned by the project. */
+  /** Cover, fonts, illustrations, and the original uploads. Owned by the project. */
   assets: ProjectAsset[];
+
+  /**
+   * The uploaded file this project's current manuscript was imported from, as a
+   * `ProjectAsset` id of kind `'source'`.
+   *
+   * Kept because **import is lossy today** — mammoth silently drops underline (ADR-0025), and
+   * `ASTBuilder` cannot recover ISBN, description or cover image at all (Risk 4, disclosed
+   * since Sprint 5). Storing only the derived AST would freeze every project permanently at the
+   * fidelity of the importer that first read it, so a future import fix could never be applied
+   * to work that already exists.
+   *
+   * Referenced by id rather than embedded, like every other asset: a 25MB upload copied into
+   * each version snapshot would turn history into an unusable pile.
+   */
+  sourceAssetId?: string;
 
   /**
    * Immutable snapshots, oldest first. Empty for a project that has never been versioned —
@@ -95,7 +110,60 @@ export interface BookVersion {
   /** Optional author note: "before the editor's cuts". */
   label?: string;
 
+  /**
+   * The source upload this snapshot was built from, if any — same reasoning as
+   * `Project.sourceAssetId`. Referenced, so several versions imported from one file share it
+   * rather than each carrying a copy.
+   */
+  sourceAssetId?: string;
+
   createdAt: Date;
+}
+
+/**
+ * What the library view needs, and nothing more.
+ *
+ * Deliberately not a `Project`. The library is the most-visited screen in the product and needs
+ * a title, a cover and a date — while a full aggregate carries the entire manuscript AST, every
+ * version snapshot and every publication report. Loading forty of those to render a grid of
+ * titles is the performance mistake that gets made once and lived with for years
+ * (AGGREGATES_AND_PERSISTENCE.md Question 4).
+ *
+ * Derived on read rather than maintained on write, so it cannot drift from the aggregate. If
+ * measurement later shows deriving it is too slow, materialising it is a change to the
+ * repository alone.
+ */
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  /** The book's own title, which may differ from the project name — see `Project.name`. */
+  bookTitle: string;
+  author: string;
+  coverAssetId?: string;
+  versionCount: number;
+  /** Platforms with at least one successful publication. Derived, never stored. */
+  publishedTargets: string[];
+  updatedAt: Date;
+}
+
+/** Projects a full aggregate down to what a library listing needs. */
+export function toProjectSummary(project: Project): ProjectSummary {
+  return {
+    id: project.id,
+    name: project.name,
+    bookTitle: project.book.metadata.title,
+    author: project.book.metadata.author,
+    coverAssetId: project.assets.find((asset) => asset.kind === 'cover')?.id,
+    versionCount: project.versions.length,
+    publishedTargets: [
+      ...new Set(
+        project.publications
+          .filter((event) => event.report.status === 'PASS')
+          .map((event) => event.target)
+      ),
+    ],
+    updatedAt: project.updatedAt,
+  };
 }
 
 /**
@@ -127,7 +195,7 @@ export interface PublicationEvent {
   occurredAt: Date;
 }
 
-export type ProjectAssetKind = 'cover' | 'font' | 'illustration' | 'other';
+export type ProjectAssetKind = 'cover' | 'font' | 'illustration' | 'source' | 'other';
 
 /**
  * A file belonging to the project rather than to the manuscript.

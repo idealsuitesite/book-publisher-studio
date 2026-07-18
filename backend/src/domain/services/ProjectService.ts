@@ -52,9 +52,48 @@ export class ProjectService {
     return { ...project, name: trimmed, updatedAt: new Date() };
   }
 
+  /**
+   * The project's current manuscript.
+   *
+   * Exists so that nothing outside the Domain reads `project.book` directly
+   * (AGGREGATES_AND_PERSISTENCE.md Question 3). `Book` is confirmed to carry two
+   * responsibilities today — the *work* (title, author, description) and one *rendition* of it
+   * (isbn, language, edition, cover). `edition?: string` on a type called `Book` is the proof,
+   * and ADR-0035 already records that KDP requires a distinct ISBN per format.
+   *
+   * Splitting `Manuscript` out is deliberately **not** done yet: nothing creates a second
+   * language or edition, and building the seam before the second case exists means guessing
+   * where it goes. Routing access through here is the cheap half of the decision — when a
+   * project really holds several manuscripts, this method takes a selector and every caller
+   * keeps working, instead of every call site being rewritten.
+   */
+  currentBook(project: Project): Book {
+    return project.book;
+  }
+
   /** Replaces the manuscript — a re-import of the same work, not a new project. */
   replaceBook(project: Project, book: Book): Project {
     return { ...project, book, updatedAt: new Date() };
+  }
+
+  /**
+   * Records the uploaded file a manuscript came from, as a `'source'` asset.
+   *
+   * Import is lossy today — mammoth drops underline (ADR-0025) and `ASTBuilder` recovers
+   * neither ISBN, description nor cover (Risk 4). Keeping the original means a future importer
+   * fix can be applied to work that already exists; discarding it freezes every project at the
+   * fidelity of the importer that first read it.
+   */
+  attachSource(project: Project, filename: string, mimeType: string, data: Buffer): Project {
+    const withAsset = this.addAsset(project, {
+      kind: 'source',
+      filename,
+      mimeType,
+      byteSize: data.byteLength,
+      data,
+    });
+    const stored = withAsset.assets[withAsset.assets.length - 1];
+    return { ...withAsset, sourceAssetId: stored.id };
   }
 
   /** Changes layout/theme. These are book properties, not workflow steps (Decision 1). */

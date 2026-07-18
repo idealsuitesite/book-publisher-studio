@@ -236,6 +236,39 @@ describe('ProjectService — publications as events', () => {
   });
 });
 
+describe('ProjectService — manuscript access and source retention', () => {
+  it('exposes the current manuscript through the service, not by reaching into the project', () => {
+    const service = serviceWithSequentialIds();
+    const project = service.create(book(), settings);
+
+    // The indirection that makes inserting `Manuscript` later a one-layer change rather than a
+    // rewrite of every call site (AGGREGATES_AND_PERSISTENCE.md Question 3).
+    expect(service.currentBook(project).metadata.title).toBe('Le Guide de Jean');
+  });
+
+  it('keeps the original upload, because import is lossy today', () => {
+    const service = serviceWithSequentialIds();
+    let project = service.create(book(), settings);
+    const bytes = Buffer.from('fake docx bytes');
+
+    project = service.attachSource(project, 'Le Guide de Jean.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', bytes);
+
+    const source = project.assets.find((asset) => asset.id === project.sourceAssetId);
+    expect(source?.kind).toBe('source');
+    expect(source?.filename).toBe('Le Guide de Jean.docx');
+    expect(source?.byteSize).toBe(bytes.byteLength);
+  });
+
+  it('records the source by reference, so versions do not each carry a copy', () => {
+    const service = serviceWithSequentialIds();
+    let project = service.create(book(), settings);
+    project = service.attachSource(project, 'x.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', Buffer.from('x'));
+
+    expect(typeof project.sourceAssetId).toBe('string');
+    expect(project.assets).toHaveLength(1);
+  });
+});
+
 describe('ProjectService — assets', () => {
   it('adds an asset by reference, with its real size', () => {
     const service = serviceWithSequentialIds();
