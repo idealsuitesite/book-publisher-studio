@@ -21,11 +21,48 @@
  *   npm run baseline           # capture (overwrites frontend/baseline/)
  *   npm run baseline -- --check  # compare against the committed baseline, exit 1 on drift
  *
- * Exit 0 = captured, or (with --check) every screen byte-identical to its baseline.
+ * Exit 0 = captured, or (with --check) every screen identical to its baseline (byte-identical,
+ *          or within the imperceptible antialiasing tolerance compareShots documents).
  * Exit 1 = a server was unreachable, a step failed, or --check found a real difference.
  */
 import { chromium } from 'playwright';
 import AxeBuilder from '@axe-core/playwright';
+import { PNG } from 'pngjs';
+
+/**
+ * Byte-compare first; on mismatch, decode and compare pixels with a tolerance for antialiasing
+ * jitter — the third real defect found in this mechanism (after mid-transition captures and the
+ * dev-indicator badge). Chromium's rasterizer is not bit-deterministic: identical DOM produced
+ * 4 pixels differing by exactly 1/255 in one channel across runs (measured 2026-07-18, two
+ * clusters at a card-border edge). Byte-identity is stricter than the renderer's own guarantee,
+ * and a check that randomly fails on identical UI degrades Decision 3 into ignorable noise.
+ *
+ * The tolerance is deliberately imperceptible-by-construction: a pixel "matches" if every
+ * channel is within 1/255, and at most 64 such pixels may differ (measured jitter: 4). Any
+ * pixel off by 2+ in any channel, or a wider spread, is a real change and still fails.
+ */
+function compareShots(baseline, shot) {
+  if (Buffer.compare(baseline, shot) === 0) return 'identical';
+  let a, b;
+  try {
+    a = PNG.sync.read(baseline);
+    b = PNG.sync.read(shot);
+  } catch {
+    return 'CHANGED';
+  }
+  if (a.width !== b.width || a.height !== b.height) return 'CHANGED';
+  let jitter = 0;
+  for (let i = 0; i < a.data.length; i += 4) {
+    let maxDelta = 0;
+    for (let c = 0; c < 4; c++) {
+      const d = Math.abs(a.data[i + c] - b.data[i + c]);
+      if (d > maxDelta) maxDelta = d;
+    }
+    if (maxDelta > 1) return 'CHANGED';
+    if (maxDelta === 1 && ++jitter > 64) return 'CHANGED';
+  }
+  return `identical (aa-jitter: ${jitter}px)`;
+}
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,7 +119,7 @@ async function scan(page, screen, viewport) {
     if (!existsSync(path)) {
       status = 'MISSING BASELINE';
     } else {
-      status = Buffer.compare(readFileSync(path), shot) === 0 ? 'identical' : 'CHANGED';
+      status = compareShots(readFileSync(path), shot);
     }
   } else {
     writeFileSync(path, shot);
@@ -208,7 +245,7 @@ async function main() {
     return;
   }
 
-  const changed = results.filter((r) => r.status !== 'identical');
+  const changed = results.filter((r) => !r.status.startsWith('identical'));
   if (changed.length > 0) {
     console.log('\n✗ Visual drift detected:\n');
     for (const c of changed) console.log(`  ${c.file}: ${c.status}`);
