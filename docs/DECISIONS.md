@@ -939,7 +939,11 @@ This is the project's first monorepo-structural change — implements Design Rev
 
 ## ADR-0038: Publishing Engine Cannot See `LayoutEngine`'s Real Pagination Metrics — Deferred Beyond Sprint 8, Question Framed Not Answered
 
-**Status:** OPEN — deferred by explicit CTO decision (2026-07-18). **This ADR deliberately does not decide the answer.** It records a confirmed gap and frames the question a future Design Review must resolve.
+**Status:** ✅ **RESOLVED by ADR-0042** (2026-07-18). The original status is preserved below rather than rewritten, per ADR-0010's annotate-never-rewrite precedent — this ADR did its job by framing a question well enough that a later review could answer it, and that history is worth reading.
+
+> **Resolution note (2026-07-18):** `RENDER_METRICS.md` answered the question below and ADR-0042 records the decision. One correction to this ADR's own framing: it describes a single blocked consumer (`PageCountRule`), but there are **three** — KDP's spine width and its gutter margins are also functions of page count. The third turned out to be a live product defect in its own right, now ADR-0043.
+
+*Original status:* OPEN — deferred by explicit CTO decision (2026-07-18). **This ADR deliberately does not decide the answer.** It records a confirmed gap and frames the question a future Design Review must resolve.
 **Date:** 2026-07-18
 **Decision:** Do **not** change Publishing Engine behavior in Sprint 8 to close this gap. Document it, leave `PageCountRule` reporting `PAGE_COUNT_UNKNOWN` when the information genuinely is not available, and open this record for a dedicated future decision.
 
@@ -1110,3 +1114,92 @@ This is not only a storage choice. It reopens questions the stateless design cur
 - If both are still open when a real second user appears, Constraint 1 becomes a live production problem rather than a theoretical one.
 
 **Related:** ADR-0039 (the reordered roadmap that scheduled the six dependent sprints), `docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` Decision 2 (the stateless rule Constraint 2 must amend), ADR-0012 (the `Renderer` port Constraint 1 must not break), ADR-0038 (the other OPEN deferral, also awaiting its own review), `docs/demo/VISIBLE_INCREMENTS.md` (Sprint 7 Commit 10, where the 598ms measurement is recorded)
+
+---
+
+## ADR-0042: Render Metrics Reach the Publishing Engine as a Narrow, Per-Format Value Object
+
+**Status:** APPROVED (CTO, 2026-07-18). **Resolves ADR-0038**, which framed this question and deliberately left it unanswered.
+**Date:** 2026-07-18
+**Decision:** Introduce a `RenderMetrics` Domain model carrying the *real* paginated page count and the `PageLayout` pagination actually used. Attach it per rendered format, transport it through a widened `PublishingTarget.prepare()`, and expose it on `PostRenderValidationContext` where rules read it.
+
+**Why the gap mattered more than ADR-0038 recorded.** ADR-0038 described one blocked consumer (`PageCountRule`). Writing `RENDER_METRICS.md` found three, by reading `KDPRuleData.ts`: KDP's page-count range (24-828), its **spine width** (`spineWidthInPerPage x pages`, so paperback cover dimensions are *derived* from page count), and its **gutter margins** (`marginsByPageCount`). Two of the three were never mentioned.
+
+**The four candidates ADR-0038 listed, adjudicated:**
+
+- *Enrich `Book` with the real count* - **rejected.** `Book.pageCount` is an import-time estimate from word count; writing the real value there gives one field two meanings depending on which path produced it, with no way for a consumer to tell which it holds. A page count is a property of a rendition, not of the work (`AGGREGATES_AND_PERSISTENCE.md` section 1).
+- *Pass `PaginatedBook` into `prepare()`* - **rejected.** It carries `styledBook`, `pages`, `pageLayout` and the TOC. Publishing needs counts, not content; passing it couples the publishing port to the layout engine's internal model.
+- *Widen `RenderedOutputs`* and *add a field to `PostRenderValidationContext`* - **both adopted**, since they solve different hops: the first transports, the second delivers.
+
+**Per-format, not per-bundle.** A bundle may hold a paginated PDF and a reflowable EPUB at once; a single bundle-level page count would necessarily be wrong about one of them. `RenderMetrics.pageCount` is therefore **optional**, and `PAGE_COUNT_UNKNOWN` keeps a legitimate life for reflowable formats - it simply stops firing on every PDF, which was the actual defect.
+
+**No fallback, ever.** `PageCountRule` must not fall back to `Book.pageCount` when metrics are absent. KDP rejects on the real count; validating an estimate against a hard platform limit converts an honest `WARNING` into a `PASS` on a book Amazon will refuse. A false green is worse than a disclosed unknown.
+
+**Consequences:**
+- `PublishingTarget.prepare()`'s signature widens. This is the evolution Sprint 8 Decision 1 explicitly anticipated in the port's own comment, not an unplanned break, and `KDPTarget` is its only implementation.
+- The `Renderer` port (ADR-0012) is **untouched** - `PublishingUseCase` assembles the metrics from the `PaginatedBook` it already holds, so none of the three renderers change.
+- The export path is deliberately not given metrics: `ExportManuscriptUseCase` has no validator to feed, and an unused field is the thing this project's handbook rule exists to prevent.
+- Real page counts may push small fixtures below KDP's 24-page minimum, turning comfortable `WARNING`s into real `ERROR`s. That is the fix working and must not be resolved by loosening the rule.
+
+**Related:** ADR-0038 (resolved by this), ADR-0043 (the defect found alongside it), ADR-0037 (platform-agnostic constraint held), ADR-0012 (`Renderer` port left untouched), ADR-0035 (the KDP spike that supplied the spine and margin data), `docs/architecture/diagrams/RENDER_METRICS.md`
+
+---
+
+## ADR-0043: `PageLayout` Has No Gutter - Every Paperback This Product Generates Is Non-Compliant
+
+**Status:** OPEN - defect confirmed and disclosed, fix deliberately deferred to its own review. **Not** a decision to leave it broken.
+**Date:** 2026-07-18
+**Found by:** writing `RENDER_METRICS.md` - reading `KDPRuleData.ts` against `PageLayout.ts`, not by a failing test.
+
+**The defect.** `PageLayout` offers `marginTop`, `marginBottom`, `marginLeft`, `marginRight` and nothing else. Confirmed by grep: `gutter` appears in neither `PageLayout.ts` nor `LayoutEngine.ts`. KDP requires an inside (gutter) margin that scales with page count:
+
+| Pages | Gutter required |
+|---|---|
+| <=150 | 0.375 in |
+| <=300 | 0.5 in |
+| <=500 | 0.625 in |
+| <=700 | 0.75 in |
+| <=828 | 0.875 in |
+
+Margins are therefore **symmetric**, with no inside/outside distinction and no recto/verso notion - every page is laid out as a loose sheet. A 400-page book generated today owes a 0.625 in gutter and gets whatever `marginLeft` happened to be. **Text runs into the binding.**
+
+**Why 479 passing tests did not catch it.** No test can assert a requirement the model is incapable of expressing. This is the sixth instance of this project's recurring pattern (ADR-0019, 0020, 0031, 0032, 0038) and the first where the blind spot was in a *Domain model's shape* rather than in a library's behaviour - worth noting, because no amount of additional test coverage against the current `PageLayout` would have surfaced it.
+
+**A real circularity, named now rather than discovered mid-implementation.** The required gutter depends on page count; widening the gutter reduces text per page, which increases page count. A book near a threshold (150, 300, 500, 700) can cross it *because of* the margin its own page count demanded.
+
+**Recommended resolution when this is picked up** (not decided here): one re-pagination pass, not convergence to a fixed point - paginate, look up the gutter for the resulting count, re-paginate if it changed, then validate. If the second pass crosses another threshold, report it as an issue rather than looping; an author whose book sits on a boundary needs to be told, not silently handed a third layout.
+
+**Why not fixed alongside ADR-0042.** The fix changes `PageLayout` and `LayoutEngine`, alters the visual output of every existing export, and has visual-baseline consequences. Folded into a metrics-transport change it would produce a commit that cannot be reviewed. Scope discipline here is the same call Sprint 8 made when deferring ADR-0038 itself.
+
+**Consequences:**
+- ADR-0042's work makes the page count *visible and validatable*; it does not make the product compliant. Release notes must say so plainly rather than let a green publish report imply otherwise.
+- Until fixed, print-on-demand output should be treated as not production-ready, regardless of what `SubmissionValidator` reports.
+
+**Related:** ADR-0042 (the work that surfaced this), ADR-0035 (the spike whose data made it visible), ADR-0030 (KDP trim sizes), `docs/architecture/diagrams/RENDER_METRICS.md` section 3
+
+---
+
+## ADR-0044: Archiving and Deletion Are Two Operations, Decided Before the Storage Spike
+
+**Status:** APPROVED (CTO, 2026-07-18). Closes `AGGREGATES_AND_PERSISTENCE.md` Risk 5.
+**Date:** 2026-07-18
+**Decision:** Separate **archive** (reversible, loses nothing, hides from the library) from **delete** (irreversible, removes the whole aggregate including the author's original upload). Deletion is never blocked by history. `ProjectRepository` gains no new method.
+
+**The finding that dissolved the dilemma.** Framed as "keep history or destroy it", the question looks unresolvable. The real problem is that **one verb served two intentions**: "this is finished, get it out of my way" (common, expects to lose nothing) and "this was a mistake, remove it" (rare, expects real erasure). A single destructive delete fails the common case by discarding a publication record the author wanted kept; a single soft delete fails the rare case worse, retaining data the author believes erased. Separating them lets archive absorb the common case - and the publication record then survives because *the project* survives.
+
+**Deletion is not blocked, however much history exists.** The project belongs to the author; refusing because they once published is paternalism dressed as stewardship. Amazon holds its own record of what was published. This also keeps the product defensible under a right-to-erasure request - a "delete" that quietly retains is the shape that causes real trouble later.
+
+**Archiving needs no port surface, and that is evidence.** It is a state change on the aggregate (`archivedAt`), persisted through the existing whole-aggregate `save()`. Only `list()` changes, gaining an options argument and **excluding archived projects by default** - a caller that forgets the flag then shows too few projects, which is visible and reported, rather than leaking archived work into every library view. That a lifecycle change is absorbed without widening the persistence boundary is independent confirmation that the aggregate boundary approved in `AGGREGATES_AND_PERSISTENCE.md` section 2 is drawn correctly.
+
+**Sequenced before the storage spike, deliberately.** Whether the schema carries a nullable `archivedAt` and whether every query filters is determined here. Deciding after a store is chosen means a migration over real author data - the one class of change this project has no way to rehearse.
+
+**CTO override, recorded.** The review recommended offering deletion in the UI immediately. The CTO decided **no**, and the override is correct: a delete button is the one control whose mistakes cannot be walked back, and against a store that loses everything on restart its only real use would be working around a limitation we intend to remove. The review's own "a mis-imported file needs removing" argument is better served by archive, which the same review introduces - the destructive tool was reached for while the reversible one sat on the same page.
+
+**Consequences:**
+- `delete()` stays as designed, correct, and without a UI caller - its state today.
+- Decision 6's typed confirmation is a UI rule with no surface to live on; deferred with the UI.
+- The publication-record export is still built: it is a legitimate read of an author's own history independent of deletion, and it must exist before a delete button can ever be offered.
+- `archivedAt` becomes a filter every future project query must respect. Sprint 11 (Workspace) and Sprint 14 (Collaboration) each add queries and each is a chance to forget it; default-exclude plus a standing regression test are the mitigation.
+- Committing to real deletion before a real store exists makes backup and replica retention a **selection criterion** for the storage spike rather than a later discovery.
+
+**Related:** `AGGREGATES_AND_PERSISTENCE.md` Risk 5 (closed by this) and section 2 (the boundary this confirms), ADR-0041 (persistence prerequisite; this is sequenced before its spike), ADR-0001 (immutability - `archive()` returns a new Project), `docs/architecture/diagrams/PROJECT_LIFECYCLE.md`

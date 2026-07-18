@@ -1,6 +1,6 @@
 # Project Lifecycle — Archiving and Deletion — Level 2 Design Review
 
-**Status:** 🟡 **ROUND 1 — DRAFT. Not approved. No branch, no code.**
+**Status:** ✅ **APPROVED** — CTO, 2026-07-18, round 1. Implementation authorized, with **one decision overriding Question 3: deletion is not offered in the UI.** See §5 Q3 and the revised §7.
 **Date:** 2026-07-18
 **Trigger:** `AGGREGATES_AND_PERSISTENCE.md` Risk 5, flagged in the port itself when `ProjectRepository` was written:
 
@@ -110,7 +110,14 @@ Friction proportional to what is actually lost. Uniform friction trains authors 
 *Recommendation: no.* An author who has not opened a manuscript in six months has not abandoned it — long gaps are normal in book writing. Software that tidies away a work in progress on its own is software the author stops trusting with the next one.
 
 **Question 3 — should deleting be offered in the UI at all before persistence exists?**
-*Recommendation: yes, once this review is approved.* With `InMemoryProjectRepository`, everything is lost on restart anyway; the greater risk is shipping a library with no way to remove a mis-imported file, which forces a server restart as the workaround.
+*My recommendation was yes.* **CTO decision, 2026-07-18: no. Deletion is not offered in the UI.** My recommendation is overruled and recorded as such rather than edited away.
+
+The reasoning I now consider correct, having thought about the override: a delete button is the one control whose mistakes cannot be walked back, and shipping it against a store that loses everything on restart means its *only* real-world use would be working around a limitation we intend to remove. My "a mis-imported file needs removing" argument is better served by archive, which this same review already introduces — I reached for the destructive tool when the reversible one was in scope on the same page.
+
+**Consequences, carried into §7:**
+- `ProjectRepository.delete()` stays as designed and stays correct. It has no UI caller, which is exactly its state today.
+- Decision 6 (typed confirmation) is a **UI** rule with no surface to live on. Deferred with the UI, not implemented.
+- Decision 5's export is still built. It is a legitimate read of an author's own publication history independent of deletion, and it must exist *before* a delete button can ever be offered — building it now is what keeps that future decision cheap.
 
 **Question 4 — what happens to a project's `'source'` asset on archive?**
 *Recommendation: retained, unchanged.* Archiving loses nothing by definition, and the source exists precisely so a future importer fix can be reapplied (`AGGREGATES_AND_PERSISTENCE.md` Question 5). Dropping the largest asset on archive would quietly make archiving lossy — a different operation than the one described to the author.
@@ -133,9 +140,11 @@ Friction proportional to what is actually lost. Uniform friction trains authors 
 | 1 | `Project.archivedAt`, `ProjectService.archive()`/`restore()`, `ProjectSummary.archivedAt`, tests. |
 | 2 | `list()` options + default-exclude; `InMemoryProjectRepository` honours it; the Risk-1 regression test. |
 | 3 | Publication-record export (Decision 5), Domain-side, format-agnostic. |
-| 4 | UI: distinct Archive and Delete, typed confirmation when publications exist (Decision 6), export offered. |
+| ~~4~~ | ~~UI: Archive and Delete, typed confirmation, export offered.~~ **Withdrawn by the Q3 override.** |
 
-Commit 4 depends on `Project` being wired into the import pipeline — currently unstarted. If that has not happened, commits 0–3 still stand alone and leave the port correct for whenever the UI arrives.
+**Revised scope after the CTO's Q3 decision:** commits 0–3 only. No UI work in this scope.
+
+Two things must be true before a Commit 4 is ever reopened: `Project` wired into the import pipeline (unstarted), and a persistent store, so that deleting means something more considered than clearing a `Map`. When it is reopened, **Archive ships alone first** — Decision 6's typed confirmation and Decision 5's export offer attach to Delete, and Delete is not in scope until both conditions hold.
 
 ---
 

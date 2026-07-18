@@ -45,6 +45,9 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 | 0039 | Roadmap Reprioritized — Product Completeness Before AI (Strategic Decision) | 2026-07-18 | Governance, Product | APPROVED |
 | 0040 | Sprint 9 Plan Corrections — Inline Tests, Playwright Adoption, and Two Documentation Fixes | 2026-07-18 | UI Foundation, Governance | APPROVED |
 | 0041 | Two Scalability Constraints Framed, Not Fixed — Event-Loop Blocking and the Persistence Prerequisite | 2026-07-18 | Architecture, Governance | **OPEN** — both deferred, each awaiting its own Design Review |
+| 0042 | Render Metrics Reach the Publishing Engine as a Narrow, Per-Format Value Object | 2026-07-18 | Publishing, Rendering | APPROVED — resolves 0038 |
+| 0043 | `PageLayout` Has No Gutter — Every Paperback This Product Generates Is Non-Compliant | 2026-07-18 | Rendering, Layout | **OPEN** — confirmed defect, fix deferred to its own review |
+| 0044 | Archiving and Deletion Are Two Operations, Decided Before the Storage Spike | 2026-07-18 | Architecture, Product Object Model | APPROVED — closes Aggregates Risk 5 |
 
 ## By category
 
@@ -54,10 +57,11 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 - **Validation Engine** (Sprint 5): 0027, 0028
 - **Professional Layout Engine** (Sprint 6): 0029, 0030, 0031, 0032
 - **First Demonstrable Product** (Sprint 7): 0033, 0034
-- **Publishing Engine** (Sprint 8): 0035, 0036, 0037, 0038
+- **Publishing Engine** (Sprint 8): 0035, 0036, 0037, 0038, 0042
 - **Governance** (process, not a specific engine): 0006, 0007, 0010, 0017, 0021, 0032, 0033, 0034, 0036, 0037, 0039, 0040
 - **UI Foundation** (Sprint 9): 0040
-- **Scalability / open constraints**: 0038, 0041
+- **Product Object Model / persistence**: 0044
+- **Scalability / open constraints**: ~~0038~~ (resolved by 0042), 0041, 0043
 
 ## Related
 
