@@ -184,6 +184,24 @@ Per commit, appended below (never edited retroactively — this is a timeline, n
 
 **Sprint 7's remaining scope: Commit 12 (curated screenshots, docs/ADR closure, `SPRINT_7_TIMELINE.md`, Sprint 7 Final Report).**
 
+### Commit 12 — Sprint 7 closure (official Demo Script, ADR-0034, Final Report)
+
+**The official Demo Script (`docs/product/PRODUCT_DEMO.md`) was run for real, twice, against the real running application** — once with `large-book.docx` (the primary scenario: home → import → 15-chapter structure → layout change (KDP 6"×9") → preview → 3 exports), once with `typography-test.docx` (the secondary scenario, for the one screenshot needing real, non-empty warnings per the script's own footnote). All 6 official screenshots (`01-home` through `06-export`) captured — real, in-conversation, matching every named requirement (real fixtures, no retouching, real running `frontend/`+`backend/`).
+
+**A real, disclosed tooling bug found and worked around during capture:** the Browser pane's `computer` screenshot action reliably returned a blank white image (not a timeout, not an error — a real image with real dimensions, entirely white) whenever the page was scrolled away from the top before capture, even though the underlying DOM/scroll state was independently confirmed correct via `javascript_tool` (`window.scrollY`, `getBoundingClientRect()` all reported sane, on-page values). Reproduced across multiple tabs and multiple scroll techniques (the `computer` tool's own `scroll`/`scroll_to` actions, and a raw `element.scrollIntoView()` via JS) — consistently blank whenever `scrollY > 0` at capture time, consistently correct at `scrollY = 0`. Root cause not identified (likely a compositor/paint-timing issue specific to this session's Browser pane, not this project's code). **Worked around, not silently abandoned:** resized the viewport tall enough (up to 1280×2800) that every Demo Script screen fit within a single unscrolled capture, restoring real, correct screenshots for every remaining step. `zoom` (region-crop capture) was also attempted as an alternative and found unsupported in this Browser pane (`region crop not yet supported`, full screenshot returned instead) — not used further.
+
+**ADR-0034 written**, consolidating four Sprint 7 process-level decisions raised and resolved during Commits 7-10: the Commit 9 → 9a/9b split, the deferred PDF-viewer-needs-new-dependency decision, the deferred licensing/monetization architecture proposal, and the disclosed `backend/uploads/` verification exception (Commit 10, Verification 6). `docs/ADR_INDEX.md` updated with both ADR-0034 and the previously-missing ADR-0033 entry (a gap found during this session's own opening Recovery Review, fixed here rather than left open).
+
+**`docs/releases/v0.8.0-alpha/SPRINT_7_TIMELINE.md` and `SPRINT_7_FINAL_REPORT.md` written**, compiling this entire log and the sprint's real metrics, deferred items, residual risks, and lessons learned — matching the structure of `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md`.
+
+**Disclosed, not silently narrowed: PR/merge/tag/branch-cleanup are explicitly out of scope for this commit.** Those are separate `docs/RELEASE_CHECKLIST.md` steps requiring their own explicit authorization (pushing to shared state, opening/merging a PR) — not performed, not implied by this commit's docs-only closure work.
+
+**Confirmed real, not simulated:**
+- Both dev servers healthy via `curl` before any capture began; the real running `frontend/`+`backend/`, not a static export.
+- Real network calls for every Demo Script step: `POST .../import` (both fixtures), `POST .../export?format=pdf` (preview), 3× `POST .../export` (PDF/DOCX/EPUB downloads) — all `200 OK`, confirmed via `read_network_requests`.
+- The real preview page count ("Estimated pages: 75" for `large-book.docx` at KDP 6"×9") matched, exactly, the independent `curl`-based cross-check from Commit 10's Verification 3/4 — the same real number, derived twice, by two different paths.
+- The real `ProgressStepper` showed all 6 steps ✓ in the final capture, each one earned by an actual completed action during this same session, not toggled for the screenshot.
+
 ## Related
 
 - `docs/DEVELOPMENT_WORKFLOW.md` — the durable Visible Increment Rule this log exists to satisfy
