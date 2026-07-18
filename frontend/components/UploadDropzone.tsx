@@ -1,17 +1,19 @@
 'use client';
 
-import { useState } from 'react';
-import type { ImportResponseDTO } from 'shared-types';
-import { importManuscript } from '@/lib/api-client';
+import { useEffect, useState } from 'react';
+import type { ImportResponseDTO, ManuscriptOptionsDTO } from 'shared-types';
+import { getManuscriptOptions, importManuscript } from '@/lib/api-client';
 import { BookStructureView } from '@/components/BookStructureView';
 import { ValidationSummary } from '@/components/ValidationSummary';
+import { FormatSelector } from '@/components/FormatSelector';
 
 // Sprint 7 commit 5 (docs/architecture/diagrams/SPRINT_7_KICKOFF.md) - the dropzone commit 4
 // shipped as static UI now drives the real ThemeEngine/ASTBuilder pipeline via a real
 // POST /api/manuscripts/import. Commit 6 added the real book structure view on success
-// (BookStructureView). Commit 7 adds the real validation findings (ValidationSummary) below
-// it - format/layout selection (commit 8) and export/preview (commit 9) are still deliberately
-// not wired here.
+// (BookStructureView). Commit 7 added the real validation findings (ValidationSummary).
+// Commit 8 adds the format/layout selector (FormatSelector), fetching GET
+// /api/manuscripts/options once on success and holding the selection here, ready for commit
+// 9's export/preview call - no export request fires yet.
 type State =
   | { status: 'idle' }
   | { status: 'uploading'; filename: string }
@@ -24,6 +26,18 @@ const CARD_CLASSES =
 export function UploadDropzone() {
   const [isDragging, setIsDragging] = useState(false);
   const [state, setState] = useState<State>({ status: 'idle' });
+  const [options, setOptions] = useState<ManuscriptOptionsDTO | null>(null);
+  const [selectedLayout, setSelectedLayout] = useState<string | null>(null);
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (state.status !== 'success' || options) return;
+    void getManuscriptOptions().then((result) => {
+      setOptions(result);
+      setSelectedLayout(result.layouts[0]?.name ?? null);
+      setSelectedTheme(result.themes[0]?.name ?? null);
+    });
+  }, [state.status, options]);
 
   async function handleFile(file: File) {
     setState({ status: 'uploading', filename: file.name });
@@ -50,6 +64,9 @@ export function UploadDropzone() {
 
   function reset() {
     setState({ status: 'idle' });
+    setOptions(null);
+    setSelectedLayout(null);
+    setSelectedTheme(null);
   }
 
   if (state.status === 'uploading') {
@@ -66,6 +83,15 @@ export function UploadDropzone() {
       <div className="flex w-full max-w-2xl flex-col gap-6">
         <BookStructureView book={state.result.book} filename={state.filename} onReset={reset} />
         <ValidationSummary report={state.result.report} />
+        {options && selectedLayout && selectedTheme && (
+          <FormatSelector
+            options={options}
+            selectedLayout={selectedLayout}
+            selectedTheme={selectedTheme}
+            onLayoutChange={setSelectedLayout}
+            onThemeChange={setSelectedTheme}
+          />
+        )}
       </div>
     );
   }
