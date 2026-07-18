@@ -1,7 +1,7 @@
 # Publishing Engine — Level 2 Design Review
 
-**Status:** 🟡 Round 2 — all 5 round-1 questions plus 1 new architectural decision **LOCKED** by explicit CTO decision (2026-07-18). **Not yet ✅ APPROVED** — the CTO's own review message ended mid-sentence at "Mon verdict CTO," with no final verdict statement following it, and opened by stating the review was "approuvée à environ 90%," not 100%. Per `docs/DESIGN_REVIEW_PROCESS.md`'s approval gate ("not implementation-ready until it says ✅ APPROVED with a date"), this document does not treat the missing 10% as filled in by assumption. **No branch, no code, until the verdict is completed and confirmed.**
-**Date:** 2026-07-18 (round 1) / 2026-07-18 (round 2 decisions)
+**Status:** ✅ APPROVED (2026-07-18) — conditional sign-off, condition satisfied same day. The CTO's completed verdict: *"Je signerais cette Review avec une seule réserve : Le terme 'Publishing Engine' est encore un peu trop large. Avant la première ligne de code, je demanderais à Claude d'ajouter un diagramme montrant clairement les responsabilités internes (orchestrateur, validation, packaging, rapport, cible de publication)... En dehors de ce point, la démarche est rigoureuse... C'est exactement le rôle attendu d'une Design Review de niveau 2."* The requested Internal Responsibilities Diagram (with explicit OWNS/NEVER boundaries per component) is now in §3, immediately below Decision 6. **This marks the design as approved — it does not by itself authorize branching or implementation. Per `docs/DESIGN_REVIEW_PROCESS.md`'s two-gate discipline (design approval and go-ahead-to-implement are separate events, as in every prior sprint), Commit 0 / the KDP spike still awaits an explicit go-ahead.**
+**Date:** 2026-07-18 (round 1) / 2026-07-18 (round 2 decisions) / 2026-07-18 (approved)
 **Sprint:** Sprint 8 — confirmed as this sprint's target by explicit CTO direction, following Sprint 7's release (`v0.8.0-alpha`).
 
 ---
@@ -88,6 +88,92 @@ The CTO's own component list, mapped onto this project's existing Clean Architec
 | `PublishingUseCase` | Application — **use case** | Mirrors `ExportManuscriptUseCase`'s exact existing shape (`UseCase<TRequest, TResponse>`) — orchestrates the existing pipeline (parse→normalize→build→theme→typography→paginate→render) then hands the result to `PublishingTarget.prepare()` |
 
 **A KDP-specific consequence of this decomposition, folded in from the CTO's separate risk note below (§6):** KDP's own real requirements (cover pixel dimensions, required metadata fields, file-naming rules) must live in an isolated, swappable `KDPRuleSet` — data, not hardcoded conditionals inside `KDPTarget`/`SubmissionValidator` — so a future KDP spec change is a data update, not an engine change. Mirrors this project's existing registry pattern (`getTheme`, `ManualLayoutSelector`'s registry) rather than inventing a new one.
+
+### Internal Responsibilities Diagram (CTO-requested, round-2 sign-off condition)
+
+The CTO's one reservation on this Review: *"Publishing Engine"* as a name is still too broad, and without an explicit map of internal responsibilities, one class risks absorbing all the logic over successive sprints — exactly what happened to no component yet in this codebase, and what this diagram exists to prevent. Every box below has an explicit **OWNS** (what it is allowed to do) and **NEVER** (what it must delegate) boundary. No box may grow into another box's NEVER list without a new ADR.
+
+```
+                        ┌───────────────────────────────┐
+                        │   PublishingUseCase            │
+                        │   (Orchestrator, Application)  │
+                        │                                │
+                        │ OWNS  : sequencing the existing│
+                        │         pipeline (parse→        │
+                        │         normalize→build→theme→ │
+                        │         typography→paginate→   │
+                        │         render) then handing    │
+                        │         the result to a         │
+                        │         PublishingTarget        │
+                        │ NEVER : validation rules,        │
+                        │         packaging mechanics,     │
+                        │         KDP-specific logic       │
+                        └───────────────┬────────────────┘
+                                         │ calls .prepare()
+                                         ▼
+                        ┌───────────────────────────────┐
+                        │   PublishingTarget (port)      │
+                        │   Domain                       │
+                        │                                │
+                        │ OWNS  : the contract for "which │
+                        │         platform" — one method  │
+                        │         signature, no KDP-       │
+                        │         specific detail          │
+                        │ NEVER : HOW validation or        │
+                        │         packaging work           │
+                        │         internally (that's the   │
+                        │         implementation's job)    │
+                        └───────────────┬────────────────┘
+                                         │ implemented by
+                                         ▼
+                        ┌───────────────────────────────┐
+                        │   KDPTarget                    │
+                        │   Infrastructure                │
+                        │                                │
+                        │ OWNS  : wiring Packaging +      │
+                        │         SubmissionValidator     │
+                        │         together for the KDP    │
+                        │         platform specifically   │
+                        │ NEVER : the content of the       │
+                        │         rules themselves (that's │
+                        │         KDPRuleSet, data not     │
+                        │         code)                    │
+                        └──────┬─────────────────┬────────┘
+                               │                  │
+                 uses          │                  │  uses
+                               ▼                  ▼
+        ┌───────────────────────────┐  ┌───────────────────────────┐
+        │   Packaging                │  │   SubmissionValidator      │
+        │   Domain/Application       │  │   Domain/Application       │
+        │                            │  │                            │
+        │ OWNS  : assembling book +  │  │ OWNS  : running             │
+        │         cover + metadata   │  │         PostRenderValidation│
+        │         into one bundle    │  │         Rules against a     │
+        │         ready to submit    │  │         rendered bundle,    │
+        │                            │  │         using KDPRuleSet    │
+        │ NEVER : deciding whether   │  │         as data              │
+        │         the bundle is      │  │ NEVER : file assembly,       │
+        │         valid              │  │         packaging mechanics  │
+        └────────────┬───────────────┘  └──────────────┬─────────────┘
+                      │                                 │
+                      └───────────────┬─────────────────┘
+                                       ▼
+                        ┌───────────────────────────────┐
+                        │   PublishingReport              │
+                        │   Domain (pure data model,      │
+                        │   mirrors ValidationReport/      │
+                        │   QualityScore)                  │
+                        │                                  │
+                        │ OWNS  : the PASS/FAIL/Warnings   │
+                        │         data shape only           │
+                        │ NEVER : any logic — no methods    │
+                        │         beyond simple accessors,  │
+                        │         no validation, no          │
+                        │         decision-making            │
+                        └───────────────────────────────┘
+```
+
+**Why this shape satisfies the CTO's concern:** `PublishingUseCase` cannot grow KDP-specific conditionals without visibly reaching past its own OWNS line into `KDPTarget`'s territory — a code reviewer (human or automated) can check each new line of logic against the box it landed in. `KDPRuleSet` as data (not code) means the single most likely source of future logic-creep — Amazon changing its spec — is contained to a data update, per Risk 5 below.
 
 ---
 
