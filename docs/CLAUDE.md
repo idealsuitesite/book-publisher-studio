@@ -38,6 +38,8 @@ A global publishing software platform (DOCX import, AST-based book model, PDF/EP
 - `docs/VERSIONS.md` — version-to-milestone mapping, the authoritative "what's released" record
 - `docs/releases/<version>/SPRINT_N_FINAL_REPORT.md` and `ReleaseNotes.md` — per-sprint retrospectives and release notes
 - `docs/architecture/diagrams/*.md` — Design Review documents, one per engine/sprint
+- `docs/product/PERSONAS.md`, `USER_JOURNEYS.md`, `FEATURE_MATRIX.md`, `WIREFRAMES.md`, `PRODUCT_DEMO.md`, `PRODUCT_ACCEPTANCE.md` — user-facing product thinking, distinct from the technical Design Reviews above (introduced Sprint 7)
+- `docs/demo/screenshots/` — real captures from `docs/product/PRODUCT_DEMO.md`'s Demo Script
 
 ## Session start
 
