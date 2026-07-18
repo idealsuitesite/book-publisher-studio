@@ -46,6 +46,8 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
     const typeset = this.typographyResolver.resolve(styled);
     const paginated = this.layoutEngine.paginate(typeset, request.pageLayout);
 
-    return this.renderer.render(paginated, { language: book.metadata.language });
+    // Metrics are discarded here on purpose: the export path has no validator to feed, and an
+    // unused field is what the handbook's port-vs-class rule exists to prevent (ADR-0045).
+    return (await this.renderer.render(paginated, { language: book.metadata.language })).output;
   }
 }

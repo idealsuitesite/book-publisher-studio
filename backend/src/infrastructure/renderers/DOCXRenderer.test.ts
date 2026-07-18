@@ -80,7 +80,7 @@ describe('DOCXRenderer', () => {
   it('produces a valid docx zip containing paragraph text', async () => {
     const paginated = paginate([chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1', 'Hello world.')])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
 
     expect(buffer.length).toBeGreaterThan(0);
     const xml = await extractDocumentXml(buffer);
@@ -97,7 +97,7 @@ describe('DOCXRenderer', () => {
     const a4Layout: PageLayout = { ...LETTER_LAYOUT, pageSize: 'a4', width: 595.28, height: 841.89 };
     const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], a4Layout);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const xml = await extractDocumentXml(buffer);
 
     expect(xml).toMatch(/<w:pgSz[^>]*w:w="11905"[^>]*w:h="16837"/);
@@ -111,7 +111,7 @@ describe('DOCXRenderer', () => {
         chapter([paragraph('p-2', 'Hello two.')], { id: 'c-2', number: 2, openingPageStyle: 'right' }),
       ]);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const xml = await extractDocumentXml(buffer);
 
       const pageBreakCount = (xml.match(/<w:pageBreakBefore\/>/g) ?? []).length;
@@ -125,7 +125,7 @@ describe('DOCXRenderer', () => {
     it('does not insert an extra blank page for a first chapter (nothing to break from)', async () => {
       const paginated = paginate([chapter([paragraph('p-1', 'Hello one.')], { id: 'c-1', number: 1, openingPageStyle: 'right' })]);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const xml = await extractDocumentXml(buffer);
 
       expect((xml.match(/<w:pageBreakBefore\/>/g) ?? []).length).toBe(0);
@@ -138,7 +138,7 @@ describe('DOCXRenderer', () => {
     it("writes a real header part with the book's title and a footer part with a live PAGE/NUMPAGES field", async () => {
       const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])]);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const zip = await JSZip.loadAsync(buffer);
       const headerFile = Object.keys(zip.files).find((f) => /word\/header\d+\.xml/.test(f));
       const footerFile = Object.keys(zip.files).find((f) => /word\/footer\d+\.xml/.test(f));
@@ -158,7 +158,7 @@ describe('DOCXRenderer', () => {
       const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, show: false } };
       const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const zip = await JSZip.loadAsync(buffer);
       const headerFile = Object.keys(zip.files).find((f) => /word\/header\d+\.xml/.test(f));
       const footerFile = Object.keys(zip.files).find((f) => /word\/footer\d+\.xml/.test(f));
@@ -171,7 +171,7 @@ describe('DOCXRenderer', () => {
       const theme: Theme = { ...ClassicTheme, runningHead: undefined };
       const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const zip = await JSZip.loadAsync(buffer);
       const headerFile = Object.keys(zip.files).find((f) => /word\/header\d+\.xml/.test(f));
 
@@ -182,7 +182,7 @@ describe('DOCXRenderer', () => {
   it('includes chapter titles as headings', async () => {
     const paginated = paginate([chapter([paragraph('p-1')], { title: 'My Chapter' })]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const xml = await extractDocumentXml(buffer);
 
     expect(xml).toContain('My Chapter');
@@ -192,7 +192,7 @@ describe('DOCXRenderer', () => {
     const table: Table = { type: 'table', id: 't-1', headers: ['Name'], rows: [['Alexandre']] };
     const paginated = paginate([chapter([table])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const xml = await extractDocumentXml(buffer);
 
     expect(xml).toContain('Name');
@@ -204,7 +204,7 @@ describe('DOCXRenderer', () => {
     const paginated = paginate([chapter(manyParagraphs)]);
     expect(paginated.pages.length).toBeGreaterThan(1);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const xml = await extractDocumentXml(buffer);
 
     expect(xml).toContain('<w:pageBreakBefore/>');
@@ -214,7 +214,7 @@ describe('DOCXRenderer', () => {
     const image: Image = { type: 'image', id: 'img-1', url: 'https://example.com/a.png', caption: 'A cover' };
     const paginated = paginate([chapter([image])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const xml = await extractDocumentXml(buffer);
 
     expect(xml).toContain('A cover');
@@ -233,7 +233,7 @@ describe('DOCXRenderer', () => {
     const para: Paragraph = { type: 'paragraph', id: 'p-1', text: 'ignored when inlines present', inlines };
     const paginated = paginateWithTypography([chapter([para])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const xml = await extractDocumentXml(buffer);
 
     // Functional check: text is present regardless of which runs carried it.
@@ -260,7 +260,7 @@ describe('DOCXRenderer', () => {
   it('sizes headings from theme.fontSizes.h1, not a hardcoded value', async () => {
     const paginated = paginateWithTypography([chapter([{ type: 'heading', id: 'h-1', level: 1, text: 'Big Title' }])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const zip = await JSZip.loadAsync(buffer);
     const stylesXml = await zip.file('word/styles.xml')!.async('string');
 
@@ -277,7 +277,7 @@ describe('DOCXRenderer', () => {
     const list: List = { type: 'list', id: 'l-1', ordered: false, items: ['ignored', 'ignored'], inlines: inlinesPerItem };
     const paginated = paginateWithTypography([chapter([list])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const xml = await extractDocumentXml(buffer);
 
     expect(xml).toContain('First');
@@ -289,7 +289,7 @@ describe('DOCXRenderer', () => {
     const para: Paragraph = { type: 'paragraph', id: 'p-1', text: 'Once upon a time.', dropCap: true };
     const paginated = paginateWithTypography([chapter([para])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const xml = await extractDocumentXml(buffer);
 
     // Functional check: the full text is present exactly once, split across a
@@ -315,7 +315,7 @@ describe('DOCXRenderer', () => {
         { generateAutomatically: true, entries: [] }
       );
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const xml = await extractDocumentXml(buffer);
 
       expect(xml).toContain('Table of Contents');
@@ -331,7 +331,7 @@ describe('DOCXRenderer', () => {
     it('renders no TOC when tableOfContents is absent (generateAutomatically not set)', async () => {
       const paginated = paginate([chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1')])]);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const xml = await extractDocumentXml(buffer);
 
       expect(xml).not.toContain('Table of Contents');

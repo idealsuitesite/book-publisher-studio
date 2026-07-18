@@ -129,7 +129,16 @@ Sprint 8 Decision 1 recorded in the port itself that `prepare()` was "Sprint 8's
 ## 5. Open questions — for CTO decision
 
 **Question 1 — does `Renderer` produce the metrics, or does `PublishingUseCase` assemble them?**
-*Recommendation: `PublishingUseCase` assembles them.* It already holds `paginated`; the `Renderer<TOutput>` port (ADR-0012) has three implementations and widening its return type changes all three plus the export path, for no gain. **This keeps ADR-0012 untouched.**
+
+> ⛔ **This recommendation was approved and was wrong. Corrected by ADR-0045 during implementation.** Kept as written, per ADR-0010's annotate-never-rewrite precedent.
+>
+> It was wrong twice over. `PaginatedBook.pages.length` is an *estimate* that ADR-0013 already recorded as drifting from the real rendered count — `PDFRenderer` says so in its own comments and uses `bufferedPageRange().count` instead for exactly that reason. And renderers emit title and copyright pages that pagination never sees. On the canonical fixtures the reported count was **1** while the shipped PDF had **3**.
+>
+> The real answer: **the renderer produces the metrics**, because only the renderer knows what it emitted. `Renderer<TOutput>` now returns `RenderResult<TOutput>`, and ADR-0012 does change after all. Cost: 55 call sites, nearly all test assertions.
+>
+> The reasoning error is worth naming: this question was settled by weighing blast radius instead of reading `PDFRenderer`, which contained the fact that falsified it. "Confirmed, not guessed" (ADR-0031/0032) applies to our own code, and approval did not make the answer true.
+
+*Original recommendation: `PublishingUseCase` assembles them.* It already holds `paginated`; the `Renderer<TOutput>` port (ADR-0012) has three implementations and widening its return type changes all three plus the export path, for no gain. **This keeps ADR-0012 untouched.**
 
 **Question 2 — does the export path get metrics too?**
 *Recommendation: not in this scope.* `ExportManuscriptUseCase` has no validator to feed. Adding metrics there would be unused code, and §7 of this project's own handbook rule (port when more than one real implementation is plausible) applies equally to fields.

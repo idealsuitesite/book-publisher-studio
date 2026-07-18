@@ -1203,3 +1203,39 @@ Margins are therefore **symmetric**, with no inside/outside distinction and no r
 - Committing to real deletion before a real store exists makes backup and replica retention a **selection criterion** for the storage spike rather than a later discovery.
 
 **Related:** `AGGREGATES_AND_PERSISTENCE.md` Risk 5 (closed by this) and section 2 (the boundary this confirms), ADR-0041 (persistence prerequisite; this is sequenced before its spike), ADR-0001 (immutability - `archive()` returns a new Project), `docs/architecture/diagrams/PROJECT_LIFECYCLE.md`
+
+---
+
+## ADR-0045: Render Metrics Come From the Renderer - Correcting an Approved Decision, and the Publish/Export Divergence It Exposed
+
+**Status:** APPROVED (implemented 2026-07-18). **Corrects RENDER_METRICS.md Question 1**, which was approved and wrong.
+**Date:** 2026-07-18
+**Found by:** real-fixture verification during ADR-0042's own Commit 4 - not by the 484 tests that were green at the time.
+
+**What the approved review said.** RENDER_METRICS.md Question 1 asked whether the `Renderer` port should produce metrics or `PublishingUseCase` should assemble them. It recommended the use case, reasoning that `Renderer` has three implementations and widening its return type would change all three plus the export path "for no gain", and that this keeps ADR-0012 untouched. The CTO approved it. **It was wrong twice over.**
+
+**First: `PaginatedBook.pages.length` is an estimate the codebase already documented as unreliable.** ADR-0013 recorded that PDFKit's real rendered page count can differ from `LayoutEngine`'s `Page[]` length, and `PDFRenderer` says so in its own comments - it deliberately uses `doc.bufferedPageRange().count` for the "of TOTAL" footer *because* the estimate undershot on real content (ADR-0019 finding 6C). Question 1 selected, as the source of a number used to validate against a hard platform limit, the one figure this project had already written down as untrustworthy.
+
+**Second: renderers emit pages that pagination never sees.** `PDFRenderer` renders the title and copyright pages from `book.frontMatter` itself, outside `LayoutEngine.paginate()`. The estimate therefore counts body pages only.
+
+**The measurement.** On the canonical fixtures the publish pipeline reported a page count of **1** while the exported PDF had **3**. After the fix, reported and real agree exactly: 3/3, 3/3, 3/3, and `large-book.docx` at 32 real pages sits inside KDP's 24-828 range and correctly raises no issue.
+
+**A second, independent defect surfaced by the same investigation.** `PublishingUseCase` did not build front matter at all, while `ExportManuscriptUseCase` did. **The Publishing Engine was validating a document the author would never upload** - no title page, no copyright page, no ISBN page - and reporting on it as though it were the finished book. Fixed in the same work by giving both paths the same `FrontMatterBuilder` step, and locked by a test that renders through both and asserts the publish-reported count equals the real page count of the PDF export actually ships.
+
+**Decision:** `Renderer<TOutput>.render()` returns `RenderResult<TOutput> = { output, metrics }`. Only the renderer knows what it emitted, so only the renderer can report it honestly.
+
+- `PDFRenderer` reports `doc.bufferedPageRange().count`, captured after every `addPage()` and before `end()` flushes.
+- `DOCXRenderer` reports **no** page count. Word repaginates on open against the reader's own fonts and printer metrics; a number here would be invented.
+- `EPUBRenderer` reports **no** page count. Reflowable formats have no pages until a device lays them out.
+
+The two renderers that return `pageCount: undefined` are not gaps - they are the reason `RenderMetrics.pageCount` is optional (ADR-0042), and `PageCountRule`'s `PAGE_COUNT_UNKNOWN` is the correct outcome for them.
+
+**Consequences:**
+- ADR-0012's `Renderer` port **does** change, contrary to ADR-0042's stated consequence. That earlier claim is superseded here rather than edited, per ADR-0010's annotate-never-rewrite precedent.
+- `ExportManuscriptUseCase` discards the metrics: it has no validator to feed, and an unused field is what the handbook's port-vs-class rule exists to prevent. `verify-real-export` stayed 16/16 across the change.
+- Cost of the correction: 55 call sites, almost all of them assertions in the three renderer test suites. Mechanical, and cheap precisely because it was caught during the sprint that introduced the metric rather than after something depended on it.
+- **The deeper issue is left open**: renderers adding pages behind pagination's back means `LayoutEngine` does not model the whole document. That also affects running heads and page numbering, and it is the same class of layout-fidelity problem as ADR-0043's missing gutter. Both belong to one future Design Review on layout fidelity; neither is fixed here.
+
+**The governance lesson, recorded because it is the actionable part.** This project's rule is spike-before-decide for external behaviour (ADR-0019, 0020, 0030, 0035). Question 1 was a decision about **this codebase's own internals**, made by reasoning about blast radius rather than by reading `PDFRenderer` - which contained, in a comment, the exact fact that falsified it. ADR-0031/0032 already recorded that "confirmed, not guessed" applies to our own upstream code too. It applied here and was not honoured, and a design review being approved did not make it true.
+
+**Related:** ADR-0042 (whose Question 1 this corrects and whose `Renderer`-untouched consequence this supersedes), ADR-0013 (the estimate-vs-real drift already on record), ADR-0019 finding 6C (why `bufferedPageRange().count` is the trusted figure), ADR-0012 (the port this widens), ADR-0043 (the sibling layout-fidelity defect), ADR-0031/0032 ("confirmed, not guessed" applied to our own code), `docs/REAL_FIXTURE_POLICY.md` (the verification that caught it), `docs/architecture/diagrams/RENDER_METRICS.md`

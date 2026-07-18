@@ -18,7 +18,7 @@ import {
   type IStylesOptions,
   type ParagraphChild,
 } from 'docx';
-import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
+import type { Renderer, RenderContext, RenderResult } from '../../domain/ports/Renderer';
 import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
@@ -256,7 +256,7 @@ function buildTableOfContentsParagraphs(entries: TOCEntry[], theme: Theme): Para
 }
 
 export class DOCXRenderer implements Renderer<Buffer> {
-  async render(book: PaginatedBook, _context: RenderContext): Promise<Buffer> {
+  async render(book: PaginatedBook, _context: RenderContext): Promise<RenderResult<Buffer>> {
     const pageStarts = new Map<string, Page>();
     for (const page of book.pages.slice(1)) {
       const firstId = page.blocks[0];
@@ -309,7 +309,10 @@ export class DOCXRenderer implements Renderer<Buffer> {
       sections: [section],
     });
 
-    return Packer.toBuffer(doc);
+    // No pageCount: DOCX carries no pagination of its own - Word repaginates on open, against
+    // the reader's own fonts and printer metrics. Reporting a number here would be inventing
+    // one, and PageCountRule's honest PAGE_COUNT_UNKNOWN is the correct outcome (ADR-0045).
+    return { output: await Packer.toBuffer(doc), metrics: { pageLayout: book.pageLayout } };
   }
 
   private renderContent(

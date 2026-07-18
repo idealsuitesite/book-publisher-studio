@@ -41,24 +41,25 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 | 0035 | KDP Publishing-Requirements Spike Findings (Sprint 8, Commit 0) | 2026-07-18 | Publishing Engine | APPROVED |
 | 0036 | Platform-Specific Publishing Rules Must Be Encapsulated Behind a `RuleProvider` Port (Engineering Governance Principle) | 2026-07-18 | Publishing Engine, Governance | APPROVED |
 | 0037 | Publishing Engine Domain Objects Are Platform-Agnostic; Platforms Depend on the Engine, Never the Inverse (Engineering Governance Principle) | 2026-07-18 | Publishing Engine, Governance | APPROVED |
-| 0038 | Publishing Engine Cannot See `LayoutEngine`'s Real Pagination Metrics — Deferred Beyond Sprint 8, Question Framed Not Answered | 2026-07-18 | Publishing Engine | **OPEN** — deferred, awaiting its own Design Review |
+| 0038 | Publishing Engine Cannot See `LayoutEngine`'s Real Pagination Metrics — Deferred Beyond Sprint 8, Question Framed Not Answered | 2026-07-18 | Publishing Engine | ✅ RESOLVED by ADR-0042 |
 | 0039 | Roadmap Reprioritized — Product Completeness Before AI (Strategic Decision) | 2026-07-18 | Governance, Product | APPROVED |
 | 0040 | Sprint 9 Plan Corrections — Inline Tests, Playwright Adoption, and Two Documentation Fixes | 2026-07-18 | UI Foundation, Governance | APPROVED |
 | 0041 | Two Scalability Constraints Framed, Not Fixed — Event-Loop Blocking and the Persistence Prerequisite | 2026-07-18 | Architecture, Governance | **OPEN** — both deferred, each awaiting its own Design Review |
 | 0042 | Render Metrics Reach the Publishing Engine as a Narrow, Per-Format Value Object | 2026-07-18 | Publishing, Rendering | APPROVED — resolves 0038 |
 | 0043 | `PageLayout` Has No Gutter — Every Paperback This Product Generates Is Non-Compliant | 2026-07-18 | Rendering, Layout | **OPEN** — confirmed defect, fix deferred to its own review |
 | 0044 | Archiving and Deletion Are Two Operations, Decided Before the Storage Spike | 2026-07-18 | Architecture, Product Object Model | APPROVED — closes Aggregates Risk 5 |
+| 0045 | Render Metrics Come From the Renderer — Correcting an Approved Decision | 2026-07-18 | Publishing, Rendering, Governance | APPROVED — corrects 0042 Q1, supersedes its ADR-0012 claim |
 
 ## By category
 
 - **Architecture** (core Clean Architecture / DDD rules): 0001, 0002, 0003, 0005, 0008, 0033
 - **Import pipeline**: 0004, 0009, 0011, 0025, 0026
-- **Rendering pipeline** (Theme/Typography/Layout-precursor/Renderer port/PDF/DOCX/EPUB): 0012, 0013, 0014, 0015, 0016, 0018, 0019, 0020, 0022, 0023, 0024
+- **Rendering pipeline** (Theme/Typography/Layout-precursor/Renderer port/PDF/DOCX/EPUB): 0012, 0013, 0014, 0015, 0016, 0018, 0019, 0020, 0022, 0023, 0024, 0043, 0045
 - **Validation Engine** (Sprint 5): 0027, 0028
 - **Professional Layout Engine** (Sprint 6): 0029, 0030, 0031, 0032
 - **First Demonstrable Product** (Sprint 7): 0033, 0034
-- **Publishing Engine** (Sprint 8): 0035, 0036, 0037, 0038, 0042
-- **Governance** (process, not a specific engine): 0006, 0007, 0010, 0017, 0021, 0032, 0033, 0034, 0036, 0037, 0039, 0040
+- **Publishing Engine** (Sprint 8): 0035, 0036, 0037, 0038, 0042, 0045
+- **Governance** (process, not a specific engine): 0006, 0007, 0010, 0017, 0021, 0032, 0033, 0034, 0036, 0037, 0039, 0040, 0045
 - **UI Foundation** (Sprint 9): 0040
 - **Product Object Model / persistence**: 0044
 - **Scalability / open constraints**: ~~0038~~ (resolved by 0042), 0041, 0043

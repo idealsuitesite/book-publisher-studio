@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
+import type { Renderer, RenderContext, RenderResult } from '../../domain/ports/Renderer';
 import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
@@ -44,7 +44,7 @@ export class PDFRenderer implements Renderer<Buffer> {
 
   constructor(private options: { compress?: boolean } = {}) {}
 
-  async render(book: PaginatedBook, context: RenderContext): Promise<Buffer> {
+  async render(book: PaginatedBook, context: RenderContext): Promise<RenderResult<Buffer>> {
     return new Promise((resolve, reject) => {
       // bufferPages defers writing pages to the output stream until flushed - see
       // drawHeadersAndFooters() below for why this is the right approach here.
@@ -63,8 +63,21 @@ export class PDFRenderer implements Renderer<Buffer> {
       this.fonts.registerAll(doc);
 
       const chunks: Buffer[] = [];
+      // The true page count, captured before end() flushes the buffered pages. This is the same
+      // figure drawHeadersAndFooters() already trusts for the "of TOTAL" denominator - the one
+      // number in this file that is measured rather than estimated (ADR-0019 finding 6C), and
+      // therefore the only honest source for RenderMetrics (ADR-0045).
+      // A holder rather than a `let`: the 'end' listener closes over it and reads it after the
+      // assignment below, which prefer-const cannot see - it would have us freeze the value
+      // before it is measured.
+      const measured: { pageCount?: number } = {};
       doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('end', () =>
+        resolve({
+          output: Buffer.concat(chunks),
+          metrics: { pageCount: measured.pageCount, pageLayout: book.pageLayout },
+        })
+      );
       doc.on('error', (err: unknown) => reject(err instanceof Error ? err : new Error(String(err))));
 
       // Maps a page-starting block's id to the domain Page it starts (blankPagesBefore, for
@@ -131,6 +144,10 @@ export class PDFRenderer implements Renderer<Buffer> {
       );
 
       this.drawHeadersAndFooters(doc, book, pageOwners);
+
+      // Read after every addPage() has happened and before end() flushes: at this point the
+      // buffered range is exactly the document that will be written, front matter included.
+      measured.pageCount = doc.bufferedPageRange().count;
 
       doc.end();
     });

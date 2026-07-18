@@ -13,6 +13,8 @@ import { PDFRenderer } from '../../infrastructure/renderers/PDFRenderer';
 import { LetterPageLayout } from '../../domain/layouts/LetterPageLayout';
 import { createKDPTarget } from '../../domain/services/publishing/createKDPTarget';
 import { buildTestDocxBuffer } from '../../test-utils/buildTestDocx';
+import { ExportManuscriptUseCase } from './ExportManuscriptUseCase';
+import type { PublishingTarget } from '../../domain/ports/PublishingTarget';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -106,6 +108,61 @@ describe('PublishingUseCase', () => {
       expect(report.artifacts).toEqual(['pdf']);
       expect(report.generatedAt).toBeInstanceOf(Date);
       expect(report.duration).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  // ADR-0045. Found by real-fixture verification, not by these tests: the exported PDFs had 3
+  // pages while the publish pipeline reported a page count of 1, because publish skipped front
+  // matter and export did not. The engine was validating a document the author would never
+  // upload. This asserts the invariant directly rather than the symptom.
+  describe('validates the document export actually ships (ADR-0045)', () => {
+    it('publishes the same page count the export path produces, front matter included', async () => {
+      const buffer = readFileSync(
+        join(__dirname, '..', '..', '..', 'verification', 'typography-test.docx')
+      );
+      const request = {
+        buffer,
+        filename: 'typography-test.docx',
+        themeName: 'classic',
+        pageLayout: LetterPageLayout,
+      };
+
+      // What publish measured.
+      let measured: number | undefined;
+      const kdp = createKDPTarget();
+      const capturing: PublishingTarget = {
+        prepare(book, outputs) {
+          measured = outputs.pdf?.metrics.pageCount;
+          return kdp.prepare(book, outputs);
+        },
+      };
+      const publishing = new PublishingUseCase(
+        new MammothParser(),
+        new HtmlNormalizer(),
+        new ASTBuilder(),
+        new ThemeEngine(),
+        new TypographyResolver(),
+        new LayoutEngine(),
+        new PDFRenderer(),
+        capturing
+      );
+      await publishing.execute(request);
+
+      // What export actually ships, counted from the real PDF bytes.
+      const exporting = new ExportManuscriptUseCase(
+        new MammothParser(),
+        new HtmlNormalizer(),
+        new ASTBuilder(),
+        new ThemeEngine(),
+        new TypographyResolver(),
+        new LayoutEngine(),
+        new PDFRenderer()
+      );
+      const pdf = await exporting.execute(request);
+      const shipped = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+
+      expect(shipped).toBeGreaterThan(1); // guards the assertion itself against a trivial pass
+      expect(measured).toBe(shipped);
     });
   });
 });

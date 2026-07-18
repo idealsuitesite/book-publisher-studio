@@ -9,7 +9,7 @@ import type { TypographyResolver } from '../../domain/services/TypographyResolve
 import type { LayoutEngine } from '../../domain/services/LayoutEngine';
 import type { PageLayout } from '../../domain/models/PageLayout';
 import type { PublishingReport } from '../../domain/models/PublishingReport';
-import type { RenderMetrics } from '../../domain/models/RenderMetrics';
+import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 import { getTheme } from '../../domain/themes/getTheme';
 
 export interface PublishRequest {
@@ -33,34 +33,35 @@ export class PublishingUseCase implements UseCase<PublishRequest, PublishingRepo
     private typographyResolver: TypographyResolver,
     private layoutEngine: LayoutEngine,
     private renderer: Renderer<Buffer>,
-    private publishingTarget: PublishingTarget
+    private publishingTarget: PublishingTarget,
+    private frontMatterBuilder: FrontMatterBuilder = new FrontMatterBuilder()
   ) {}
 
   async execute(request: PublishRequest): Promise<PublishingReport> {
     const raw = await this.parser.parse(request.buffer);
     const normalized = this.normalizer.normalize(raw.html, { fileName: request.filename });
-    const book = this.builder.build(normalized);
+    const built = this.builder.build(normalized);
+
+    // Front matter is built here for the same reason ExportManuscriptUseCase builds it, and it
+    // must be the *same* book. Until this line existed, publish validated a manuscript with no
+    // title or copyright page while export shipped one with both - so the Publishing Engine was
+    // approving a document the author would never upload. Found by real-fixture verification:
+    // the exported PDFs had 3 pages and the reported page count said 1 (ADR-0045).
+    const book = { ...built, frontMatter: this.frontMatterBuilder.build(built) };
 
     const theme = getTheme(request.themeName);
     const styled = this.themeEngine.applyTheme(book, theme);
     const typeset = this.typographyResolver.resolve(styled);
     const paginated = this.layoutEngine.paginate(typeset, request.pageLayout);
 
-    const pdf = await this.renderer.render(paginated, { language: book.metadata.language });
+    // Metrics come from the renderer, not from `paginated` (ADR-0045). RENDER_METRICS.md
+    // Question 1 answered this the other way and was wrong twice over: ADR-0013 already recorded
+    // that `PaginatedBook.pages.length` drifts from the real rendered count, and front matter
+    // compounds it, since PDFRenderer emits title and copyright pages pagination never saw.
+    const { output: bytes, metrics } = await this.renderer.render(paginated, {
+      language: book.metadata.language,
+    });
 
-    // The real paginated count, captured here rather than measured downstream (ADR-0042).
-    // This use case is the last place that holds the PaginatedBook: before this fix it computed
-    // pagination, rendered from it, then discarded it, leaving PageCountRule to report
-    // PAGE_COUNT_UNKNOWN on every real manuscript (ADR-0038).
-    //
-    // Assembled here rather than returned by Renderer deliberately (RENDER_METRICS.md Q1): the
-    // Renderer port has three implementations and widening its return type would change all
-    // three plus the export path, for no gain. ADR-0012 stays untouched.
-    const metrics: RenderMetrics = {
-      pageCount: paginated.pages.length,
-      pageLayout: paginated.pageLayout,
-    };
-
-    return this.publishingTarget.prepare(book, { pdf: { bytes: pdf, metrics } });
+    return this.publishingTarget.prepare(book, { pdf: { bytes, metrics } });
   }
 }

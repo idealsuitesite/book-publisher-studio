@@ -3,7 +3,7 @@ import type { Chapter as EpubChapter, Options as EpubOptions } from 'epub-gen-me
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
+import type { Renderer, RenderContext, RenderResult } from '../../domain/ports/Renderer';
 import type { PaginatedBook } from '../../domain/models/PaginatedBook';
 import type { Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
@@ -80,7 +80,7 @@ function renderRunsWithDropCap(runs: TypeRun[]): string {
 }
 
 export class EPUBRenderer implements Renderer<Buffer> {
-  async render(book: PaginatedBook, context: RenderContext): Promise<Buffer> {
+  async render(book: PaginatedBook, context: RenderContext): Promise<RenderResult<Buffer>> {
     const { book: domainBook, theme, blockTypography } = book.styledBook;
     // Scoped per render call: images with embedded base64 data are written here and referenced
     // via file:// (ADR-0020, finding 5 - epub-gen-memory unconditionally fetches <img src>, with
@@ -118,7 +118,9 @@ export class EPUBRenderer implements Renderer<Buffer> {
         verbose: false,
       };
 
-      return await epub(options, chapters);
+      // No pageCount, and that is a real answer rather than a gap: an EPUB is reflowable and
+      // has no pages until a reading device lays it out (ADR-0045).
+      return { output: await epub(options, chapters), metrics: { pageLayout: book.pageLayout } };
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
     }
