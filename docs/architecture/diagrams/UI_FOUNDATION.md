@@ -288,3 +288,15 @@ Token categories expected in `globals.css` (replacing today's two-token scaffold
 - ADR-0033 — `packages/shared-types` is transport contracts only; unchanged by this sprint
 - `docs/TODO.md` — the frontend-test-suite backlog item Question 6 proposes closing
 - `docs/DESIGN_REVIEW_PROCESS.md` — the two-gate discipline this document is the first gate of
+
+---
+
+## Addendum (2026-07-18, CTO-directed) — the Import panel's information hierarchy
+
+**Trigger, in the CTO's own framing:** after real use, the Import panel had grown to show practically the whole table of contents (17 chapters, dozens of sub-sections), forcing scrolling before Validation/Layout/Preview were even reachable. *"Ce n'est pas un bug CSS, c'est un problème de conception de l'interface. Le panneau Import ne doit pas devenir proportionnel à la taille du manuscrit."*
+
+**The principle now locked:** the Import panel answers **"what did I import?"** — title, author, filename, statistics, success state. It never answers "show me the whole book"; those are different needs, and the second belongs to a future structure surface (the Sprint 10+ multi-page interface), not to an import confirmation. **No panel's height may be proportional to manuscript size.**
+
+**Implementation:** the structure list in `BookStructureView` collapses behind a native `<details>` disclosure showing "Structure — N parts"; expanded, it is height-capped (`max-h-64`) and scrolls internally, so even opened it cannot dominate. Native disclosure chosen over a custom toggle for its free, correct semantics — the same reasoning as Commit 3's native `<select>`.
+
+**Baseline note:** this changes `02/03/04` screens on every viewport — an intentional, CTO-ordered change landing before Commit 8's restyle window. Decision 3's process is followed (recapture with attribution in the same commit series), not silently bypassed; the *neutral-through-Commit-7* rule is amended by the CTO's explicit instruction, which this addendum records.

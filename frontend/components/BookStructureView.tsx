@@ -51,20 +51,37 @@ export function BookStructureView({ book, filename, onReset }: BookStructureView
         </dl>
       )}
 
-      <ul className="flex flex-col gap-2">
-        {book.mainContent.map((content) => (
-          <li key={content.id} className="text-sm text-zinc-900 dark:text-zinc-50">
-            {contentLabel(content)}
-            {content.type === 'chapter' && content.sections && content.sections.length > 0 && (
-              <ul className="ml-4 mt-1 flex flex-col gap-1 text-zinc-500 dark:text-zinc-400">
-                {content.sections.map((section) => (
-                  <li key={section.id}>{section.title || 'Untitled section'}</li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
-      </ul>
+      {/*
+        The full structure is collapsed by default, deliberately (CTO decision, 2026-07-18).
+        This panel answers "what did I import?" — showing every chapter and sub-section made its
+        height proportional to the manuscript, so a 500-page book buried Validation/Layout/
+        Preview under its own table of contents. That is an information-hierarchy defect, not a
+        CSS one: "what did I import" and "show me the whole book" are different needs, and the
+        second one belongs to a structure surface, not the import confirmation.
+
+        A native <details> disclosure: correct semantics for free (button role, aria-expanded,
+        keyboard toggling). The expanded list is height-capped and scrolls internally, so even
+        opened it can never dominate the page.
+      */}
+      <details className="group">
+        <summary className="cursor-pointer select-none text-sm font-medium text-zinc-900 underline underline-offset-4 dark:text-zinc-50">
+          Structure — {book.mainContent.length} {book.mainContent.length === 1 ? 'part' : 'parts'}
+        </summary>
+        <ul className="mt-3 flex max-h-64 flex-col gap-2 overflow-y-auto pr-2">
+          {book.mainContent.map((content) => (
+            <li key={content.id} className="text-sm text-zinc-900 dark:text-zinc-50">
+              {contentLabel(content)}
+              {content.type === 'chapter' && content.sections && content.sections.length > 0 && (
+                <ul className="ml-4 mt-1 flex flex-col gap-1 text-zinc-500 dark:text-zinc-400">
+                  {content.sections.map((section) => (
+                    <li key={section.id}>{section.title || 'Untitled section'}</li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }

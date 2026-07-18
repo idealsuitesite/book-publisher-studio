@@ -69,4 +69,43 @@ describe('BookStructureView', () => {
 
     expect(onReset).toHaveBeenCalledTimes(1);
   });
+
+  // CTO decision (2026-07-18): the Import panel answers "what did I import?", never "show me
+  // the whole book". Its height must not be proportional to the manuscript - a 500-page book
+  // was burying Validation/Layout/Preview under its own table of contents.
+  describe('structure disclosure', () => {
+    it('collapses the structure by default, showing a count instead of the whole TOC', () => {
+      render(<BookStructureView book={book()} filename="large-book.docx" onReset={() => {}} />);
+
+      expect(screen.getByText('Structure — 2 parts')).toBeInTheDocument();
+      expect(document.querySelector('details')?.open).toBe(false);
+    });
+
+    it('reveals the full structure on demand', async () => {
+      const user = userEvent.setup();
+      render(<BookStructureView book={book()} filename="large-book.docx" onReset={() => {}} />);
+
+      await user.click(screen.getByText(/Structure — 2 parts/));
+
+      expect(document.querySelector('details')?.open).toBe(true);
+      expect(screen.getByText('Chapter 1: Beginnings')).toBeVisible();
+    });
+
+    it('caps the expanded list height so a huge book still cannot dominate the panel', () => {
+      const many = Array.from({ length: 40 }, (_, i) => ({
+        type: 'chapter' as const,
+        id: `c-${i}`,
+        number: i + 1,
+        title: `Chapter ${i + 1}`,
+        content: [],
+      }));
+      render(
+        <BookStructureView book={book({ mainContent: many })} filename="big.docx" onReset={() => {}} />
+      );
+
+      expect(screen.getByText('Structure — 40 parts')).toBeInTheDocument();
+      expect(document.querySelector('details ul')?.className).toContain('max-h-64');
+      expect(document.querySelector('details ul')?.className).toContain('overflow-y-auto');
+    });
+  });
 });

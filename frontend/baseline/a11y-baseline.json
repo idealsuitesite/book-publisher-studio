@@ -1,7 +1,7 @@
 {
-  "capturedAt": "2026-07-18T20:49:39.883Z",
+  "capturedAt": "2026-07-18T21:26:03.482Z",
   "totalViolations": 11,
-  "totalNodes": 44,
+  "totalNodes": 41,
   "screens": [
     {
       "screen": "01-landing",
@@ -28,7 +28,7 @@
       "screen": "02-imported",
       "viewport": "desktop",
       "file": "02-imported--desktop.png",
-      "bytes": 92025,
+      "bytes": 76491,
       "status": "captured",
       "violations": [
         {
@@ -46,7 +46,7 @@
         {
           "id": "region",
           "impact": "moderate",
-          "nodes": 10,
+          "nodes": 9,
           "help": "All page content should be contained by landmarks"
         }
       ]
@@ -55,7 +55,7 @@
       "screen": "03-layout-kdp",
       "viewport": "desktop",
       "file": "03-layout-kdp--desktop.png",
-      "bytes": 91340,
+      "bytes": 75851,
       "status": "captured",
       "violations": [
         {
@@ -73,7 +73,7 @@
         {
           "id": "region",
           "impact": "moderate",
-          "nodes": 10,
+          "nodes": 9,
           "help": "All page content should be contained by landmarks"
         }
       ]
@@ -82,7 +82,7 @@
       "screen": "04-preview",
       "viewport": "desktop",
       "file": "04-preview--desktop.png",
-      "bytes": 90964,
+      "bytes": 75456,
       "status": "captured",
       "violations": [
         {
@@ -100,7 +100,7 @@
         {
           "id": "region",
           "impact": "moderate",
-          "nodes": 10,
+          "nodes": 9,
           "help": "All page content should be contained by landmarks"
         }
       ]
