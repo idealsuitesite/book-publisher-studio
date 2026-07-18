@@ -1,5 +1,13 @@
 # Architecture Reference
 
+> **⚠️ PARTIALLY STALE — the principles are current, the file listings are not (annotated 2026-07-18).**
+>
+> The **Core Principles** below remain accurate and are still the rules this codebase follows. The **directory listings** are Sprint-1-era and describe as "(planned)" several things that shipped long ago: renderers (Sprints 2–3B), themes (Sprint 3), and the export use case (Sprint 2). Nine sprints have shipped through `v0.9.0-alpha`.
+>
+> This staleness was disclosed in `docs/DEVELOPER_HANDBOOK.md` from Sprint 6 onward but never corrected. It is annotated here rather than rewritten (ADR-0010 precedent), because the principles are worth keeping verbatim and the listings are better read from the code than maintained by hand in a fourth place.
+>
+> **For the current structure, read the code** — `backend/src/{domain,application,infrastructure,presentation}` and `frontend/{app,components,lib}`. For which engines exist and what they do, see `docs/VERSIONS.md` and the per-sprint Level 2 Design Reviews in `docs/architecture/diagrams/`.
+
 ## Core Principles
 
 ### 1. Book is the Single Source of Truth

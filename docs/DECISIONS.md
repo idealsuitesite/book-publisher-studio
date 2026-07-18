@@ -1065,3 +1065,48 @@ A checked-in Playwright script makes both **reproducible by anyone on any machin
 - `docs/CURRENT_STATE.md`'s test table becomes self-consistent and stays that way only if future sprints regenerate it rather than appending rows.
 
 **Related:** `docs/architecture/diagrams/UI_FOUNDATION.md` (the Sprint 9 review these correct), ADR-0039 (the reprioritization that made UI Foundation Sprint 9), ADR-0010 (the annotate-never-rewrite precedent Correction 3 follows), ADR-0033 (the last new-dependency decision, for comparison), `docs/DESIGN_REVIEW_PROCESS.md` (the new-dependency rule Correction 2 satisfies)
+
+---
+
+## ADR-0041: Two Scalability Constraints Framed, Not Fixed — Event-Loop Blocking and the Persistence Prerequisite
+
+**Status:** OPEN — both deferred deliberately. **This ADR does not decide either answer.** It records two constraints found by the 2026-07-18 review, with enough evidence that a future Design Review starts from facts rather than rediscovery.
+
+**Date:** 2026-07-18
+**Decision:** Do **not** fix either inside Sprint 9. Both are architectural changes with real blast radius, and Sprint 9's defining constraint is that it touches no backend code and adds no business logic. Fixing them here would break that constraint and bury a significant change inside a UI sprint.
+
+### Constraint 1 — Rendering blocks the Node event loop
+
+**Confirmed by reading the code, not inferred:** `PDFRenderer.render()` is declared `async` and returns a `Promise<Buffer>`, but the work inside is synchronous PDFKit document construction — the `async` wrapper never yields to the event loop. The same shape holds for `DOCXRenderer` and `EPUBRenderer`.
+
+**The measured consequence:** Sprint 7 Commit 10 recorded a real 39,913-word manuscript exporting to PDF in 598ms. That is 598ms during which this single-threaded server **answers no other request** — not a health check, not another user's import. Two concurrent exports serialise; ten make the tenth user wait several seconds before their work even starts.
+
+Today this is invisible: the product has one user at a time and no deployment. It stops being invisible the moment two people use it simultaneously, and `v0.14.0-alpha` (Sprint 13, Performance & Scalability) is where it must be answered.
+
+**The question a future Design Review must answer:**
+> How should rendering be moved off the request thread without breaking the `Renderer<TOutput>` port that three implementations and every export path depend on?
+
+Candidate shapes, **none endorsed here**: a `worker_threads` pool behind the existing port (keeps the contract, adds serialisation cost for the `PaginatedBook`); a job queue with polling or SSE (changes the HTTP contract from synchronous to asynchronous, and would interact with Sprint 12's Autosave work); or accepting the limit and scaling horizontally with multiple processes (cheapest, but caps per-instance throughput at one export).
+
+**A constraint any answer must respect:** ADR-0012 makes `Renderer<TOutput>` a port with three real implementations. Whatever is chosen should not force PDF, DOCX and EPUB renderers to each know they are running in a worker.
+
+### Constraint 2 — Six of nine scheduled sprints need a persistence layer that is currently forbidden
+
+**Confirmed by `grep` across `backend/src/`:** there is no database, no repository, no session, and no cache. Sprint 7 Decision 2 (approved, held without exception through Sprints 8 and 9) states: *"No session, no server-side manuscript cache — every UI action is its own complete round trip."*
+
+**The conflict, from ADR-0039's own roadmap:** Workspace (11), Autosave & Recovery (12), Collaboration (14), Cloud Sync (15), Licensing (16), and Telemetry (17) each fundamentally require remembering something between requests. **Sprint 11 is where this becomes blocking** — projects, recent manuscripts, favourites and history are, definitionally, state.
+
+Sprints 9 and 10 are frontend-only and fully compatible with the backend as it stands, which is part of why ADR-0039 placed them first.
+
+**The question a future Design Review must answer:**
+> What is persisted, where, and does Sprint 7 Decision 2 get amended or superseded?
+
+This is not only a storage choice. It reopens questions the stateless design currently answers for free: what a "project" is as a Domain concept, whether manuscripts are stored as uploaded bytes or as serialised `Book` ASTs (`Book.ts` already declares itself SERIALIZABLE), who owns them once Licensing exists, and what happens to them on deletion.
+
+**Consequences:**
+- Neither constraint blocks Sprints 9 or 10. Both are recorded now so Sprint 11 opens with the problem already framed rather than discovered.
+- Sprint 13's Design Review should treat Constraint 1 as its starting point and re-measure first: the 598ms figure is from Sprint 7 and the pipeline has changed since.
+- Sprint 11's Design Review must resolve Constraint 2 **before** any Workspace code, since amending an approved decision is a governance step, not an implementation detail.
+- If both are still open when a real second user appears, Constraint 1 becomes a live production problem rather than a theoretical one.
+
+**Related:** ADR-0039 (the reordered roadmap that scheduled the six dependent sprints), `docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` Decision 2 (the stateless rule Constraint 2 must amend), ADR-0012 (the `Renderer` port Constraint 1 must not break), ADR-0038 (the other OPEN deferral, also awaiting its own review), `docs/demo/VISIBLE_INCREMENTS.md` (Sprint 7 Commit 10, where the 598ms measurement is recorded)
