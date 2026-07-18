@@ -1,6 +1,6 @@
 # Quality Gate
 
-The official checklist before every significant commit — not just before a PR merges (that's `docs/MERGE_CHECKLIST.md`'s narrower, merge-specific gate). This document exists so the checklist is codified in project governance instead of something that has to be remembered fresh in every session.
+The official checklist before every significant commit — not just before a PR merges (that's `docs/MERGE_CHECKLIST.md`'s narrower, merge-specific gate). This document exists so the checklist is codified in project governance instead of something that has to be remembered fresh in every session. It is the operational form of ADR-0032's **Engineering Governance Principle**: no feature is done until it is validated simultaneously at the Code, Product, and Documentation levels — see that ADR for the full rationale.
 
 ## The checklist
 
@@ -27,7 +27,7 @@ Every item above maps to something this project has already gotten wrong at leas
 | Item | What went wrong before it existed |
 |---|---|
 | Real Fixture Verification | Four real bugs (ADR-0019 6B/6C, ADR-0020 addendum, ADR-0031 bug 2) shipped past 100% synthetic-fixture test coverage |
-| verify-server | A real-export check was once reported against the wrong port, never actually checked against the server's own startup log (`docs/CLAUDE.md`'s Server Verification Policy) |
+| verify-server | A real-export check was once reported against the wrong port, never actually checked against the server's own startup log (`docs/DEVELOPMENT_WORKFLOW.md`'s "Server verification" section) |
 | ADRs synchronized | `docs/architecture/diagrams/BASELINE_v0.1.md`'s stale test-count claim went unnoticed until ADR-0010 |
 | Documentation synchronized | Same class of drift — `docs/MERGE_CHECKLIST.md` was written specifically to stop `CURRENT_STATE.md` claims from silently diverging from reality |
 | No TODO introduced | Not yet a caught incident in this project, but the same failure mode as an ADR gap: a decision deferred with no record of *why* or *by when* |

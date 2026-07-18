@@ -182,7 +182,7 @@ function buildHeaderFooter(book: PaginatedBook): { headers?: ISectionOptions['he
 // paragraphs from our own precomputed entries (title indented by level, page number appended
 // inline) rather than docx's native TableOfContents field - a real Word TOC field requires
 // Word to "update fields" before showing real text, which would make this unverifiable by real
-// text extraction (this project's Real Export Policy, docs/CLAUDE.md) the same way every other
+// text extraction (this project's Real Export Policy, docs/DEVELOPMENT_WORKFLOW.md) the same way every other
 // renderer output already is; consistency with PDFRenderer's own literal-paragraph approach was
 // also preferred over introducing a second rendering strategy for the same data.
 function buildTableOfContentsParagraphs(entries: TOCEntry[], theme: Theme): Paragraph[] {

@@ -1,5 +1,5 @@
 /**
- * Real Export Policy (docs/CLAUDE.md): mechanical verification only - no visual
+ * Real Export Policy (docs/DEVELOPMENT_WORKFLOW.md): mechanical verification only - no visual
  * analysis. This script confirms every permanent fixture in backend/verification/
  * survives a real round trip through the running server (import + export to all
  * 3 formats) with a 200, the right Content-Type, a non-empty/non-trivial body,

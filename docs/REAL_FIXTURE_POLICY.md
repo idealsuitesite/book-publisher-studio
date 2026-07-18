@@ -2,7 +2,7 @@
 
 ## Why this exists
 
-`docs/CLAUDE.md`'s existing "Permanent Verification Policy" already mandates real-file verification for the rendering pipeline (`DOCXRenderer`, `PDFRenderer`, `EPUBRenderer`, `ThemeEngine`, `LayoutEngine`, `TypographyResolver`, the `Renderer` port, `ExportManuscriptUseCase`) — written after this project missed three real bugs (ADR-0019 findings 6B/6C, ADR-0020 addendum) that synthetic fixtures alone never caught. Sprint 6 added a fourth: automatic TOC generation shipped against synthetic fixtures alone, passed 328/328 tests, and would have produced a permanently empty TOC on every real DOCX import — caught only when real-file verification was actually run against `large-book.docx` (ADR-0031 bug 2, formalized as a standing rule in ADR-0032).
+This project's Permanent Verification Policy (originally written directly in `docs/CLAUDE.md`, now formalized as this document) already mandated real-file verification for the rendering pipeline (`DOCXRenderer`, `PDFRenderer`, `EPUBRenderer`, `ThemeEngine`, `LayoutEngine`, `TypographyResolver`, the `Renderer` port, `ExportManuscriptUseCase`) — written after this project missed three real bugs (ADR-0019 findings 6B/6C, ADR-0020 addendum) that synthetic fixtures alone never caught. Sprint 6 added a fourth: automatic TOC generation shipped against synthetic fixtures alone, passed 328/328 tests, and would have produced a permanently empty TOC on every real DOCX import — caught only when real-file verification was actually run against `large-book.docx` (ADR-0031 bug 2, formalized as a standing rule in ADR-0032).
 
 Four misses in one project, all with the same shape: a synthetic fixture built directly as domain objects doesn't reproduce a real quirk of how the import pipeline actually shapes real content. This policy generalizes the trigger condition beyond "rendering pipeline only" to close that gap.
 
@@ -48,7 +48,7 @@ Some fields have no real-world way to be set from an actual DOCX upload — `Cha
 
 ## Related
 
-- `docs/CLAUDE.md` — "Permanent Verification Policy," "Server Verification Policy," "Real Export Policy" (this policy extends the first's trigger scope; the port/fixture-selection mechanics are unchanged)
+- `docs/DEVELOPMENT_WORKFLOW.md` — "Server verification," "Which fixture to use" (the port-verification and fixture-selection mechanics this policy's trigger scope builds on, unchanged)
 - `docs/REAL_EXPORT_CHECKLIST.md` — the checklist template and process this policy makes mandatory for a broader set of changes
 - `docs/QUALITY_GATE.md` — the per-commit gate this policy's checklist item feeds into
 - ADR-0019/ADR-0020 (the first three real bugs this project's real-file discipline was built to catch), ADR-0031/ADR-0032 (the fourth, and the reason this policy's scope was broadened beyond rendering)

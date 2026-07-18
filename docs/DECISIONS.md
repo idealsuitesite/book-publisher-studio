@@ -752,7 +752,7 @@ So this is one precisely-located gap: `MammothParser.ts`'s `mammoth.convertToHtm
 
 ---
 
-## ADR-0032: Table of Contents Generation Follows Structural Document Hierarchy, Never Heading Blocks
+## ADR-0032: Table of Contents Generation Follows Structural Document Hierarchy, Never Heading Blocks; Engineering Governance Principle
 
 **Status:** APPROVED
 **Date:** 2026-07-17
@@ -765,4 +765,32 @@ So this is one precisely-located gap: `MammothParser.ts`'s `mammoth.convertToHtm
 - `TOCEntry.headingId` continues to reference either a `Heading.id` (when one exists) or the owning `Chapter`/`Section`'s own id (the common, real-import case) — documented on the type itself in `Book.ts`, not just in this ADR.
 - This is a Real Fixture Policy example case (see `docs/REAL_FIXTURE_POLICY.md`): any future TOC-adjacent change should be re-verified against a real multi-chapter fixture (`backend/verification/large-book.docx`), not synthetic fixtures alone, before being considered done.
 
-**Related:** ADR-0031 (the real-file-verification finding this ADR formalizes into a standing rule), `docs/REAL_FIXTURE_POLICY.md` (the governance policy this decision is a worked example of), `backend/src/domain/services/LayoutEngine.ts` (`buildTableOfContents()`)
+---
+
+**Additional decision, same ADR (CTO direction, 2026-07-17 — matches the ADR-0028 precedent of consolidating related rulings into one record rather than a new ADR per ruling): the Engineering Governance Principle.**
+
+**Decision:** No feature may be considered done until it is validated **simultaneously** at three levels — Code, Product, and Documentation. All three are required together; passing two of three is not "done," it's "done except for the part most likely to hide a real bug" (see ADR-0031, where Code passed — 328/328 tests — while Product had never actually been checked).
+
+- **Code:**
+  - Build (`npm run build`, 0 TypeScript errors)
+  - Lint (`npm run lint`, 0 errors)
+  - Tests (`npm test`, 0 failing)
+  - Coverage (`npm run test:coverage`, Domain >90% / global >80%, ADR-0006)
+- **Product:**
+  - Real fixtures (`docs/REAL_FIXTURE_POLICY.md`) — verified against actual manuscript content, not only hand-built test objects
+  - `npm run verify-server` (real port, real route, real fixture — never assumed)
+  - `npm run verify-real-export` (16/16 canonical-fixture checks)
+- **Documentation:**
+  - ADRs — a real architectural decision this work made has a record; an existing ADR it contradicts has been updated or superseded, not silently ignored
+  - `docs/CURRENT_STATE.md` — reflects what actually shipped, with real verified numbers
+  - `docs/TODO.md` — completed items moved, newly discovered items added
+  - Sprint Report / Release Notes — written for anything reaching a sprint or release boundary
+
+**Rationale:** this project's own six-sprint history is the evidence for the rule, not an abstraction invented ahead of it. Every real bug this project has shipped past its own test suite (ADR-0019 findings 6B/6C, ADR-0020 addendum, ADR-0031 bugs 1 and 2) passed Code-level validation completely — 100% synthetic-fixture coverage, 0 lint errors, full build — and was only caught because someone separately checked the Product level (a real manuscript through the real running server). Documentation gaps have their own independent history in this project (`docs/architecture/diagrams/BASELINE_v0.1.md`'s stale test-count claim, corrected by ADR-0010; the Sprint 6 PR/merge race that dropped a docs commit, caught only by `docs/RELEASE_CHECKLIST.md`'s mandatory re-verification-on-`main` step). Three independent kinds of gap, three independent kinds of check — collapsing them into "tests pass" has already produced real, shipped defects more than once.
+
+**Consequences:**
+- `docs/QUALITY_GATE.md`'s per-commit checklist and its 3 validation levels (Development/Product/Release) are the operational form of this principle — this ADR is the formal record of *why* those three levels are mandatory together, not just a convenient checklist shape.
+- A PR or commit that reports "tests pass" without addressing Product and Documentation should be treated as incomplete, not merely light on process — matching how ADR-0031's own two bugs are now treated as defects this project takes seriously enough to name a permanent principle after, not isolated incidents.
+- This principle is expected to outlive any single engine or sprint — it is a project-wide rule, not scoped to Professional Layout Engine or Table of Contents generation specifically, which is why it's recorded as a second decision in this ADR rather than folded into the first decision's own narrower rationale.
+
+**Related:** ADR-0031 (the real-file-verification finding this ADR formalizes into a standing rule), `docs/REAL_FIXTURE_POLICY.md` (the governance policy this decision is a worked example of), `docs/QUALITY_GATE.md` (the operational checklist this principle underlies), `docs/RELEASE_CHECKLIST.md` (the Documentation-level check that caught the Sprint 6 PR/merge race), ADR-0028 (precedent for consolidating multiple related rulings into one ADR when CTO-directed), `backend/src/domain/services/LayoutEngine.ts` (`buildTableOfContents()`)

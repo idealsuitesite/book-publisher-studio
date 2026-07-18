@@ -1,6 +1,6 @@
 # Verification Fixtures
 
-Permanent, canonical `.docx` inputs for real-export verification (`docs/REAL_EXPORT_CHECKLIST.md`, `docs/CLAUDE.md`'s Real Export Policy). Not automated-test fixtures — those live under `src/test-utils/` and are covered by `npm test`. These exist so every session verifies real rendering output against the exact same known documents, instead of searching `backend/uploads/` for whatever happens to be there or generating a throwaway file each time.
+Permanent, canonical `.docx` inputs for real-export verification (`docs/REAL_EXPORT_CHECKLIST.md`, `docs/DEVELOPMENT_WORKFLOW.md`'s "Which fixture to use"). Not automated-test fixtures — those live under `src/test-utils/` and are covered by `npm test`. These exist so every session verifies real rendering output against the exact same known documents, instead of searching `backend/uploads/` for whatever happens to be there or generating a throwaway file each time.
 
 | File | Purpose |
 |---|---|

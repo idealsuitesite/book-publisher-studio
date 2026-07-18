@@ -150,7 +150,7 @@ describe('POST /api/manuscripts/export', () => {
   });
 
   // Sprint 4 commit 10 (docs/architecture/diagrams/TYPOGRAPHY_ENGINE.md §8) - E2E regression
-  // using the canonical, permanent verification fixture (docs/CLAUDE.md's Real Export Policy),
+  // using the canonical, permanent verification fixture (docs/DEVELOPMENT_WORKFLOW.md's "Which fixture to use"),
   // not a synthetic buildTestDocxBuffer() fixture like every test above. Closes a real gap:
   // until this commit, nothing in the automated suite ever exercised bold/italic/underline/
   // strikethrough survival through the real import -> TypographyResolver -> render pipeline

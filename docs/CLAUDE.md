@@ -1,144 +1,44 @@
 # Claude Instructions for Book Publisher Studio
 
-## Core Principles
+This file is an entry point, not a container. It states what governs the project and where to find each policy in detail — it does not restate architecture, ADRs, review rules, coding conventions, or Git workflow inline. If you're about to add more than a couple of lines to this file, that content almost certainly belongs in one of the documents below instead.
 
-1. **Always review architecture before coding**
-   - Check CLAUDE.md
-   - Check docs/CURRENT_STATE.md
-   - Check docs/ARCHITECTURE.md
+## What this project is
 
-2. **Never violate Clean Architecture**
-   - Domain has ZERO infrastructure dependencies
-   - Application depends only on abstractions
-   - Presentation depends on Application
-   - No cyclic dependencies
+A global publishing software platform (DOCX import, AST-based book model, PDF/EPUB export, AI-assisted editing) built on Clean Architecture (Domain → Application → Infrastructure/Presentation) and DDD. Start a session with `docs/SESSION_BOOTSTRAP.md`, not this file directly.
 
-3. **Never expose Domain objects to Presentation**
-   - Use DTOs for HTTP responses
-   - Mappers convert Domain → DTO
-   - Controllers never touch Domain
+## The non-negotiables (detail lives elsewhere)
 
-4. **Always use Dependency Inversion**
-   - Use Cases depend on interfaces, not implementations
-   - Constructor injection mandatory
-   - Mock interfaces for testing
+1. **Never violate Clean Architecture** — Domain has zero infrastructure dependencies; no cyclic dependencies. → `docs/DEVELOPER_HANDBOOK.md`
+2. **Never expose Domain objects to Presentation** — DTOs and Mappers only. → `docs/DEVELOPER_HANDBOOK.md`
+3. **Always use Dependency Inversion** — constructor injection, ports over concrete classes where more than one real implementation is plausible. → `docs/DEVELOPER_HANDBOOK.md`
+4. **A Design Review precedes non-trivial code** — new engines, new ports, new dependencies, or an approach with two genuinely different options all need one, approved before a branch exists. → `docs/DESIGN_REVIEW_PROCESS.md`
+5. **Real fixtures over synthetic ones** — for import, pagination, TOC, renderer, and publishing changes, verify against a real manuscript, not only hand-built test objects. This project has shipped four real bugs that passed 100% synthetic-fixture coverage (ADR-0019, ADR-0020, ADR-0031). → `docs/REAL_FIXTURE_POLICY.md`
+6. **No feature is done until Code, Product, and Documentation all pass** — this is now a formal governance principle, not just a habit. → `docs/DECISIONS.md` (ADR-0032) and `docs/QUALITY_GATE.md`
 
-5. **Strict TypeScript**
-   - No `any` (except for mocks)
-   - Explicit return types
-   - Full type safety
+## Where everything lives
 
-6. **SOLID Principles**
-   - Single Responsibility
-   - Open/Closed
-   - Liskov Substitution
-   - Interface Segregation
-   - Dependency Inversion
+### Governance (process — how work gets done)
+- `docs/DEVELOPMENT_WORKFLOW.md` — branching, commits, "after every task," server verification, which fixture to use
+- `docs/DESIGN_REVIEW_PROCESS.md` — when a Design Review is required, the two-level structure, the approval gate
+- `docs/RELEASE_CHECKLIST.md` — the exact sprint-closure sequence (tag, Release Notes, `VERSIONS.md` flip, branch cleanup)
+- `docs/REAL_FIXTURE_POLICY.md` — when real-manuscript verification is mandatory and how to handle fields the real import pipeline can't reach
+- `docs/QUALITY_GATE.md` — the per-commit checklist and the 3 validation levels (Development/Product/Release)
+- `docs/TESTING_STRATEGY.md` — functional-vs-rendering and structural(L1)-vs-rendering(L2) test taxonomies
+- `docs/MERGE_CHECKLIST.md` — the narrower gate specific to merging a feature branch into `main`
 
-7. **DDD (Domain-Driven Design)**
-   - Domain contains business logic
-   - Value Objects are immutable
-   - Aggregates are explicit
-   - Ubiquitous Language
+### Technical (how the system is built)
+- `docs/ARCHITECTURE.md` — layered architecture reference (see `docs/DEVELOPER_HANDBOOK.md` for a note on this file's staleness)
+- `docs/DEVELOPER_HANDBOOK.md` — coding conventions, naming, file structure, port-vs-class judgment calls
+- `docs/DECISIONS.md` — every ADR, full text
+- `docs/ADR_INDEX.md` — a searchable table of every ADR (number, title, date, category, status)
 
-8. **No Technical Debt**
-   - Write tests before code
-   - Document architectural decisions
-   - Refactor before adding features
-   - Keep coverage >80%
+### Product (what's being built and why)
+- `docs/VISION.md` — long-term product vision
+- `docs/ROADMAP.md` — timeline (note: predates the current sprint-numbering scheme; `docs/VERSIONS.md` is the current source of truth for what's shipped and what's next)
+- `docs/VERSIONS.md` — version-to-milestone mapping, the authoritative "what's released" record
+- `docs/releases/<version>/SPRINT_N_FINAL_REPORT.md` and `ReleaseNotes.md` — per-sprint retrospectives and release notes
+- `docs/architecture/diagrams/*.md` — Design Review documents, one per engine/sprint
 
-## After Every Task
+## Session start
 
-- [ ] Update docs/CURRENT_STATE.md
-- [ ] Update docs/TODO.md
-- [ ] Run `npm test` (all tests pass)
-- [ ] Run `npm run build` (no errors)
-- [ ] Commit with clear message
-- [ ] Push to GitHub
-
-## Before Every Session
-
-See [docs/START_HERE.md](START_HERE.md) for the reading order, then summarize:
-- Current architecture
-- Current sprint status
-- Current task
-- Remaining work
-- Next action
-
-## File Structure (Immutable)
-src/
-├── domain/           (Business logic only)
-│   ├── models/
-│   ├── services/
-│   └── plugins/
-├── application/      (Use Cases + DTOs)
-│   ├── contracts/
-│   ├── dto/
-│   ├── mappers/
-│   └── use-cases/
-├── infrastructure/   (External services)
-│   ├── normalizers/
-│   └── parsers/
-└── presentation/     (Controllers + Routes)
-├── controllers/
-└── routes/
-## Testing Rules
-
-- Unit tests for Domain
-- Integration tests for Use Cases
-- E2E tests for Presentation
-- Minimum 80% coverage
-- All tests must pass before commit
-
-## Permanent Verification Policy (Real Export Checklist)
-
-This project has already missed multiple real bugs that synthetic fixtures did not detect: PDF "Page 6 of 4" (ADR-0019 finding 6C), a completely empty EPUB (ADR-0020 addendum), PDFKit infinite pagination (ADR-0019 finding 6B), and a permanently empty Table of Contents on every real DOCX import (ADR-0031 bug 2, formalized as a standing rule in ADR-0032). All four were caught only by exporting a real manuscript through the running HTTP API (or, where the HTTP round trip structurally can't reach the changed field, a direct real-pipeline composition against real fixture content) and inspecting the actual output — never by a green `npm test` alone. A separate incident (2026-07-17) showed the verification step itself can silently give a false read too: a real-export check was reported against the wrong port, never actually checked against the server's own startup log — see the Server Verification Policy below, added for exactly this reason.
-
-**Rule:** any change touching `DOCXRenderer`, `PDFRenderer`, `EPUBRenderer`, `ThemeEngine`, `LayoutEngine`, `TypographyResolver`, the `Renderer` port, or `ExportManuscriptUseCase` must complete `docs/REAL_EXPORT_CHECKLIST.md` before the task is considered done — unit tests and E2E tests passing is necessary but never sufficient on its own for this category of change. No sprint touching the rendering pipeline is complete until the canonical fixture (see Real Export Policy below) has been exported (all applicable formats) through `POST /api/manuscripts/export` and inspected — not by calling a renderer class directly in a script.
-
-**`docs/REAL_FIXTURE_POLICY.md` broadens this trigger list** (2026-07-17, post-Sprint-6) beyond the rendering pipeline to also cover the import pipeline (`MammothParser`, `HtmlNormalizer`, `ASTBuilder`, `ImportManuscriptUseCase`) and Table of Contents generation/consumption specifically — read that policy for the full scope and for how to handle fields with no real DOCX-native signal to trigger them from.
-
-This is enforced at merge time via `docs/MERGE_CHECKLIST.md`'s own gate for this category of change, and per-commit via `docs/QUALITY_GATE.md`'s "Real Fixture Verification PASS" item. It applies automatically in every session touching the rendering or import pipeline, without needing to be re-requested.
-
-## Server Verification Policy
-
-Never assume the backend port.
-
-Before every real export verification:
-
-1. Read the server's own startup output (`npm run dev` prints `Server running on http://localhost:PORT`) — do not assume a value.
-2. Verify `GET /api/health` returns HTTP 200 on that exact port.
-3. Use that verified port for every export request in the session.
-4. Never hardcode `localhost:3000` — nothing in this project listens there. `src/index.ts` reads `PORT` from the environment (default `5000`); dev, tests, CI, and tooling all resolve it the same way.
-
-`npm run verify-server` automates steps 1-3 (plus confirming the export route is registered and the canonical fixture — see below — exists) and exits non-zero on any failure with the specific check that failed. Run it before any Real Export Verification pass instead of assuming the server is reachable.
-
-## Real Export Policy
-
-Always use `backend/verification/typography-test.docx` for every real export verification, unless the change specifically concerns pagination/performance (`backend/verification/large-book.docx`), images (`backend/verification/images.docx`), or tables (`backend/verification/tables.docx`) — see `backend/verification/README.md`.
-
-- Never search `backend/uploads/` or elsewhere for a DOCX to use.
-- Never generate a temporary DOCX for verification.
-- If the expected fixture file is missing, **stop and ask** — do not substitute or regenerate it silently.
-
-This ensures the same known documents are used for verification every session, rather than whatever happens to be present.
-
-## Naming Conventions
-
-- Domain: `Book`, `Chapter`, `Block`, `Validator`, `Calculator`
-- Application: `ImportManuscriptUseCase`, `BookDTO`, `BookMapper`
-- Infrastructure: `HtmlNormalizer`, `MammothParser`
-- Presentation: `ManuscriptController`, `ManuscriptRoute`
-
-## Documentation
-
-- Update DECISIONS.md for architectural changes
-- Update CURRENT_STATE.md after each sprint
-- Update ROADMAP.md if timelines change
-- Keep docs/architecture/diagrams/ current
-
-## Quality Gate, Testing Strategy, Real Fixture Policy (added post-Sprint-6)
-
-- `docs/QUALITY_GATE.md` — the per-commit checklist (build/lint/tests/coverage/verify-server/verify-real-export/Real Fixture Verification/no stray TODOs/ADRs synced/docs synced/public API unchanged), and the three validation levels (Development/Product/Release)
-- `docs/TESTING_STRATEGY.md` — functional-vs-rendering and structural(Level 1)-vs-rendering(Level 2) test taxonomies, for triage once the suite is large
-- `docs/REAL_FIXTURE_POLICY.md` — broadens real-fixture verification beyond the rendering pipeline (see Permanent Verification Policy above)
+See `docs/SESSION_BOOTSTRAP.md` for the reading order, then summarize: current version, current branch, architecture, completed work, next task. Wait for explicit approval before writing code.

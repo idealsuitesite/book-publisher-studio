@@ -2,7 +2,7 @@
  * Regenerates the fixture .docx files committed alongside this script.
  *
  * These fixtures are the canonical, permanent inputs for real-export verification
- * (docs/REAL_EXPORT_CHECKLIST.md, docs/CLAUDE.md's Real Export Policy) - not test
+ * (docs/REAL_EXPORT_CHECKLIST.md, docs/DEVELOPMENT_WORKFLOW.md's "Which fixture to use") - not test
  * fixtures for automated tests (those live under src/test-utils/). They exist so
  * every session verifies against the exact same known documents instead of
  * searching backend/uploads/ for whatever happens to be there, or generating a

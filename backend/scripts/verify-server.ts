@@ -1,5 +1,5 @@
 /**
- * Server Verification Policy (docs/CLAUDE.md): never assume the backend port.
+ * Server Verification Policy (docs/DEVELOPMENT_WORKFLOW.md): never assume the backend port.
  * This script reads the same PORT resolution src/index.ts uses (env var, 5000
  * fallback), then actually checks the running server against it - it does not
  * start the server itself. Run `npm run dev` first, in a separate terminal.
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
 
   if (!existsSync(CANONICAL_FIXTURE)) {
     console.error(`✗ Canonical fixture missing: ${CANONICAL_FIXTURE}`);
-    console.error('  Stop and ask before generating or substituting a different file (docs/CLAUDE.md Real Export Policy).');
+    console.error('  Stop and ask before generating or substituting a different file (docs/DEVELOPMENT_WORKFLOW.md "Which fixture to use").');
     process.exitCode = 1;
     return;
   }
