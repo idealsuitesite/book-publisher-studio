@@ -4,8 +4,19 @@
 
 > ## ▶ START HERE — session handoff (2026-07-18)
 >
-> **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed. Last commit `f958b70`.
-> **Verified state:** backend **516/516**, frontend **141/141** (zero unhandled errors), `verify-real-export` 16/16, `verify-real-publish` 4/4, visual baseline green twice consecutively, build + lint clean on both workspaces.
+> **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed. Last commit `a13fec6`.
+> **Verified state:** backend **520/520**, frontend **144/144**, `verify-real-export` 16/16, `verify-real-publish` 4/4, baseline green, build + lint clean on both workspaces.
+>
+> ### Late session of 2026-07-18: the pagination-quality investigation (CTO real-book report)
+> The CTO exported a **real book**: pages half-empty, chapter titles alone above voids, "ça dépasse → nouvelle page". `LAYOUT_FIDELITY.md` is now **ROUND 2** with the full investigation (§2bis, all evidence line-numbered):
+> - The estimator charged **1.43×** real height (+30%/line: theme lineHeight 1.5 vs renderer's natural ~1.15 with no lineGap; `WORDS_PER_LINE=12` blind to width/font; **chapter titles booked at 0pt**; spaceAfter never modelled) and `PDFRenderer.renderBlock:371` **forced** those estimated breaks onto real text. Verdict: algorithm + parameters, **not** the library.
+> - **Phase A implemented (`f8c682a`)**: `TextMeasurer` Domain port + `PdfKitTextMeasurer` on the renderer's own embedded fonts. Pagination now measures; titles and spacing are priced. ADR-0045 parity test upgraded to guard the real (measured) wiring.
+> - **Phase B designed, NOT implemented**: line-level splitting with min-2-lines widow/orphan control — changes the `Page` model and both renderers; its own commit series with real-book visual verification.
+> - LF **Q1–4 locked**: gutter resolved at export time; native `docx` `margin.gutter` (+spike for `mirrorMargins`); Q3 superseded by the measurer; blank verso yes.
+> - **Real Fixture Policy finding**: `large-book.docx` is too uniform to exhibit variance-driven underfill — the canonical set needs a varied-prose fixture. The CTO's own book is currently the only artifact showing this class.
+>
+> ### Import panel (CTO information-hierarchy decision, `a13fec6`)
+> The panel answers *"what did I import?"* — structure now collapses behind `Structure — N parts` (native `<details>`, height-capped when open). **No panel's height may be proportional to manuscript size** (UI_FOUNDATION addendum). Baseline recaptured with attribution; a11y improved 44→41 nodes as a side effect.
 >
 > ### Session of 2026-07-18 (evening): five phases, all landed
 > 1. **Enumerated errors fixed** — the frontend unhandled-error race (lying test fixtures, not the component) and `frontend/AGENTS.md` now says what to do instead of pointing at a directory that doesn't exist.
