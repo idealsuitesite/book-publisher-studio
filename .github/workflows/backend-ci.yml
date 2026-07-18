@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies (root workspace)
         run: npm ci
 
+      - name: Build shared-types
+        run: npm run build --workspace=shared-types
+
       - name: Build
         run: npm run build --workspace=backend
 
