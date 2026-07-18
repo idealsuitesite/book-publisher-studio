@@ -7,15 +7,17 @@ import { BookStructureView } from '@/components/BookStructureView';
 import { ValidationSummary } from '@/components/ValidationSummary';
 import { FormatSelector } from '@/components/FormatSelector';
 import { PreviewPanel } from '@/components/PreviewPanel';
+import { ExportPanel } from '@/components/ExportPanel';
 
 // Sprint 7 commit 5 (docs/architecture/diagrams/SPRINT_7_KICKOFF.md) - the dropzone commit 4
 // shipped as static UI now drives the real ThemeEngine/ASTBuilder pipeline via a real
 // POST /api/manuscripts/import. Commit 6 added the real book structure view on success
 // (BookStructureView). Commit 7 added the real validation findings (ValidationSummary).
-// Commit 8 added the format/layout selector (FormatSelector). Commit 9a adds the real PDF
-// preview (PreviewPanel) - the success state now keeps the real dropped File (not just its
-// name) since the stateless backend needs the real bytes resent for export/preview. Commit 9b
-// (download) is not wired here yet.
+// Commit 8 added the format/layout selector (FormatSelector). Commit 9a added the real PDF
+// preview (PreviewPanel) - the success state keeps the real dropped File (not just its name)
+// since the stateless backend needs the real bytes resent for export/preview. Commit 9b adds
+// real export/download for all 3 formats (ExportPanel), completing the originally-planned
+// Commit 9.
 type State =
   | { status: 'idle' }
   | { status: 'uploading'; filename: string }
@@ -96,6 +98,9 @@ export function UploadDropzone() {
         )}
         {selectedLayout && selectedTheme && (
           <PreviewPanel file={state.file} layout={selectedLayout} theme={selectedTheme} />
+        )}
+        {selectedLayout && selectedTheme && (
+          <ExportPanel file={state.file} layout={selectedLayout} theme={selectedTheme} />
         )}
       </div>
     );
