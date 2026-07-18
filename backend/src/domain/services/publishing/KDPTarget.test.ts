@@ -18,17 +18,16 @@ const output = (text: string, pageCount?: number): RenderedOutput => ({
 });
 
 function compliantBook(): Book {
-  return {
-    ...createBook({ title: 'T', author: 'A', language: 'en', isbn: '978-0' }),
-    pageCount: 200,
-  };
+  // No pageCount here on purpose: compliance rests on the *rendered* count now, and
+  // book.pageCount is the import-time estimate the rule must never fall back to (ADR-0042).
+  return createBook({ title: 'T', author: 'A', language: 'en', isbn: '978-0' });
 }
 
 describe('KDPTarget - real integration (Packaging + SubmissionValidator + KDPRuleProvider)', () => {
   const target = new KDPTarget(new Packaging(), new SubmissionValidator(new KDPRuleProvider()));
 
   it('returns a PASS report with target "kdp" for a fully compliant manuscript', () => {
-    const report = target.prepare(compliantBook(), { pdf: output('pdf') });
+    const report = target.prepare(compliantBook(), { pdf: output('pdf', 200) });
 
     expect(report.status).toBe('PASS');
     expect(report.target).toBe('kdp');
@@ -51,7 +50,7 @@ describe('KDPTarget - real integration (Packaging + SubmissionValidator + KDPRul
   });
 
   it('artifacts reflects exactly the bundle\'s formatsIncluded - not a separate computation', () => {
-    const report = target.prepare(compliantBook(), { pdf: output('p'), docx: output('d') });
+    const report = target.prepare(compliantBook(), { pdf: output('p', 200), docx: output('d') });
 
     expect(report.artifacts).toEqual(['pdf', 'docx']);
   });
@@ -145,7 +144,7 @@ describe('createKDPTarget', () => {
     const { createKDPTarget } = await import('./createKDPTarget');
     const target = createKDPTarget();
 
-    const report = target.prepare(compliantBook(), { pdf: output('pdf') });
+    const report = target.prepare(compliantBook(), { pdf: output('pdf', 200) });
 
     expect(report.target).toBe('kdp');
     expect(report.status).toBe('PASS');

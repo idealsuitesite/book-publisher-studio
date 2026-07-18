@@ -5,15 +5,25 @@ import { createBook } from '../models/Book';
 import type { ValidationRuleProvider } from '../ports/ValidationRuleProvider';
 import type { PostRenderValidationRule } from './publishing/PostRenderValidationRule';
 import type { PublishingBundle } from '../models/PublishingBundle';
+import type { RenderedOutputs } from '../models/PublishingReport';
+import { KDP6x9PageLayout } from '../layouts/KDP6x9PageLayout';
 
-function bundleWith(overrides: Partial<PublishingBundle['manifest']> = {}): PublishingBundle {
+function bundleWith(
+  overrides: Partial<PublishingBundle['manifest']> = {},
+  manuscript: RenderedOutputs = {}
+): PublishingBundle {
   return {
-    manuscript: {},
+    manuscript,
     metadata: { title: '', author: '', language: '' },
     assets: [],
     manifest: { formatsIncluded: [], hasCover: false, assembledAt: new Date(), ...overrides },
   };
 }
+
+/** A really-rendered PDF interior carrying its real paginated count (ADR-0042). */
+const renderedPdf = (pageCount: number): RenderedOutputs => ({
+  pdf: { bytes: Buffer.from('pdf'), metrics: { pageCount, pageLayout: KDP6x9PageLayout } },
+});
 
 describe('SubmissionValidator', () => {
   it('depends only on the ValidationRuleProvider abstraction - a fake provider works with no KDP class involved', () => {
@@ -45,9 +55,13 @@ describe('SubmissionValidator', () => {
 
   it('returns no issues for a fully compliant manuscript', () => {
     const validator = new SubmissionValidator(new KDPRuleProvider());
-    const book = { ...createBook({ title: 'T', author: 'A', language: 'en', isbn: '978-0' }), pageCount: 200 };
+    // Compliance now rests on the *rendered* page count, not on book.pageCount's estimate.
+    const book = createBook({ title: 'T', author: 'A', language: 'en', isbn: '978-0' });
 
-    const issues = validator.validate({ book, bundle: bundleWith({ formatsIncluded: ['pdf'], hasCover: true }) });
+    const issues = validator.validate({
+      book,
+      bundle: bundleWith({ formatsIncluded: ['pdf'], hasCover: true }, renderedPdf(200)),
+    });
 
     expect(issues).toHaveLength(0);
   });

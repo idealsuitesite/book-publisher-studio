@@ -19,7 +19,13 @@ export class KDPRuleProvider implements ValidationRuleProvider {
   getRules(): PostRenderValidationRule[] {
     return [
       new RequiredMetadataFieldsRule(this.data.requiredMetadataFields),
-      new PageCountRule(this.data.interiorSpec.minPageCount, this.data.interiorSpec.maxPageCount),
+      // 'pdf' because that is the interior format KDP paginates and rejects on. An EPUB is
+      // reflowable and has no page count to validate (ADR-0042).
+      new PageCountRule(
+        this.data.interiorSpec.minPageCount,
+        this.data.interiorSpec.maxPageCount,
+        'pdf'
+      ),
       new CoverPresenceRule(),
       new InteriorFormatAvailabilityRule(this.data.interiorSpec.acceptedFormats),
     ];
