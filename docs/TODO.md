@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 18, 2026 (Sprint 8 "Publishing Engine" implementation complete on `feature/sprint-8-publishing-engine`, Commits 0–8 — not yet merged, not yet tagged)
+**Last Updated:** July 18, 2026 (Sprint 8 "Publishing Engine" released as `v0.9.0-alpha`, PR #13 merged; no sprint currently assigned)
 
 ---
 
@@ -14,7 +14,7 @@ None currently.
 
 **Sprint 7 ("First Demonstrable Product") is complete, merged, and released.** PR #12 merged (`f17fd65`), `v0.8.0-alpha` tagged and pushed, `feature/sprint-7-first-demonstrable-product` deleted (local + remote). Full commit-by-commit detail (13 implementation commits, Commit 9 split into 9a/9b at CTO direction, ADR-0034) moved to the COMPLETED section below — see there, `docs/CURRENT_STATE.md`'s Sprint 7 section, and `docs/releases/v0.8.0-alpha/SPRINT_7_FINAL_REPORT.md` for full detail.
 
-**Sprint 8 (Publishing Engine) — 🟡 Design Review round 1 drafted (2026-07-18), not yet approved.** Confirmed as this sprint's target by explicit CTO direction. `docs/architecture/diagrams/PUBLISHING_ENGINE.md` — real evidence gathered by reading the actual code (`Book.ts`'s `FrontMatter`/`BackMatter` fully modeled but grep-confirmed unconsumed by any renderer except `frontMatter.toc`; `ExportManuscriptUseCase`'s pipeline ends at a raw `Buffer`, nothing downstream exists today). A real, previously-unflagged tension found and disclosed: `docs/VISION.md`'s original framing treats future platforms as just more `IRenderer` implementations, while `PLATFORM_ARCHITECTURE_ROADMAP.md`'s later framing wants a post-Renderer `PublishingTarget` port — this review recommends the latter but leaves it as an open question for explicit CTO confirmation, since it reverses the original vision document, not just extends it. 5 open questions posed, each with a recommendation, none locked: architectural framing, first platform (recommended: Amazon KDP, matching Sprint 6's own spike-first precedent) + whether a real spike is needed before locking decisions, `PostRenderValidation` ownership (inherited from `VALIDATION_ENGINE.md`'s Sprint 5 Decision 2), HTTP surface shape (`POST /api/manuscripts/publish` vs. extending `/export`), and an explicit recommendation against real automated KDP submission this sprint (validation/packaging only). **While fixing this staleness, also corrected `PLATFORM_ARCHITECTURE_ROADMAP.md`'s §2.4 (still described Professional Layout Engine as unbuilt, though it shipped Sprint 6) and §4a (Sprint 7's proposal section still read as unapproved, though it shipped as `v0.8.0-alpha`) — annotated, not rewritten, matching ADR-0010's precedent.** No branch, no code. Next: CTO round 2 review of the 5 open questions.
+**Sprint 8 (Publishing Engine) — ✅ COMPLETE AND RELEASED as `v0.9.0-alpha`** (PR #13, merge commit `4a4deaa`). Design Review approved, 9 commits, 386/386 tests, 4/4 real-fixture publish checks. Full detail in the COMPLETED section below and in `docs/releases/v0.9.0-alpha/SPRINT_8_FINAL_REPORT.md`.
 
 Also post-Sprint-6 (2026-07-17), independent of the Sprint 7 scope question: new governance docs formalizing practices that had previously lived only in ADRs/session discipline — `docs/QUALITY_GATE.md` (per-commit checklist + 3 validation levels: Development/Product/Release), `docs/TESTING_STRATEGY.md` (functional-vs-rendering and structural(L1)-vs-rendering(L2) test taxonomies), `docs/REAL_FIXTURE_POLICY.md` (broadens real-fixture verification beyond the rendering pipeline to also cover import and TOC generation, formalizing the trigger gap ADR-0031 bug 2 exposed). ADR-0032 written (TOC generation must use `Chapter`/`Section` titles, never `Heading` blocks — formalizes ADR-0031 bug 2 as a standing rule so a future session can't silently reintroduce it; also gained a second, project-wide decision the same day, the **Engineering Governance Principle** — no feature is done until validated simultaneously at Code/Product/Documentation levels, per CTO direction to consolidate it into this ADR rather than open a new one, matching ADR-0028's precedent).
 
@@ -173,6 +173,23 @@ Sprint 4 (Typography Engine) is **complete, merged, and released** — all 11 co
 - ✅ **Deliberately deferred, each with its own ADR-0034 decision:** a full PDF viewer with page navigation/zoom (needs a new dependency + its own Design Review) and a licensing/monetization-aware architecture (conflicts with this sprint's own locked minimal-scope decision)
 - ✅ Full retrospective: `docs/releases/v0.8.0-alpha/SPRINT_7_FINAL_REPORT.md` (objectives, ADRs created, real bugs found and fixed, final metrics, deferred items, residual risks, lessons learned); compiled timeline: `docs/releases/v0.8.0-alpha/SPRINT_7_TIMELINE.md`; full evidence trail: `docs/demo/VISIBLE_INCREMENTS.md`
 - [x] PR #12 merged (`f17fd65`), tagged `v0.8.0-alpha`, `docs/releases/v0.8.0-alpha/ReleaseNotes.md` written, `feature/sprint-7-first-demonstrable-product` deleted (local + remote)
+
+### Sprint 8 - Publishing Engine (merged via PR #13, `4a4deaa`; tagged `v0.9.0-alpha`)
+
+- ✅ Design Review approved before any code (`docs/architecture/diagrams/PUBLISHING_ENGINE.md`) — 8 decisions locked across two rounds plus four mid-sprint CTO reviews, each recorded with its reasoning. Approved with one condition (an internal-responsibilities diagram with explicit OWNS/NEVER boundaries), satisfied before the first line of implementation.
+- ✅ Commit 0 — KDP requirements spike (ADR-0035), real specs from 5 `kdp.amazon.com` pages. **Caught a wrong interface shape before any code existed:** the paperback cover has *computed* dimensions (trim size + page count + paper type via a spine-width formula), not the fixed pixel size the eBook cover uses.
+- ✅ Commit 1 — `PublishingTarget` port + `PublishingReport`/`PublishingIssue`/`RenderedOutputs` (Domain). `PublishingReport` later enriched with `artifacts`/`generatedAt`/`duration`/`summary` at CTO direction.
+- ✅ Commit 2 — `Packaging` + `PublishingBundle`/`PublishingBundleManifest`, entirely generic (`{manuscript, cover, metadata, assets, manifest}`), zero KDP knowledge.
+- ✅ Commit 3 — `SubmissionValidator` + 4 `PostRenderValidationRule`s + `ValidationRuleProvider` port + `KDPRuleProvider`/`KDPRuleData`. Closes `VALIDATION_ENGINE.md`'s own Sprint 5 Decision 2 commitment.
+- ✅ Commit 4 — `KDPTarget` + `createKDPTarget()`, a platform adapter: calls `Packaging.assemble()` and `SubmissionValidator.validate()` exactly once each, never re-validating or re-packaging (proven by 3 spy-collaborator tests).
+- ✅ Commit 5 — `PublishingUseCase` (Application), mirroring `ExportManuscriptUseCase` with one added responsibility: delegating to `PublishingTarget`.
+- ✅ Commit 6 — `POST /api/manuscripts/publish` + `PublishingResponseDTO` + `PublishingReportMapper` (Presentation). DTO named generically at CTO direction so future platforms need no contract change.
+- ✅ Commit 7 — real-fixture verification (`npm run verify-real-publish`), **4/4** canonical fixtures through the real running server. **No engine code changed.** Surfaced ADR-0038's gap.
+- ✅ Commit 8 — docs/ADR reconciliation, documentation only.
+- ✅ Two standing governance rules locked: **ADR-0036** (platform rules behind a `RuleProvider` port — no `if (platform === 'kdp')` anywhere in the engine) and **ADR-0037** (engine objects are platform-agnostic; platforms depend on the engine, never the inverse).
+- ✅ 386/386 tests (up from 336, **+50**), 93.41% statement coverage, 98.91% function coverage, 0 lint warnings, `verify-real-export` 16/16, `verify-real-publish` 4/4 — all re-verified on `main` after merge.
+- ✅ Full retrospective: `docs/releases/v0.9.0-alpha/SPRINT_8_FINAL_REPORT.md`; release notes: `docs/releases/v0.9.0-alpha/ReleaseNotes.md`.
+- [x] PR #13 merged (`4a4deaa`), tagged `v0.9.0-alpha`, `docs/VERSIONS.md` flipped (Plugin System shifted to `v0.10.0-alpha` and later rows accordingly), `feature/sprint-8-publishing-engine` deleted (local + remote).
 
 ---
 
