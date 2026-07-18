@@ -170,6 +170,8 @@ Minimum coverage required:
 
 **Not required:** exhaustive coverage. This is a real safety net for the specific risk this sprint creates, not a testing sprint.
 
+**Amended by ADR-0040 Correction 1 — how the tests actually land:** Commit 2 ships the **harness only** (config, `test` script, one smoke test proving the runner executes); **every commit from 3 onward ships its own tests inline.** A "test suite" commit at position 2 would have almost nothing to test — the `ui/` primitives it would cover do not exist until Commit 3 — so it would either be an empty harness mislabelled as a suite, or force primitives to be written early and collapse two commits into one. Shipping tests alongside each component is also what this project has done in **every one of its 8 prior sprints**: Sprint 8's implementation commits carried 1, 6, 1, 1, and 2 test files respectively, and there has never been a standalone unit-test commit. The round-2 *intent* — a safety net before the large refactor — is preserved and arguably strengthened: by Commit 5, every primitive the refactor consumes already has real tests written against real behaviour rather than anticipated behaviour.
+
 Vitest plus Testing Library, matching `backend/`'s existing Vitest choice so the monorepo keeps one test runner. This closes `docs/TODO.md`'s standing "Frontend automated test suite" backlog item, open since v0.8.0-alpha.
 
 ---
@@ -241,12 +243,12 @@ Token categories expected in `globals.css` (replacing today's two-token scaffold
 
 | # | Commit | Appearance |
 |---|---|---|
-| 0 | **Baseline** — automated a11y audit + reference screenshots of every Demo Script screen, archived before anything is touched. Analogous to Sprint 8's Commit-0 spike: establish facts before deciding against them. | — |
+| 0 | **Baseline** — adopt Playwright (ADR-0040 Correction 2), then capture an automated a11y audit + reference screenshots of every Demo Script screen, archived before anything is touched. Analogous to Sprint 8's Commit-0 spike: establish facts before deciding against them. **If Playwright cannot install or run here, that is a blocker to surface immediately, not to work around.** | — |
 | 1 | **Design tokens** in `globals.css` (`AppTheme`, light + dark), plus the Geist/Arial fix (§5) | neutral |
-| 2 | **Frontend test setup** — Vitest + Testing Library (Decision 6, moved earlier by CTO direction) | neutral |
-| 3 | **`ui/` primitives** — `Button`, `Card`, `Alert`, `Badge`, `Input`, `Textarea`, `Select` (Decision 1) | neutral |
-| 4 | **Accessibility primitives** — `Dialog`, `Popover`, `Menu`, `Tooltip`, focus trap, via headless library (Decision 1) | neutral |
-| 5 | **Refactor the 7 existing components onto `ui/`** — the largest commit, and the one the Commit-2 safety net exists for | neutral |
+| 2 | **Frontend test harness** — Vitest + Testing Library config, a `test` script, and one smoke test proving the runner executes. **Harness only, not a suite** (ADR-0040 Correction 1) | neutral |
+| 3 | **`ui/` primitives** — `Button`, `Card`, `Alert`, `Badge`, `Input`, `Textarea`, `Select` (Decision 1), **each shipping its own tests** | neutral |
+| 4 | **Accessibility primitives** — `Dialog`, `Popover`, `Menu`, `Tooltip`, focus trap, via headless library (Decision 1), **with their own tests** | neutral |
+| 5 | **Refactor the 7 existing components onto `ui/`** — the largest commit; every primitive it consumes already has real tests from Commits 3–4 | neutral |
 | 6 | **Navigation shell** — header, logo, title, placeholder (Decision 4) | neutral |
 | 7 | **Responsive behaviour**, verified at real breakpoints | **desktop neutral; mobile/tablet intentionally changes** (Decision 3's carve-out) |
 | 8 | **Deliberate restyle** — the first commit permitted to change desktop appearance | **intentional change** |
@@ -262,7 +264,7 @@ Token categories expected in `globals.css` (replacing today's two-token scaffold
 **Approved (round 2)**, with one criterion added by the CTO (the screenshot-archival rule below). Every item independently verifiable against the real running application — not asserted. This sprint needs these more than most, because "it looks better" is not checkable.
 
 - ✓ **`docs/product/PRODUCT_DEMO.md`'s Demo Script passes end to end, unchanged** — the single strongest objective criterion, and the CTO's own reason for approving it: the test is not *"the design is prettier"* but *"the software still works."*
-- ✓ **Reference screenshots of every Demo Script screen are archived before the first commit, then compared after every commit that intentionally changes appearance** (CTO-added criterion). This is what makes Decision 3's appearance-neutral policy enforceable rather than aspirational — a diff against Commit 0's baseline is either empty (Commits 1–7, desktop) or intentional (Commits 7 mobile, 8). **One disclosed constraint from real experience:** Sprint 7 Commit 12 found this environment has no mechanism to persist a captured screenshot to disk, and captures returned blank when the page was scrolled. If that limitation still holds, the archival must use a real, checked-in mechanism (a headless-browser script committing real image files) rather than in-conversation captures — otherwise this criterion cannot actually be met, and that must be surfaced at Commit 0, not at Commit 8.
+- ✓ **Reference screenshots of every Demo Script screen are archived before the first commit, then compared after every commit that intentionally changes appearance** (CTO-added criterion). This is what makes Decision 3's appearance-neutral policy enforceable rather than aspirational — a diff against Commit 0's baseline is either empty (Commits 1–7, desktop) or intentional (Commits 7 mobile, 8). **Resolved by ADR-0040 Correction 2:** confirmed by checking that neither `playwright` nor `puppeteer` was installed anywhere in this repository, which meant this criterion could not be met at all as originally written. **Playwright is adopted as a `frontend/` dev dependency at Commit 0**, giving a checked-in, re-runnable script that captures real image files — reproducible by anyone on any machine, rather than by one operator in one environment. It serves two locked requirements at once (this criterion, and Commit 9's real-browser verification), which is what justifies the dependency. Sprint 7's finding still stands as the reason the interactive-browser route was rejected: no disk persistence, and blank captures once the page is scrolled.
 - ✓ Real DOCX import → structure → validation → layout → preview → export still works in a real browser
 - ✓ **Zero backend files changed** (`git diff --stat` verifiable); 386 backend tests pass unmodified
 - ✓ No new business logic in the frontend — no new endpoint called, no new domain concept introduced

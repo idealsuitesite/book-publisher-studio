@@ -1,5 +1,16 @@
 # Roadmap - Book Publisher Studio
 
+> **⚠️ SUPERSEDED — HISTORICAL RECORD ONLY (annotated 2026-07-18, ADR-0040 Correction 3).**
+>
+> This document stopped being maintained around Sprint 1 and is roughly **eight sprints out of date** — it still describes "Sprint 1: Import Pipeline ✅ IN PROGRESS" below, while the project has released nine sprints through `v0.9.0-alpha`. It is **annotated rather than rewritten or deleted**, following ADR-0010's precedent, so it stays readable as the record of how the project was originally planned.
+>
+> **For anything current, use these instead — all three are actively maintained:**
+> - `docs/VERSIONS.md` — the authoritative version→milestone mapping, including the full reordered roadmap (ADR-0039)
+> - `docs/TODO.md` — current task state: blocked, in progress, completed
+> - `docs/architecture/diagrams/*.md` — the per-sprint Level 2 Design Reviews, where sprint scope is actually decided
+>
+> Nothing below this line should be read as a statement about the present.
+
 ## Sprint 1: Import Pipeline ✅ IN PROGRESS
 
 **Current Phase:** Phase 2 (Application Layer) Complete → Phase 3 (Presentation) Starting

@@ -1007,3 +1007,61 @@ Candidate shapes worth weighing (**none endorsed here** — listed so a future s
 - The Level 1 map gains no new engines: Sprints 9–17 are product/platform work, not new Domain engines, so no new Level 1 §2 section is required. Each still needs its own Level 2 Design Review before implementation, per the unchanged two-gate discipline.
 
 **Related:** `docs/architecture/diagrams/EDITORIAL_AI_ENGINE.md` (the round-1 review this decision defers), `docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` Decision 2 (the stateless constraint 6 of these sprints will need amended), `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` §2.2/§2.3, `docs/VERSIONS.md` (the mapping this decision rewrites), `docs/DESIGN_REVIEW_PROCESS.md` (each new sprint still needs its own Level 2 review)
+
+---
+
+## ADR-0040: Sprint 9 Plan Corrections — Inline Tests, Playwright Adoption, and Two Documentation Fixes
+
+**Status:** APPROVED
+**Date:** 2026-07-18
+**Decision:** Four corrections to the Sprint 9 UI Foundation plan and its surrounding documentation, made after an evidence-gathering audit and before any Sprint 9 code exists. Records the reasoning, not just the rulings, per this project's standing discipline.
+
+### Correction 1 — There is no standalone test commit; the harness lands at Commit 2 and every commit after ships its own tests
+
+**Supersedes both the round-1 commit plan (tests at Commit 8) and the round-2 revision (a single test commit at Commit 2).** Neither is right, and the reason is a fact about this repository rather than a preference.
+
+**Evidence:** every Sprint 8 implementation commit shipped its own tests inline — `86e0116` (1 test file), `5abd067` (6), `99f0df7` (1), `68be289` (1), `9133931` (2). **This project has never once had a standalone unit-test commit.** Tests have always been part of the commit that created the thing they test.
+
+**Why the round-2 revision cannot work as literally stated:** a "frontend test suite" commit at position 2 would have almost nothing to test — the `ui/` primitives it would cover do not exist until Commit 3. It would either be an empty harness mislabelled as a suite, or it would force primitives to be written early, collapsing Commits 2 and 3 together.
+
+**The correction keeps the round-2 *intent* — a safety net before the large refactor — while making it buildable:**
+- **Commit 2** establishes the **harness only**: Vitest + Testing Library configuration, a `test` script in `frontend/package.json`, and one smoke test proving the runner actually executes. Small, and genuinely appearance-neutral.
+- **Commits 3 onward each ship their own tests**, exactly as all 8 prior sprints did. By Commit 5 (the large refactor), every `ui/` primitive it depends on already has real tests — which is precisely the safety net the round-2 revision was reaching for.
+
+This is stronger than a single test commit: a lump-sum suite written at position 2 would be written against components that do not exist, whereas tests written alongside each component test real behaviour.
+
+### Correction 2 — Playwright is adopted as a frontend dev dependency at Commit 0
+
+**The problem, confirmed by checking rather than assuming:** neither `playwright` nor `puppeteer` is installed anywhere in this repository. The round-2 acceptance criterion requiring reference screenshots *"archived before the first commit, then compared after every commit that intentionally changes appearance"* **cannot currently be met at all.** Sprint 7 Commit 12 separately established that this environment cannot persist a captured screenshot to disk, and that captures return blank when the page is scrolled.
+
+**Decision: add `playwright` as a `frontend/` dev dependency in Commit 0.** New dependencies require a Design Review in this project; this ADR is that record.
+
+**Justification, weighed rather than assumed:** Playwright is a large dependency and this project has been deliberately frugal (10 backend runtime dependencies after 8 sprints). It is justified here because it serves **two** separately-locked requirements, not one:
+1. The screenshot baseline and comparison that makes Decision 3's appearance-neutral policy enforceable rather than aspirational.
+2. Commit 9's real-browser verification pass, which currently depends on an interactive browser tool that Sprint 7 proved unreliable (crashes, blank captures, click-below-viewport failures).
+
+A checked-in Playwright script makes both **reproducible by anyone on any machine**, rather than by one operator in one environment. That is the same reasoning that produced `verify-server`, `verify-real-export`, and `verify-real-publish` — this project's consistent preference for scripted, re-runnable verification over manual steps.
+
+**Scope limit:** Playwright is for screenshot capture and Demo Script verification only. It is **not** a general E2E testing framework for this sprint, and component testing stays with Vitest + Testing Library (Correction 1). Should Playwright fail to install or run in this environment, that is a **Commit 0 blocker to be surfaced immediately**, not worked around silently — the acceptance criterion depends on it.
+
+### Correction 3 — `docs/ROADMAP.md` is superseded and no longer authoritative
+
+**Evidence:** `docs/ROADMAP.md` currently opens with *"Sprint 1: Import Pipeline ✅ IN PROGRESS — Phase 2 (Application Layer) Complete → Phase 3 (Presentation) Starting."* The project has since released **nine** sprints through `v0.9.0-alpha`. The document is roughly eight sprints stale. **`docs/VERSIONS.md` line 3 actively points to it** as the authority for *"exact sprint scope,"* which makes it a live pointer to obsolete information, not merely a dormant file.
+
+**Decision: annotate it as historical and superseded — do not rewrite it, and do not delete it.** Following ADR-0010's established precedent (corrections are annotated, never rewritten), it stays readable as the record of early planning. `docs/VERSIONS.md`'s pointer is corrected to name the documents that are actually maintained: `VERSIONS.md` itself, `TODO.md`, and the per-sprint Level 2 Design Reviews.
+
+**Why not simply update it:** `VERSIONS.md` (version→milestone), `TODO.md` (task state), and the per-sprint Design Reviews (scope) already cover everything `ROADMAP.md` claimed, and all three are actively maintained. Keeping a fourth overlapping document synchronized is precisely how documents drift — this staleness is the demonstration.
+
+### Correction 4 — `docs/CURRENT_STATE.md`'s test table is rebuilt from real measured counts
+
+**Evidence:** the table's per-row figures summed to **378** against a real total of **386** — a delta of 8, because rows predating Sprint 7 were never re-derived. Sprint 8's closure disclosed this discrepancy in a footnote rather than fixing it.
+
+**Decision: rebuild all 44 rows from vitest's own JSON reporter and delete the disclaimer.** The disclosure was honest, but a permanently non-summing table invites future readers to distrust the whole document. Real counts also revealed genuine drift beyond the missing rows — `ManualLayoutSelector` had 10 tests where the table claimed 8, and `getTheme` 4 where it claimed 2.
+
+**Consequences:**
+- Sprint 9's commit plan (`UI_FOUNDATION.md` §7) is rewritten per Correction 1; Decision 6 is amended to say "harness at Commit 2, tests inline thereafter."
+- `frontend/package.json` gains `playwright`, `vitest`, and `@testing-library/react` as dev dependencies during Sprint 9 — the first new frontend dependencies since Sprint 7.
+- `docs/ROADMAP.md` gains a superseded header; `docs/VERSIONS.md`'s pointer is corrected.
+- `docs/CURRENT_STATE.md`'s test table becomes self-consistent and stays that way only if future sprints regenerate it rather than appending rows.
+
+**Related:** `docs/architecture/diagrams/UI_FOUNDATION.md` (the Sprint 9 review these correct), ADR-0039 (the reprioritization that made UI Foundation Sprint 9), ADR-0010 (the annotate-never-rewrite precedent Correction 3 follows), ADR-0033 (the last new-dependency decision, for comparison), `docs/DESIGN_REVIEW_PROCESS.md` (the new-dependency rule Correction 2 satisfies)

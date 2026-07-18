@@ -400,50 +400,51 @@ Exact counts (via vitest's own JSON reporter, not hand-counted):
 
 | Component | Tests | Notes |
 |-----------|-------|-------|
-| Book domain model | 10 | |
+| LayoutEngine | 29 | |
+| PDFRenderer | 25 | |
 | ASTBuilder | 23 | |
-| BookValidator | 6 | unchanged since Sprint 4 - still directly tested; also now `StructuralRule`'s internal implementation |
-| BookMetricsCalculator | 10 | |
 | HtmlNormalizer | 21 | |
-| MammothParser | 4 | |
-| BookMapper | 6 | |
-| ImportManuscriptUseCase | 13 | Sprint 5: `BookValidator` → `ValidationEngine` wiring, one test's exact-report-equality assertion updated for the new `issues`/`score` fields |
-| Manuscript import route (E2E) | 5 | |
-| ThemeEngine | 4 | |
-| getTheme | 2 | |
-| LayoutEngine | 29 | Sprint 6: +19 (headerFooterTitle resolution, openingPageStyle, startPageNumber, automatic TOC generation) |
-| DOCXRenderer | 17 | Sprint 6: +8 (real PageLayout geometry, header/footer, openingPageStyle blank pages, TOC) |
-| ExportManuscriptUseCase | 7 | |
-| Manuscript export route (E2E) | 12 | Sprint 6: +2 (unknown layout 400, explicit KDP layout) |
-| PDFRenderer | 25 | Sprint 6: +9 (real PageLayout geometry, running head, openingPageStyle blank pages, startPageNumber footer, TOC) |
-| EPUBRenderer | 11 | |
+| DOCXRenderer | 17 | |
 | TypographyResolver | 17 | |
+| HyperlinkRule | 13 | |
+| ImportManuscriptUseCase | 13 | |
+| Manuscript export route (E2E) | 12 | |
+| EPUBRenderer | 11 | |
+| Book domain model | 10 | |
+| BookMetricsCalculator | 10 | |
+| ManualLayoutSelector | 10 | |
+| MissingRequiredStyleRule | 10 | |
+| ValidationEngine | 10 | |
+| **KDPTarget** | **9** | Sprint 8 |
+| TypographyRule | 9 | |
+| HeadingRule | 8 | |
+| ImageRule | 8 | |
+| MetadataRule | 8 | |
+| ComplianceRule | 7 | |
+| ExportManuscriptUseCase | 7 | |
+| **Manuscript publish route (E2E)** | **7** | Sprint 8 |
+| **Packaging** | **7** | Sprint 8 |
 | PdfFontRegistry | 7 | |
+| StructuralRule | 7 | |
+| BookMapper | 6 | |
+| BookValidator | 6 | |
+| Manuscript import route (E2E) | 5 | |
+| **PublishingUseCase** | **5** | Sprint 8 |
 | extractPdfText | 4 | |
-| **ValidationEngine** | **10** | Sprint 5, new |
-| **RuleRegistry** | **4** | Sprint 5, new |
-| **createValidationEngine** | **3** | Sprint 5, new |
-| **StructuralRule** | **7** | Sprint 5, new |
-| **MetadataRule** | **8** | Sprint 5, new |
-| **HeadingRule** | **8** | Sprint 5, new |
-| **MissingRequiredStyleRule** | **10** | Sprint 5, new |
-| **TypographyRule** | **9** | Sprint 5, new |
-| **ImageRule** | **8** | Sprint 5, new |
-| **HyperlinkRule** | **13** | Sprint 5, new (includes an `it.each` over 2 URL cases) |
-| **ComplianceRule** | **7** | Sprint 5, new |
-| **ManualLayoutSelector** | **8** | Sprint 6, new |
-| **Packaging** | **7** | Sprint 8, new |
-| **SubmissionValidator** | **3** | Sprint 8, new (includes the fake-provider test proving it depends only on the `ValidationRuleProvider` abstraction) |
-| **KDPRuleProvider** | **3** | Sprint 8, new |
-| **KDPTarget** | **9** | Sprint 8, new (includes 3 spy-collaborator tests proving it never re-validates, re-packages, or re-derives an issue) |
-| **RequiredMetadataFieldsRule** | **4** | Sprint 8, new |
-| **PageCountRule** | **4** | Sprint 8, new |
-| **CoverPresenceRule** | **2** | Sprint 8, new |
-| **InteriorFormatAvailabilityRule** | **4** | Sprint 8, new |
-| **PublishingUseCase** | **5** | Sprint 8, new (real infrastructure classes + the canonical `typography-test.docx` fixture, no mocks) |
-| **PublishingReportMapper** | **2** | Sprint 8, new |
-| **Manuscript publish route (E2E)** | **7** | Sprint 8, new (real `supertest` round trips, includes the real-fixture regression and a real disclosed `FAIL`) |
-| **Total** | **386** | up from 328 at Sprint 6's close (+58 across Sprints 7–8; Sprint 8 alone added **+50**, from 336). Counts above are Sprint 6-era for pre-existing rows and were not re-derived — the total is real, taken from vitest's own JSON reporter (44 files, 386 tests), so a per-row sum will not reconcile against it until the older rows are refreshed. Disclosed rather than silently adjusted. |
+| getTheme | 4 | |
+| **InteriorFormatAvailabilityRule** | **4** | Sprint 8 |
+| MammothParser | 4 | |
+| Options route (E2E) | 4 | |
+| **PageCountRule** | **4** | Sprint 8 |
+| **RequiredMetadataFieldsRule** | **4** | Sprint 8 |
+| RuleRegistry | 4 | |
+| ThemeEngine | 4 | |
+| createValidationEngine | 3 | |
+| **KDPRuleProvider** | **3** | Sprint 8 |
+| **SubmissionValidator** | **3** | Sprint 8 |
+| **CoverPresenceRule** | **2** | Sprint 8 |
+| **PublishingReportMapper** | **2** | Sprint 8 |
+| **Total** | **386** | All 44 rows regenerated from vitest's own JSON reporter on 2026-07-18 (ADR-0040 Correction 4) — the per-row figures now sum exactly to the real total. Previously the rows summed to 378 against a real 386, because pre-Sprint-7 rows were never re-derived; that gap was disclosed in a footnote rather than fixed. Regenerating also surfaced real drift beyond the missing rows: `ManualLayoutSelector` had 10 tests where the table claimed 8, and `getTheme` 4 where it claimed 2. **Regenerate this table wholesale each sprint; never append rows to it.** |
 
 ---
 

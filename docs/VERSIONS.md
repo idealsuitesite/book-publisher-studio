@@ -1,6 +1,6 @@
 # Version Index
 
-A running journal of every tagged version and where the product is headed. For exact sprint scope, see `docs/ROADMAP.md` and `docs/TODO.md` — this file tracks the version-to-milestone mapping, not day-to-day task detail.
+A running journal of every tagged version and where the product is headed. For exact sprint scope, see `docs/TODO.md` and the per-sprint Level 2 Design Reviews in `docs/architecture/diagrams/` — this file tracks the version-to-milestone mapping, not day-to-day task detail. (**Pointer corrected 2026-07-18, ADR-0040 Correction 3:** this line previously named `docs/ROADMAP.md` as authoritative for sprint scope; that document has been annotated as superseded, being roughly eight sprints stale.)
 
 | Version | Milestone | Status | Tag | Notes |
 |---|---|---|---|---|
