@@ -26,7 +26,7 @@ Two competing Sprint 5 priority proposals were on the table at the end of Sprint
 
 **Relationship to what's already built:** extends today's `BookValidator` (structural-only: missing title/author, empty book, empty/duplicate chapter) and activates `QualityMetrics` (`BookMetricsCalculator.calculateQualityMetrics()`, built Sprint 4 commit 9 but not yet consumed by anything) as real input data for scoring. Architecture: `ValidationEngine` orchestrating a `RuleRegistry` of independent `ValidationRule`s (not a flat set of Validator classes, not one large class) — full detail in `VALIDATION_ENGINE.md`.
 
-**Position in the pipeline:** after `ASTBuilder`, same position `BookValidator` already occupies today. **Resolved (round 2):** format-compliance checks are split into `PreRenderValidation` (Sprint 5, checkable from the `Book` AST alone) and `PostRenderValidation` (future, likely `Publishing Engine` scope, since rendered-output correctness like real page count and EPUB structural validity naturally belongs with platform packaging, not manuscript validation).
+**Position in the pipeline:** after `ASTBuilder`, same position `BookValidator` already occupies today. **Resolved (round 2):** format-compliance checks are split into `PreRenderValidation` (Sprint 5, checkable from the `Book` AST alone) and `PostRenderValidation` (future, likely `Publishing Engine` scope, since rendered-output correctness like real page count and EPUB structural validity naturally belongs with platform packaging, not manuscript validation). **Confirmed and built (Sprint 8):** `PostRenderValidation` did land in Publishing Engine, as `SubmissionValidator` + a `PostRenderValidationRule` family (`PUBLISHING_ENGINE.md` Decision 3), closing `VALIDATION_ENGINE.md`'s own Decision 2 commitment. One caveat, disclosed: the "real page count" named here as a motivating example is **not** actually checkable yet — `PageCountRule` exists but the real pagination data never reaches it (ADR-0038, deferred).
 
 ### 2.2 Editorial AI Engine
 
@@ -60,6 +60,15 @@ Parser → Normalizer → ASTBuilder → Validation Engine → Editorial AI Engi
 **Position in the pipeline:** unchanged from today's `LayoutEngine` — after Typography, before the `Renderer` port.
 
 ### 2.5 Publishing Engine
+
+**Status: ✅ Built (Sprint 8, 2026-07-18) — Level 2 Design Review `docs/architecture/diagrams/PUBLISHING_ENGINE.md`, ADR-0035/0036/0037/0038.** The original Level 1 text below is preserved unchanged as the record of what was mapped before Sprint 8's own Design Review decided the detail — annotated, not rewritten, matching ADR-0010's precedent (the same treatment §2.4 and §4a already received).
+
+What actually shipped, versus what this section predicted:
+- **`PublishingTarget` port + `KDPTarget` adapter — as predicted.** The "port-per-platform shape analogous to `Renderer<TOutput>`" guess below was confirmed as Decision 1, though only after resolving a real documentary tension this section didn't know about: `docs/VISION.md` line 26 framed future platforms as just more `IRenderer` implementations. Decision 1 supersedes that framing explicitly.
+- **Decomposed further than this section anticipated:** not one engine class but six named components with explicit OWNS/NEVER boundaries — `PublishingUseCase`, `PublishingTarget`, `KDPTarget`, `Packaging`, `SubmissionValidator`, `PublishingReport` — plus a `ValidationRuleProvider` port (Decision 7/ADR-0036) so platform rules never leak into the engine, and a platform-agnostic-objects rule (Decision 8/ADR-0037).
+- **Amazon KDP only.** Kobo, Apple Books, Google Play Books, Lulu, and IngramSpark remain unbuilt — each becomes a future `PublishingTarget`/`ValidationRuleProvider` implementation pair, with no change to the port or the engine.
+- **Validation and packaging only, no real submission.** No KDP account, no Amazon API call, no credentials, no publication event (Decision 5) — `POST /api/manuscripts/publish` returns a `PublishingReport`, never submits.
+- **`FrontMatter`/`BackMatter` are still not populated or rendered.** The "natural landing spot already reserved" noted below remains reserved — Sprint 8 did not activate it. Still real, still unconsumed.
 
 **Responsibility:** Prepare the finished book for distribution — Amazon KDP, Kobo, Apple Books, Google Play Books.
 
@@ -115,7 +124,7 @@ Deliberately left to each engine's own Level 2 Design Review, matching this proj
 
 - ~~Whether "Professional Layout Engine" is `LayoutEngine` extended or a new class~~ — **resolved:** extended, not a new class (ADR-0029 Decision 1, Sprint 6)
 - The exact shape of the `AIProvider` port and which vendor(s) get a first adapter
-- Publishing Engine's exact port shape and which platform ships first
+- ~~Publishing Engine's exact port shape and which platform ships first~~ — **resolved:** a `PublishingTarget` port operating *after* `Renderer` (not another `Renderer` implementation — Decision 1 supersedes `VISION.md` line 26's original framing), decomposed into 6 named components plus a `ValidationRuleProvider` port; **Amazon KDP ships first**, validation and packaging only, no real submission (`PUBLISHING_ENGINE.md` Decisions 1/2/5/6/7, ADR-0035/0036/0037, Sprint 8)
 - Sprint numbering/scheduling for Editorial AI Engine, Professional Layout Engine, Plugin System, and Publishing Engine beyond "Validation Engine is Sprint 5" — no commitment made here about Sprint 6, 7, 8 assignments
 
 ## 4a. Proposed Sprint 7 Scope Change — Not Yet Decided

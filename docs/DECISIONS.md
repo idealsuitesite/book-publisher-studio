@@ -934,3 +934,39 @@ This is the project's first monorepo-structural change — implements Design Rev
 - Combined with ADR-0036, the full dependency direction for Sprint 8 is: `KDPTarget` → `PublishingTarget` (implements), `KDPTarget` → `PublishingBundle` (uses), `KDPRuleProvider` → `ValidationRuleProvider` (implements) — never the reverse arrow, in either case.
 
 **Related:** ADR-0036 (the rule-provider-specific instance this ADR generalizes), ADR-0032 (the engineering-governance-principle precedent both follow), `PUBLISHING_ENGINE.md` Decision 8 (where this rule is locked at the design-review level) and Decision 1/6/7 (the prior instances of the same dependency direction this ADR states generally)
+
+---
+
+## ADR-0038: Publishing Engine Cannot See `LayoutEngine`'s Real Pagination Metrics — Deferred Beyond Sprint 8, Question Framed Not Answered
+
+**Status:** OPEN — deferred by explicit CTO decision (2026-07-18). **This ADR deliberately does not decide the answer.** It records a confirmed gap and frames the question a future Design Review must resolve.
+**Date:** 2026-07-18
+**Decision:** Do **not** change Publishing Engine behavior in Sprint 8 to close this gap. Document it, leave `PageCountRule` reporting `PAGE_COUNT_UNKNOWN` when the information genuinely is not available, and open this record for a dedicated future decision.
+
+**The confirmed gap (found by Commit 7's real-fixture verification, not by inspection or assumption):** `PageCountRule` reports `PAGE_COUNT_UNKNOWN` on **every** real fixture — all 4 canonical fixtures including `large-book.docx`. Traced by reading the actual code:
+
+- `Book.pageCount` is populated only by `BookMetricsCalculator`, which runs only on the **import** path (`ImportManuscriptUseCase`). It never runs on the export/publish path.
+- The **real** page count does exist inside the publish pipeline: `LayoutEngine.paginate()` produces a `PaginatedBook` carrying real `pages`, which `PublishingUseCase` computes and renders from — then discards, because `PublishingTarget.prepare(book, renderedOutputs)` receives only the `Book` and the rendered bytes.
+- Note the two are not even the same quantity: `BookMetricsCalculator.pageCount` is an *estimate* derived from word count (`estimatePageCount(wordCount)`), whereas `PaginatedBook.pages` is the *real* paginated result. Any future fix must decide which one Publishing Engine should actually validate against — they will not agree.
+
+`PageCountRule` itself is correct and needs no change: it honestly reports "unknown" rather than guessing. It is simply being fed less than the pipeline already knows.
+
+**Why this was not fixed in Sprint 8 (CTO's own reasoning, verbatim in substance):** Sprint 8's objective was to *create a Publishing Engine*, not to *modify the rendering pipeline*. Closing this gap would mean changing the data passed to `PublishingTarget.prepare(...)` — modifying an internal API, enriching the transported objects, and propagating a new value across several layers. That is not a small correction; it is a **contract evolution**, and it warrants its own architectural decision rather than being absorbed silently into a validation-only commit.
+
+**The question a future Design Review must answer (posed here, deliberately unanswered):**
+> How should `LayoutEngine`'s computed metrics be exposed to the Publishing Engine without breaking the existing separation of responsibilities?
+
+Constraints any answer must respect, all already locked by earlier decisions in this sprint:
+- Decision 8 / ADR-0037 — every Publishing Engine object stays platform-agnostic; platforms depend on the engine, never the inverse.
+- Decision 1's API-evolution note — `prepare()` is Sprint 8's only operation, not necessarily `PublishingTarget`'s final API; a widened signature is an anticipated, planned evolution, not a surprise break.
+- Decision 6's OWNS/NEVER boundaries — whatever carries the metrics must not turn `Packaging` into a validator or `SubmissionValidator` into a packager.
+
+Candidate shapes worth weighing (**none endorsed here** — listed so a future session starts from a real option set rather than a blank page): widening `RenderedOutputs` to carry render-time metrics alongside the bytes; adding a metrics field to `PostRenderValidationContext`; passing `PaginatedBook` (or a narrow projection of it) into `prepare()`; or having `PublishingUseCase` enrich the `Book` with real pagination data before delegating.
+
+**Consequences:**
+- `PageCountRule` ships in Sprint 8 permanently reporting `PAGE_COUNT_UNKNOWN` (a `WARNING`, never an `ERROR`, so it never blocks a report) against real manuscripts. Real, disclosed, and expected — not a defect to be surprised by later.
+- `PUBLISHING_ENGINE.md` §6 Risk 6 records the same gap at the design-review level; this ADR is its citable, permanent counterpart.
+- A future contributor asking "why does the page-count check never pass?" has a complete answer — including the estimate-vs-real distinction — instead of rediscovering it from scratch.
+- Whoever picks this up must run real-fixture verification again afterward (`npm run verify-real-publish`), since this gap was invisible to 386 passing tests and was found only by a real round trip — the fifth instance of this project's recurring pattern (ADR-0019, ADR-0020, ADR-0031, ADR-0032).
+
+**Related:** `PUBLISHING_ENGINE.md` §6 Risk 6 (the design-review-level record) and Decision 1's API-evolution note (the anticipated-evolution framing this deferral relies on), ADR-0037 (the platform-agnostic constraint any answer must respect), ADR-0031/ADR-0032 (prior real bugs found only by real-file verification, the same discipline that surfaced this), `docs/REAL_FIXTURE_POLICY.md` (the policy whose Publishing-Engine scope mandated the pass that found this), `backend/scripts/verify-real-publish.ts` (the verification that surfaced it)
