@@ -51,6 +51,8 @@ Parser → Normalizer → ASTBuilder → Validation Engine → Editorial AI Engi
 
 ### 2.4 Professional Layout Engine
 
+**Status: ✅ Built (Sprint 6, tagged `v0.7.0-alpha`, ADR-0029/0030/0031).** This section is preserved exactly as originally drafted at Level 1 (2026-07-17), before the engine's own Level 2 review — annotated, not rewritten, matching ADR-0010's precedent for `BASELINE_v0.1.md`. See `docs/architecture/diagrams/PROFESSIONAL_LAYOUT_ENGINE.md` for the actual Level 2 design and `docs/releases/v0.7.0-alpha/SPRINT_6_FINAL_REPORT.md` for what shipped. Flagged and corrected 2026-07-18, during Sprint 8's own kickoff, after sitting stale through all of Sprint 7.
+
 **Responsibility:** Apply composition and layout decisions automatically — fuller than today's `LayoutEngine`.
 
 **Relationship to what's already built:** this is very likely an **evolution of the existing `LayoutEngine`** (ADR-0012's concrete Domain class, `paginate()`), not a new parallel component — `LayoutEngine` already owns pagination, margins, and (as of Sprint 4) keep-with-next nudges. "Automatic layout/style selection" is a real expansion of scope (today's `ThemeEngine`/`LayoutEngine` apply a caller-chosen theme and a fixed `PageLayout`; nothing today *chooses* one), but the Level 2 Design Review for this engine (not yet scheduled) needs to confirm whether it's `LayoutEngine` gaining new responsibility or a genuinely new class — same kind of question Sprint 4's Design Review resolved for `TypographyResolver` vs. folding into `ThemeEngine`.
@@ -91,8 +93,8 @@ Parser → Normalizer → ASTBuilder → Validation Engine → Editorial AI Engi
                     │  Typography Engine    │  (built, Sprint 4)
                     └──────────┬──────────┘
                     ┌──────────▼──────────┐
-                    │ Professional Layout   │  evolves LayoutEngine (built, Sprint 2)
-                    │       Engine           │
+                    │ Professional Layout   │  built, Sprint 6 (`v0.7.0-alpha`) — extends
+                    │       Engine           │  LayoutEngine, not a new class (ADR-0029)
                     └──────────┬──────────┘
                     ┌──────────▼──────────┐
                     │   Renderer port       │  (built: DOCX/PDF/EPUB, Sprints 2-3B)
@@ -111,14 +113,16 @@ Parser → Normalizer → ASTBuilder → Validation Engine → Editorial AI Engi
 
 Deliberately left to each engine's own Level 2 Design Review, matching this project's "spike/design before code" discipline (ADR-0019/ADR-0020 precedent):
 
-- Whether "Professional Layout Engine" is `LayoutEngine` extended or a new class
+- ~~Whether "Professional Layout Engine" is `LayoutEngine` extended or a new class~~ — **resolved:** extended, not a new class (ADR-0029 Decision 1, Sprint 6)
 - The exact shape of the `AIProvider` port and which vendor(s) get a first adapter
 - Publishing Engine's exact port shape and which platform ships first
 - Sprint numbering/scheduling for Editorial AI Engine, Professional Layout Engine, Plugin System, and Publishing Engine beyond "Validation Engine is Sprint 5" — no commitment made here about Sprint 6, 7, 8 assignments
 
 ## 4a. Proposed Sprint 7 Scope Change — Not Yet Decided
 
-**Status:** PROPOSED (2026-07-17, CTO recommendation, post-Sprint-6). Explicitly not approved — recorded here so it isn't lost before its own Design Review, and so `docs/VERSIONS.md`'s existing sequencing (Plugin System / Editorial AI Engine / Publishing Engine before Premium UI/UX at `v0.8.0-alpha`) isn't silently contradicted by a later session picking a different Sprint 7 without knowing this was floated.
+**Status: ✅ Implemented and released (Sprint 7, tagged `v0.8.0-alpha`, PR #12, merge commit `f17fd65`).** Closes out the "PROPOSED, explicitly not approved" status below, preserved as the original record of how this proposal was weighed before approval — see `docs/releases/v0.8.0-alpha/ReleaseNotes.md` and `SPRINT_7_FINAL_REPORT.md` for what actually shipped, and `docs/VERSIONS.md` for the row this section predicted would move (it did — `v0.8.0-alpha` is now First Demonstrable Product, Plugin System/Editorial AI Engine/Publishing Engine each shifted one slot later, exactly as anticipated below). Sprint 8's own Design Review (Publishing Engine) begins directly below this closed-out section.
+
+**Status (original, 2026-07-17):** PROPOSED (CTO recommendation, post-Sprint-6). Explicitly not approved — recorded here so it isn't lost before its own Design Review, and so `docs/VERSIONS.md`'s existing sequencing (Plugin System / Editorial AI Engine / Publishing Engine before Premium UI/UX at `v0.8.0-alpha`) isn't silently contradicted by a later session picking a different Sprint 7 without knowing this was floated.
 
 **Design Review ✅ APPROVED (round 2, 2026-07-18):** `docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` (renamed from "Premium UI/UX" per CTO direction — the objective is making six sprints of built capability visible, not primarily visual polish). All 5 open decisions from round 1 resolved by explicit CTO direction: full re-export instead of instant preview, a fully stateless backend, only-what-the-demo-needs scope, a real `packages/shared-types` workspace package instead of hand-duplicated types, and a `GET /api/manuscripts/options` endpoint deliberately shaped for future extension. Companion product docs written: `docs/product/PERSONAS.md`, `USER_JOURNEYS.md`, `FEATURE_MATRIX.md`, `WIREFRAMES.md`, `PRODUCT_DEMO.md` (includes the official Demo Script), `PRODUCT_ACCEPTANCE.md`, plus `docs/demo/screenshots/README.md`. **No branch, no code yet** — ready for implementation once the CTO gives final go-ahead to branch, matching every prior sprint's own gate.
 
