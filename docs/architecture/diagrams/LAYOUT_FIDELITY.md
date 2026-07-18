@@ -1,6 +1,7 @@
 # Layout Fidelity — Gutter, Recto/Verso, and the One True Page Count — Level 2 Design Review
 
-**Status:** 🟡 **ROUND 1 — DRAFT. Not approved. No branch, no code.**
+**Status:** 🔵 **ROUND 2 — Phase A implementation CTO-authorized (2026-07-18 evening: "qu'on les implémente immédiatement avant de passer au Commit 5"). Questions 1–4 locked below. Phase B (line splitting, widows/orphans) designed here, implemented next.**
+**Round 2 trigger:** the CTO exported a **real book** and reported systematic underfill — pages ending more than half empty (pp. 5, 6, 9 of their export), a chapter title ("3. Faith Is a Gift From God") alone above a huge blank, and an apparent "ça dépasse → nouvelle page" strategy. They asked for the responsible component, the reason, and algorithm-vs-library-vs-parameters — **before any fix**. §2bis answers all of it with measurements.
 **Date:** 2026-07-18
 **Trigger:** two defects that share one root. **ADR-0043** (OPEN): `PageLayout` has no gutter, so every paperback this product generates runs text into the binding. **ADR-0045**'s deeper issue, deliberately left open there: renderers emit pages (title, copyright) that `LayoutEngine` never models, so pagination is not a model of the document — it is a model of *part* of it.
 
@@ -15,7 +16,7 @@ The shared root, named plainly: **`LayoutEngine` does not know what a book physi
 3. Resolve the gutter ↔ page-count circularity deterministically.
 4. State what this does to the visual baseline and to every existing export, before it happens rather than after.
 
-Out of scope: hyphenation/justification quality (ADR-0024, deferred to v2), running-head content rules, and replacing the estimator with a real text measurer — see Question 3 for why that last one is *named* here but not *decided* here.
+Out of scope: hyphenation/justification quality (ADR-0024, deferred to v2) and running-head content rules. ~~Replacing the estimator with a real text measurer~~ — round 1 kept this out; **round 2 pulled it in as Decision 6**, because §2bis proved it is the root of the CTO-reported underfill, not an adjacent nicety.
 
 ---
 
@@ -28,6 +29,40 @@ Out of scope: hyphenation/justification quality (ADR-0024, deferred to v2), runn
 - **Renderers emit pages pagination never saw**: `PDFRenderer` renders title and copyright pages from `book.frontMatter` itself, then `addPage()`s into the body ([PDFRenderer.ts:104](../../../backend/src/infrastructure/renderers/PDFRenderer.ts#L104)–118). On the canonical fixture: `pages.length` said 1, the shipped PDF had 3 (ADR-0045's measurement).
 - **The true count already exists, in exactly one place**: `doc.bufferedPageRange().count`, which ADR-0019 finding 6C made the footer's "of TOTAL" denominator and ADR-0045 made `RenderMetrics.pageCount`. Everything downstream of rendering is already honest; the dishonest layer is pagination itself.
 - **DOCX partially expresses this natively — checked against the installed types, and the check corrected the claim.** `margin.gutter` exists in the installed `docx` package's declarations (grep, `dist/index.d.ts:65`). `mirrorMargins` does **not** appear anywhere in those declarations — the draft of this very review asserted it did, from memory, and grep said no. Whether OOXML's `w:mirrorMargins` can be reached through this library (settings passthrough, raw XML, or not at all) is exactly what Commit 0's spike must answer before Question 2 is locked. EPUB has no pages at all and is untouched by this entire review.
+
+---
+
+## 2bis. The underfill investigation — component located, cause measured, verdict stated
+
+Method: read both components end to end, then measure with `backend/spikes/pagination-fill-spike.ts` — real fixture, real pipeline, real PDFKit font metrics. No fix was designed before this section existed.
+
+### Where the page-break decision is taken — two places, and their relationship is the defect
+
+1. **The decision:** [LayoutEngine.ts:89](../../../backend/src/domain/services/LayoutEngine.ts#L89) — `overflow = currentHeight + blockHeight > usableHeight`. `blockHeight` is an **estimate**.
+2. **The obedience:** [PDFRenderer.ts:371](../../../backend/src/infrastructure/renderers/PDFRenderer.ts#L371)–378 — every block the estimator designated as a page start triggers an unconditional `doc.addPage()`. **The renderer forces the estimator's breaks onto real text.** The estimator's error is not corrected at render time; it is enforced.
+
+### The CTO's three suspicions, adjudicated against the code
+
+- **"keepTogether / pageBreakBefore responsible?" — No.** The only keep rule is `staysWithNext` (headings, [LayoutEngine.ts:71](../../../backend/src/domain/services/LayoutEngine.ts#L71)) and it is not the driver. `pageBreakBefore` semantics exist only as chapter-start `forceNewPage`, which is correct book convention.
+- **"Une règle trop conservatrice?" — Yes, and it is quantified.** Three compounding estimator errors:
+  | Error | Mechanism | Measured |
+  |---|---|---|
+  | Line height | Estimator charges `fontSize × 1.5` (theme); renderer draws with **no `lineGap`** ([PDFRenderer.ts:402](../../../backend/src/infrastructure/renderers/PDFRenderer.ts#L402)–408), i.e. the font's natural ~1.15 | **16.5pt vs 12.7pt — +30% per line, every line** |
+  | Words per line | `WORDS_PER_LINE = 12`, a constant blind to width, font, and language | wrong in *both* directions depending on prose |
+  | Never modelled | chapter/section titles (24pt+ + a blank line, `renderTitle`), `spaceAfter` (~8pt × every block) | 15 titles at 0pt; ~3.7 pages of unmodelled spacing on the fixture |
+- **"Ça dépasse → nouvelle page?" — Confirmed, verbatim.** `addBlock` ([LayoutEngine.ts:87](../../../backend/src/domain/services/LayoutEngine.ts#L87)) is fit-whole-or-flush. **A block is never split** — the code's own comment says so ("this pagination model never splits a block's own content across pages"). There is no "essai de coupure" step at all.
+
+### The aggregate measurement
+
+On the canonical fixture: the estimator charges **1.43×** the real rendered height (300 of 300 blocks overestimated >5%), which caps every page at a **mean real fill of 71%**. The canonical fixture *understates* the visible damage because its paragraphs are near-identical in length; on varied real prose the same mechanisms concentrate the waste into the exact pattern the CTO photographed — some pages half empty, and (per the simulation) the constant also *under*-estimates long-word prose, producing the historical "Page 6 of 4" drift in the other direction.
+
+**The title-alone-above-blank case, explained:** a chapter opens (forced break, correct), its title is drawn at a cost the model booked as **zero**, and its following paragraphs are atomic blocks priced +43% — so the model concludes far less fits under the title than really does, and pushes them. The white space is the sum of both lies.
+
+### Verdict — the CTO's question 5
+
+**Algorithm and parameters. Not the library.** PDFKit provides exact measurement (`heightOfString`, already trusted for the footer's "of TOTAL" since ADR-0019) and natural text flow; the pipeline uses neither for pagination. It estimates with wrong constants, never splits, and then forces those estimates onto the rendered document. The fix is therefore architectural (measure, don't guess — Decision 6) followed by typographic (split with widow/orphan control — Decision 7), not a parameter tweak: correcting `WORDS_PER_LINE` alone would leave titles unmodelled, line height wrong, and blocks atomic.
+
+**A Real Fixture Policy finding in its own right:** `large-book.docx`'s uniform paragraphs cannot exhibit variance-driven underfill — every page fills identically. The canonical set needs a varied-prose fixture; until then, the CTO's own book is the only artifact that shows this class of defect, which is precisely why it reached production-quality review before any fixture caught it.
 
 ---
 
@@ -67,21 +102,45 @@ Paginate → look up the gutter for the resulting count in the target's margin t
 
 `letter`/`a4`/`a5` set `marginInside = marginOutside = ` today's symmetric value: **byte-identical output for every existing export path that doesn't ask for a gutter**. Only the three KDP trim layouts adopt real inside/outside values. This is what keeps the visual baseline change reviewable: Commit N's baseline diff shows *only* KDP-layout screens moving.
 
+### Decision 6 — Pagination measures, it does not estimate: a `TextMeasurer` Domain port *(round 2, from §2bis)*
+
+```ts
+// Domain port
+export interface TextMeasurer {
+  /** Real rendered height of this text at this size in this column width, natural line height. */
+  measureHeight(text: string, options: { fontSize: number; width: number; heading?: boolean }): number;
+  /** Height of one line at this size — for moveDown modelling and per-line reasoning. */
+  lineHeight(fontSize: number): number;
+}
+```
+
+Infrastructure implements it on PDFKit's `heightOfString` with the **real embedded fonts** (the same `PdfFontRegistry` the renderer uses), so `LayoutEngine` prices a block at what `PDFRenderer` will actually draw. `WORDS_PER_LINE` dies. The engine also starts charging what it never charged: chapter/section titles (measured at `renderTitle`'s own sizes + its `moveDown`) and each block's `spaceAfter`.
+
+Port-vs-class judgment (`DEVELOPER_HANDBOOK.md`): a port, because a second real implementation is already foreseeable — DOCX line metrics differ from PDF's, and a future DOCX-faithful pagination would implement the same interface with Word-metric behaviour. Clean Architecture holds: Domain defines the port, Infrastructure owns PDFKit.
+
+This **supersedes Question 3's round-1 answer** ("width-sensitive estimation"): §2bis showed estimation with better constants still cannot price titles, spacing, or real fonts. Measurement is the only answer that closes the class of defect rather than one instance.
+
+### Decision 7 — Typographic pagination lands in two phases, and the split is the honest part *(round 2)*
+
+**Phase A — implemented now (CTO-authorized):** Decision 6. Blocks stay atomic, but their prices become true, titles and spacing enter the model, and the renderer's forced breaks land where real text actually ends. This removes the *systematic* underfill (the +43%) and the title-above-blank case. Residual waste = end-of-page remainders smaller than one block — real books show this as the occasional short page, not half-empty ones.
+
+**Phase B — designed here, implemented next, not blind-fixed today:** line-level block splitting. `Page.blocks` entries become spans (`{ blockId, fromLine?, toLine? }`), `LayoutEngine` fills the remainder of a page with the head of the next paragraph when at least 2 lines fit and at least 2 lines remain for the following page — which **is** widow/orphan control (min-2-lines at both ends), plus `staysWithNext` generalized so a heading never sits last on a page. The renderer renders spans (PDFKit `heightOfString` per line range). Lists, quotes, tables split at item/row boundaries; images never split. This is the CTO's "veuves, orphelines, paragraphes longs, titres, listes, citations, images" list, mapped one-to-one — and it needs its own commit series with real-book visual verification, which is why it is not squeezed into tonight.
+
 ---
 
-## 4. Open questions — for CTO decision
+## 4. Open questions — ~~for CTO decision~~ **LOCKED (CTO, 2026-07-18 evening: "Propose la meilleure résolution pour ses quatre questions" — resolutions below are those proposals, applied)**
 
 **Question 1 — do KDP layout presets bake in a *default* gutter, or is the gutter always resolved from page count at export time?**
-*Recommendation: resolved at export/publish time, presets carry none.* A preset with a baked 0.5″ gutter is wrong for a 600-page book and the model cannot know the count before pagination. The re-pagination pass (Decision 4) is the mechanism; presets stay honest by carrying only what is true independent of content.
+**✔ LOCKED: resolved at export/publish time; presets carry none.** A preset with a baked 0.5″ gutter is wrong for a 600-page book and the model cannot know the count before pagination. The re-pagination pass (Decision 4) is the mechanism; presets stay honest by carrying only what is true independent of content.
 
 **Question 2 — does the DOCX renderer use the library's native gutter field, or compute per-section margins itself?**
-*Recommendation: native `margin.gutter`, with `mirrorMargins` contingent on the spike.* The gutter field is confirmed in the installed types; `mirrorMargins` is **not** exposed there (§2 — the draft claimed otherwise from memory and grep corrected it). If the spike finds no path to `w:mirrorMargins`, the fallback is honest: a gutter without mirroring is what OOXML's own gutter semantics give single-sided documents, and Word still applies it to the binding side when mirroring is enabled by the user. The spike (Commit 0) must open real output in Word and look — per ADR-0019/0020 precedent, and per this review's own fresh demonstration that remembered library capabilities cannot be trusted.
+**✔ LOCKED: native `margin.gutter`; `mirrorMargins` contingent on the Commit-0 spike opening real output in Word.** The gutter field is confirmed in the installed types; `mirrorMargins` is **not** exposed there (§2 — the draft claimed otherwise from memory and grep corrected it). If the spike finds no path to `w:mirrorMargins`, the fallback is honest: a gutter without mirroring is what OOXML's own gutter semantics give single-sided documents, and Word still applies it to the binding side when mirroring is enabled by the user. The spike (Commit 0) must open real output in Word and look — per ADR-0019/0020 precedent, and per this review's own fresh demonstration that remembered library capabilities cannot be trusted.
 
 **Question 3 — is this the moment to replace `WORDS_PER_LINE` with width-aware line estimation?**
-*Recommendation: no — but one narrow change is unavoidable.* The estimator must become *width-sensitive enough to notice the gutter* (chars-per-line derived from usable width and font metrics, still an estimate), or Decision 4's re-pagination pass would be re-running an estimator that cannot feel the thing that changed. Full text measurement (real font metrics, kerning) stays out — it is the Performance sprint's problem (ADR-0041 Constraint 1) and this review must not absorb it.
+**✔ LOCKED — and the round-1 answer is superseded by Decision 6:** not width-aware *estimation* but real *measurement* via the `TextMeasurer` port. §2bis is why half-measures cannot close this. The estimator must become *width-sensitive enough to notice the gutter* (chars-per-line derived from usable width and font metrics, still an estimate), or Decision 4's re-pagination pass would be re-running an estimator that cannot feel the thing that changed. Full text measurement (real font metrics, kerning) stays out — it is the Performance sprint's problem (ADR-0041 Constraint 1) and this review must not absorb it.
 
 **Question 4 — blank verso after title page?**
-*Recommendation: yes, one `'blank'` page* so copyright lands on the title's verso and Chapter 1 opens recto — standard book-making, and the `'blank'` page kind already exists (Sprint 6, `openingPageStyle`). Cheap now, a churn later.
+**✔ LOCKED: yes, one `'blank'` page** so copyright lands on the title's verso and Chapter 1 opens recto — standard book-making, and the `'blank'` page kind already exists (Sprint 6, `openingPageStyle`). Cheap now, a churn later.
 
 ---
 
