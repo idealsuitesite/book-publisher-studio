@@ -15,6 +15,12 @@ Day-to-day operational rules for working in this repository — distinct from `d
 - Every commit must clear `docs/QUALITY_GATE.md`'s Level 1 gate (build, lint, tests) before the next commit starts — never stack unverified commits.
 - A real bug found mid-implementation gets its own commit and, if it represents a real architectural lesson, its own ADR — not silently folded into an unrelated commit's diff.
 
+## Frontend commit visibility (from Sprint 7 onward)
+
+- Every commit that touches `frontend/` must leave something a human can actually look at and confirm working — a running dev server, a rendered page, a working interaction, a real download. "Types added, no UI yet" is not a frontend commit's stopping point on its own; pair it with the next commit that makes it visible, or fold it into that commit.
+- CTO direction, 2026-07-18 (`docs/architecture/diagrams/SPRINT_7_KICKOFF.md`): the backend's existing discipline (green build/lint/test per commit) proves correctness; this rule proves the same increments are also demonstrable, not just compilable — the whole point of a "First Demonstrable Product" sprint.
+- Applies going forward, not just to Sprint 7 — a later sprint that adds frontend work should keep the same bar.
+
 ## After every task
 
 - [ ] Run `npm run build` (backend) — 0 TypeScript errors
