@@ -202,6 +202,43 @@ Per commit, appended below (never edited retroactively — this is a timeline, n
 - The real preview page count ("Estimated pages: 75" for `large-book.docx` at KDP 6"×9") matched, exactly, the independent `curl`-based cross-check from Commit 10's Verification 3/4 — the same real number, derived twice, by two different paths.
 - The real `ProgressStepper` showed all 6 steps ✓ in the final capture, each one earned by an actual completed action during this same session, not toggled for the screenshot.
 
+---
+
+# Sprint 8 — Publishing Engine
+
+Sprint 8 is **entirely backend** — no frontend component changed, so no screenshot exists for any Sprint 8 commit. The visible increment is a real HTTP endpoint (`POST /api/manuscripts/publish`) returning a real JSON `PublishingResponseDTO`. Evidence below is real request/response output from the real running server, not a rendered UI.
+
+### Commit 7 — Real-fixture verification pass (2026-07-18)
+
+**No engine code changed in this commit.** New verification tooling only (`backend/scripts/verify-real-publish.ts`, `npm run verify-real-publish`), mirroring the existing `verify-real-export.ts` structure — required by `docs/REAL_FIXTURE_POLICY.md`, which names "any future Publishing Engine work (platform packaging, KDP/Kobo/Apple Books/Google Play Books targets)" as in scope.
+
+**What's now true:** every one of the 4 canonical fixtures in `backend/verification/` has been driven through the real, full publish pipeline (real DOCX upload → parse → normalize → build → theme → typography → paginate → render PDF → `Packaging` → `SubmissionValidator` → `KDPTarget` → JSON DTO) against the real running server, and each returned a real, well-formed, structurally-validated `PublishingResponseDTO`.
+
+**Result: 4/4 checks passed.**
+
+| Fixture | HTTP | Status | Real findings |
+|---|---|---|---|
+| `images.docx` | 200 | FAIL | `MISSING_REQUIRED_METADATA`, `PAGE_COUNT_UNKNOWN`, `NO_COVER_IMAGE` |
+| `large-book.docx` | 200 | FAIL | same three |
+| `tables.docx` | 200 | FAIL | same three |
+| `typography-test.docx` | 200 | FAIL | same three |
+
+**A `FAIL` status here is the expected, correct result — and the script asserts shape, never `PASS`.** A green result would indicate a bug: `ASTBuilder` cannot populate `BookMetadata.isbn` from a real DOCX (no DOCX-native signal exists — the same confirmed gap Sprint 5 disclosed, recorded as `PUBLISHING_ENGINE.md` §6 Risk 4). The engine correctly reports that real gap instead of fabricating a pass.
+
+**Real finding surfaced by this pass — disclosed, not fixed in this commit:** `PAGE_COUNT_UNKNOWN` fires on *every* fixture, including `large-book.docx`. Traced to a real pipeline gap, confirmed by reading the code, not assumed:
+- `Book.pageCount` is populated only by `BookMetricsCalculator`, which runs **only on the import path** (`ImportManuscriptUseCase`) — never on the export/publish path.
+- The **real** page count does exist in the publish pipeline: `LayoutEngine.paginate()` produces a `PaginatedBook` with real `pages`, which `PublishingUseCase` computes, uses for rendering, and then discards — only `book` and the rendered PDF reach `PublishingTarget.prepare()`.
+
+`PageCountRule` is behaving correctly (it honestly reports "unknown" rather than guessing), but it is being fed less than the pipeline actually knows. **Not fixed here**: threading real pagination data into `PostRenderValidationContext` is a behavior change to the Publishing Engine, and Commits 7–8 are explicitly validation/documentation only by CTO direction. Recorded as a real, known, assumed gap for a future commit or sprint to close deliberately.
+
+**Confirmed real, not simulated:**
+- `npm run verify-server` passed first — real port 5000 confirmed, never assumed (Server Verification Policy).
+- All 4 runs hit the real running `backend/` over real HTTP; each response was parsed as real JSON and structurally validated field-by-field against the `PublishingResponseDTO` contract (`target`/`status`/`summary`/`issues[]`/`warnings[]`/`artifacts[]`/`generatedAt`/`duration`), including per-issue `code`/`message`/`severity` checks.
+- `artifacts: ["pdf"]` on every fixture proves the render step really ran and its output really reached `KDPTarget` — not an empty or short-circuited pipeline.
+- Real reports written to `backend/verification/output/<fixture>/publish-kdp.json` (gitignored, as all generated output is) — transcribed above rather than committed.
+- Full Definition-of-Done re-run alongside: build PASS, lint PASS, 386/386 tests PASS, coverage 93.41% statements / 98.91% functions.
+- One honest observation, not hidden: `duration` reads `0` ms in every report. Real and correct — the post-render publish step (packaging + 4 validation rules over in-memory data) completes inside `Date.now()`'s 1 ms resolution. The rendering time it follows is real and much larger; `duration` measures only `prepare()`, exactly as `KDPTarget` defines it.
+
 ## Related
 
 - `docs/DEVELOPMENT_WORKFLOW.md` — the durable Visible Increment Rule this log exists to satisfy
