@@ -387,7 +387,7 @@ class KDPRuleProvider implements ValidationRuleProvider {
 Approved by the CTO as "very prudent," matching their own stated order (Spike → Port → Validation → API → Tests → Documentation). Refined into concrete commits now that Decision 6's decomposition is locked:
 
 1. ✅ **Commit 0 — KDP publishing-requirements spike** (`backend/spikes/kdp-publishing-spike.ts`, 2026-07-18, ADR-0035) — real metadata requirements, real cover spec, real file-naming/submission rules, matching ADR-0019/0020/0030
-2. **Commit 1 — `PublishingTarget` port + `PublishingReport`/`PublishingIssue` models** (Domain)
+2. ✅ **Commit 1 — `PublishingTarget` port + `PublishingReport`/`PublishingIssue` models** (Domain, 2026-07-18) — `backend/src/domain/ports/PublishingTarget.ts`, `backend/src/domain/models/PublishingReport.ts` (also holds `RenderedOutputs`, the port's second parameter type)
 3. **Commit 2 — `Packaging`** (assembles book + cover + metadata into a `PublishingBundle`)
 4. **Commit 3 — `SubmissionValidator` + `PostRenderValidationRule` family + `ValidationRuleProvider` port + `KDPRuleProvider`/`KDPRuleData`** (real values from the spike, isolated behind the provider port per Decision 6/7/Risk 5 — no platform conditionals in `SubmissionValidator`)
 5. **Commit 4 — `KDPTarget`** (the only `PublishingTarget` implementation this sprint, wires `Packaging` + `SubmissionValidator`)
