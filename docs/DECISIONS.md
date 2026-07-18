@@ -970,3 +970,40 @@ Candidate shapes worth weighing (**none endorsed here** — listed so a future s
 - Whoever picks this up must run real-fixture verification again afterward (`npm run verify-real-publish`), since this gap was invisible to 386 passing tests and was found only by a real round trip — the fifth instance of this project's recurring pattern (ADR-0019, ADR-0020, ADR-0031, ADR-0032).
 
 **Related:** `PUBLISHING_ENGINE.md` §6 Risk 6 (the design-review-level record) and Decision 1's API-evolution note (the anticipated-evolution framing this deferral relies on), ADR-0037 (the platform-agnostic constraint any answer must respect), ADR-0031/ADR-0032 (prior real bugs found only by real-file verification, the same discipline that surfaced this), `docs/REAL_FIXTURE_POLICY.md` (the policy whose Publishing-Engine scope mandated the pass that found this), `backend/scripts/verify-real-publish.ts` (the verification that surfaced it)
+---
+
+## ADR-0039: Roadmap Reprioritized — Product Completeness Before AI (Strategic Decision)
+
+**Status:** APPROVED
+**Date:** 2026-07-18
+**Decision:** Editorial AI Engine and Plugin System are moved from "next up" to the **strategic backlog (Sprint 18+ / Sprint 19+)**. Sprints 9–17 are reassigned to completing Book Publisher Studio as a real, usable, stable product. Decided by the CTO immediately after reviewing `EDITORIAL_AI_ENGINE.md`'s round-1 Design Review.
+
+**CTO's rationale (verbatim reasoning):** the Editorial AI Engine is a very high-value feature, but not indispensable for shipping a usable product. Waiting until real users are actually using Book Publisher Studio allows the AI to be designed from **observed needs rather than assumed ones**. The Plugin System follows the same logic: it only has value once several AI engines or extensions actually need integrating.
+
+**The reordered roadmap:**
+
+| Sprint | Milestone | Rationale |
+|---|---|---|
+| 9 | **UI Foundation** | Design System, components, themes, typography, colors, icons, grid, responsive, accessibility, navigation. **No new business logic.** |
+| 10 | **UX & Workflow** | How an editor actually works, end to end — not how it looks. Observable with real editors. |
+| 11 | **Workspace & Project Management** | Projects, recent manuscripts, favorites, history, search. Today the user works on *a file*; tomorrow on *a library*. |
+| 12 | **Autosave & Recovery** | Guarantee no work is ever lost — before there are many users, not after. |
+| 13 | **Performance & Scalability** | Large DOCX/PDF, memory, speed, pagination, rendering. Where the real problems usually surface. |
+| 14 | **Collaboration** | Comments, sharing, review, history, version comparison. |
+| 15 | **Cloud Sync** | Only after the local version is stable. |
+| 16 | **Licensing** | Activation, licences, subscriptions, Community/Pro editions. |
+| 17 | **Telemetry & Observability** | Non-personal indicators — import time, error frequency, most-used features, performance — to direct future work with evidence. |
+| 18+ | **Editorial AI Engine** | By then: real users, real manuscripts, real feedback, real friction points. |
+| 19+ | **Plugin System** | Valuable once multiple engines/extensions need integrating. |
+
+**UI and UX are deliberately separate sprints, not one** (CTO direction). UI (Sprint 9) answers *"what does the software look like?"* — visual identity, components, colour, graphical consistency, the Design System. UX (Sprint 10) answers *"is the software pleasant and efficient to use?"* — user journey, click count, comprehensibility of actions, error messages, guidance, fluidity. One can have a beautiful UI with poor UX, or excellent UX with an unpolished interface; separating them lets each be designed against its own objective.
+
+**A real architectural prerequisite this reordering surfaces, flagged rather than discovered mid-sprint:** **6 of the 9 newly-scheduled sprints require a persistence layer that does not exist and is currently forbidden.** Sprint 7 Decision 2 (approved, and held without exception through Sprint 8) states: *"No session, no server-side manuscript cache — every UI action is its own complete round trip,"* and `grep`-confirmed there is no database, repository, session, or cache anywhere in `backend/src/`. Workspace (11), Autosave (12), Collaboration (14), Cloud Sync (15), Licensing (16), and Telemetry (17) each fundamentally require remembering something between requests. **Sprints 9 and 10 do not** — they are frontend-only and fully compatible with the stateless backend as it stands, which is a further argument for their position at the front of the queue. Amending Decision 2 is therefore a prerequisite for Sprint 11, and warrants its own Design Review at that time rather than being treated as an implementation detail.
+
+**Consequences:**
+- `docs/VERSIONS.md`'s version-to-milestone mapping is rewritten from `v0.10.0-alpha` onward: the previously-planned Plugin System / AI Features / Licensing & Cloud rows are superseded by the sequence above. Same renumbering discipline already applied four times (v0.6.0, v0.7.0, v0.8.0, v0.9.0) — annotated, never deleted.
+- `EDITORIAL_AI_ENGINE.md` is **deferred, not rejected, and not withdrawn.** Its round-1 draft stays exactly as written: the 6 open questions, the real code evidence (zero AI references, zero outbound HTTP, no secret management), and the accept/reject-versus-stateless tension all remain valid and will save the Sprint-18 session that work. Its status is amended to record the deferral and why.
+- `PLATFORM_ARCHITECTURE_ROADMAP.md` §2.2/§2.3 keep their architectural content unchanged — only their scheduling expectation moves. §2.3's existing "Not this sprint or the next" line becomes an understatement rather than an error.
+- The Level 1 map gains no new engines: Sprints 9–17 are product/platform work, not new Domain engines, so no new Level 1 §2 section is required. Each still needs its own Level 2 Design Review before implementation, per the unchanged two-gate discipline.
+
+**Related:** `docs/architecture/diagrams/EDITORIAL_AI_ENGINE.md` (the round-1 review this decision defers), `docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` Decision 2 (the stateless constraint 6 of these sprints will need amended), `docs/architecture/diagrams/PLATFORM_ARCHITECTURE_ROADMAP.md` §2.2/§2.3, `docs/VERSIONS.md` (the mapping this decision rewrites), `docs/DESIGN_REVIEW_PROCESS.md` (each new sprint still needs its own Level 2 review)

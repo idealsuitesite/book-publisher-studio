@@ -1,8 +1,14 @@
 # Editorial AI Engine — Level 2 Design Review
 
-**Status:** 🟡 **ROUND 1 — DRAFT. Not approved. No branch, no code.** 6 open questions posed below, each with a recommendation and the reasoning behind it. Every one is left open for explicit CTO decision, matching the process followed for Sprints 5–8.
-**Date:** 2026-07-18
-**Sprint:** Proposed for Sprint 9 — **the engine choice itself is Question 1 below**, not assumed.
+**Status:** ⏸️ **DEFERRED to Sprint 18+ by explicit CTO strategic decision (2026-07-18, ADR-0039) — deferred, not rejected, and deliberately not withdrawn.** This round-1 draft stands exactly as written: the 6 open questions, the real code evidence, and the accept/reject-versus-stateless tension all remain valid and will save the future session that picks this up.
+
+**Why deferred (CTO's reasoning):** the Editorial AI Engine is a very high-value feature, but not indispensable for shipping a usable product. Waiting until real users are actually using Book Publisher Studio allows the AI to be designed from **observed needs rather than assumed ones** — which is precisely what Question 4 (*which of the 8 services actually ship?*) could not answer from documents alone. Sprints 9–17 now target product completeness first; see ADR-0039 for the full reordered roadmap.
+
+**What a future session should know before reopening this:** the six questions below were drafted against the codebase as of 2026-07-18. By Sprint 18 the answers to Questions 3 and 6 will likely have changed — Sprint 11 (Workspace) and Sprint 12 (Autosave) are expected to introduce the persistence layer whose absence forces Question 3's stateless workaround, and Sprint 16 (Licensing) may introduce the secret management Question 6 has to invent from scratch today. **Re-verify §2's evidence before trusting it**; every claim there is timestamped to a codebase that will have moved.
+
+**Original round-1 status, preserved:** 🟡 ROUND 1 — DRAFT. Not approved. No branch, no code. 6 open questions posed below, each with a recommendation and the reasoning behind it, all left open for explicit CTO decision, matching the process followed for Sprints 5–8.
+**Date:** 2026-07-18 (round 1 drafted) / 2026-07-18 (deferred, ADR-0039)
+**Sprint:** Originally proposed for Sprint 9 — **now Sprint 18+**. Question 1 (Editorial AI Engine versus Plugin System) is answered by ADR-0039: **neither, for now** — both move to the strategic backlog, Plugin System behind Editorial AI at Sprint 19+.
 
 ---
 
