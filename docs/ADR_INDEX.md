@@ -39,6 +39,7 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 | 0033 | Repository Converted to an npm Workspace; `packages/shared-types` Introduced | 2026-07-18 | Architecture, Governance | APPROVED — implemented |
 | 0034 | Sprint 7 Governance Decisions | 2026-07-18 | Governance | APPROVED |
 | 0035 | KDP Publishing-Requirements Spike Findings (Sprint 8, Commit 0) | 2026-07-18 | Publishing Engine | APPROVED |
+| 0036 | Platform-Specific Publishing Rules Must Be Encapsulated Behind a `RuleProvider` Port (Engineering Governance Principle) | 2026-07-18 | Publishing Engine, Governance | APPROVED |
 
 ## By category
 
@@ -48,8 +49,8 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 - **Validation Engine** (Sprint 5): 0027, 0028
 - **Professional Layout Engine** (Sprint 6): 0029, 0030, 0031, 0032
 - **First Demonstrable Product** (Sprint 7): 0033, 0034
-- **Publishing Engine** (Sprint 8): 0035
-- **Governance** (process, not a specific engine): 0006, 0007, 0010, 0017, 0021, 0032, 0033, 0034
+- **Publishing Engine** (Sprint 8): 0035, 0036
+- **Governance** (process, not a specific engine): 0006, 0007, 0010, 0017, 0021, 0032, 0033, 0034, 0036
 
 ## Related
 
