@@ -16,11 +16,16 @@ export async function importManuscript(file: File): Promise<ImportResponseDTO> {
     body: formData,
   });
 
-  if (!response.ok) {
-    throw new Error(`Import failed: ${response.status} ${response.statusText}`);
+  // ManuscriptController returns a real ImportResponseDTO body on BOTH 200 (report.status ===
+  // 'success') and 422 (report.status === 'error', e.g. an empty DOCX) - the import pipeline
+  // ran either way, so the caller inspects report.status itself. Only other statuses (400 bad
+  // file, 500 server error) are genuine transport failures with a plain { error } body instead.
+  if (response.status === 200 || response.status === 422) {
+    return response.json() as Promise<ImportResponseDTO>;
   }
 
-  return response.json() as Promise<ImportResponseDTO>;
+  const body = (await response.json().catch(() => null)) as { error?: string } | null;
+  throw new Error(body?.error ?? `Import failed: ${response.status} ${response.statusText}`);
 }
 
 export async function getManuscriptOptions(): Promise<ManuscriptOptionsDTO> {
