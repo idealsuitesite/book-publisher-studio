@@ -45,7 +45,7 @@ Sprint 7 has **not** succeeded if:
 
 ---
 
-## New Rule (CTO direction, 2026-07-18): Every Frontend Commit Ships Something Visible
+## New Rule (CTO direction, 2026-07-18): the Visible Increment Rule
 
 From Sprint 7 onward, any commit that touches `frontend/` must leave something a human can actually look at and confirm working — not just "types added, no UI yet." This is a working discipline for demonstrable, incremental progress, layered on top of (not a replacement for) the Design Review's own 12-commit plan (`SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` §6). Illustrative mapping onto that plan:
 
@@ -58,7 +58,9 @@ From Sprint 7 onward, any commit that touches `frontend/` must leave something a
 - Commit 9 → a real embedded PDF preview renders
 - Commit 9 → PDF/DOCX/EPUB are real, downloadable files
 
-This rule is now also recorded as a durable workflow rule in `docs/DEVELOPMENT_WORKFLOW.md` (not just this sprint's charter), since the CTO's framing ("from Sprint 7 onward") is project-wide, not scoped to this sprint alone.
+**Formalized the same day (CTO direction, after Commit 2):** every `frontend/`-touching commit now produces three concrete deliverables, logged in `docs/demo/VISIBLE_INCREMENTS.md` — a real screenshot of the running dev server (never a mockup), a plain-language "what's now usable" description, and an explicit "confirmed real, not simulated" statement showing the real backend request/response behind what's on screen. Full mechanics in `docs/DEVELOPMENT_WORKFLOW.md`'s "Frontend commit visibility" section, which this Kickoff's original rule is now a pointer to rather than a duplicate of. This is distinct from `docs/demo/screenshots/` — the curated, final 6-image Demo Script set produced once at Commit 11, not a per-commit log.
+
+This rule is recorded as a durable workflow rule in `docs/DEVELOPMENT_WORKFLOW.md` (not just this sprint's charter), since the CTO's framing ("from Sprint 7 onward") is project-wide, not scoped to this sprint alone.
 
 ---
 
@@ -69,7 +71,7 @@ This rule is now also recorded as a durable workflow rule in `docs/DEVELOPMENT_W
 - **ADR-0017** — `main` as a production branch; this Kickoff (like Sprint 6's) is committed directly to `main` as a governance doc, the feature branch is created after.
 - **ADR-0022/ADR-0027/ADR-0029** — the additive-field pattern (`blockTypography?`, `pageLayout?`/`tableOfContents?`, `runningHead?`) this sprint's `ManuscriptOptionsDTO` shape (Decision 5) reuses for the first time on an HTTP response instead of a Domain model.
 - **ADR-0032** — the Engineering Governance Principle (Code/Product/Documentation, all three required together). This sprint's own Definition of Done (below) is checked against it directly — it is also the ADR this sprint is most at risk of violating in spirit if "the UI looks done" is mistaken for "the UI is done" without a real-fixture pass.
-- **ADR-0033 (to be written, Commit 1)** — this project's first monorepo/npm-workspace structural change (Design Review Decision 4), per that Design Review's own instruction to write a dedicated ADR for Commit 1, not just a commit message.
+- **ADR-0033** — this project's first monorepo/npm-workspace structural change (Design Review Decision 4), written and implemented in Commit 1, per that Design Review's own instruction to write a dedicated ADR for Commit 1, not just a commit message.
 
 ## Reference Documents
 
@@ -79,8 +81,9 @@ This rule is now also recorded as a durable workflow rule in `docs/DEVELOPMENT_W
 - `docs/product/PRODUCT_ACCEPTANCE.md` — the non-technical Definition of Done (import/read/understand/change/export)
 - `docs/product/FEATURE_MATRIX.md` — what ships this sprint vs. deliberately deferred
 - `docs/demo/screenshots/README.md` — the expected screenshot set Commit 11 produces
+- `docs/demo/VISIBLE_INCREMENTS.md` — the running per-commit visual log the Visible Increment Rule produces, starting at whichever commit first touches `frontend/`
 - `docs/DECISIONS.md` — every ADR listed above
-- `docs/DEVELOPMENT_WORKFLOW.md` — branching, commit discipline, the new frontend-visibility rule
+- `docs/DEVELOPMENT_WORKFLOW.md` — branching, commit discipline, the Visible Increment Rule
 - `docs/REAL_FIXTURE_POLICY.md` — applies to this sprint's UI too, not just backend renderers
 
 ## The Planned Commits
@@ -104,7 +107,7 @@ Per `SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` §6, one responsibility each, green
 
 Sprint 7 is done when, and only when:
 
-- All implementation commits landed, each with its own green build/lint/test before the next started, and each `frontend/`-touching commit satisfied the visibility rule above
+- All implementation commits landed, each with its own green build/lint/test before the next started, and each `frontend/`-touching commit satisfied the Visible Increment Rule above (screenshot + description + real-data confirmation logged in `docs/demo/VISIBLE_INCREMENTS.md`)
 - `npm run dev` in `frontend/` and `npm run dev` in `backend/` both start cleanly under the workspace structure; the frontend calls the backend successfully across the two processes (CORS confirmed working, not assumed)
 - A real DOCX from `backend/verification/` can be dragged in through the actual UI, its structure and real validation warnings are visibly rendered — not swallowed
 - Selecting a different layout (e.g. KDP 6×9) and re-previewing shows a visibly different-sized PDF
