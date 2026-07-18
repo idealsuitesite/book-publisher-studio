@@ -7,6 +7,18 @@ const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
 export const uploadManuscript = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE_BYTES },
+  // Without this, busboy decodes multipart filenames as latin1 (its `defParamCharset` default
+  // is undefined, which falls back to latin1). A file called
+  // "Une recommandation supplémentaire.docx" arrived as "Une recommandation
+  // supplÃ©mentaire.docx" - the UTF-8 bytes for é (0xC3 0xA9) read as two latin1 characters.
+  //
+  // That is data corruption, not a display quirk: the filename becomes the book title when a
+  // DOCX carries no title of its own, so it reached the AST, every rendered PDF/DOCX/EPUB, and
+  // the KDP publishing report. For software whose users are authors and publishers - who write
+  // in French, Spanish, German, Arabic, Chinese - a pipeline that mangles accents at the front
+  // door is not fit for purpose. Fixed at the boundary where the bytes are first decoded rather
+  // than patched further downstream.
+  defParamCharset: 'utf8',
   fileFilter: (_req, file, callback) => {
     // Both must match, not either. With `||`, any file claiming the DOCX mime type passed
     // regardless of its name, and any file merely named *.docx passed regardless of its type -
