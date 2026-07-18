@@ -23,7 +23,8 @@ Day-to-day operational rules for working in this repository — distinct from `d
   1. **A real screenshot** of the running `frontend/` at that commit — captured against the actual dev server in a browser (this project's Browser tooling: `preview_start`/`navigate`/`computer` screenshot), never a mockup or a design tool export. Saved to `docs/demo/visible-increments/commit-NN-<slug>.png`.
   2. **A short "what's now usable" description** — plain language, what a person could actually do by hand at this commit, not an implementation summary.
   3. **A "confirmed real, not simulated" statement** — explicit evidence the screenshot reflects the real backend, not mocked/hardcoded frontend state: the real HTTP request/response inspected via the Browser pane's network tools, or the real fixture file used, quoted directly.
-- Applies going forward, not just to Sprint 7 — a later sprint that adds frontend work should keep the same bar, including the three-part log.
+- **Scope extended the same day (CTO direction, after Commit 3), Sprint 7 only:** `docs/demo/VISIBLE_INCREMENTS.md` now logs every implementation commit from Commit 3 onward, not just `frontend/`-touching ones. A backend/tooling commit with no UI yet gets a small conceptual diagram (SVG, two or three labeled boxes + an arrow, e.g. "Workspace → Shared DTOs") instead of a screenshot, plus the same "what's now true" description and "confirmed real" evidence. The screenshot requirement above for `frontend/` commits is unchanged and still the project-wide rule below; the diagram-for-every-commit extension is this sprint's own flavor of making the whole build visible, not a permanent requirement for every future sprint's backend work.
+- Applies going forward, not just to Sprint 7 — a later sprint that adds frontend work should keep the screenshot bar, including the three-part log.
 
 ## After every task
 
