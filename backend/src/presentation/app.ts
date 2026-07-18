@@ -18,10 +18,15 @@ import { EPUBRenderer } from '../infrastructure/renderers/EPUBRenderer';
 import { ManuscriptController } from './controllers/ManuscriptController';
 import { ExportController } from './controllers/ExportController';
 import { ManuscriptOptionsController } from './controllers/ManuscriptOptionsController';
+import { PublishController } from './controllers/PublishController';
 import { manuscriptRoutes } from './routes/manuscripts';
 import { exportRoutes } from './routes/export';
 import { optionsRoutes } from './routes/options';
+import { publishRoutes } from './routes/publish';
 import { errorHandler } from './middleware/errorHandler';
+import { PublishingUseCase } from '../application/use-cases/PublishingUseCase';
+import { PublishingReportMapper } from '../application/mappers/PublishingReportMapper';
+import { createKDPTarget } from '../domain/services/publishing/createKDPTarget';
 
 export function createApp(): Express {
   const app: Express = express();
@@ -89,6 +94,22 @@ export function createApp(): Express {
     new ManualLayoutSelector()
   );
   app.use('/api/manuscripts', exportRoutes(exportController));
+
+  // Sprint 8 (PUBLISHING_ENGINE.md Decision 4): a new route, never a field on /export -
+  // PublishingUseCase reuses the same pipeline dependencies as exportPdfUseCase, plus KDPTarget
+  // (createKDPTarget(), Commit 4) as the only PublishingTarget implementation this sprint.
+  const publishUseCase = new PublishingUseCase(
+    new MammothParser(),
+    new HtmlNormalizer(),
+    new ASTBuilder(),
+    new ThemeEngine(),
+    new TypographyResolver(),
+    new LayoutEngine(),
+    new PDFRenderer(),
+    createKDPTarget()
+  );
+  const publishController = new PublishController(publishUseCase, new ManualLayoutSelector(), new PublishingReportMapper());
+  app.use('/api/manuscripts', publishRoutes(publishController));
 
   // Sprint 7 commit 2 (Decision 5): a real discovery endpoint, additive to Presentation only -
   // no Domain/Application change beyond the two additive, read-only list functions the

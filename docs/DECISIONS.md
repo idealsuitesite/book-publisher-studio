@@ -859,3 +859,114 @@ This is the project's first monorepo-structural change — implements Design Rev
 - Decision 4 sets precedent: a future one-off scale/timing diagnostic may use a real `backend/uploads/` file under the same narrow conditions (measurement only, never adopted as a fixture, disclosed in the same commit's `VISIBLE_INCREMENTS.md` entry) without each future instance re-litigating whether `DEVELOPMENT_WORKFLOW.md`'s rule applies — it does, and this is the documented shape of the narrow exception to it.
 
 **Related:** ADR-0021 (post-Sprint-3 governance decisions, the precedent this ADR's grouping follows), ADR-0028 (Validation Engine rule-design principles, the precedent for consolidating multiple CTO-directed rulings into one ADR), ADR-0033 (the npm workspace / `packages/shared-types` decision, Sprint 7's other ADR), `docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` (Decision 3, the minimal-for-demo scope Decision 3 above cites), `docs/DEVELOPMENT_WORKFLOW.md` ("Which fixture to use," the rule Decision 4 narrowly departs from), `docs/REAL_FIXTURE_POLICY.md`, `docs/TODO.md` (the backlog entries for the PDF viewer and licensing proposal), `docs/demo/VISIBLE_INCREMENTS.md` (Commits 9a, 9b, and 10's entries, the real evidence behind Decisions 1 and 4), `docs/releases/v0.8.0-alpha/SPRINT_7_FINAL_REPORT.md`
+
+---
+
+## ADR-0035: KDP Publishing-Requirements Spike Findings (Sprint 8, Commit 0)
+
+**Status:** APPROVED
+**Date:** 2026-07-18
+**Decision:** Resolves the one item Decision 2 of `docs/architecture/diagrams/PUBLISHING_ENGINE.md` explicitly declined to decide ("a real Commit-0 spike... verifying KDP's actual current metadata requirements, cover image spec, and file-naming/submission rules is required before any `KDPTarget`/`KDPRuleSet` code is written"). Spike script: `backend/spikes/kdp-publishing-spike.ts`, run via `npx tsx spikes/kdp-publishing-spike.ts`, same throwaway/not-in-`src/`/not-test-covered discipline as `pdfkit-spike.ts` (ADR-0019), `epub-library-spike.ts` (ADR-0020), and `kdp-trim-size-spike.ts` (ADR-0030, this spike's direct sibling for the same platform).
+
+**Method:** Not a runtime API/library check — KDP has no submission API to query, and Decision 5 (locked, no reservations) forbids creating an account or calling Amazon this sprint regardless. The real external behavior verified here is KDP's own *documented policy*: five `kdp.amazon.com` help pages fetched directly (Paperback Submission Guidelines `G201857950`, Create a Paperback Cover `G201953020`, Set Trim Size/Bleed/Margins `GVBQ3CMEQW3W2VL6`, Metadata Guidelines `G201097560`, Cover Image Guidelines `G6GTK3T3NUHKLEFX`), not summarized by a third party first. Bleed (0.125in) and the cover-width formula were independently confirmed on two of the five pages and agreed exactly — no discrepancy to disclose this time, unlike `kdp-trim-size-spike.ts`'s real 16th-size disagreement.
+
+**Verified values:**
+
+| Area | Finding |
+|---|---|
+| Interior manuscript formats | PDF/DOC/DOCX/RTF/HTML/TXT without bleed; PDF only if any content bleeds to the edge |
+| Interior bleed | 0.125in (3.2mm) top/bottom/outer edge; bleed PDFs sized +0.25in height / +0.125in width over trim size |
+| Interior margins | Gutter 0.375in–0.875in scaling with page count (24–828 pages, 5 tiers); outside margin ≥0.25in (no bleed) / ≥0.375in (bleed) |
+| Interior resolution | 300 DPI minimum, 600 DPI recommended max (600MB file-size cap) |
+| Page count bounds | 24 minimum, up to 828 maximum (upper bound depends on ink/paper/trim combination) |
+| File naming | No emoji or unsupported special characters in cover/interior file names |
+| Paperback cover | Single PDF (front+spine+back as one image), CMYK, 300 DPI minimum, 650MB max (40MB recommended) — dimensions **computed**, not fixed |
+| Spine width formula | `pageCount × factor`, factor = 0.002252in (B&W white / standard color), 0.0025in (B&W cream), 0.002347in (premium color); no spine text printed below 79 pages |
+| eBook cover (different artifact) | JPEG, RGB (not CMYK), fixed ~2560×1600px, 300 DPI minimum, 5MB max — recorded for disambiguation, not used by this sprint's paperback-only scope (Decision 2) |
+| Metadata, mapped to real `BookMetadata` | `title`/`author`/`isbn`/`language` required; `description`/`keywords` recommended, not required |
+| Metadata gap found | KDP also requires `Categories` (≤3), `Primary Audience` (explicit-content Y/N), and `Primary Marketplace` at submission — none has a `BookMetadata` field today; out of scope to add this sprint (Decision 5), recorded so a future session doesn't rediscover it from scratch |
+
+**A real shape correction this spike surfaces:** `PUBLISHING_ENGINE.md` §5's provisional `KDPRuleSet.coverSpec: {minWidthPx, minHeightPx, minDpi}` assumed a fixed-pixel cover, matching the eBook model. The real paperback cover has no fixed pixel size — width and height are computed from trim size, page count, and paper type via the spine formula above. §5 is corrected to define a `PaperbackCoverSpec` shape instead of forcing a real value into the wrong field, following this project's own "confirmed, not guessed" discipline rather than shipping a plausible-looking but wrong interface.
+
+**Consequences:**
+- `domain/publishing/KDPRuleData` (Commit 3) is built directly from this table — no further KDP requirements research needed for Sprint 8's acceptance criteria. (Renamed from the `KDPRuleSet` name used when this ADR was first written — ADR-0036/`PUBLISHING_ENGINE.md` Decision 7, same day, locked the data as inert and reachable only through a new `KDPRuleProvider`/`ValidationRuleProvider` port, not referenced directly by `SubmissionValidator`.)
+- `PublishingIssue`-producing `PostRenderValidationRule`s (Commit 3) can cite exact real thresholds (e.g. "gutter margin below 0.5in for a 200-page book") instead of placeholder logic.
+- The metadata gap (Categories/Primary Audience/Primary Marketplace) is not blocking Sprint 8 (`PublishingReport` can flag "not verifiable — no BookMetadata field" as a `WARNING`, not silently skip the check) — recorded here so a future `BookMetadata` extension has a citable originating source, and formalized as a per-platform traceability table in `PUBLISHING_ENGINE.md`'s Decision 7 section.
+- If KDP's own published spec changes later, per Risk 5 (`PUBLISHING_ENGINE.md` §6), this same spike script is re-run rather than trusting this ADR's table read in isolation years later.
+
+**Related:** `PUBLISHING_ENGINE.md` Decision 2 (the design decision this spike unblocks) and Decision 6/7/Risk 5 (`KDPRuleData` reached only through the `ValidationRuleProvider` port), ADR-0019/ADR-0020/ADR-0030 (spike-before-decide precedent), ADR-0036 (the `RuleProvider` governance rule this ADR's findings are wrapped behind), `backend/spikes/kdp-publishing-spike.ts` (the spike itself)
+
+---
+
+## ADR-0036: Platform-Specific Publishing Rules Must Be Encapsulated Behind a `RuleProvider` Port (Engineering Governance Principle)
+
+**Status:** APPROVED
+**Date:** 2026-07-18
+**Decision:** Reviewing ADR-0035's findings, the CTO caught a real remaining architectural seam before Commit 1 could start: `PUBLISHING_ENGINE.md`'s Decision 6 had already isolated KDP's requirements as *data* (`KDPRuleSet`), but `SubmissionValidator` still referenced that data's concrete name directly — an implicit dependency on "which platform" that would have forced a code change to `SubmissionValidator` the moment a second target (Kobo, Apple Books, Lulu, IngramSpark) was added, exactly the drift Decision 6 was written to prevent one layer up. This ADR locks the fix as a standing rule for the whole engine, not a one-sprint choice, matching the engineering-governance-principle precedent set by ADR-0032 (TOC generation must follow structural hierarchy, never `Heading` blocks).
+
+**The rule:** Platform-specific publishing requirements (KDP today; Kobo, Apple Books, Lulu, IngramSpark later) must never be hardcoded as conditionals or by-name data references inside the Publishing Engine's orchestration classes (`PublishingUseCase`, `SubmissionValidator`, `Packaging`, `KDPTarget`'s siblings). They must be encapsulated behind a `ValidationRuleProvider` port — one method, `getRules(): PostRenderValidationRule[]` — with exactly one concrete provider class per platform (`KDPRuleProvider` this sprint; `KoboRuleProvider`/`AppleBooksRuleProvider`/`LuluRuleProvider`/`IngramRuleProvider` future). No `if (platform === 'kdp')` branch may appear anywhere in the engine's own code — the CTO's own verbatim requirement.
+
+**Rationale:** Mirrors the exact reasoning this project has already applied to every other cross-cutting concern with more than one plausible real implementation — `Renderer<TOutput>` (PDF/DOCX/EPUB, ADR-0012), `LayoutSelector` (A4/A5/KDP trims, ADR-0029/0030), and now `PublishingTarget` itself (Decision 1). A `RuleProvider` port is the same Dependency Inversion pattern one layer deeper: `SubmissionValidator` depends on the abstraction, never the concrete platform, so its own code never needs to change as platforms are added — only a new provider class is written, and only `KDPTarget`'s (or `KoboTarget`'s, etc.) wiring changes to inject it.
+
+**Consequences:**
+- The `KDPRuleSet` interface named in `PUBLISHING_ENGINE.md` §5's initial draft (not yet written to `src/` — Commit 3 is still pending) is renamed `KDPRuleData` (inert data) and is joined by a new `ValidationRuleProvider` Domain port and `KDPRuleProvider` Infrastructure class — see `PUBLISHING_ENGINE.md` §5 for the exact shapes to be implemented in Commit 3.
+- `SubmissionValidator`'s constructor signature takes a `ValidationRuleProvider`, never a platform name or a concrete rule-data type — enforced by the type system, not by code-review discipline alone.
+- Sprint 8's Acceptance Criteria (`PUBLISHING_ENGINE.md` §8) already required the architecture to extend to Kobo/Apple Books/Lulu "without modifying any public interface" for `PublishingTarget` — this ADR extends that same guarantee one layer down, to `ValidationRuleProvider`.
+- A future contributor adding `KoboTarget` writes exactly one new class (`KoboRuleProvider implements ValidationRuleProvider`) and wires it into `KoboTarget`'s constructor — `SubmissionValidator`, `PublishingUseCase`, and `PublishingReport` are untouched, verifiable by the fact that none of them import any platform-specific type today.
+
+**Related:** ADR-0035 (the KDP-specific findings this rule now wraps behind a port), ADR-0032 (the engineering-governance-principle precedent this ADR's format follows), ADR-0012 (`Renderer` port-vs-class precedent), ADR-0029/ADR-0030 (`LayoutSelector` port precedent), `PUBLISHING_ENGINE.md` Decision 6/Decision 7 (where this rule is locked at the design-review level, with the full component diagram), `docs/DEVELOPER_HANDBOOK.md` (the general port-vs-class judgment rule this ADR applies to a new case)
+
+---
+
+## ADR-0037: Publishing Engine Domain Objects Are Platform-Agnostic; Platforms Depend on the Engine, Never the Inverse (Engineering Governance Principle)
+
+**Status:** APPROVED
+**Date:** 2026-07-18
+**Decision:** Reviewing Commit 1 (`PublishingTarget` + `PublishingReport`/`PublishingIssue`), the CTO generalized ADR-0036's rule-provider-specific pattern into a standing principle covering every object the Publishing Engine defines, applied immediately as a condition on Commit 2's `PublishingBundle`. Same engineering-governance-principle format as ADR-0032 and ADR-0036.
+
+**The rule (CTO's verbatim principle):** *"Les objets du Publishing Engine ne doivent jamais dépendre d'une plateforme spécifique. Les plateformes (KDP, Kobo, Apple Books, etc.) dépendent du Publishing Engine, jamais l'inverse."* No Domain object the engine defines — `PublishingTarget`, `PublishingReport`, `PublishingBundle`, `ValidationRuleProvider`, or any future addition — may reference a platform name, a platform-specific field, or a platform-specific assumption. Platform implementations (`KDPTarget`, `KDPRuleProvider`, and later `KoboTarget`/`AppleBooksTarget`/`LuluTarget`/`IngramTarget`) are always the dependent side.
+
+**Rationale:** This is ADR-0036's Dependency Inversion pattern stated once, generally, instead of re-derived per object. ADR-0036 already applied it narrowly to rule injection (`ValidationRuleProvider`); Decision 1/ADR predecessors already applied it to the target itself (`PublishingTarget`); this ADR closes the gap for everything else the engine will define — starting with Commit 2's `PublishingBundle`, which the CTO named explicitly as this rule's first real test: `{manuscript, cover, metadata, assets, manifest}`, with zero KDP-specific fields or assumptions.
+
+**Consequences:**
+- `PublishingBundle` (Commit 2) is built to this rule from its first line of code — `manuscript` stays typed as `RenderedOutputs` (every rendered format available), not a single pre-chosen format, because choosing which format a given platform needs is that platform's decision, not `Packaging`'s.
+- Every future Commit adding a new engine-level type (a hypothetical `PublishingSubmission`, `PublishingSchedule`, etc.) is reviewed against this rule before being written, not only `PublishingBundle`.
+- Combined with ADR-0036, the full dependency direction for Sprint 8 is: `KDPTarget` → `PublishingTarget` (implements), `KDPTarget` → `PublishingBundle` (uses), `KDPRuleProvider` → `ValidationRuleProvider` (implements) — never the reverse arrow, in either case.
+
+**Related:** ADR-0036 (the rule-provider-specific instance this ADR generalizes), ADR-0032 (the engineering-governance-principle precedent both follow), `PUBLISHING_ENGINE.md` Decision 8 (where this rule is locked at the design-review level) and Decision 1/6/7 (the prior instances of the same dependency direction this ADR states generally)
+
+---
+
+## ADR-0038: Publishing Engine Cannot See `LayoutEngine`'s Real Pagination Metrics — Deferred Beyond Sprint 8, Question Framed Not Answered
+
+**Status:** OPEN — deferred by explicit CTO decision (2026-07-18). **This ADR deliberately does not decide the answer.** It records a confirmed gap and frames the question a future Design Review must resolve.
+**Date:** 2026-07-18
+**Decision:** Do **not** change Publishing Engine behavior in Sprint 8 to close this gap. Document it, leave `PageCountRule` reporting `PAGE_COUNT_UNKNOWN` when the information genuinely is not available, and open this record for a dedicated future decision.
+
+**The confirmed gap (found by Commit 7's real-fixture verification, not by inspection or assumption):** `PageCountRule` reports `PAGE_COUNT_UNKNOWN` on **every** real fixture — all 4 canonical fixtures including `large-book.docx`. Traced by reading the actual code:
+
+- `Book.pageCount` is populated only by `BookMetricsCalculator`, which runs only on the **import** path (`ImportManuscriptUseCase`). It never runs on the export/publish path.
+- The **real** page count does exist inside the publish pipeline: `LayoutEngine.paginate()` produces a `PaginatedBook` carrying real `pages`, which `PublishingUseCase` computes and renders from — then discards, because `PublishingTarget.prepare(book, renderedOutputs)` receives only the `Book` and the rendered bytes.
+- Note the two are not even the same quantity: `BookMetricsCalculator.pageCount` is an *estimate* derived from word count (`estimatePageCount(wordCount)`), whereas `PaginatedBook.pages` is the *real* paginated result. Any future fix must decide which one Publishing Engine should actually validate against — they will not agree.
+
+`PageCountRule` itself is correct and needs no change: it honestly reports "unknown" rather than guessing. It is simply being fed less than the pipeline already knows.
+
+**Why this was not fixed in Sprint 8 (CTO's own reasoning, verbatim in substance):** Sprint 8's objective was to *create a Publishing Engine*, not to *modify the rendering pipeline*. Closing this gap would mean changing the data passed to `PublishingTarget.prepare(...)` — modifying an internal API, enriching the transported objects, and propagating a new value across several layers. That is not a small correction; it is a **contract evolution**, and it warrants its own architectural decision rather than being absorbed silently into a validation-only commit.
+
+**The question a future Design Review must answer (posed here, deliberately unanswered):**
+> How should `LayoutEngine`'s computed metrics be exposed to the Publishing Engine without breaking the existing separation of responsibilities?
+
+Constraints any answer must respect, all already locked by earlier decisions in this sprint:
+- Decision 8 / ADR-0037 — every Publishing Engine object stays platform-agnostic; platforms depend on the engine, never the inverse.
+- Decision 1's API-evolution note — `prepare()` is Sprint 8's only operation, not necessarily `PublishingTarget`'s final API; a widened signature is an anticipated, planned evolution, not a surprise break.
+- Decision 6's OWNS/NEVER boundaries — whatever carries the metrics must not turn `Packaging` into a validator or `SubmissionValidator` into a packager.
+
+Candidate shapes worth weighing (**none endorsed here** — listed so a future session starts from a real option set rather than a blank page): widening `RenderedOutputs` to carry render-time metrics alongside the bytes; adding a metrics field to `PostRenderValidationContext`; passing `PaginatedBook` (or a narrow projection of it) into `prepare()`; or having `PublishingUseCase` enrich the `Book` with real pagination data before delegating.
+
+**Consequences:**
+- `PageCountRule` ships in Sprint 8 permanently reporting `PAGE_COUNT_UNKNOWN` (a `WARNING`, never an `ERROR`, so it never blocks a report) against real manuscripts. Real, disclosed, and expected — not a defect to be surprised by later.
+- `PUBLISHING_ENGINE.md` §6 Risk 6 records the same gap at the design-review level; this ADR is its citable, permanent counterpart.
+- A future contributor asking "why does the page-count check never pass?" has a complete answer — including the estimate-vs-real distinction — instead of rediscovering it from scratch.
+- Whoever picks this up must run real-fixture verification again afterward (`npm run verify-real-publish`), since this gap was invisible to 386 passing tests and was found only by a real round trip — the fifth instance of this project's recurring pattern (ADR-0019, ADR-0020, ADR-0031, ADR-0032).
+
+**Related:** `PUBLISHING_ENGINE.md` §6 Risk 6 (the design-review-level record) and Decision 1's API-evolution note (the anticipated-evolution framing this deferral relies on), ADR-0037 (the platform-agnostic constraint any answer must respect), ADR-0031/ADR-0032 (prior real bugs found only by real-file verification, the same discipline that surfaced this), `docs/REAL_FIXTURE_POLICY.md` (the policy whose Publishing-Engine scope mandated the pass that found this), `backend/scripts/verify-real-publish.ts` (the verification that surfaced it)

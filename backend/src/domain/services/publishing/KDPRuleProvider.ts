@@ -1,0 +1,27 @@
+import type { ValidationRuleProvider } from '../../ports/ValidationRuleProvider';
+import type { PostRenderValidationRule } from './PostRenderValidationRule';
+import type { KDPRuleData } from './KDPRuleData';
+import { KDP_RULE_DATA } from './KDPRuleData';
+import { RequiredMetadataFieldsRule } from './RequiredMetadataFieldsRule';
+import { PageCountRule } from './PageCountRule';
+import { CoverPresenceRule } from './CoverPresenceRule';
+import { InteriorFormatAvailabilityRule } from './InteriorFormatAvailabilityRule';
+
+// The only ValidationRuleProvider implementation this sprint (Decision 7, ADR-0036). Domain, not
+// Infrastructure - the Commit-0 spike confirmed no file I/O is needed to turn KDPRuleData into
+// rules (same conclusion ManualLayoutSelector already reached for LayoutSelector, ADR-0029's
+// port-vs-class judgment applied identically here). Turns inert KDPRuleData into concrete
+// PostRenderValidationRule instances - this is where "if(platform=='kdp')" would have leaked
+// into SubmissionValidator without Decision 7.
+export class KDPRuleProvider implements ValidationRuleProvider {
+  constructor(private readonly data: KDPRuleData = KDP_RULE_DATA) {}
+
+  getRules(): PostRenderValidationRule[] {
+    return [
+      new RequiredMetadataFieldsRule(this.data.requiredMetadataFields),
+      new PageCountRule(this.data.interiorSpec.minPageCount, this.data.interiorSpec.maxPageCount),
+      new CoverPresenceRule(),
+      new InteriorFormatAvailabilityRule(this.data.interiorSpec.acceptedFormats),
+    ];
+  }
+}

@@ -29,3 +29,4 @@ export type { ValidationIssueDTO } from './ValidationIssueDTO';
 export type { QualityScoreDTO } from './QualityScoreDTO';
 export type { ImportReportDTO } from './ImportReportDTO';
 export type { ImportResponseDTO } from './ImportResponseDTO';
+export type { PublishingIssueDTO, PublishingResponseDTO } from './PublishingResponseDTO';
