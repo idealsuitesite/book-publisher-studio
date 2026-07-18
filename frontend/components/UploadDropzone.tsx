@@ -6,18 +6,20 @@ import { getManuscriptOptions, importManuscript } from '@/lib/api-client';
 import { BookStructureView } from '@/components/BookStructureView';
 import { ValidationSummary } from '@/components/ValidationSummary';
 import { FormatSelector } from '@/components/FormatSelector';
+import { PreviewPanel } from '@/components/PreviewPanel';
 
 // Sprint 7 commit 5 (docs/architecture/diagrams/SPRINT_7_KICKOFF.md) - the dropzone commit 4
 // shipped as static UI now drives the real ThemeEngine/ASTBuilder pipeline via a real
 // POST /api/manuscripts/import. Commit 6 added the real book structure view on success
 // (BookStructureView). Commit 7 added the real validation findings (ValidationSummary).
-// Commit 8 adds the format/layout selector (FormatSelector), fetching GET
-// /api/manuscripts/options once on success and holding the selection here, ready for commit
-// 9's export/preview call - no export request fires yet.
+// Commit 8 added the format/layout selector (FormatSelector). Commit 9a adds the real PDF
+// preview (PreviewPanel) - the success state now keeps the real dropped File (not just its
+// name) since the stateless backend needs the real bytes resent for export/preview. Commit 9b
+// (download) is not wired here yet.
 type State =
   | { status: 'idle' }
   | { status: 'uploading'; filename: string }
-  | { status: 'success'; filename: string; result: ImportResponseDTO }
+  | { status: 'success'; file: File; result: ImportResponseDTO }
   | { status: 'error'; filename: string; message: string };
 
 const CARD_CLASSES =
@@ -45,7 +47,7 @@ export function UploadDropzone() {
     try {
       const result = await importManuscript(file);
       if (result.report.status === 'success') {
-        setState({ status: 'success', filename: file.name, result });
+        setState({ status: 'success', file, result });
       } else {
         setState({
           status: 'error',
@@ -81,7 +83,7 @@ export function UploadDropzone() {
   if (state.status === 'success') {
     return (
       <div className="flex w-full max-w-2xl flex-col gap-6">
-        <BookStructureView book={state.result.book} filename={state.filename} onReset={reset} />
+        <BookStructureView book={state.result.book} filename={state.file.name} onReset={reset} />
         <ValidationSummary report={state.result.report} />
         {options && selectedLayout && selectedTheme && (
           <FormatSelector
@@ -91,6 +93,9 @@ export function UploadDropzone() {
             onLayoutChange={setSelectedLayout}
             onThemeChange={setSelectedTheme}
           />
+        )}
+        {selectedLayout && selectedTheme && (
+          <PreviewPanel file={state.file} layout={selectedLayout} theme={selectedTheme} />
         )}
       </div>
     );
