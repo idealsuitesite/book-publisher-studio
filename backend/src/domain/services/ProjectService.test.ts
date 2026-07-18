@@ -92,6 +92,78 @@ describe('ProjectService — identity and settings', () => {
   });
 });
 
+describe('ProjectService — archiving (ADR-0044)', () => {
+  it('archives without losing anything — the whole point of the split', () => {
+    const service = serviceWithSequentialIds();
+    let project = service.create(book(), settings);
+    project = service.snapshot(project, 'first draft');
+    project = service.recordPublication(project, report('kdp', 'PASS', new Date('2026-01-01')));
+    project = service.addAsset(project, {
+      kind: 'cover',
+      filename: 'c.png',
+      mimeType: 'image/png',
+      byteSize: 1,
+    });
+
+    const archived = service.archive(project);
+
+    expect(archived.archivedAt).toBeInstanceOf(Date);
+    expect(archived.versions).toHaveLength(1);
+    expect(archived.publications).toHaveLength(1);
+    expect(archived.assets).toHaveLength(1);
+    expect(archived.book).toBe(project.book);
+  });
+
+  it('restores an archived project', () => {
+    const service = serviceWithSequentialIds();
+    const project = service.create(book(), settings);
+
+    const restored = service.restore(service.archive(project));
+
+    expect(restored.archivedAt).toBeUndefined();
+  });
+
+  it('keeps the publication record through archive and restore — the case that motivated it', () => {
+    const service = serviceWithSequentialIds();
+    let project = service.create(book(), settings);
+    project = service.recordPublication(project, report('kdp', 'PASS', new Date('2026-01-01')));
+
+    const roundTripped = service.restore(service.archive(project));
+
+    expect(isPublishedTo(roundTripped, 'kdp')).toBe(true);
+    expect(latestPublicationFor(roundTripped, 'kdp')?.occurredAt).toEqual(new Date('2026-01-01'));
+  });
+
+  it('archiving twice does not rewrite when it was archived', () => {
+    const service = serviceWithSequentialIds();
+    const archived = service.archive(service.create(book(), settings));
+
+    expect(service.archive(archived)).toBe(archived);
+  });
+
+  it('restoring a project that was never archived is a no-op', () => {
+    const service = serviceWithSequentialIds();
+    const project = service.create(book(), settings);
+
+    expect(service.restore(project)).toBe(project);
+  });
+
+  it('never mutates the project it archives (ADR-0001)', () => {
+    const service = serviceWithSequentialIds();
+    const project = service.create(book(), settings);
+    const snapshot = structuredClone(project);
+
+    service.archive(project);
+
+    expect(project).toEqual(snapshot);
+    expect(project.archivedAt).toBeUndefined();
+  });
+
+  it('a new project is not archived', () => {
+    expect(serviceWithSequentialIds().create(book(), settings).archivedAt).toBeUndefined();
+  });
+});
+
 describe('ProjectService — versions', () => {
   it('numbers versions sequentially from 1', () => {
     const service = serviceWithSequentialIds();

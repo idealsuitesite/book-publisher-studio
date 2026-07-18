@@ -1,4 +1,4 @@
-import type { ProjectRepository } from '../../domain/ports/ProjectRepository';
+import type { ProjectRepository, ListProjectsOptions } from '../../domain/ports/ProjectRepository';
 import type { Project, ProjectSummary } from '../../domain/models/Project';
 import { toProjectSummary } from '../../domain/models/Project';
 
@@ -28,10 +28,12 @@ export class InMemoryProjectRepository implements ProjectRepository {
     return stored ? structuredClone(stored) : undefined;
   }
 
-  async list(): Promise<ProjectSummary[]> {
+  async list(options?: ListProjectsOptions): Promise<ProjectSummary[]> {
     // Derived on read rather than maintained on write, so a summary cannot drift from its
     // aggregate. Newest first: a library is browsed by recency, not by insertion order.
+    // Archived projects are filtered out unless asked for (ADR-0044).
     return [...this.projects.values()]
+      .filter((project) => options?.includeArchived || !project.archivedAt)
       .map(toProjectSummary)
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   }

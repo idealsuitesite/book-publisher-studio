@@ -45,6 +45,33 @@ export class ProjectService {
     };
   }
 
+  /**
+   * Archives the project: it leaves the library, and nothing is lost.
+   *
+   * The reversible half of ADR-0044's split. Versions, publications, assets and the original
+   * upload all stay, which is what makes it safe to offer freely — and it is why the publication
+   * record survives the case authors actually hit, since the project itself survives.
+   *
+   * Archiving an already-archived project is a no-op rather than an error: the caller asked for
+   * a state, it is in that state, and re-stamping the date would quietly rewrite when it was
+   * archived.
+   */
+  archive(project: Project): Project {
+    if (project.archivedAt) return project;
+    const now = new Date();
+    return { ...project, archivedAt: now, updatedAt: now };
+  }
+
+  /** Restores an archived project to the library. A no-op if it was never archived. */
+  restore(project: Project): Project {
+    if (!project.archivedAt) return project;
+    // Removes the key rather than setting it to undefined, so a restored project is
+    // indistinguishable from one that was never archived.
+    const restored = { ...project, updatedAt: new Date() };
+    delete restored.archivedAt;
+    return restored;
+  }
+
   /** Renames the project without touching the book's own title — see `Project.name`. */
   rename(project: Project, name: string): Project {
     const trimmed = name.trim();

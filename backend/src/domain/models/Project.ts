@@ -69,6 +69,24 @@ export interface Project {
   /** Append-only. See PublicationEvent for why this is a log and not a status. */
   publications: PublicationEvent[];
 
+  /**
+   * When the author archived this project, or absent if it is active.
+   *
+   * Archiving exists because one verb was serving two intentions (ADR-0044). "This is finished,
+   * get it out of my way" is the common case and expects to lose nothing; "this was a mistake,
+   * remove it" is rare and expects real erasure. A single destructive delete failed the first by
+   * discarding a publication record the author wanted kept.
+   *
+   * Nothing is lost here: versions, publications, assets and the original upload all remain, and
+   * `ProjectService.restore()` reverses it. Real deletion is still real — see
+   * `ProjectRepository.delete()`.
+   *
+   * A date rather than a `status` enum, deliberately: it answers "archived?" and "when?" in one
+   * field, and an enum invites a `published` member that would contradict the publication log
+   * already deriving that answer (ADR-0044, Question 1).
+   */
+  archivedAt?: Date;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -143,6 +161,9 @@ export interface ProjectSummary {
   versionCount: number;
   /** Platforms with at least one successful publication. Derived, never stored. */
   publishedTargets: string[];
+  /** Present only for archived projects, so a caller listing them can tell them apart without
+   * loading aggregates (ADR-0044). */
+  archivedAt?: Date;
   updatedAt: Date;
 }
 
@@ -162,6 +183,7 @@ export function toProjectSummary(project: Project): ProjectSummary {
           .map((event) => event.target)
       ),
     ],
+    archivedAt: project.archivedAt,
     updatedAt: project.updatedAt,
   };
 }

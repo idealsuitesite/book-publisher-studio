@@ -1,5 +1,10 @@
 import type { Project, ProjectSummary } from '../models/Project';
 
+export interface ListProjectsOptions {
+  /** Include archived projects. Defaults to false — see `ProjectRepository.list()`. */
+  includeArchived?: boolean;
+}
+
 /**
  * Persistence boundary for the `Project` aggregate.
  *
@@ -37,8 +42,14 @@ export interface ProjectRepository {
    * Returns summaries, never aggregates — see `ProjectSummary` for why. An implementation that
    * satisfies this by loading every aggregate and mapping it is correct but defeats the
    * purpose; the whole point is that a store can answer this cheaply.
+   *
+   * **Archived projects are excluded unless asked for** (ADR-0044). Default-exclude is the safe
+   * direction: a caller that forgets the flag shows too few projects, which is visible and gets
+   * reported, whereas default-include would leak archived work into every library view and read
+   * as a bug in archiving rather than in the caller. Sprint 11 (Workspace) and Sprint 14
+   * (Collaboration) each add project queries, and each is a chance to forget this.
    */
-  list(): Promise<ProjectSummary[]>;
+  list(options?: ListProjectsOptions): Promise<ProjectSummary[]>;
 
   /**
    * Saves a whole aggregate, creating or replacing it.
@@ -50,12 +61,20 @@ export interface ProjectRepository {
   save(project: Project): Promise<void>;
 
   /**
-   * Deletes a project and everything inside its boundary.
+   * Deletes a project and everything inside its boundary — versions, publications, assets, and
+   * the original uploaded file.
    *
-   * **Deletion semantics are an open question** (AGGREGATES_AND_PERSISTENCE.md Risk 5):
-   * deleting a project with publication events destroys the record of a real publication that
-   * actually happened. Until that is decided, implementations should treat this as a genuine
-   * delete and callers should not offer it in the UI.
+   * **This is a genuine, irreversible delete, and that is now a decision rather than an open
+   * question** (ADR-0044, closing AGGREGATES_AND_PERSISTENCE.md Risk 5). It is never blocked by
+   * publication history: the project belongs to the author, refusing because they once published
+   * is paternalism dressed as stewardship, and a "delete" that quietly retains is the shape that
+   * causes real trouble later. Authors who mean "get it out of my way" want `archive()`, which
+   * is why that exists.
+   *
+   * **Not offered in the UI** (CTO decision, 2026-07-18). A delete button is the one control
+   * whose mistakes cannot be walked back, and against a store that loses everything on restart
+   * its only real use would be working around a limitation we intend to remove. Two things must
+   * be true before it is: `Project` wired into the import pipeline, and a persistent store.
    */
   delete(id: string): Promise<void>;
 }

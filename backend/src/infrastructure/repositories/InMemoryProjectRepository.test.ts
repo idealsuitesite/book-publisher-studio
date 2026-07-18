@@ -192,3 +192,58 @@ describe('InMemoryProjectRepository — library listing', () => {
     expect(await repo.list()).toEqual([]);
   });
 });
+
+describe('InMemoryProjectRepository — archived projects are excluded by default (ADR-0044)', () => {
+  // The standing regression test for Risk 1. Sprint 11 (Workspace) and Sprint 14
+  // (Collaboration) each add project queries; this is what catches the one that forgets.
+  it('does not return an archived project from a default list()', async () => {
+    const project = service.create(book('Finished'), settings);
+    await repo.save(service.archive(project));
+
+    expect(await repo.list()).toEqual([]);
+  });
+
+  it('returns it when explicitly asked for', async () => {
+    const project = service.create(book('Finished'), settings);
+    await repo.save(service.archive(project));
+
+    const listed = await repo.list({ includeArchived: true });
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0].archivedAt).toBeInstanceOf(Date);
+  });
+
+  it('lists active projects alongside archived ones only when asked', async () => {
+    await repo.save(service.create(book('Active'), settings));
+    await repo.save(service.archive(service.create(book('Archived'), settings)));
+
+    expect((await repo.list()).map((s) => s.bookTitle)).toEqual(['Active']);
+    expect((await repo.list({ includeArchived: true })).map((s) => s.bookTitle).sort()).toEqual([
+      'Active',
+      'Archived',
+    ]);
+  });
+
+  it('archiving loses nothing the repository was holding', async () => {
+    let project = service.create(book('Finished'), settings);
+    project = service.snapshot(project);
+    project = service.recordPublication(project, report('kdp', 'PASS'));
+    await repo.save(service.archive(project));
+
+    const loaded = await repo.findById(project.id);
+
+    expect(loaded?.versions).toHaveLength(1);
+    expect(loaded?.publications).toHaveLength(1);
+    expect(loaded?.archivedAt).toBeInstanceOf(Date);
+  });
+
+  it('a restored project comes back to the default listing', async () => {
+    const project = service.create(book('Back'), settings);
+    await repo.save(service.archive(project));
+
+    const archived = await repo.findById(project.id);
+    await repo.save(service.restore(archived!));
+
+    expect((await repo.list()).map((s) => s.bookTitle)).toEqual(['Back']);
+  });
+});
