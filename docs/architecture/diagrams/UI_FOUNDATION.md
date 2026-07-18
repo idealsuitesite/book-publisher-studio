@@ -1,7 +1,12 @@
 # UI Foundation — Level 2 Design Review
 
-**Status:** 🟡 **ROUND 1 — DRAFT. Not approved. No branch, no code.** 6 open questions posed below, each with a recommendation and its reasoning, all left open for explicit CTO decision — the same process followed for Sprints 5–8.
-**Date:** 2026-07-18
+**Status:** ✅ **APPROVED (2026-07-18, round 2).** All 6 round-1 questions resolved by explicit CTO decision, recorded as Locked Decisions 1–6 in §3 below. The CTO also added one acceptance criterion (screenshot archival and comparison, §8) and revised the commit plan to move the frontend test suite earlier, before the large refactor (§7).
+
+**This approves the design. It does not by itself authorize branching or implementation** — per `docs/DESIGN_REVIEW_PROCESS.md`'s two-gate discipline, exercised as two separate events in every prior sprint. Awaiting explicit go-ahead before any branch or code.
+
+**One inconsistency found while integrating the CTO's decisions, flagged rather than silently resolved:** Decision 3 was stated as *"Commits 1 to 6 → no intentional visual change. Then Commit 7 → restyling,"* which matches the **round-1** commit numbering. The CTO's own revised plan (§7) inserts frontend test setup at position 2, shifting everything after it by one — so restyle becomes **Commit 8**, not 7. The *principle* is unchanged and is what has been locked; only the numbers move. §3's Decision 3 and §7 now both read **"Commits 1–7 appearance-neutral, Commit 8 restyles."** If that reading is wrong, it needs correcting before Commit 0.
+
+**Date:** 2026-07-18 (round 1 drafted) / 2026-07-18 (round 2 approved)
 **Sprint:** Sprint 9, per ADR-0039's reordered roadmap. Target version `v0.10.0-alpha`.
 
 ---
@@ -38,13 +43,29 @@ Every claim below was confirmed by reading the actual files or running an actual
 
 ---
 
-## 3. Open Questions — For CTO Decision
+## 3. Locked Decisions (Round 2, 2026-07-18)
 
-None are locked. Each records a recommendation and why.
+All six round-1 questions are now resolved by explicit CTO decision. Each records the ruling **and** the reasoning behind it, not just the outcome — matching this project's discipline that rationale is what a future contributor actually needs. The original round-1 recommendation is preserved beneath each ruling.
 
-### Question 1 — Build the component library, or adopt one?
+### Decision 1 — Build the primitives; adopt headless libraries only where accessibility is genuinely hard
 
-**Recommendation: build a small, owned set of primitives. Do not adopt a component framework.**
+**Locked.** Do **not** adopt MUI, Chakra, or Mantine.
+
+**The CTO's refinement of the round-1 recommendation, which sharpens it:** rather than leaving "use headless primitives where accessibility is hard" as a judgment call, the split is named explicitly.
+
+| Built in-house (`components/ui/`) | Headless library (Radix UI or React Aria) |
+|---|---|
+| `Button`, `Card`, `Alert`, `Badge`, `Input`, `Textarea`, `Select` | `Dialog`, `Popover`, `Menu`, `Tooltip`, focus trap |
+
+**CTO's rationale:** the second group are complex accessibility components — focus management, keyboard interaction, ARIA relationships — and hand-rolling them is exactly where accessibility silently fails. The first group is visual surface this product should own.
+
+**A boundary this makes explicit:** `Input`, `Textarea`, and `Select` are in-house, which the round-1 draft had not named. Note that a fully accessible `Select` (listbox keyboard navigation, typeahead) is closer in difficulty to the headless group than to `Button` — **if it proves so during implementation, escalate rather than ship a half-accessible hand-rolled one.** Recorded now so that call is a disclosed escalation, not a silent deviation.
+
+**Explicitly out of scope:** 50 components, 100 variants, a home-grown mini-MUI. Small, stable, reusable.
+
+---
+
+*Round-1 recommendation, preserved:* build a small, owned set of primitives. Do not adopt a component framework.
 
 **Reasoning from the real numbers, not preference:** the entire frontend is 694 lines with 7 components. Adopting a full library (MUI, Chakra, Mantine) would add a dependency substantially larger than the application itself, and impose its design language on a product whose visual identity is precisely what this sprint exists to define. The measured duplication — `rounded-2xl` six times, a hand-repeated dark/light border pair — is a *tokenization* problem, not a "we lack components" problem.
 
@@ -52,7 +73,17 @@ None are locked. Each records a recommendation and why.
 
 **Honest counter-argument:** any new dependency is a new maintenance surface, and this project has been notably disciplined about that (10 runtime backend dependencies after 8 sprints). A reviewer could reasonably say "build the 5 primitives you need by hand." My concern is that hand-rolled focus management and keyboard interaction is exactly where accessibility silently fails.
 
-### Question 2 — How far do "themes" go this sprint?
+### Decision 2 — Interface theming is `AppTheme`, light + dark only, and the name never collides with the Domain's `Theme`
+
+**Locked, validated 100%.**
+
+**CTO's rationale (verbatim):** in this codebase `Theme` already means *the theme of a book*. Reusing that name for the interface would create a lasting confusion. The interface concept is therefore `AppTheme`; the existing Domain `Theme`/`ThemeEngine`/`getTheme`/`ClassicTheme` are untouched and keep their meaning.
+
+Scope this sprint: **light + dark only**, driven by tokens. This is real cleanup rather than new surface — dark mode is currently hand-maintained per component (`border-zinc-700`/`border-zinc-300`, five times each). Custom or user-authored interface themes wait: there is no user-facing setting for them, and `docs/VISION.md`'s Theme Marketplace concept is about *book* themes.
+
+---
+
+*Round-1 question, preserved:* how far do "themes" go this sprint?
 
 The word is ambiguous in this codebase and needs disambiguating before anything is built. **`Theme` already exists as a Domain concept** (`ClassicTheme`, `getTheme`, `ThemeEngine`) meaning *the visual style of the produced book*. The CTO's Sprint 9 scope also lists "themes" meaning *the visual style of the application interface*. **These are unrelated and must never be conflated** — the same word, two entirely different things.
 
@@ -60,7 +91,19 @@ The word is ambiguous in this codebase and needs disambiguating before anything 
 
 Dark mode is already half-present and hand-maintained (`border-zinc-700`/`border-zinc-300` repeated five times each), so tokenizing it is a real, immediate cleanup rather than new surface. Custom or user-authored interface themes should wait — there is no user-facing setting for it, and `docs/VISION.md`'s Theme Marketplace concept is about *book* themes, not interface ones.
 
-### Question 3 — Does Sprint 9 change any pixel the user sees, or only how it is built?
+### Decision 3 — Commits 1–7 introduce no intentional visual change; Commit 8 restyles
+
+**Locked.** The CTO called this *"probably the best idea in the whole review"* and made it official policy for the sprint rather than a preference.
+
+**CTO's rationale (verbatim reasoning):** because reference screenshots can then be compared. Otherwise there is never a way to know whether a defect came from the refactoring or from the new design.
+
+**Numbering, reconciled:** stated in round 2 as "Commits 1–6, then 7," matching round-1 numbering. The CTO's own revised plan (§7) inserts test setup at position 2, shifting later commits by one. The locked principle is therefore **Commits 1–7 appearance-neutral, Commit 8 restyles** — the boundary sits immediately before the restyle commit wherever it lands, not at a fixed number.
+
+**One honest nuance this policy needs, or it cannot be enforced as written:** **Commit 7 is responsive behaviour, which necessarily changes appearance at some viewport widths — that is its entire purpose.** "Appearance-neutral" therefore means: *desktop reference screenshots stay pixel-identical through Commit 7; mobile and tablet appearance is expected to change at that commit and only that commit, intentionally.* Without this carve-out, Commit 7 would either violate the rule or force responsive work into the restyle commit, defeating the isolation the rule exists to provide.
+
+---
+
+*Round-1 question, preserved:* does Sprint 9 change any pixel the user sees, or only how it is built?
 
 **This is the sharpest scope question in the review, and I do not think it can be dodged.**
 
@@ -70,7 +113,24 @@ A "Design System sprint" that changes nothing visually is a pure refactor — sa
 
 **The real trade-off, stated plainly:** this makes the sprint longer than a pure refactor. The alternative — restyle everything while extracting tokens — is faster but leaves no point at which "nothing should have changed" is a checkable statement.
 
-### Question 4 — Which navigation, given there is exactly one page today?
+### Decision 4 — Navigation is a shell only: header, logo, title, placeholder
+
+**Locked.**
+
+**CTO's rationale (verbatim intent):** with exactly one page today, links to Projects, Library, Settings, Home, or Favourites would **all be false**. Building them would ship dead UI and pre-empt decisions belonging to Sprint 10 (UX & Workflow) and Sprint 11 (Workspace), which are the sprints that will know what destinations actually exist.
+
+```
+Header
+  ├── Logo
+  ├── Title
+  └── Placeholder (slot for future destinations)
+```
+
+Responsive collapse behaviour for this shell is in scope (Commit 6/7); inventing destinations is not.
+
+---
+
+*Round-1 question, preserved:* which navigation, given there is exactly one page today?
 
 The application is currently a single route (`app/page.tsx`) with a vertical panel flow. "Navigation" is in scope, but **there is nowhere to navigate to** — Workspace (projects, recent, favourites) is Sprint 11, and it is the first thing that genuinely needs routing.
 
@@ -78,7 +138,17 @@ The application is currently a single route (`app/page.tsx`) with a vertical pan
 
 Inventing a sidebar with links to Projects/Library/Settings before those exist would mean shipping dead UI — and Sprint 10 (UX & Workflow) is the sprint that should decide what the real journey needs, informed by real editors. Building the shell now and populating it in Sprints 10–11 respects both boundaries.
 
-### Question 5 — Where exactly is the UI/UX line, given they are deliberately separate sprints?
+### Decision 5 — Sprint 9 builds the components; Sprint 10 decides how they are used
+
+**Locked.** The CTO validated the separation completely: *"Sprint 9 builds the components. Sprint 10 decides how they are used."*
+
+The operational rule: **Sprint 9 owns anything expressible as a reusable token or component; Sprint 10 owns anything expressible as a decision about the user's journey.** So Sprint 9 builds an `Alert` with error/warning/info variants; Sprint 10 decides what each message says and when it appears.
+
+**The consequence that makes this enforceable:** existing wording is **preserved verbatim** unless it is factually wrong — so Sprint 10 reviews real, unchanged text rather than text this sprint quietly rewrote.
+
+---
+
+*Round-1 question, preserved:* where exactly is the UI/UX line, given they are deliberately separate sprints?
 
 Some items are genuinely ambiguous: an error message's *styling* is UI, its *wording* is UX; a loading state's *appearance* is UI, whether a spinner or skeleton better fits the wait is UX.
 
@@ -86,7 +156,25 @@ Some items are genuinely ambiguous: an error message's *styling* is UI, its *wor
 
 **Practical consequence worth accepting explicitly:** Sprint 9 will inevitably *touch* wording while restyling components. Recommend the rule be "preserve existing wording verbatim unless it is factually wrong" — so that Sprint 10 reviews real, unchanged text rather than text this sprint quietly rewrote.
 
-### Question 6 — Does Sprint 9 introduce the frontend test suite?
+### Decision 6 — The frontend test suite is mandatory, and lands *before* the refactor
+
+**Locked, and strengthened beyond the round-1 recommendation.** The CTO went further than "yes": the test commit is **obligatory**, and it moves from position 8 to **position 2** in the commit plan — before the large refactor rather than after it.
+
+**CTO's rationale (verbatim):** without it, the entire UI layer is rewritten with no safety net.
+
+Minimum coverage required:
+- component rendering
+- variants
+- accessibility
+- interactions
+
+**Not required:** exhaustive coverage. This is a real safety net for the specific risk this sprint creates, not a testing sprint.
+
+Vitest plus Testing Library, matching `backend/`'s existing Vitest choice so the monorepo keeps one test runner. This closes `docs/TODO.md`'s standing "Frontend automated test suite" backlog item, open since v0.8.0-alpha.
+
+---
+
+*Round-1 question, preserved:* does Sprint 9 introduce the frontend test suite?
 
 **No frontend test exists.** This sprint refactors every existing component with no automated safety net.
 
@@ -149,27 +237,32 @@ Token categories expected in `globals.css` (replacing today's two-token scaffold
 
 ## 7. Provisional Commit Plan
 
-Shape only — **not approved**, contingent on §3. Ordered so the appearance-neutral work lands before any deliberate visual change (Question 3).
+**Approved (round 2), with the CTO's own reordering: the frontend test suite moves from position 8 to position 2**, so the safety net exists *before* the large refactor begins rather than after it.
 
-0. **Commit 0 — accessibility + visual baseline.** Capture the current state before touching anything: an automated a11y audit and reference screenshots of every Demo Script screen. Analogous to Sprint 8's Commit-0 spike — establish facts before deciding against them.
-1. **Commit 1 — design tokens** in `globals.css`, plus the Geist/Arial fix (§5).
-2. **Commit 2 — `ui/` primitives**, appearance-neutral: `Button`, `Card`, `Alert`, `Badge`, and whatever the audit shows is genuinely repeated.
-3. **Commit 3 — accessibility primitives** (Question 1's headless-library decision applies here).
-4. **Commit 4 — refactor the 7 existing components onto `ui/`**, still appearance-neutral and screenshot-comparable.
-5. **Commit 5 — navigation shell** (Question 4).
-6. **Commit 6 — responsive behaviour**, verified at real breakpoints.
-7. **Commit 7 — deliberate restyle** (the first commit permitted to change appearance).
-8. **Commit 8 — frontend test suite** (Question 6; earlier if the CTO makes it a prerequisite, which I recommend).
-9. **Commit 9 — real-browser verification pass** against the full Demo Script.
-10. **Commit 10 — docs/ADR reconciliation.**
+| # | Commit | Appearance |
+|---|---|---|
+| 0 | **Baseline** — automated a11y audit + reference screenshots of every Demo Script screen, archived before anything is touched. Analogous to Sprint 8's Commit-0 spike: establish facts before deciding against them. | — |
+| 1 | **Design tokens** in `globals.css` (`AppTheme`, light + dark), plus the Geist/Arial fix (§5) | neutral |
+| 2 | **Frontend test setup** — Vitest + Testing Library (Decision 6, moved earlier by CTO direction) | neutral |
+| 3 | **`ui/` primitives** — `Button`, `Card`, `Alert`, `Badge`, `Input`, `Textarea`, `Select` (Decision 1) | neutral |
+| 4 | **Accessibility primitives** — `Dialog`, `Popover`, `Menu`, `Tooltip`, focus trap, via headless library (Decision 1) | neutral |
+| 5 | **Refactor the 7 existing components onto `ui/`** — the largest commit, and the one the Commit-2 safety net exists for | neutral |
+| 6 | **Navigation shell** — header, logo, title, placeholder (Decision 4) | neutral |
+| 7 | **Responsive behaviour**, verified at real breakpoints | **desktop neutral; mobile/tablet intentionally changes** (Decision 3's carve-out) |
+| 8 | **Deliberate restyle** — the first commit permitted to change desktop appearance | **intentional change** |
+| 9 | **Real-browser verification pass** against the full Demo Script | — |
+| 10 | **Docs/ADR reconciliation** | — |
+
+**Decision 3's boundary in this numbering:** Commits 1–7 introduce no intentional *desktop* visual change and stay screenshot-comparable; Commit 8 is the first permitted to. Commit 7 is the single carve-out, and only for mobile/tablet widths.
 
 ---
 
 ## 8. Provisional Acceptance Criteria
 
-Every item independently verifiable against the real running application — not asserted. This sprint needs these more than most, because "it looks better" is not checkable.
+**Approved (round 2)**, with one criterion added by the CTO (the screenshot-archival rule below). Every item independently verifiable against the real running application — not asserted. This sprint needs these more than most, because "it looks better" is not checkable.
 
-- ✓ **`docs/product/PRODUCT_DEMO.md`'s Demo Script passes end to end, unchanged** — the single strongest objective criterion
+- ✓ **`docs/product/PRODUCT_DEMO.md`'s Demo Script passes end to end, unchanged** — the single strongest objective criterion, and the CTO's own reason for approving it: the test is not *"the design is prettier"* but *"the software still works."*
+- ✓ **Reference screenshots of every Demo Script screen are archived before the first commit, then compared after every commit that intentionally changes appearance** (CTO-added criterion). This is what makes Decision 3's appearance-neutral policy enforceable rather than aspirational — a diff against Commit 0's baseline is either empty (Commits 1–7, desktop) or intentional (Commits 7 mobile, 8). **One disclosed constraint from real experience:** Sprint 7 Commit 12 found this environment has no mechanism to persist a captured screenshot to disk, and captures returned blank when the page was scrolled. If that limitation still holds, the archival must use a real, checked-in mechanism (a headless-browser script committing real image files) rather than in-conversation captures — otherwise this criterion cannot actually be met, and that must be surfaced at Commit 0, not at Commit 8.
 - ✓ Real DOCX import → structure → validation → layout → preview → export still works in a real browser
 - ✓ **Zero backend files changed** (`git diff --stat` verifiable); 386 backend tests pass unmodified
 - ✓ No new business logic in the frontend — no new endpoint called, no new domain concept introduced
