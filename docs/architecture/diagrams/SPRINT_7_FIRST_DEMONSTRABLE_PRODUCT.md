@@ -6,6 +6,16 @@
 
 **Renamed from "Premium UI/UX" (CTO direction, round 2):** the objective is not primarily visual polish — it is making six sprints of already-built, already-verified backend capability visible and usable for the first time. "Premium UI/UX" undersold that; "First Demonstrable Product" states it directly. `docs/VERSIONS.md`'s `v0.8.0-alpha` row title updates to match once this review's implementation is scheduled.
 
+**Decision Index (CTO direction, 2026-07-18, added after Commit 1):** the 5 locked decisions in §3 below are formally numbered, referenced from here on by number + name (e.g. "Decision 4 was revised") instead of re-quoting a paragraph. The numbers are the same ones §3 already used since round 2 — this index doesn't renumber anything, it names what was already numbered so future Sprint Reports/ADRs can cite it tersely.
+
+| ID | Name | One-line summary |
+|---|---|---|
+| Decision 1 | Preview Strategy | "Preview" = a full `POST /api/manuscripts/export` re-export, not a new incremental renderer |
+| Decision 2 | Stateless Backend | No session, no server-side manuscript cache — every UI action is its own complete round trip |
+| Decision 3 | Demo-Minimal Scope | Sprint 7 ships only what the first demonstrable product needs, not `docs/VISION.md`'s full UI ambition |
+| Decision 4 | Shared-Types Workspace | `packages/shared-types` — the project's first monorepo/npm-workspace structural change (implemented, ADR-0033) |
+| Decision 5 | Options Discovery Endpoint | `GET /api/manuscripts/options`, additive-friendly response shape for future themes/layouts/plugins |
+
 ---
 
 ## 1. Objectives

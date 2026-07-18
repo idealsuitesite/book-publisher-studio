@@ -1,9 +1,2 @@
-export interface QualityScoreDTO {
-  overall: number;
-  categories: {
-    structure: number;
-    metadata: number;
-    typography: number;
-    accessibility: number;
-  };
-}
+// Re-export shim (Sprint 7 commit 3, ADR-0033) - see InlineDTO.ts for the pattern.
+export type { QualityScoreDTO } from 'shared-types';

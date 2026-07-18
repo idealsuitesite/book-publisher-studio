@@ -1,0 +1,19 @@
+<svg viewBox="0 0 360 220" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="360" height="220" fill="#ffffff"/>
+
+  <rect x="60" y="24" width="240" height="64" rx="10" fill="#eef2ff" stroke="#4338ca" stroke-width="2"/>
+  <text x="180" y="50" text-anchor="middle" font-size="18" font-weight="600" fill="#1e1b4b">Workspace</text>
+  <text x="180" y="72" text-anchor="middle" font-size="12" fill="#4338ca">Commit 1 - npm workspace + shared-types scaffold</text>
+
+  <line x1="180" y1="88" x2="180" y2="128" stroke="#334155" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="132" width="240" height="64" rx="10" fill="#ecfdf5" stroke="#047857" stroke-width="2"/>
+  <text x="180" y="158" text-anchor="middle" font-size="18" font-weight="600" fill="#064e3b">Shared DTOs</text>
+  <text x="180" y="180" text-anchor="middle" font-size="12" fill="#047857">Commit 3 - 9 DTOs moved to packages/shared-types</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+  </defs>
+</svg>

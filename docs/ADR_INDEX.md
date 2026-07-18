@@ -36,15 +36,18 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 | 0030 | KDP/Platform Trim-Size Spike Findings (Sprint 6, Commit 0) | 2026-07-17 | Layout | APPROVED |
 | 0031 | Two Real Bugs Fixed During Sprint 6 Real-File Verification (Explicit Scope Exception) | 2026-07-17 | Layout | APPROVED |
 | 0032 | Table of Contents Generation Follows Structural Document Hierarchy, Never Heading Blocks; Engineering Governance Principle | 2026-07-17 | Layout, Governance | APPROVED |
+| 0033 | Repository Converted to an npm Workspace; `packages/shared-types` Introduced | 2026-07-18 | Architecture, Governance | APPROVED — implemented |
+| 0034 | Sprint 7 Governance Decisions | 2026-07-18 | Governance | APPROVED |
 
 ## By category
 
-- **Architecture** (core Clean Architecture / DDD rules): 0001, 0002, 0003, 0005, 0008
+- **Architecture** (core Clean Architecture / DDD rules): 0001, 0002, 0003, 0005, 0008, 0033
 - **Import pipeline**: 0004, 0009, 0011, 0025, 0026
 - **Rendering pipeline** (Theme/Typography/Layout-precursor/Renderer port/PDF/DOCX/EPUB): 0012, 0013, 0014, 0015, 0016, 0018, 0019, 0020, 0022, 0023, 0024
 - **Validation Engine** (Sprint 5): 0027, 0028
 - **Professional Layout Engine** (Sprint 6): 0029, 0030, 0031, 0032
-- **Governance** (process, not a specific engine): 0006, 0007, 0010, 0017, 0021, 0032
+- **First Demonstrable Product** (Sprint 7): 0033, 0034
+- **Governance** (process, not a specific engine): 0006, 0007, 0010, 0017, 0021, 0032, 0033, 0034
 
 ## Related
 

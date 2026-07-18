@@ -8,6 +8,7 @@ Coding conventions and layer rules for Book Publisher Studio. This is reference 
 2. **Application depends only on abstractions.** Use Cases take interfaces (ports) via constructor injection, never concrete Infrastructure classes directly. (ADR-0003)
 3. **Presentation depends on Application, never on Domain directly.** Controllers return DTOs, never Domain objects. Mappers convert Domain → DTO. (Core Principle 3, `docs/CLAUDE.md`)
 4. **No cyclic dependencies, ever**, in any direction.
+5. **`packages/shared-types` is transport contracts only — interfaces, types, enums, nothing else.** No Mappers, Validators, business rules, or Services, ever (CTO direction, Sprint 7 commit 3, ADR-0033 addendum). It sits on the direct import path of both `backend/` and `frontend/`, outside the layers rule 1-4 above already govern — if something would do anything at runtime, it belongs in Domain/Application/Infrastructure, not here. See `packages/shared-types/README.md` for the one-sentence version.
 
 ## Dependency Inversion
 
@@ -40,7 +41,25 @@ This project has answered this question explicitly, per-component, every time it
 - **Infrastructure:** `HtmlNormalizer`, `MammothParser` — `<Technology/Format><Role>`
 - **Presentation:** `ManuscriptController`, `ManuscriptRoute` — `<Resource><Layer>`
 
-## File structure
+## Repository structure (monorepo, since Sprint 7 commit 1 / ADR-0033)
+
+The repository root is an npm workspace (`package.json`'s `workspaces` field) — not a single `backend/` project anymore. The `src/` tree below this section is `backend/src/`'s own internal layering; this is the level above it:
+
+```
+Book Publisher Studio/                (repo root - npm workspace)
+├── backend/                            (Express API - Domain/Application/Infrastructure/Presentation, see below)
+├── frontend/                           (Next.js 16, App Router - Sprint 7 in progress)
+│   └── app/                              only the create-next-app default page as of Commit 1;
+│                                          upload/structure/format/preview routes land Commits 5-9
+├── packages/
+│   └── shared-types/                   canonical DTO/type definitions, consumed by both backend/
+│                                          and frontend/ - types only, zero runtime dependencies (ADR-0033)
+└── docs/                               governance, product, and technical documentation (this file's own directory)
+```
+
+Each of `backend/`, `frontend/`, `packages/shared-types/` has its own `package.json`, builds/lints/tests independently (`npm run <script> --workspace=<name>` from the root, or `cd` into it directly), and is installed from the single root `package-lock.json` — never its own nested lockfile (removed in ADR-0033).
+
+## File structure (`backend/src/`)
 
 ```
 src/

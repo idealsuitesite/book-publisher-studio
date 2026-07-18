@@ -1,0 +1,13 @@
+{
+  "name": "book-publisher-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Book Publisher Studio — global publishing platform (DOCX import, AST-based book model, PDF/EPUB export, AI-assisted editing). Monorepo root, npm workspaces (Sprint 7, ADR-0033).",
+  "workspaces": [
+    "backend",
+    "frontend",
+    "packages/*"
+  ],
+  "author": "Alexandre",
+  "license": "MIT"
+}
