@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 18, 2026 (Sprint 8 "Publishing Engine" released as `v0.9.0-alpha`, PR #13 merged; no sprint currently assigned)
+**Last Updated:** July 18, 2026 (Sprint 8 "Publishing Engine" released as `v0.9.0-alpha`; Sprint 9 Design Review drafted round 1, not yet approved)
 
 ---
 
@@ -15,6 +15,8 @@ None currently.
 **Sprint 7 ("First Demonstrable Product") is complete, merged, and released.** PR #12 merged (`f17fd65`), `v0.8.0-alpha` tagged and pushed, `feature/sprint-7-first-demonstrable-product` deleted (local + remote). Full commit-by-commit detail (13 implementation commits, Commit 9 split into 9a/9b at CTO direction, ADR-0034) moved to the COMPLETED section below — see there, `docs/CURRENT_STATE.md`'s Sprint 7 section, and `docs/releases/v0.8.0-alpha/SPRINT_7_FINAL_REPORT.md` for full detail.
 
 **Sprint 8 (Publishing Engine) — ✅ COMPLETE AND RELEASED as `v0.9.0-alpha`** (PR #13, merge commit `4a4deaa`). Design Review approved, 9 commits, 386/386 tests, 4/4 real-fixture publish checks. Full detail in the COMPLETED section below and in `docs/releases/v0.9.0-alpha/SPRINT_8_FINAL_REPORT.md`.
+
+**Sprint 9 (Editorial AI Engine) — 🟡 Design Review round 1 drafted (2026-07-18), not yet approved.** `docs/architecture/diagrams/EDITORIAL_AI_ENGINE.md`. **The engine choice is itself Question 1** — the Level 1 map (§2.3) says Plugin System is "not this sprint or the next" and that AI-provider abstraction should be built by its first real consumer, which points to Editorial AI Engine, but the decision is the CTO's. 6 open questions posed, each with a recommendation, none locked: engine choice, whether a real LLM call happens at all this sprint (the Sprint-8 Decision-5 analogue), how accept/reject survives the stateless backend, which 1 of the 8 envisioned services ships, how a manuscript larger than the context window is chunked, and where API keys live. Real evidence gathered by reading the code: zero AI references, zero outbound HTTP, no secret management anywhere. **No branch, no code.** Next: CTO round 2 review of the 6 questions.
 
 Also post-Sprint-6 (2026-07-17), independent of the Sprint 7 scope question: new governance docs formalizing practices that had previously lived only in ADRs/session discipline — `docs/QUALITY_GATE.md` (per-commit checklist + 3 validation levels: Development/Product/Release), `docs/TESTING_STRATEGY.md` (functional-vs-rendering and structural(L1)-vs-rendering(L2) test taxonomies), `docs/REAL_FIXTURE_POLICY.md` (broadens real-fixture verification beyond the rendering pipeline to also cover import and TOC generation, formalizing the trigger gap ADR-0031 bug 2 exposed). ADR-0032 written (TOC generation must use `Chapter`/`Section` titles, never `Heading` blocks — formalizes ADR-0031 bug 2 as a standing rule so a future session can't silently reintroduce it; also gained a second, project-wide decision the same day, the **Engineering Governance Principle** — no feature is done until validated simultaneously at Code/Product/Documentation levels, per CTO direction to consolidate it into this ADR rather than open a new one, matching ADR-0028's precedent).
 
