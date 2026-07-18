@@ -4,8 +4,15 @@
 
 > ## ▶ START HERE — session handoff (2026-07-18)
 >
-> **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed. Last commit `fe2260e`.
-> **Verified state:** backend **507/507**, frontend **125/125**, `verify-real-export` 16/16, `verify-real-publish` 4/4, visual baseline byte-identical, build + lint clean on both workspaces.
+> **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed. Last commit `f958b70`.
+> **Verified state:** backend **516/516**, frontend **141/141** (zero unhandled errors), `verify-real-export` 16/16, `verify-real-publish` 4/4, visual baseline green twice consecutively, build + lint clean on both workspaces.
+>
+> ### Session of 2026-07-18 (evening): five phases, all landed
+> 1. **Enumerated errors fixed** — the frontend unhandled-error race (lying test fixtures, not the component) and `frontend/AGENTS.md` now says what to do instead of pointing at a directory that doesn't exist.
+> 2. **Persistence spike done, Question 6 ANSWERED (ADR-0046): SQLite via `node:sqlite`** (built into Node 24, zero new deps). Decisive: `list()` 317ms vs 7015ms for JSON-files, and crash-mid-write rolls back vs corrupts. Bigger finding: a 50-version aggregate is **45MB** — version-snapshot growth is Sprint 11's first-class design input. Implementation still gated on Sprint 11 amending Decision 2 formally.
+> 3. **`Project` wired into import (ADR-0047)** — a successful import creates a project, source retained byte-for-byte, `GET /api/projects` lists summaries, `projectId` on the import response. **The backend now holds in-memory state, by CTO direction** — Decision 2 amended in code. Rejected imports create no project. Found+fixed: `structuredClone` downgrades `Buffer`→`Uint8Array` in the repository round trip.
+> 4. **`LAYOUT_FIDELITY.md` written — 🟡 DRAFT, awaiting CTO approval.** Gutter + recto/verso + LayoutEngine modelling front matter + one-pass repagination for the gutter/count circularity. New evidence: the height estimator uses a CONSTANT words-per-line — pagination ignores page width entirely. Risk 1: must NOT be implemented mid-Sprint-9 (baseline rule) unless confined off demo screens.
+> 5. **Sprint 9 Commit 4 done** — Dialog/Popover/Menu/Tooltip/FocusTrap on Radix (5 packages, the Decision-1 authorized dependency), 16 behaviour tests, required-title/required-content discipline. Getting the baseline green found the mechanism's **third** defect: Chromium raster jitter (4px at 1/255) — `compareShots()` now tolerates only imperceptible-by-construction jitter. Also: the committed baseline had been stale since `c88160f` (title extension fix); refreshed with attribution in `e07057d`. **Next: Commit 5 — refactor the 7 components onto `ui/`.**
 >
 > ### Two Level 2 reviews approved and fully implemented (2026-07-18)
 > `RENDER_METRICS.md` and `PROJECT_LIFECYCLE.md`, both ✅ APPROVED, both built. ADRs 0042–0045.
