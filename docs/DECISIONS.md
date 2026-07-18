@@ -915,3 +915,22 @@ This is the project's first monorepo-structural change — implements Design Rev
 - A future contributor adding `KoboTarget` writes exactly one new class (`KoboRuleProvider implements ValidationRuleProvider`) and wires it into `KoboTarget`'s constructor — `SubmissionValidator`, `PublishingUseCase`, and `PublishingReport` are untouched, verifiable by the fact that none of them import any platform-specific type today.
 
 **Related:** ADR-0035 (the KDP-specific findings this rule now wraps behind a port), ADR-0032 (the engineering-governance-principle precedent this ADR's format follows), ADR-0012 (`Renderer` port-vs-class precedent), ADR-0029/ADR-0030 (`LayoutSelector` port precedent), `PUBLISHING_ENGINE.md` Decision 6/Decision 7 (where this rule is locked at the design-review level, with the full component diagram), `docs/DEVELOPER_HANDBOOK.md` (the general port-vs-class judgment rule this ADR applies to a new case)
+
+---
+
+## ADR-0037: Publishing Engine Domain Objects Are Platform-Agnostic; Platforms Depend on the Engine, Never the Inverse (Engineering Governance Principle)
+
+**Status:** APPROVED
+**Date:** 2026-07-18
+**Decision:** Reviewing Commit 1 (`PublishingTarget` + `PublishingReport`/`PublishingIssue`), the CTO generalized ADR-0036's rule-provider-specific pattern into a standing principle covering every object the Publishing Engine defines, applied immediately as a condition on Commit 2's `PublishingBundle`. Same engineering-governance-principle format as ADR-0032 and ADR-0036.
+
+**The rule (CTO's verbatim principle):** *"Les objets du Publishing Engine ne doivent jamais dépendre d'une plateforme spécifique. Les plateformes (KDP, Kobo, Apple Books, etc.) dépendent du Publishing Engine, jamais l'inverse."* No Domain object the engine defines — `PublishingTarget`, `PublishingReport`, `PublishingBundle`, `ValidationRuleProvider`, or any future addition — may reference a platform name, a platform-specific field, or a platform-specific assumption. Platform implementations (`KDPTarget`, `KDPRuleProvider`, and later `KoboTarget`/`AppleBooksTarget`/`LuluTarget`/`IngramTarget`) are always the dependent side.
+
+**Rationale:** This is ADR-0036's Dependency Inversion pattern stated once, generally, instead of re-derived per object. ADR-0036 already applied it narrowly to rule injection (`ValidationRuleProvider`); Decision 1/ADR predecessors already applied it to the target itself (`PublishingTarget`); this ADR closes the gap for everything else the engine will define — starting with Commit 2's `PublishingBundle`, which the CTO named explicitly as this rule's first real test: `{manuscript, cover, metadata, assets, manifest}`, with zero KDP-specific fields or assumptions.
+
+**Consequences:**
+- `PublishingBundle` (Commit 2) is built to this rule from its first line of code — `manuscript` stays typed as `RenderedOutputs` (every rendered format available), not a single pre-chosen format, because choosing which format a given platform needs is that platform's decision, not `Packaging`'s.
+- Every future Commit adding a new engine-level type (a hypothetical `PublishingSubmission`, `PublishingSchedule`, etc.) is reviewed against this rule before being written, not only `PublishingBundle`.
+- Combined with ADR-0036, the full dependency direction for Sprint 8 is: `KDPTarget` → `PublishingTarget` (implements), `KDPTarget` → `PublishingBundle` (uses), `KDPRuleProvider` → `ValidationRuleProvider` (implements) — never the reverse arrow, in either case.
+
+**Related:** ADR-0036 (the rule-provider-specific instance this ADR generalizes), ADR-0032 (the engineering-governance-principle precedent both follow), `PUBLISHING_ENGINE.md` Decision 8 (where this rule is locked at the design-review level) and Decision 1/6/7 (the prior instances of the same dependency direction this ADR states generally)
