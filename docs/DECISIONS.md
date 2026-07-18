@@ -1239,3 +1239,35 @@ The two renderers that return `pageCount: undefined` are not gaps - they are the
 **The governance lesson, recorded because it is the actionable part.** This project's rule is spike-before-decide for external behaviour (ADR-0019, 0020, 0030, 0035). Question 1 was a decision about **this codebase's own internals**, made by reasoning about blast radius rather than by reading `PDFRenderer` - which contained, in a comment, the exact fact that falsified it. ADR-0031/0032 already recorded that "confirmed, not guessed" applies to our own upstream code too. It applied here and was not honoured, and a design review being approved did not make it true.
 
 **Related:** ADR-0042 (whose Question 1 this corrects and whose `Renderer`-untouched consequence this supersedes), ADR-0013 (the estimate-vs-real drift already on record), ADR-0019 finding 6C (why `bufferedPageRange().count` is the trusted figure), ADR-0012 (the port this widens), ADR-0043 (the sibling layout-fidelity defect), ADR-0031/0032 ("confirmed, not guessed" applied to our own code), `docs/REAL_FIXTURE_POLICY.md` (the verification that caught it), `docs/architecture/diagrams/RENDER_METRICS.md`
+
+---
+
+## ADR-0046: Persistence Store Spike — SQLite via `node:sqlite` Recommended, and the Aggregate Is the Real Cost
+
+**Status:** APPROVED as a spike finding + recommendation (2026-07-18). **Answers AGGREGATES_AND_PERSISTENCE.md Question 6.** Implementation deliberately NOT started: Sprint 7 Decision 2 (stateless backend) must be formally amended by Sprint 11's Design Review first (ADR-0041 Constraint 2) — choosing the store and wiring the store are two gates, not one.
+**Date:** 2026-07-18
+**Spike:** `backend/spikes/persistence-store-spike.ts`, run on this machine (Node v24.18.0, Windows). Round-trips **real domain aggregates** built by the real `ProjectService` — an 80k-word, 20-chapter book, a real 5MB source upload, 50 version snapshots, 200 further projects for the listing — per ADR-0031/0032's "confirmed, not guessed" applied to our own code. ADR-0045, three commits ago, is what guessing costs.
+
+**Candidates and why only these two.** (A) one JSON file per aggregate — the zero-dependency baseline; (B) SQLite via `node:sqlite` — built into Node 24 (verified), so **also zero new dependencies**, which changes the usual calculus. Postgres and document stores were deliberately not spiked: they need a running server, and this product's own reference points (Atticus, Affinity Publisher — the CTO's stated inspirations) are local-first tools. A client-server store is Sprint 15's (Cloud Sync) question, not "where does an author's project live on their machine".
+
+**Measured results (real numbers, this machine):**
+
+| Measure | A: JSON files | B: SQLite |
+|---|---|---|
+| Save aggregate + 5MB blob | 177ms (blob separated) | 3052ms (one transaction) |
+| Load whole aggregate | 571ms | 616ms |
+| `list()` over 201 projects | **7015ms — loads every aggregate** | **317ms — summary columns, zero aggregates loaded** |
+| Crash mid-write | **CORRUPTED, unreadable** without rename discipline | **rolled back**, partial state never visible |
+| Blob embedded in aggregate | 58MB file, 4.9s load | n/a (blobs table by design) |
+
+**Decision basis, stated plainly:**
+- The two measures that decide it are the last two. `list()` is the operation the UI runs constantly, and 7s vs 0.3s is not a tuning gap — the files candidate has no index and structurally cannot have one without building, by hand, the thing SQLite already is. And a store that can hand back a **corrupted, unreadable aggregate** after a crash fails the whole reason the aggregate boundary exists (a consistency boundary that can be torn in half is not one). File-rename discipline mitigates but cannot cover multi-file writes (aggregate + blobs), which SQLite covers with one transaction — measured, not asserted (B4).
+- SQLite's slower save (3s, dominated by binding a 45MB string) is the price of that transaction, paid at save time where it is least felt.
+
+**Recommendation: SQLite via `node:sqlite`.** Schema shape proven in the spike: aggregate as a JSON document column (the port's whole-aggregate contract, kept literally), summary fields as real indexed columns (Question 4's read model becomes a `SELECT`, and ADR-0044's `archived_at IS NULL` filter becomes an index), blobs in their own table written in the same transaction (Question 5's source retention without aggregate bloat — the embedded-blob measurement, 58MB/4.9s, is why this is structural, not stylistic).
+
+**The finding that outranks the question asked:** the blob-stripped aggregate was **45.1MB** — not from the book (~0.9MB) but from **50 full-copy version snapshots**. Version history grows the aggregate linearly, and at that size every candidate is slow at whole-aggregate load (571ms vs 616ms — the store choice is a rounding error next to the shape). This does not change today's model (correct first, compact later, ADR-0001's immutability makes dedup/structural-sharing possible precisely because snapshots never mutate) — but Sprint 11's review must treat **version-snapshot growth** as a first-class design input, not discover it in production.
+
+**Also real, disclosed:** both candidates need an explicit hydration layer (`Date` and `Buffer` do not survive `JSON.parse` naively — the spike's `hydrate()` is the sketch); `node:sqlite` is the one dependency on Node's own API stability, verified available without flags on v24.18.0 and worth re-verifying in CI's Node version before Sprint 11 wires it.
+
+**Related:** `AGGREGATES_AND_PERSISTENCE.md` Question 6 (answered here), Question 4 (the summary read model this schema makes a `SELECT`), Question 5 (blob separation), ADR-0044 (`archivedAt` as an indexed filter), ADR-0041 Constraint 2 (the governance gate implementation waits behind), ADR-0019/0020/0030/0035 (spike-before-decide precedent), ADR-0045 (the freshest reason this spike used real aggregates), `backend/spikes/persistence-store-spike.ts`
