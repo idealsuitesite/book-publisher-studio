@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { UploadDropzone } from './UploadDropzone';
+import type { ImportResponseDTO, ImportReportDTO } from 'shared-types';
 
 vi.mock('@/lib/api-client', () => ({
   importManuscript: vi.fn(),
@@ -15,6 +16,32 @@ const docx = () =>
   new File(['content'], 'manuscript.docx', {
     type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   });
+
+// A COMPLETE ImportResponseDTO, typed with no `as never`. The old fixtures lied about the shape
+// ({ book: { id: 'b1' } }, cast to silence the compiler), so BookStructureView rendered a book
+// with no metadata after one test had already finished - the unhandled TypeError every suite run
+// reported without failing. A fixture that violates the type it silenced is a defect in the
+// test, not in the component; the component's contract (a complete BookDTO) matches what the
+// real API actually returns.
+const importResponse = (report: Partial<ImportReportDTO> = {}): ImportResponseDTO => ({
+  book: {
+    id: 'b1',
+    metadata: { title: 'Le Guide de Jean', author: 'Jean Dupont', language: 'fr' },
+    mainContent: [],
+  },
+  report: {
+    status: 'success',
+    statistics: { chapters: 1, images: 0, tables: 0, words: 120 },
+    warnings: [],
+    errors: [],
+    issues: [],
+    score: {
+      overall: 90,
+      categories: { structure: 90, metadata: 90, typography: 90, accessibility: 90 },
+    },
+    ...report,
+  },
+});
 
 beforeEach(() => {
   vi.mocked(importManuscript).mockReset();
@@ -41,16 +68,17 @@ describe('UploadDropzone — accessibility of the application entry point', () =
   });
 
   it('accepts a file chosen through the input, not only through a drop event', async () => {
-    vi.mocked(importManuscript).mockResolvedValue({
-      book: { id: 'b1' },
-      report: { status: 'success' },
-    } as never);
+    vi.mocked(importManuscript).mockResolvedValue(importResponse());
     const user = userEvent.setup();
     render(<UploadDropzone />);
 
     await user.upload(document.querySelector('input[type="file"]') as HTMLInputElement, docx());
 
     await waitFor(() => expect(importManuscript).toHaveBeenCalledTimes(1));
+    // Wait for the success render, not just the API call. Without this the state update lands
+    // after the test has finished, and BookStructureView renders outside any test's awareness -
+    // exactly the unhandled-error race this fixture's old `as never` lie made possible.
+    expect(await screen.findByText(/Import complete/)).toBeInTheDocument();
   });
 
   it('restricts the picker to .docx rather than offering every file type', () => {
@@ -92,10 +120,9 @@ describe('UploadDropzone — import outcomes', () => {
   });
 
   it('reports a pipeline-level failure returned with a 422 body', async () => {
-    vi.mocked(importManuscript).mockResolvedValue({
-      book: { id: 'b1' },
-      report: { status: 'error', errors: ['The document has no chapters.'] },
-    } as never);
+    vi.mocked(importManuscript).mockResolvedValue(
+      importResponse({ status: 'error', errors: ['The document has no chapters.'] })
+    );
     const user = userEvent.setup();
     render(<UploadDropzone />);
 
