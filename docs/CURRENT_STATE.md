@@ -4,7 +4,18 @@
 
 > ## ▶ START HERE — session handoff (2026-07-18)
 >
-> **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed. Last commit `d6fa420`.
+> **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed.
+>
+> ### Session of 2026-07-19 (later): the studio ships — Home, Workspace, stations
+> **Backend 533/533, frontend 140/140, baseline green twice consecutively on the NEW journey, build + lint clean.**
+> - **`HOME_WORKSPACE.md` ROUND 2 approved & fully implemented.** The pipeline metaphor answered (conversion → place; stations, not steps; `ProgressStepper` deleted), Home/Workspace as two contexts (library vs one book), the complete journey mapped and REAL end to end.
+> - **Backend (`6d73635`)**: `GET /api/projects/:id` (validation computed on read, never stale), `PATCH settings`, `POST export`, `POST publish` — all from the **STORED source** (Decision 6; 'Continuer' works across sessions). **Publish now writes history**: snapshot version + recorded attempt, the first production caller of `recordPublication`/`snapshot`. Dev-only `POST /api/dev/reset-projects` for deterministic captures.
+> - **Frontend (`aebed3b`+)**: `AppShell` (header/main/status landmarks), Home `/` (library, honest empty state, stats), Workspace `/projects/:id` (station nav with status, properties rail, History). Panels take an injected `exporter` — no component owns a `File` anymore. English UI locked (Q-B, CTO market call).
+> - **Verified in the real browser** via the rewritten Demo Script capture: import → redirect → stations → KDP publish (honest FAIL: no ISBN/cover) → History 1/Publish 1 in the nav → Home shows the library. **Axe: 41 nodes → 5** (landmarks did their work; Home = 0). Baseline determinism defect #4 found & fixed (the Updated timestamp — masked at capture, never hidden from users).
+> - `PRODUCT_DEMO.md` Demo Script superseded with attribution (old kept). UI_FOUNDATION Commits 6–8 are absorbed by this work.
+> - **Next:** Sprint 9 closure pass (docs/ADR reconciliation, final report) or Sprint 11 persistence (SQLite, ADR-0046) — the CTO picks.
+>
+> *(Previous handoff below.)* Last commit at previous handoff: `d6fa420`.
 > **Verified state:** backend **528/528**, frontend **144/144**, `verify-real-export` 16/16, `verify-real-publish` 4/4, baseline 12/12 byte-identical, build + lint clean on both workspaces.
 >
 > ### Session of 2026-07-19: Commit 5, Phase B, Home/Workspace review

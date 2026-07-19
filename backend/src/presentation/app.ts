@@ -164,6 +164,18 @@ export function createApp(): Express {
   const manuscriptOptionsController = new ManuscriptOptionsController();
   app.use('/api/manuscripts', optionsRoutes(manuscriptOptionsController));
 
+  // Dev-only: resets the in-memory project store so the visual-baseline capture starts every
+  // viewport run from a deterministic empty library. Imports create projects (ADR-0047), so
+  // without this each capture run would see the accumulated state of every run before it and
+  // no two baselines could ever match. Never registered in production; when SQLite lands
+  // (Sprint 11) the capture tool seeds a scratch database instead and this route disappears.
+  if (process.env.NODE_ENV !== 'production') {
+    app.post('/api/dev/reset-projects', (req: Request, res: Response) => {
+      projectRepository.clear();
+      res.json({ ok: true });
+    });
+  }
+
   app.get('/api/health', (req: Request, res: Response) => {
     res.json({ status: 'OK', message: 'Backend is running!' });
   });

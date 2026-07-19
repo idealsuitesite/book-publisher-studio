@@ -117,6 +117,9 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
       </aside>
 
       <section aria-label={station} className="flex flex-1 flex-col items-start gap-6 overflow-y-auto px-8 py-8">
+        {/* The page's one h1: the book the Workspace answers for. Visually the stations carry
+            their own headings; structurally the document needs its root. */}
+        <h1 className="sr-only">{project.name}</h1>
         {station === 'Manuscript' && (
           <BookStructureView
             book={project.book}
@@ -222,7 +225,12 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
           )}
           <div>
             <dt className="text-xs uppercase">Updated</dt>
-            <dd className="text-zinc-900 dark:text-zinc-50">{new Date(project.updatedAt).toLocaleString()}</dd>
+            {/* data-baseline-mask: real wall-clock data the visual baseline masks at capture
+                time — a timestamp that changes every run would make determinism impossible,
+                and hiding the field from users to please a screenshot tool would be backwards. */}
+            <dd data-baseline-mask className="text-zinc-900 dark:text-zinc-50">
+              {new Date(project.updatedAt).toLocaleString()}
+            </dd>
           </div>
         </dl>
       </aside>

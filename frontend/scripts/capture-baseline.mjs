@@ -110,7 +110,16 @@ async function scan(page, screen, viewport) {
   // caught mid-transition at a random point and differed between consecutive runs with
   // no code change. A baseline that drifts on its own would report a false regression on
   // every commit, making Decision 3 unenforceable.
-  const shot = await page.screenshot({ fullPage: true, animations: 'disabled' });
+  // mask: elements carrying data-baseline-mask hold real wall-clock data (the project's
+  // Updated timestamp) that changes every run - masked with a fixed color at capture time so
+  // the baseline stays deterministic without hiding real data from real users. The fourth
+  // determinism defect this mechanism has found (transitions, dev badge, raster jitter, time).
+  const shot = await page.screenshot({
+    fullPage: true,
+    animations: 'disabled',
+    mask: [page.locator('[data-baseline-mask]')],
+    maskColor: '#e4e4e7',
+  });
   const file = `${screen}--${viewport}.png`;
   const path = join(BASELINE_DIR, file);
 
@@ -148,40 +157,51 @@ async function runDemoScript(browser, viewport) {
   });
   const page = await context.newPage();
 
-  // Step 1 - launch (empty state)
+  // Deterministic start: imports create real projects server-side (ADR-0047), so without a
+  // reset every capture run would see the accumulated library of every run before it and no
+  // two baselines could ever match. Dev-only route; production never has it.
+  await fetch(`${BACKEND}/api/dev/reset-projects`, { method: 'POST' });
+
+  // Journey step 1 (HOME_WORKSPACE.md §0) - Home, the library, honest empty state.
   await page.goto(FRONTEND, { waitUntil: 'networkidle' });
-  await scan(page, '01-landing', viewport.name);
+  await waitForText(page, 'Your studio');
+  await scan(page, '01-home', viewport.name);
 
-  // Step 2-4 - import the real canonical fixture, then structure + validation appear.
-  //
-  // Uses the real file input. At Commit 0 this had to synthesize a DataTransfer drop event,
-  // because UploadDropzone had no input at all - only onDrop - which meant keyboard and screen
-  // reader users could not import at all. That defect is fixed, so the baseline now drives the
-  // same control a real user does, and the fact that setInputFiles() works is itself evidence
-  // the fix holds.
+  // Step 2 - import through the real file input; success IS a redirect to the Workspace.
   await page.setInputFiles('input[type="file"]', FIXTURE);
+  await page.waitForURL(/\/projects\//, { timeout: 60000 });
+  await waitForText(page, 'Import complete');
+  await scan(page, '02-workspace-manuscript', viewport.name);
 
-  await waitForText(page, 'Structure');
-  await scan(page, '02-imported', viewport.name);
-
-  // Step 5 - change layout to a KDP trim size
+  // Step 3 - Layout station: settings are PROJECT properties; picking KDP persists via PATCH.
+  await page.getByRole('button', { name: 'Layout' }).click();
   const kdp = page.getByText('KDP 6" x 9"', { exact: false }).first();
-  if (await kdp.count()) {
-    await kdp.click();
-    await scan(page, '03-layout-kdp', viewport.name);
-  }
+  await kdp.click();
+  // The workspace reloads the project after PATCH; the properties rail/nav reflect it.
+  await page.waitForTimeout(500);
+  await scan(page, '03-layout-kdp', viewport.name);
 
-  // Step 6 - generate the real preview (a real export round trip, so allow time)
-  const preview = page.getByRole('button', { name: /preview/i }).first();
-  if (await preview.count()) {
-    await preview.scrollIntoViewIfNeeded();
-    await preview.click();
-    await waitForText(page, 'pages', 120000).catch(() => {});
-    await scan(page, '04-preview', viewport.name);
-  }
+  // Step 4 - Preview station: a real export round trip from the STORED source (Decision 6).
+  await page.getByRole('button', { name: 'Preview' }).click();
+  await page.getByRole('button', { name: /Generate Preview/i }).click();
+  await waitForText(page, 'pages', 120000).catch(() => {});
+  await scan(page, '04-preview', viewport.name);
+
+  // Step 5 - Publish station: real KDP validation, recorded into the project history.
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await page.getByRole('button', { name: /Validate for KDP/i }).click();
+  await waitForText(page, 'error', 120000).catch(() => {});
+  await scan(page, '05-publish', viewport.name);
+
+  // Step 6 - back Home: the library now shows the project, its publication, the statistics.
+  await page.getByRole('link', { name: 'Studio', exact: true }).click();
+  await waitForText(page, 'Recent projects');
+  await waitForText(page, 'large-book');
+  await scan(page, '06-home-library', viewport.name);
 
   await context.close();
 }
+
 
 async function main() {
   console.log(`Frontend: ${FRONTEND}\nBackend:  ${BACKEND}\n`);

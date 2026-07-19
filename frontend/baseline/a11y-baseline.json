@@ -1,53 +1,28 @@
 {
-  "capturedAt": "2026-07-18T21:26:03.482Z",
-  "totalViolations": 11,
-  "totalNodes": 41,
+  "capturedAt": "2026-07-19T11:25:48.779Z",
+  "totalViolations": 5,
+  "totalNodes": 5,
   "screens": [
     {
-      "screen": "01-landing",
+      "screen": "01-home",
       "viewport": "desktop",
-      "file": "01-landing--desktop.png",
-      "bytes": 28358,
+      "file": "01-home--desktop.png",
+      "bytes": 37465,
       "status": "captured",
-      "violations": [
-        {
-          "id": "landmark-one-main",
-          "impact": "moderate",
-          "nodes": 1,
-          "help": "Document should have one main landmark"
-        },
-        {
-          "id": "region",
-          "impact": "moderate",
-          "nodes": 1,
-          "help": "All page content should be contained by landmarks"
-        }
-      ]
+      "violations": []
     },
     {
-      "screen": "02-imported",
+      "screen": "02-workspace-manuscript",
       "viewport": "desktop",
-      "file": "02-imported--desktop.png",
-      "bytes": 76491,
+      "file": "02-workspace-manuscript--desktop.png",
+      "bytes": 41559,
       "status": "captured",
       "violations": [
         {
           "id": "color-contrast",
           "impact": "serious",
-          "nodes": 3,
-          "help": "Elements must meet minimum color contrast ratio thresholds"
-        },
-        {
-          "id": "landmark-one-main",
-          "impact": "moderate",
           "nodes": 1,
-          "help": "Document should have one main landmark"
-        },
-        {
-          "id": "region",
-          "impact": "moderate",
-          "nodes": 9,
-          "help": "All page content should be contained by landmarks"
+          "help": "Elements must meet minimum color contrast ratio thresholds"
         }
       ]
     },
@@ -55,26 +30,20 @@
       "screen": "03-layout-kdp",
       "viewport": "desktop",
       "file": "03-layout-kdp--desktop.png",
-      "bytes": 75851,
+      "bytes": 51905,
       "status": "captured",
       "violations": [
         {
           "id": "color-contrast",
           "impact": "serious",
-          "nodes": 3,
+          "nodes": 1,
           "help": "Elements must meet minimum color contrast ratio thresholds"
         },
         {
-          "id": "landmark-one-main",
+          "id": "heading-order",
           "impact": "moderate",
           "nodes": 1,
-          "help": "Document should have one main landmark"
-        },
-        {
-          "id": "region",
-          "impact": "moderate",
-          "nodes": 9,
-          "help": "All page content should be contained by landmarks"
+          "help": "Heading levels should only increase by one"
         }
       ]
     },
@@ -82,28 +51,39 @@
       "screen": "04-preview",
       "viewport": "desktop",
       "file": "04-preview--desktop.png",
-      "bytes": 75456,
+      "bytes": 43867,
       "status": "captured",
       "violations": [
         {
-          "id": "color-contrast",
-          "impact": "serious",
-          "nodes": 3,
-          "help": "Elements must meet minimum color contrast ratio thresholds"
-        },
-        {
-          "id": "landmark-one-main",
+          "id": "heading-order",
           "impact": "moderate",
           "nodes": 1,
-          "help": "Document should have one main landmark"
-        },
-        {
-          "id": "region",
-          "impact": "moderate",
-          "nodes": 9,
-          "help": "All page content should be contained by landmarks"
+          "help": "Heading levels should only increase by one"
         }
       ]
+    },
+    {
+      "screen": "05-publish",
+      "viewport": "desktop",
+      "file": "05-publish--desktop.png",
+      "bytes": 59167,
+      "status": "captured",
+      "violations": [
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "nodes": 1,
+          "help": "Heading levels should only increase by one"
+        }
+      ]
+    },
+    {
+      "screen": "06-home-library",
+      "viewport": "desktop",
+      "file": "06-home-library--desktop.png",
+      "bytes": 46182,
+      "status": "captured",
+      "violations": []
     }
   ]
 }
