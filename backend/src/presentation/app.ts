@@ -1,5 +1,6 @@
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
+import { join } from 'node:path';
 import { MammothParser } from '../infrastructure/parsers/MammothParser';
 import { HtmlNormalizer } from '../infrastructure/normalizers/HtmlNormalizer';
 import { ASTBuilder } from '../domain/services/ASTBuilder';
@@ -29,7 +30,7 @@ import { buildCorsOptions } from './middleware/corsOptions';
 import { PublishingUseCase } from '../application/use-cases/PublishingUseCase';
 import { PublishingReportMapper } from '../application/mappers/PublishingReportMapper';
 import { createKDPTarget } from '../domain/services/publishing/createKDPTarget';
-import { InMemoryProjectRepository } from '../infrastructure/repositories/InMemoryProjectRepository';
+import { SqliteProjectRepository } from '../infrastructure/repositories/SqliteProjectRepository';
 import { ProjectService } from '../domain/services/ProjectService';
 import { ProjectSummaryMapper } from '../application/mappers/ProjectSummaryMapper';
 import { ProjectsController } from './controllers/ProjectsController';
@@ -45,11 +46,13 @@ export function createApp(): Express {
   app.use(express.json());
 
   // The Project store — ONE instance for the whole app, because it IS the app's state.
-  // This is the first place the backend deliberately holds state between requests, by explicit
-  // CTO direction (ADR-0047): Sprint 7 Decision 2 (stateless) is now amended in code, not just
-  // in principle. In-memory means nothing survives a restart — disclosed in the class itself —
-  // and the durable store (SQLite, ADR-0046) stays gated behind Sprint 11's review.
-  const projectRepository = new InMemoryProjectRepository();
+  // Durable since Sprint 11 (PERSISTENCE.md, ADR-0048): SQLite on disk, so a restart is no
+  // longer an act of data loss. Route tests get a fresh `:memory:` database per createApp() —
+  // the same isolation the in-memory store gave them, from the real implementation.
+  const databasePath =
+    process.env.DATABASE_PATH ??
+    (process.env.NODE_ENV === 'test' ? ':memory:' : join(process.cwd(), 'data', 'studio.db'));
+  const projectRepository = new SqliteProjectRepository(databasePath);
   const projectService = new ProjectService();
 
   // Pagination measures with the renderer's own fonts (LAYOUT_FIDELITY.md Decision 6) - one
@@ -164,11 +167,12 @@ export function createApp(): Express {
   const manuscriptOptionsController = new ManuscriptOptionsController();
   app.use('/api/manuscripts', optionsRoutes(manuscriptOptionsController));
 
-  // Dev-only: resets the in-memory project store so the visual-baseline capture starts every
-  // viewport run from a deterministic empty library. Imports create projects (ADR-0047), so
-  // without this each capture run would see the accumulated state of every run before it and
-  // no two baselines could ever match. Never registered in production; when SQLite lands
-  // (Sprint 11) the capture tool seeds a scratch database instead and this route disappears.
+  // Dev-only: resets the project store so the visual-baseline capture starts every viewport
+  // run from a deterministic empty library. Imports create projects (ADR-0047), so without
+  // this each capture run would see the accumulated state of every run before it and no two
+  // baselines could ever match. ADR-0047's comment here predicted this route's death when
+  // SQLite landed; PERSISTENCE.md §5 amended that — it survives, repointed at the durable
+  // store, because the capture still needs its determinism. Never registered in production.
   if (process.env.NODE_ENV !== 'production') {
     app.post('/api/dev/reset-projects', (req: Request, res: Response) => {
       projectRepository.clear();

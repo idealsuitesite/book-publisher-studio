@@ -8,4 +8,5 @@ uploads/*
 !uploads/.gitkeep
 spikes/output/
 verification/output/
-~$*.docxdata/
+~$*.docx
+data/
