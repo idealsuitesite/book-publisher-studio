@@ -1,10 +1,30 @@
 # Current State - Book Publisher Studio
 
-**Last Updated:** July 18, 2026 — **Sprint 9 in progress on `feature/sprint-9-ui-foundation`** (pushed, unmerged, no PR). Sprint 8 released as `v0.9.0-alpha`.
+**Last Updated:** July 21, 2026 — **everything is merged to `main`** (PR #14: Sprints 9-11 + Import Fidelity; PR #15: Render Drift fixes). Last tagged release: `v0.9.0-alpha` (Sprint 8); the merged work is deliberately untagged pending the next release decision.
 
-> ## ▶ START HERE — session handoff (2026-07-18)
+> ## ▶ START HERE — executive brief (2026-07-21), self-contained
 >
-> **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed.
+> *This section alone should let a reader with no repository access — including a Claude session on the web — reconstruct the full context. The dated session log below it is the detailed history.*
+>
+> **The product.** Book Publisher Studio: DOCX import → a Book AST (the single source of truth, ADR-0001) → measured pagination → PDF/DOCX/EPUB export → per-platform publishing validation (Amazon KDP first). Clean Architecture/DDD: Domain → Application → Infrastructure/Presentation, DTOs at every boundary, ports where multiple implementations are plausible. Monorepo: `backend/` (Express, Node 24), `frontend/` (Next.js 16, the "L'Atelier" studio UI), `packages/shared-types`. The backend is stateful and durable since ADR-0048: projects live in SQLite (`node:sqlite`, `SqliteProjectRepository` behind the `ProjectRepository` port, whole-aggregate contract, restart survival proven live); the *rendering pipeline* remains stateless.
+>
+> **The governance.** Two-gate discipline: a Design Review (in `docs/architecture/diagrams/`) precedes non-trivial code, and the CTO approves before implementation. Decisions live in `docs/DECISIONS.md` (ADR-0001…0051, indexed in `docs/ADR_INDEX.md`). Real fixtures beat synthetic ones (`docs/REAL_FIXTURE_POLICY.md`) — this project has now shipped **six** real bugs that passed 100% synthetic coverage. Every claim below was reproduced live before being written down.
+>
+> **The doctrine (ADR-0050, CTO-authored): Fidelity Is the Product.** Document fidelity — import to export — outranks interface, features, aesthetics. Its rendering corollary is ADR-0051: *the renderer never breaks a page on its own initiative; any reconciliation with the pagination plan must be explicit and measurable.*
+>
+> **Where the product stands (all merged, all verified):**
+> - **The studio** (Sprint 9-10 evolved into "L'Atelier", PRODUCT_EXPERIENCE/VISUAL_LANGUAGE reviews): Home library + per-project Workspace with stations (Overview/Structure/Validation/Layout/Proof/Editions/History), warm-paper design tokens, IBM Plex Sans + Gelasio voices, living Proof (auto-regenerating PDF preview), command palette, resume-where-left. Every displayed figure is measured or stored, never invented.
+> - **Persistence (S11, `PERSISTENCE.md`, ADR-0048)**: durable SQLite store; versions sharded to rows; asset bytes as real Buffers; one shared behavioural contract suite over every repository implementation.
+> - **Import Fidelity (`IMPORT_FIDELITY.md`, ADR-0049)** — the CTO froze all other engine work until import was bulletproof. Delivered: the `UNSTRUCTURED_MANUSCRIPT` state (a book-length manuscript with zero detected chapters can no longer score structure 100/100 silently), *explorable errors* (gravity without rejection — the project still exists so the author can see the problem), the `EMPTY_HEADING_DROPPED` diagnostic, a typed error contract end to end (`ApiErrorCode`: a screen may only show an error it can name), and `npm run verify-real-import` — a real-manuscript corpus harness (`backend/verification/corpus/`) asserting exact chapters, exact words and EXPECTED findings per file.
+> - **Render Drift (`RENDER_DRIFT.md`, ADR-0051)** — CTO-ordered investigation, hypothesis (over-segmentation) refuted by measurement, real cause found: the renderer consumed more than the model charged (+2.25pt/block), PDFKit silently inserted 55 unplanned pages per real book, producing 50 near-empty pages of 284 and shifting running-head attribution. Fixed: flat `spaceAfter` spending, real-face line heights (the "size not family" assumption was measured false), title keep-with-next, a half-line page-safety reserve, and **observable reconciliation** (`RenderMetrics.unplannedPageBreaks` + logs + page-owner realignment). Result on the corpus manuscript: **284 → 246 real pages, near-empty 50 → 3** (the disclosed bold-run ±1-line residual), locked exactly by `PDFRenderer.parity.test.ts`.
+> - **Verified state on `main`**: backend 556/556, frontend 138/138, tsc + eslint 0 warnings both sides, builds clean, `verify-real-import` + `verify-real-export` green, visual baseline byte-identical twice.
+>
+> **What is gated or open, in the CTO's own sequencing:**
+> 1. **Next: the `docs/PUBLICATION_QUALITY_BAR.md` calibration review** (CTO-authored spec of automatable export-quality criteria). Its gate — both fidelity defects fixed AND verified in the real harnesses — is now met; the CTO opens the review explicitly.
+> 2. The freeze on Validation-evolution / Editorial AI / Layout / Publishing engines ended with the Render Drift merge, per the CTO's sequence; resumption of any of them awaits explicit CTO direction.
+> 3. Still OPEN or scoped, not forgotten: ADR-0043 (gutter — every paperback is non-compliant until it ships), heuristic heading detection (own review, measured against the corpus), manual structure correction post-import (AST editing, own review), multi-volume architecture (Level-1 review before Sprint 12 code accumulates), `EDITOR_EXPERIENCE.md` review, P4 visual calibration (awaits CTO feelings on `docs/demo/screenshots/atelier/`), engine-rendered preset thumbnails.
+>
+> **Map for a new reader:** `docs/CLAUDE.md` (entry point) · `docs/DECISIONS.md` + `docs/ADR_INDEX.md` (why everything is the way it is) · `docs/architecture/diagrams/` (one Design Review per engine — IMPORT_FIDELITY, RENDER_DRIFT, PERSISTENCE, LAYOUT_FIDELITY, PRODUCT_EXPERIENCE, VISUAL_LANGUAGE, HOME_WORKSPACE are the recent load-bearing ones) · `docs/PUBLICATION_QUALITY_BAR.md` (the next gate) · `docs/TODO.md` (live task state) · `docs/VERSIONS.md` (release history).
 >
 > ### Session of 2026-07-21: IMPORT FIDELITY MERGED (PR #14); RENDER DRIFT FIXED — 284 → 246 pages, 3 observable residuals
 > **Backend 556/556, both real harnesses green, baseline byte-identical twice, full gate re-confirmed on `main` post-merge.**
