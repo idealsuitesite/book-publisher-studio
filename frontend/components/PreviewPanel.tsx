@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { exportManuscript } from '@/lib/api-client';
+import { Button, Card } from '@/components/ui';
 
 // Sprint 7 commit 9a - real PDF preview (Decision 1: full re-export, not an incremental preview
 // system). "Generate Preview" fires a real POST /api/manuscripts/export?format=pdf for the
@@ -72,16 +73,12 @@ export function PreviewPanel({ file, layout, theme, layoutLabel, themeLabel, onG
   }
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-4 rounded-2xl border-2 border-zinc-300 px-8 py-6 text-left dark:border-zinc-700">
+    <Card className="flex max-w-2xl flex-col gap-4 px-8 py-6 text-left">
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Preview</h3>
-        <button
-          onClick={() => void generatePreview()}
-          disabled={state.status === 'loading'}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 transition-colors disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900"
-        >
+        <Button onClick={() => void generatePreview()} disabled={state.status === 'loading'}>
           {state.status === 'loading' ? 'Generating…' : state.status === 'ready' ? 'Regenerate Preview' : 'Generate Preview'}
-        </button>
+        </Button>
       </div>
 
       <dl className="flex flex-wrap gap-6 text-sm">
@@ -116,6 +113,6 @@ export function PreviewPanel({ file, layout, theme, layoutLabel, themeLabel, onG
           className={`h-[500px] w-full rounded-lg border border-zinc-200 dark:border-zinc-800 ${isStale ? 'opacity-50' : ''}`}
         />
       )}
-    </div>
+    </Card>
   );
 }

@@ -1,4 +1,5 @@
 import type { ImportReportDTO, ValidationIssueDTO } from 'shared-types';
+import { Card } from '@/components/ui';
 
 // Sprint 7 commit 7 - renders the real ImportReportDTO.issues/.score a successful import
 // returns, sibling to BookStructureView (commit 6). Format/layout selection (commit 8) and
@@ -42,7 +43,7 @@ export function ValidationSummary({ report }: ValidationSummaryProps) {
   })).filter((group) => group.items.length > 0);
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-6 rounded-2xl border-2 border-zinc-300 px-8 py-8 text-left dark:border-zinc-700">
+    <Card className="flex max-w-2xl flex-col gap-6 px-8 py-8 text-left">
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Validation</h3>
         <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
@@ -92,6 +93,6 @@ export function ValidationSummary({ report }: ValidationSummaryProps) {
           </ul>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

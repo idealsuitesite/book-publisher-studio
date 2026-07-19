@@ -1,4 +1,5 @@
 import type { LayoutOptionDTO, ManuscriptOptionsDTO } from 'shared-types';
+import { Card } from '@/components/ui';
 
 // Sprint 7 commit 8 - real format/layout selector, populated from GET /api/manuscripts/options
 // (fetched once by UploadDropzone). Selection is held in the parent's state, ready for commit
@@ -58,7 +59,7 @@ export function FormatSelector({ options, selectedLayout, selectedTheme, onLayou
   const categories = Array.from(new Set(options.layouts.map((layout) => layout.category)));
 
   return (
-    <div className="flex w-full max-w-2xl flex-col divide-y divide-zinc-200 rounded-2xl border-2 border-zinc-300 text-left dark:divide-zinc-800 dark:border-zinc-700">
+    <Card className="flex max-w-2xl flex-col divide-y divide-zinc-200 text-left dark:divide-zinc-800">
       <div className="flex flex-col gap-3 px-8 py-6">
         <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Layout</h3>
         {categories.map((category) => (
@@ -97,6 +98,6 @@ export function FormatSelector({ options, selectedLayout, selectedTheme, onLayou
           ))}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

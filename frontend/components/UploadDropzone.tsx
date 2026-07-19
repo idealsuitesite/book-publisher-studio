@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { ImportResponseDTO, ManuscriptOptionsDTO } from 'shared-types';
 import { getManuscriptOptions, importManuscript } from '@/lib/api-client';
 import { BookStructureView } from '@/components/BookStructureView';
+import { Button } from '@/components/ui';
 import { ValidationSummary } from '@/components/ValidationSummary';
 import { FormatSelector } from '@/components/FormatSelector';
 import { PreviewPanel } from '@/components/PreviewPanel';
@@ -143,12 +144,9 @@ export function UploadDropzone() {
       <div className={`${CARD_CLASSES} border-red-600`}>
         <p className="text-lg font-medium text-red-600 dark:text-red-400">Import failed</p>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">{state.message}</p>
-        <button
-          onClick={reset}
-          className="mt-2 text-sm font-medium text-zinc-900 underline underline-offset-4 dark:text-zinc-50"
-        >
+        <Button variant="link" className="mt-2" onClick={reset}>
           Try again
-        </button>
+        </Button>
       </div>
     );
   }

@@ -12,7 +12,7 @@ This is ADR-0037's dependency-direction principle in frontend form. It is what l
 
 | Primitive | Variants | Notes |
 |---|---|---|
-| `Button` | `primary`, `secondary` | Defaults to `type="button"` so it cannot accidentally submit a form |
+| `Button` | `primary`, `secondary`, `link` | Defaults to `type="button"` so it cannot accidentally submit a form |
 | `Card` | — | Optional `title` turns it into a named landmark |
 | `Alert` | `error`, `warning`, `info`, `success` | Live region; errors and warnings announce assertively, the rest politely |
 | `Badge` | same four | Deliberately *not* a live region — it labels, it does not announce |

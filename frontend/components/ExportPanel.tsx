@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { exportManuscript, type ExportFormat } from '@/lib/api-client';
+import { Button, Card } from '@/components/ui';
 
 // Sprint 7 commit 9b - real export/download, completing the originally-planned Commit 9
 // (export + preview, split at CTO direction into 9a/preview and 9b/this file so an
@@ -53,23 +54,23 @@ export function ExportPanel({ file, layout, theme, onDownloaded }: ExportPanelPr
   }
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-4 rounded-2xl border-2 border-zinc-300 px-8 py-6 text-left dark:border-zinc-700">
+    <Card className="flex max-w-2xl flex-col gap-4 px-8 py-6 text-left">
       <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Export</h3>
 
       {errorMessage && <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>}
 
       <div className="flex flex-wrap gap-3">
         {FORMATS.map(({ format, label }) => (
-          <button
+          <Button
             key={format}
+            variant="secondary"
             onClick={() => void handleDownload(format)}
             disabled={exportingFormat !== null}
-            className="rounded-lg border-2 border-zinc-900 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors disabled:opacity-50 dark:border-zinc-50 dark:text-zinc-50"
           >
             {exportingFormat === format ? 'Exporting…' : label}
-          </button>
+          </Button>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }

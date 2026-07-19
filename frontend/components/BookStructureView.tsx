@@ -1,4 +1,5 @@
 import type { BookDTO } from 'shared-types';
+import { Button, Card } from '@/components/ui';
 
 // Sprint 7 commit 6 - renders the real BookDTO a successful import returns. Deliberately no
 // validation findings here (report.issues/.score) - that's ValidationSummary's job (commit 7),
@@ -23,7 +24,7 @@ export function BookStructureView({ book, filename, onReset }: BookStructureView
   if (book.readingTime != null) stats.push({ label: 'Reading time', value: `${book.readingTime} min` });
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-6 rounded-2xl border-2 border-emerald-600 px-8 py-8 text-left">
+    <Card tone="success" className="flex max-w-2xl flex-col gap-6 px-8 py-8 text-left">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Import complete</p>
@@ -32,12 +33,9 @@ export function BookStructureView({ book, filename, onReset }: BookStructureView
             {book.metadata.author} · {filename}
           </p>
         </div>
-        <button
-          onClick={onReset}
-          className="shrink-0 text-sm font-medium text-zinc-900 underline underline-offset-4 dark:text-zinc-50"
-        >
+        <Button variant="link" className="shrink-0" onClick={onReset}>
           Import another file
-        </button>
+        </Button>
       </div>
 
       {stats.length > 0 && (
@@ -82,6 +80,6 @@ export function BookStructureView({ book, filename, onReset }: BookStructureView
           ))}
         </ul>
       </details>
-    </div>
+    </Card>
   );
 }

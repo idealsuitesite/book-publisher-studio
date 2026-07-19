@@ -31,6 +31,11 @@
   /* Text */
   --app-text: var(--color-zinc-900);
   --app-text-muted: var(--color-zinc-500);
+  /* Text drawn ON an app-text-coloured surface (solid buttons). Not app-surface: the product's
+   * solid button uses zinc-50 on zinc-900 (and the inverse in dark), which app-surface's
+   * white/zinc-950 would shift by a perceptible-to-the-diff 5/255. Commit 5 discovered this
+   * gap by refusing to let the swap change a pixel. */
+  --app-text-inverse: var(--color-zinc-50);
 
   /* Borders */
   --app-border: var(--color-zinc-300);
@@ -51,6 +56,7 @@
 
     --app-text: var(--color-zinc-50);
     --app-text-muted: var(--color-zinc-400);
+    --app-text-inverse: var(--color-zinc-900);
 
     --app-border: var(--color-zinc-700);
     --app-border-strong: var(--color-zinc-50);
@@ -70,6 +76,7 @@
   --color-app-surface: var(--app-surface);
   --color-app-surface-raised: var(--app-surface-raised);
   --color-app-text: var(--app-text);
+  --color-app-text-inverse: var(--app-text-inverse);
   --color-app-text-muted: var(--app-text-muted);
   --color-app-border: var(--app-border);
   --color-app-border-strong: var(--app-border-strong);
