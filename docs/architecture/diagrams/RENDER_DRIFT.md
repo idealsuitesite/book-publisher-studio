@@ -64,7 +64,7 @@ The three fixes landed in order, and the implementation surfaced **two further r
 5. **Observability (fix 2, CTO amendment)**: every deliberate break goes through `plannedAddPage()`; anything else is counted into `RenderMetrics.unplannedPageBreaks`, logged with its trigger block, and reconciled into `pageOwners` — closing a secondary defect the census exposed: unplanned pages shifted every later owner entry, misattributing running heads and page numbers for the rest of the book.
 6. **Drift parity locked** (fix 3): `PDFRenderer.parity.test.ts` on the real corpus asserts exactly **3** reconciliations (the disclosed bold/italic-run wrapping residual, ±1 line each) and the exact page count — loud in both directions.
 
-**Result on the corpus manuscript at kdp-5x8: 284 → 246 real pages (model 241), near-empty pages 50 → 3, ratio 1.0008.** The trace/census/drift spikes remain committed and rerunnable as the measuring instruments.
+**Result on the corpus manuscript at kdp-5x8: 284 → 246 real pages (model 241), near-empty pages 50 → 3, ratio 1.0008.** The trace/census/drift spikes remain committed and rerunnable as the measuring instruments. *(Calibration follow-up, 2026-07-21: the quality-bar measurement then exposed a JS evaluation-order bug in the keep-with-next flush — ghost near-full pages at section boundaries; fixed, bringing the corpus book to 238 real pages / 234 model / 2 reconciliations / ZERO non-structural pages under 30% fill on all six layouts. PUBLICATION_QUALITY_BAR.md §10 carries the full table; the parity test carries the exact numbers.)*
 
 ## Related
 

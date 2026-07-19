@@ -130,3 +130,35 @@ This list is deliberately conservative and additive — it can grow, but nothing
 3. Only then: review this document for real (calibrate thresholds against actual corpus data), lock it, and schedule its implementation as its own sprint — likely extending `verify-real-export` into a `verify-publication-quality` harness.
 
 This document does not authorize any code. It exists so that step 3 can start immediately once steps 1–2 close, without re-deriving the specification from scratch.
+
+---
+
+## 10. Calibration round 1 — measured data and proposed values (2026-07-21, appended annotation)
+
+*Appended per the CTO's feu vert and its strict framing: this section derives replacements for §8's provisional values from real corpus data. It touches nothing above; the scope stays as written. Values below are PROPOSED until the CTO locks them. Instrument: `backend/spikes/quality-bar-calibration-spike.ts` (committed, rerunnable).*
+
+### 10.1 The measurement found one more defect first
+
+Producing the fill distribution exposed a ghost-page bug in the title keep-with-next flush (a JS evaluation-order trap: `currentHeight += f()` reads the left operand before `f()`'s internal flush zeroes it — every section boundary produced a phantom near-full page carrying one real paragraph). Fixed and locked in `PDFRenderer.parity.test.ts` before calibrating: **numbers below are from the fixed pipeline.** This is §3's guiding principle working as designed — the measurement script caught what 556 passing tests did not.
+
+### 10.2 Measured baseline — `faith-alone-styled.docx` (39,354 words, 17 chapters, Classic theme)
+
+| Layout | Model pages | Real pages | Reconciliations | Words/page | Mean fill | Pages <30% fill | …of which non-structural |
+|---|---|---|---|---|---|---|---|
+| letter | 86 | 90 | 2 | 458 | 88% | 6 | **0** |
+| a4 | 81 | 85 | 2 | 486 | 93% | 1 | **0** |
+| a5 | 182 | 186 | 2 | 216 | 95% | 3 | **0** |
+| kdp-5x8 | 234 | 238 | 2 | 168 | 95% | 3 | **0** |
+| kdp-5.5x8.5 | 187 | 191 | 2 | 210 | 96% | 1 | **0** |
+| kdp-6x9 | 155 | 159 | 2 | 254 | 95% | 1 | **0** |
+
+"Structural" = the page before a chapter start (new-page convention), before a titled-section keep-with-next break (ADR-0051), or the book's last page — legitimate typography, not defects.
+
+### 10.3 Proposed calibrated values (replacing §8's placeholders)
+
+1. **§5 criterion 5 — page-ratio tolerance (was "±10%, illustrative")**: expected pages = words ÷ WPP(layout), with the measured words-per-page table above as the Classic-theme WPP registry. Proposed tolerance: **±8%**, derived as: bounded reconciliation cost (≤2 pages, <1%) + chapter-count structure variance (a 5-to-40-chapter book shifts boundary short-pages by roughly ±5%) + a stated n=1 allowance. **Confidence note, not scope creep:** the corpus has one book-length manuscript; the tolerance should tighten as the corpus grows, per §7's own corpus-level framing.
+2. **§7 bullet 1 — content-to-whitespace threshold (was "a defined threshold")**: hard gate = **zero non-structural pages under 30% fill**, with the §10.2 structural definition. Measured today: 0 on all six layouts. Permitted exception: at most `RenderMetrics.unplannedPageBreaks` such pages (each observable reconciliation can cost at most one short page) — that counter is itself parity-locked at 2 on the corpus.
+3. **§7 last bullet — widows/orphans (was "pending further discussion")**: headings/titles hard gate **0** — enforced by construction (title keep-with-next + `staysWithNext`) and measured 0; body-text widows/orphans hard gate **0 by the min-2-lines rule** (Phase B splits never strand fewer than 2 lines at either end), observed 0. The "body advisory" hedge can be retired: the mechanism guarantees it.
+4. **New number the original could not know — reconciliation bound**: `unplannedPageBreaks ≤ 2` on the corpus manuscript, exact-locked (`PDFRenderer.parity.test.ts`); any future criterion referencing "pages the model did not plan" uses this counter, never a PDF diff.
+
+*Everything else in §4-§6 (DOCX/EPUB criteria, colors, fonts, links) carries no numeric placeholder and needs no calibration — those criteria await the future `verify-publication-quality` harness (§9 step 3), unchanged.*
