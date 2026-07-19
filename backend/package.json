@@ -14,6 +14,7 @@
     "format": "prettier --write src",
     "verify-server": "tsx scripts/verify-server.ts",
     "verify-real-export": "tsx scripts/verify-real-export.ts",
+    "verify-real-import": "tsx scripts/verify-real-import.ts",
     "verify-real-publish": "tsx scripts/verify-real-publish.ts"
   },
   "keywords": [],

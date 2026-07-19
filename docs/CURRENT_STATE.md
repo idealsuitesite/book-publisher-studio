@@ -6,6 +6,18 @@
 >
 > **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed.
 >
+> ### Session of 2026-07-20 (night): IMPORT FIDELITY — all 5 commits done, verify-real-import GREEN; RENDER_DRIFT diagnosed
+> **Backend 555/555, frontend 138/138, builds + lint clean, baseline byte-identical twice (one deliberate recapture: Inspector layout rows), `npm run verify-real-import` green on the real corpus.**
+> - **CTO froze all other engine work** until import is bulletproof; approved `IMPORT_FIDELITY.md` with two amendments (KDP-targeted block provisional pending ValidationProfile; threshold in one named constant). All five commits executed and pushed (`1e06f9b`→`08447ea` + harness):
+> - **C1 (ADR-0049)**: `UNSTRUCTURED_MANUSCRIPT` (ERROR, `UNSTRUCTURED_WORD_THRESHOLD = 2000`), `EMPTY_HEADING_DROPPED` diagnostics channel, **explorable errors** (`EXPLORABLE_ERROR_CODES` — gravity without rejection; a plain ERROR would have 422'd the import and destroyed the evidence), structure can never score 100 over 0 chapters.
+> - **C2**: the state lives on every surface (Explorer "0 ch — needs review", status bar error-ink, Structure `role=alert` banner with the backend's own words, dashboard next-action needed zero code).
+> - **C3**: typed error contract — `ApiErrorDTO`/`ApiErrorCode` in shared-types; `PROJECT_NOT_FOUND`/`IMPORT_PARSE_FAILED`(422)/`RENDER_FAILED`/`UNKNOWN_*` named end to end; frontend `ApiError` third failure family; stale resume-where-left cleared; the "projects live in memory" copy (false since ADR-0048) is dead. **Real bug found live**: `StructurePresenceRule` first read `book.wordCount`, which the publish path never enriches — silently 0; now `countBookWords()` counts from the AST (shared with BookValidator) and fixtures carry real text.
+> - **C4**: internal ticket ids out of the UI ("Coming soon"; warn styling and honesty kept); one baseline screen deliberately recaptured.
+> - **C5**: `backend/verification/corpus/` + `npm run verify-real-import` — per-file exact chapters/words + EXPECTED FINDINGS; the 18h1→17ch empty-heading absorption is a permanent assertion (CTO condition).
+> - **`RENDER_DRIFT.md`** (CTO-ordered diagnostic, no fix): over-segmentation hypothesis REFUTED (17 chapters exact; sections never break pages). Real cause measured: 100% of blocks consume more than the model charges (+2.25pt mean; `moveDown(spaceAfter/fontSize)` vs flat spaceAfter), a quarter of planned pages overflow, PDFKit auto-breaks silently (55×), the next planned break fires anyway → 50/284 near-empty pages. Classified renderer/model coordination defect (Infrastructure). Three rerunnable spikes committed. **Fix directions sketched in §5, NOT authorized — awaiting CTO verdict.**
+> - **`docs/PUBLICATION_QUALITY_BAR.md`** (CTO-authored spec) read and honored: no implementation before the freeze lifts; its sequencing gates are exactly the above.
+> - **Freeze status**: five commits done + harness green ON THE BRANCH; the CTO's remaining gate is the merge to `main`.
+
 > ### Session of 2026-07-20 (later): S11 PERSISTENCE SHIPS — a restart is no longer an act of data loss
 > **Backend 542/542 (54 files), tsc + eslint clean, baseline byte-identical twice, restart-survival PROVEN live.**
 > - **`PERSISTENCE.md` ✅ APPROVED + ADR-0048** (Decision 2 formally amended: the backend is stateful and durable; the *pipeline* stays stateless). Commits 1–4 of its plan all executed.
