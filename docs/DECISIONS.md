@@ -1314,3 +1314,24 @@ The two renderers that return `pageCount: undefined` are not gaps - they are the
 - The six-month-author journey (PRODUCT_EXPERIENCE §5) stops being a documented lie.
 
 **Related:** `PERSISTENCE.md` (the review), ADR-0041 (the gate), ADR-0046 (the spike), ADR-0047 (the in-code precursor + the Buffer scar), ADR-0044 (`archived_at` indexed), Sprint 7 Decision 2 (the decision honourably retired).
+
+---
+
+## ADR-0049: An Importer That Finds No Structure Must Say So — Explorable Errors and Normalization Diagnostics
+
+**Status:** APPROVED (CTO verdict 2026-07-20 on `IMPORT_FIDELITY.md`; freeze on other engines in effect until its five commits merge and `verify-real-import` runs green on the real corpus).
+**Date:** 2026-07-20
+
+**The decision:** "no structure detected" is a first-class, *named* state of an imported manuscript — an architecture decision, not a bug patch, exactly as the `<s>` and `.trim()` scars were recorded before it.
+
+**What was happening (reproduced live, `IMPORT_FIDELITY.md` §1-2):** a real book-length DOCX styled visually (bold runs, no Word `Heading` styles) imported into one anonymous section — `chapters: 0`, **Structure 100/100**, no warning anywhere, failure discovered only downstream at the Proof. Separately, a real manuscript's *empty* `Heading 1` was dropped by normalization with no trace (18 h1 → 17 chapters).
+
+**The mechanics now in force:**
+- **`UNSTRUCTURED_MANUSCRIPT`** (severity **ERROR**): a book above `UNSTRUCTURED_WORD_THRESHOLD` words with zero top-level chapters. The threshold lives in ONE named, documented constant (`BookValidator.ts`, 2,000 words) — CTO condition; a candidate `ValidationProfile` parameter later. Below it, a chapterless single-flow document (essay, corporate report) is a legitimate editorial choice and stays silent.
+- **Explorable errors** (`ValidationEngine.EXPLORABLE_ERROR_CODES`): this ERROR caps the structure score and will block "Validate for KDP" (targeted, provisional — see below), but it does **not** reject the import. Severity states gravity; rejection is a separate, narrower decision. Rejecting would destroy the very evidence (the project, its Proof, its Structure station) the author needs to understand the problem — coherent with ADR-0027 (validation informs, never bars exploration). Every other ERROR rejects exactly as before.
+- **`EMPTY_HEADING_DROPPED`** (WARNING, `NormalizationDiagnostic`): the normalizer still drops empty headings — the drop is right, the *silence* was the defect. Import-time evidence only, disclosed: the dropped content does not exist in the Book AST, so re-validation on read cannot rediscover it.
+- **The structure score can no longer say 100 over zero chapters** — the ERROR feeds the existing per-category scoring; no parallel mechanism was added.
+
+**Provisional, by CTO amendment:** the zero-chapter *publication* block applies to the KDP action specifically, never to a generic "publish" — corporate reports and single-flow documents are legitimate product targets. To be re-evaluated as a profile rule the day `ValidationProfile` exists (the `ValidationContext.validationProfile` field already reserves the slot).
+
+**Related:** `IMPORT_FIDELITY.md` (the review; commits 2-5 build on this state), ADR-0025 (mammoth limitation family), ADR-0027 (read-only validation), ADR-0031/0032 (the real-file scars that built the discipline this follows), `REAL_FIXTURE_POLICY.md` (commit 5's `verify-real-import` corpus is its next escalation).

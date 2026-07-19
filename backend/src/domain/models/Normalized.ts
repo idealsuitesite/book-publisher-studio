@@ -99,7 +99,20 @@ export interface DocumentMetadata {
   uploadedAt: Date;
 }
 
+/**
+ * A normalization decision the source's author would want to know about (ADR-0049): the
+ * normalizer legitimately drops or reshapes content, but doing so SILENTLY is how a real
+ * manuscript lost a heading with no trace (IMPORT_FIDELITY.md §1 — an empty Heading 1,
+ * absorbed, 18 → 17 chapters). Import-time evidence only: the dropped content does not exist
+ * in the Book AST, so re-validation on read cannot rediscover it.
+ */
+export interface NormalizationDiagnostic {
+  code: 'EMPTY_HEADING_DROPPED';
+  message: string;
+}
+
 export interface NormalizedDocument {
   metadata: DocumentMetadata;
   nodes: AnyNormalizedNode[];
+  diagnostics?: NormalizationDiagnostic[];
 }

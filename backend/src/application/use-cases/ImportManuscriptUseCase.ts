@@ -5,6 +5,7 @@ import type { ASTBuilder } from '../../domain/services/ASTBuilder';
 import type { ValidationEngine } from '../../domain/services/ValidationEngine';
 import type { BookMetricsCalculator } from '../../domain/services/BookMetricsCalculator';
 import type { Book, ValidationReport } from '../../domain/models/Book';
+import type { NormalizationDiagnostic } from '../../domain/models/Normalized';
 import type { BookMapper } from '../mappers/BookMapper';
 import type { ImportRequest } from './types';
 import type { ImportResponseDTO } from '../dto/ImportResponseDTO';
@@ -42,7 +43,7 @@ export class ImportManuscriptUseCase implements UseCase<ImportRequest, ImportRes
     const validation = this.validator.validate({ book });
     const enrichedBook = this.metrics.calculate(book);
     const bookDTO = this.mapper.map(enrichedBook);
-    const report = this.buildReport(enrichedBook, validation);
+    const report = this.buildReport(enrichedBook, validation, normalized.diagnostics);
 
     // A successful import IS the creation of a project (PRODUCT_OBJECT_MODEL.md - the project
     // is the unit of work; the book is content). The original upload is retained as a 'source'
@@ -71,9 +72,9 @@ export class ImportManuscriptUseCase implements UseCase<ImportRequest, ImportRes
     return { book: bookDTO, report, projectId };
   }
 
-  private buildReport(book: Book, validation: ValidationReport) {
+  private buildReport(book: Book, validation: ValidationReport, diagnostics?: NormalizationDiagnostic[]) {
     // Extracted to ImportReportMapper the day GetProjectUseCase became its second consumer -
     // the Workspace's Validation station must show the SAME report shape import showed.
-    return buildImportReport(book, validation, this.metrics);
+    return buildImportReport(book, validation, this.metrics, diagnostics);
   }
 }

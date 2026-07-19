@@ -235,4 +235,31 @@ describe('HtmlNormalizer', () => {
       expect(doc.nodes.some((n) => n.type === 'table')).toBe(true);
     });
   });
+
+  // ADR-0049: the drop is right, the silence was not - a real manuscript lost an empty
+  // Heading 1 with no trace (18 h1 in the source, 17 chapters out, IMPORT_FIDELITY.md).
+  describe('empty-heading diagnostics (ADR-0049)', () => {
+    it('drops an empty heading but says so', () => {
+      const doc = normalizer.normalize('<h1>Real</h1><p>Text.</p><h1></h1><h1>Also real</h1>');
+
+      const headings = doc.nodes.filter((n) => n.type === 'heading');
+      expect(headings).toHaveLength(2);
+      expect(doc.diagnostics).toHaveLength(1);
+      expect(doc.diagnostics?.[0].code).toBe('EMPTY_HEADING_DROPPED');
+      expect(doc.diagnostics?.[0].message).toContain('Heading 1');
+    });
+
+    it('emits no diagnostics channel when nothing was dropped', () => {
+      const doc = normalizer.normalize('<h1>Real</h1><p>Text.</p>');
+
+      expect(doc.diagnostics).toBeUndefined();
+    });
+
+    it('an empty paragraph is still dropped silently - only headings carry structure', () => {
+      const doc = normalizer.normalize('<p>Text.</p><p></p>');
+
+      expect(doc.nodes).toHaveLength(1);
+      expect(doc.diagnostics).toBeUndefined();
+    });
+  });
 });

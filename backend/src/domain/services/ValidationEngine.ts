@@ -57,6 +57,15 @@ function scoreFor(issues: ValidationIssue[]): number {
 }
 
 /**
+ * ERROR-severity codes that do NOT make the report invalid (ADR-0049). The finding is grave —
+ * it caps the structure score and blocks "Validate for KDP" — but rejecting the import would
+ * destroy the very evidence (the project, its Proof, its Structure station) the author needs
+ * to understand and fix the problem. Severity states gravity; rejection is a separate,
+ * narrower decision. Every other ERROR still rejects, exactly as before.
+ */
+export const EXPLORABLE_ERROR_CODES: ReadonlySet<string> = new Set(['UNSTRUCTURED_MANUSCRIPT']);
+
+/**
  * Orchestrates every registered ValidationRule (docs/architecture/diagrams/
  * VALIDATION_ENGINE.md). Never mutates `context` (ADR-0027) - it only reads
  * each rule's findings and assembles the report. `errors`/`warnings` are
@@ -82,7 +91,11 @@ export class ValidationEngine {
     const warnings = issues.filter((issue) => issue.severity === 'WARNING').map(toValidationWarning);
 
     return {
-      isValid: errors.length === 0,
+      // Explorable errors (ADR-0049) stay in `errors`/`issues` and in the score, but do not
+      // invalidate the report — see EXPLORABLE_ERROR_CODES for the why.
+      isValid: !issues.some(
+        (issue) => issue.severity === 'ERROR' && !EXPLORABLE_ERROR_CODES.has(issue.code)
+      ),
       errors,
       warnings,
       issues,

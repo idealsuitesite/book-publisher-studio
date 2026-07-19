@@ -303,4 +303,45 @@ describe('ImportManuscriptUseCase', () => {
       expect(response.projectId).toBeUndefined();
     });
   });
+
+  // ADR-0049 - the CTO's Q1 decision: UNSTRUCTURED_MANUSCRIPT is an ERROR, but the import
+  // still succeeds and still creates the project. Rejecting would destroy the very evidence
+  // (Proof, Structure station) the author needs to understand the problem.
+  describe('unstructured manuscripts stay explorable (ADR-0049)', () => {
+    const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    it('imports a book-length manuscript with no headings: success, project created, error named', async () => {
+      const paragraphs = Array.from({ length: 30 }, () => `<p>${'word '.repeat(100).trim()}.</p>`);
+      const repository = new InMemoryProjectRepository();
+      let n = 0;
+      const useCase = new ImportManuscriptUseCase(
+        new StubParser(paragraphs.join('')),
+        new HtmlNormalizer(),
+        new ASTBuilder(),
+        createValidationEngine(),
+        new BookMetricsCalculator(),
+        new BookMapper(),
+        new ProjectService(() => `id-${++n}`),
+        repository
+      );
+
+      const response = await useCase.execute({ buffer: Buffer.from('x'), filename: 'notes.docx', mimeType: DOCX_MIME });
+
+      expect(response.report.status).toBe('success');
+      expect(response.projectId).toBeDefined();
+      expect(response.report.statistics.chapters).toBe(0);
+      const issue = response.report.issues.find((i) => i.code === 'UNSTRUCTURED_MANUSCRIPT');
+      expect(issue?.severity).toBe('ERROR');
+      expect(response.report.score.categories.structure).toBeLessThan(100);
+    });
+
+    it('surfaces a dropped empty heading as an import-time warning', async () => {
+      const useCase = buildUseCase(new StubParser('<h1>One</h1><p>Text.</p><h1></h1><h1>Two</h1><p>More.</p>'));
+
+      const response = await useCase.execute({ buffer: Buffer.from('x'), filename: 'book.docx', mimeType: DOCX_MIME });
+
+      expect(response.report.warnings.some((w) => w.includes('empty Heading 1'))).toBe(true);
+      expect(response.report.issues.some((i) => i.code === 'EMPTY_HEADING_DROPPED' && i.severity === 'WARNING')).toBe(true);
+    });
+  });
 });
