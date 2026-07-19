@@ -80,7 +80,11 @@ The shell's zones map to landmarks (`header`, `nav`, `main`, `aside`, `footer`/s
 *Recommendation: `/projects/:id` now.* Deep-linking a project is what makes the browser's back button, refresh and future collaboration links work; retrofitting URLs onto a stateful workspace is the expensive order. The id is meaningless after a restart today — disclosed, and fixed by Sprint 11, not by avoiding URLs.
 
 **Q-B — French or English UI text?**
-The CTO's sketches mix both ("New Project" / "Nouveau projet"). The product imports French manuscripts and the CTO writes French. *Recommendation: French as the product language now* — a real i18n layer is a later sprint and retrofitting is mechanical when strings live in components consistently.
+**✔ LOCKED: English** (CTO, 2026-07-19: the product will serve far more anglophones than francophones).
+
+*The original recommendation said French, and it was wrong twice over — recorded rather than edited away.* It reasoned from "the CTO writes French" instead of from the market, and it missed evidence already in the codebase: **the existing UI is entirely English** ("Import complete", "Generate Preview", "Validation" — grep-confirmed). French-now would have meant translating an English UI into French for a majority-anglophone audience, then translating it back when i18n arrives.
+
+What this decision does **not** touch, stated so it never gets conflated: **UI language ≠ manuscript language.** The product's handling of French (and every other) manuscript content is governed by the Unicode invariant and is unaffected — an anglophone UI publishing *Le Guide de Jean* flawlessly is exactly the product. French becomes the **first translation target** when a real i18n layer arrives (locale files, a later sprint); until then the discipline that keeps that retrofit mechanical is simply consistent sentence-case English strings living in components, which is already the codebase's habit.
 
 **Q-C — does the Properties zone render on Home at all?**
 *Recommendation: no — absent on Home, present in the workspace.* An empty right rail on a library screen is dead space wearing a zone's name; the zone's *slot* in the grid exists either way, which is all the evolution needs.
