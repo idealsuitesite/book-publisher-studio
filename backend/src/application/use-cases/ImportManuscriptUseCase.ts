@@ -4,29 +4,13 @@ import type { DocumentNormalizer } from '../../domain/ports/DocumentNormalizer';
 import type { ASTBuilder } from '../../domain/services/ASTBuilder';
 import type { ValidationEngine } from '../../domain/services/ValidationEngine';
 import type { BookMetricsCalculator } from '../../domain/services/BookMetricsCalculator';
-import type { Book, ValidationReport, ValidationIssue, QualityScore } from '../../domain/models/Book';
+import type { Book, ValidationReport } from '../../domain/models/Book';
 import type { BookMapper } from '../mappers/BookMapper';
 import type { ImportRequest } from './types';
 import type { ImportResponseDTO } from '../dto/ImportResponseDTO';
-import type { ImportReportDTO } from '../dto/ImportReportDTO';
-import type { ValidationIssueDTO } from '../dto/ValidationIssueDTO';
-import type { QualityScoreDTO } from '../dto/QualityScoreDTO';
+import { buildImportReport } from '../mappers/ImportReportMapper';
 import type { ProjectService } from '../../domain/services/ProjectService';
 import type { ProjectRepository } from '../../domain/ports/ProjectRepository';
-
-function toIssueDTO(issue: ValidationIssue): ValidationIssueDTO {
-  return {
-    code: issue.code,
-    message: issue.message,
-    location: issue.location,
-    severity: issue.severity,
-    suggestion: issue.suggestion,
-  };
-}
-
-function toScoreDTO(score: QualityScore): QualityScoreDTO {
-  return { overall: score.overall, categories: { ...score.categories } };
-}
 
 export class ImportManuscriptUseCase implements UseCase<ImportRequest, ImportResponseDTO> {
   constructor(
@@ -87,16 +71,9 @@ export class ImportManuscriptUseCase implements UseCase<ImportRequest, ImportRes
     return { book: bookDTO, report, projectId };
   }
 
-  private buildReport(book: Book, validation: ValidationReport): ImportReportDTO {
-    const { chapters, images, tables } = this.metrics.countContent(book);
-
-    return {
-      status: validation.isValid ? 'success' : 'error',
-      statistics: { chapters, images, tables, words: book.wordCount ?? 0 },
-      warnings: validation.warnings.map((warning) => warning.message),
-      errors: validation.errors.map((error) => error.message),
-      issues: validation.issues.map(toIssueDTO),
-      score: toScoreDTO(validation.score),
-    };
+  private buildReport(book: Book, validation: ValidationReport) {
+    // Extracted to ImportReportMapper the day GetProjectUseCase became its second consumer -
+    // the Workspace's Validation station must show the SAME report shape import showed.
+    return buildImportReport(book, validation, this.metrics);
   }
 }

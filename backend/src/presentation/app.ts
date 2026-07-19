@@ -34,6 +34,9 @@ import { ProjectService } from '../domain/services/ProjectService';
 import { ProjectSummaryMapper } from '../application/mappers/ProjectSummaryMapper';
 import { ProjectsController } from './controllers/ProjectsController';
 import { projectRoutes } from './routes/projects';
+import { GetProjectUseCase } from '../application/use-cases/GetProjectUseCase';
+import { ExportProjectUseCase } from '../application/use-cases/ExportProjectUseCase';
+import { PublishProjectUseCase } from '../application/use-cases/PublishProjectUseCase';
 
 export function createApp(): Express {
   const app: Express = express();
@@ -74,11 +77,6 @@ export function createApp(): Express {
   );
   const manuscriptController = new ManuscriptController(importManuscriptUseCase);
   app.use('/api/manuscripts', manuscriptRoutes(manuscriptController));
-
-  // The author's library — read-only this sprint (see ProjectsController for what is
-  // deliberately absent and why).
-  const projectsController = new ProjectsController(projectRepository, new ProjectSummaryMapper());
-  app.use('/api/projects', projectRoutes(projectsController));
 
   // Sprint 2: Rendering pipeline (Theme Engine, Layout Engine, DOCX export)
   // Sprint 3A: PDF export reuses the same renderer-agnostic use case with PDFRenderer instead
@@ -141,6 +139,24 @@ export function createApp(): Express {
   );
   const publishController = new PublishController(publishUseCase, new ManualLayoutSelector(), new PublishingReportMapper());
   app.use('/api/manuscripts', publishRoutes(publishController));
+
+  // The author's library and the Workspace's project operations (HOME_WORKSPACE.md section 0).
+  // Export/publish here run from the STORED project source (Decision 6) through the SAME
+  // pipeline instances the manuscript routes use - one pipeline, two entry points, no drift.
+  const projectsController = new ProjectsController(
+    projectRepository,
+    new ProjectSummaryMapper(),
+    new GetProjectUseCase(projectRepository, createValidationEngine(), new BookMetricsCalculator(), new BookMapper()),
+    projectService,
+    new ExportProjectUseCase(
+      projectRepository,
+      { docx: exportDocxUseCase, pdf: exportPdfUseCase, epub: exportEpubUseCase },
+      new ManualLayoutSelector()
+    ),
+    new PublishProjectUseCase(projectRepository, projectService, publishUseCase, new ManualLayoutSelector()),
+    new PublishingReportMapper()
+  );
+  app.use('/api/projects', projectRoutes(projectsController));
 
   // Sprint 7 commit 2 (Decision 5): a real discovery endpoint, additive to Presentation only -
   // no Domain/Application change beyond the two additive, read-only list functions the

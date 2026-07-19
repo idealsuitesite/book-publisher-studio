@@ -31,3 +31,4 @@ export type { ImportReportDTO } from './ImportReportDTO';
 export type { ImportResponseDTO } from './ImportResponseDTO';
 export type { PublishingIssueDTO, PublishingResponseDTO } from './PublishingResponseDTO';
 export type { ProjectSummaryDTO, ProjectListResponseDTO } from './ProjectSummaryDTO';
+export type { ProjectDTO, ProjectVersionDTO, ProjectPublicationDTO, ProjectSettingsDTO, UpdateProjectSettingsDTO } from './ProjectDTO';
