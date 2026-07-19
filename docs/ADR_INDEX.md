@@ -51,6 +51,7 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 | 0045 | Render Metrics Come From the Renderer — Correcting an Approved Decision | 2026-07-18 | Publishing, Rendering, Governance | APPROVED — corrects 0042 Q1, supersedes its ADR-0012 claim |
 | 0046 | Persistence Store Spike — SQLite via node:sqlite Recommended | 2026-07-18 | Product Object Model, Persistence | APPROVED — answers Aggregates Q6; implementation gated on Sprint 11 |
 | 0047 | A Successful Import Creates a Project — Decision 2 Amended in Code | 2026-07-18 | Product Object Model, Architecture | APPROVED — CTO-directed |
+| 0048 | Sprint 7 Decision 2 Formally Amended — the Backend Is Stateful and Durable | 2026-07-20 | Architecture, Persistence, Governance | APPROVED — discharges ADR-0041 Constraint 2 |
 
 ## By category
 
@@ -63,7 +64,7 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 - **Publishing Engine** (Sprint 8): 0035, 0036, 0037, 0038, 0042, 0045
 - **Governance** (process, not a specific engine): 0006, 0007, 0010, 0017, 0021, 0032, 0033, 0034, 0036, 0037, 0039, 0040, 0045
 - **UI Foundation** (Sprint 9): 0040
-- **Product Object Model / persistence**: 0044, 0046, 0047
+- **Product Object Model / persistence**: 0044, 0046, 0047, 0048
 - **Scalability / open constraints**: ~~0038~~ (resolved by 0042), 0041, 0043
 
 ## Related

@@ -1292,3 +1292,25 @@ The two renderers that return `pageCount: undefined` are not gaps - they are the
 **Verified end to end against the real server:** import of `typography-test.docx` → `projectId` returned → `GET /api/projects` lists the project with its name, zero versions, no publications. The rejected-import path and the Unicode invariant (`supplémentaire` intact through the whole HTTP loop) are locked by route tests.
 
 **Related:** `PRODUCT_OBJECT_MODEL.md` (the project as unit of work), `AGGREGATES_AND_PERSISTENCE.md` Question 5 (source retention — the byte-for-byte test is its proof), ADR-0044 (why delete/archive are absent from the endpoint), ADR-0046 (the chosen store this deliberately does not wire), ADR-0041 Constraint 2 (the governance gate durability still waits behind), Sprint 7 Decision 2 (the stateless rule this amends in code)
+
+---
+
+## ADR-0048: Sprint 7 Decision 2 Formally Amended — the Backend Is Stateful and Durable
+
+**Status:** APPROVED (Sprint 11 review `PERSISTENCE.md`, CTO feu vert 2026-07-20). Discharges ADR-0041 Constraint 2.
+**Date:** 2026-07-20
+
+**The decision:** the backend holds durable state. Projects — with their versions, publications, assets and retained sources — survive restarts, stored in SQLite via `node:sqlite` (ADR-0046's measured choice) behind the unchanged `ProjectRepository` port.
+
+**The history, so nobody re-litigates it:** Decision 2 ("stateless; every request a complete round trip", Sprint 7) was correct for a conversion tool and was retired in three recorded steps — in *principle* by the aggregate design (`AGGREGATES_AND_PERSISTENCE.md`), in *code* by ADR-0047 (imports create in-memory projects, CTO-directed), and *formally* here. ADR-0041 Constraint 2 required exactly this: an approved review amending the decision before Workspace-era persistence code exists. `PERSISTENCE.md` is that review.
+
+**What survives of Decision 2, on purpose:** the rendering pipeline stays stateless — parse→layout→render holds no session and every export is a complete computation from the stored source. Statefulness lives in exactly one place: behind the repository port. That confinement is why this amendment costs no architectural rework.
+
+**Load-bearing consequences:**
+- Versions are sharded into their own rows (same transaction, same whole-aggregate port contract) — the direct answer to ADR-0046's 45MB finding, and the free path to partial loading if Sprint 12 ever needs it.
+- Asset bytes never enter JSON (blobs table) and rehydrate as real `Buffer`s — the `structuredClone` downgrade lesson (ADR-0047) institutionalized as a tested hydration boundary.
+- `PRAGMA user_version` migrations from day one; the future `events` table (PRODUCT_EXPERIENCE §10.5) is a planned v2, not a bolt-on.
+- One shared behavioural contract suite runs against every repository implementation, in-memory included — a future cloud store (S15) starts by passing it.
+- The six-month-author journey (PRODUCT_EXPERIENCE §5) stops being a documented lie.
+
+**Related:** `PERSISTENCE.md` (the review), ADR-0041 (the gate), ADR-0046 (the spike), ADR-0047 (the in-code precursor + the Buffer scar), ADR-0044 (`archived_at` indexed), Sprint 7 Decision 2 (the decision honourably retired).
