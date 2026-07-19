@@ -14,6 +14,10 @@ export interface LayoutOptionDTO {
   name: string;
   label: string;
   category: 'standard' | 'kdp';
+  /** Real page dimensions in points (additive, PRODUCT_EXPERIENCE §4.3): the preset cards
+   * draw true proportions and print real mm/inches from these — never invented. */
+  widthPt?: number;
+  heightPt?: number;
 }
 
 export interface ManuscriptOptionsDTO {

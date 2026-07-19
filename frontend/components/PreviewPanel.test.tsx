@@ -5,7 +5,7 @@ import { PreviewPanel } from './PreviewPanel';
 
 const exporter = vi.fn<() => Promise<Blob>>();
 
-/** A minimal PDF-shaped blob with two /MediaBox markers — the real page-count heuristic. */
+/** A minimal PDF-shaped blob with N /MediaBox markers — the real page-count heuristic. */
 const pdfBlob = (pages: number) =>
   new Blob([`%PDF-1.4${'/MediaBox [0 0 612 792]'.repeat(pages)}`]);
 
@@ -19,8 +19,8 @@ function setup(overrides: Partial<Props> = {}) {
     themeLabel: 'Classic',
     ...overrides,
   };
-  render(<PreviewPanel {...props} />);
-  return props;
+  const view = render(<PreviewPanel {...props} />);
+  return { props, view };
 }
 
 beforeEach(() => {
@@ -37,67 +37,64 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('PreviewPanel', () => {
-  it('shows the current format and theme before anything is generated', () => {
+// The living Proof (PRODUCT_EXPERIENCE §4.5): no Generate button — the proof exists because
+// the view opened, and refreshes because settings changed.
+describe('PreviewPanel — the living proof', () => {
+  it('has NO generate button — the button died with the pipeline metaphor', () => {
+    exporter.mockResolvedValue(pdfBlob(1));
+    setup();
+    expect(screen.queryByRole('button', { name: /create|generate|refresh/i })).not.toBeInTheDocument();
+  });
+
+  it('produces the proof on its own when the view opens', async () => {
+    exporter.mockResolvedValue(pdfBlob(2));
+    setup();
+
+    await waitFor(() => expect(exporter).toHaveBeenCalledTimes(1), { timeout: 3000 });
+  });
+
+  it('re-inks when the settings change — modify → the rendering follows', async () => {
+    exporter.mockResolvedValue(pdfBlob(2));
+    const { view, props } = setup();
+    await waitFor(() => expect(exporter).toHaveBeenCalledTimes(1), { timeout: 3000 });
+
+    view.rerender(<PreviewPanel {...props} settingsKey="a4/classic" />);
+
+    await waitFor(() => expect(exporter).toHaveBeenCalledTimes(2), { timeout: 3000 });
+  });
+
+  it('reads the page count from the produced PDF itself, never an estimate', async () => {
+    exporter.mockResolvedValue(pdfBlob(3));
+    setup();
+
+    expect(await screen.findByText('3', {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+
+  it('reports the real page count upward for the engine facts', async () => {
+    exporter.mockResolvedValue(pdfBlob(4));
+    const onPageCount = vi.fn();
+    setup({ onPageCount });
+
+    await waitFor(() => expect(onPageCount).toHaveBeenCalledWith(4), { timeout: 3000 });
+  });
+
+  it('shows the current format and theme while the first proof is being set', () => {
+    exporter.mockImplementation(() => new Promise(() => {}));
     setup();
     expect(screen.getByText('KDP 6" x 9"')).toBeInTheDocument();
     expect(screen.getByText('Classic')).toBeInTheDocument();
   });
 
-  it('does not claim a page count before a real preview exists', () => {
-    setup();
-    expect(screen.queryByText(/Estimated pages/i)).not.toBeInTheDocument();
-  });
-
-  it('asks its injected exporter for the preview - the panel owns no source, per Decision 6', async () => {
-    exporter.mockResolvedValue(pdfBlob(2));
-    const user = userEvent.setup();
-    setup();
-
-    await user.click(screen.getByRole('button', { name: 'Create proof' }));
-
-    await waitFor(() => expect(exporter).toHaveBeenCalledTimes(1));
-  });
-
-  it('derives the page count from the real returned PDF, not from an estimate', async () => {
-    exporter.mockResolvedValue(pdfBlob(5));
-    const user = userEvent.setup();
-    setup();
-
-    await user.click(screen.getByRole('button', { name: /proof/i }));
-
-    expect(await screen.findByText(/5/)).toBeInTheDocument();
-  });
-
-  it('notifies the parent once a preview really completed', async () => {
-    exporter.mockResolvedValue(pdfBlob(2));
-    const onGenerated = vi.fn();
-    const user = userEvent.setup();
-    setup({ onGenerated });
-
-    await user.click(screen.getByRole('button', { name: /proof/i }));
-
-    await waitFor(() => expect(onGenerated).toHaveBeenCalledTimes(1));
-  });
-
-  it('surfaces a real failure rather than leaving the panel blank', async () => {
-    exporter.mockRejectedValue(new Error('Export timed out after 180s'));
-    const user = userEvent.setup();
-    setup();
-
-    await user.click(screen.getByRole('button', { name: /proof/i }));
-
-    expect(await screen.findByText(/Export timed out after 180s/)).toBeInTheDocument();
-  });
-
-  it('is operable by keyboard', async () => {
+  it('surfaces a real failure with a way to try again', async () => {
+    exporter.mockRejectedValueOnce(new Error('Unknown page layout: bad'));
     exporter.mockResolvedValue(pdfBlob(1));
     const user = userEvent.setup();
     setup();
 
-    await user.tab();
-    await user.keyboard('{Enter}');
+    expect(await screen.findByText(/Unknown page layout: bad/, {}, { timeout: 3000 })).toBeInTheDocument();
 
-    await waitFor(() => expect(exporter).toHaveBeenCalled());
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+
+    await waitFor(() => expect(exporter).toHaveBeenCalledTimes(2), { timeout: 3000 });
   });
 });

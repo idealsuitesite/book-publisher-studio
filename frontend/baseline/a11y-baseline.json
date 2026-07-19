@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-07-19T13:31:20.924Z",
+  "capturedAt": "2026-07-19T14:19:17.653Z",
   "totalViolations": 3,
   "totalNodes": 3,
   "screens": [
@@ -31,7 +31,7 @@
       "screen": "04-layout-kdp",
       "viewport": "desktop",
       "file": "04-layout-kdp--desktop.png",
-      "bytes": 68636,
+      "bytes": 89933,
       "status": "captured",
       "violations": [
         {
@@ -46,7 +46,7 @@
       "screen": "05-proof",
       "viewport": "desktop",
       "file": "05-proof--desktop.png",
-      "bytes": 52697,
+      "bytes": 52666,
       "status": "captured",
       "violations": [
         {
@@ -61,7 +61,7 @@
       "screen": "06-editions-publish",
       "viewport": "desktop",
       "file": "06-editions-publish--desktop.png",
-      "bytes": 85307,
+      "bytes": 109379,
       "status": "captured",
       "violations": [
         {

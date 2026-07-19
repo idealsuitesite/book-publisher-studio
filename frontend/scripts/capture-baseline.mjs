@@ -185,10 +185,10 @@ async function runDemoScript(browser, viewport) {
   await page.waitForTimeout(500);
   await scan(page, '04-layout-kdp', viewport.name);
 
-  // Step 5 - Proof: a real render from the STORED source.
+  // Step 5 - the LIVING Proof (PRODUCT_EXPERIENCE §4.5): no button to click - opening the
+  // view produces the proof from the STORED source; the capture just waits for it to settle.
   await page.getByRole('button', { name: /^Proof/ }).click();
-  await page.getByRole('button', { name: /Create proof/i }).click();
-  await waitForText(page, 'pages', 120000).catch(() => {});
+  await waitForText(page, 'Up to date', 120000).catch(() => {});
   await scan(page, '05-proof', viewport.name);
 
   // Step 6 - Editions & Publish: real KDP validation, recorded into history.

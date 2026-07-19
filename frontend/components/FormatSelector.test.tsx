@@ -7,9 +7,9 @@ import { FormatSelector } from './FormatSelector';
 const options: ManuscriptOptionsDTO = {
   themes: [{ name: 'classic', label: 'Classic' }],
   layouts: [
-    { name: 'letter', label: 'US Letter', category: 'standard' },
-    { name: 'a4', label: 'A4', category: 'standard' },
-    { name: 'kdp-6x9', label: 'KDP 6" x 9"', category: 'kdp' },
+    { name: 'letter', label: 'US Letter', category: 'standard', widthPt: 612, heightPt: 792 },
+    { name: 'a4', label: 'A4', category: 'standard', widthPt: 595.28, heightPt: 841.89 },
+    { name: 'kdp-6x9', label: 'KDP 6" x 9"', category: 'kdp', widthPt: 432, heightPt: 648 },
   ],
 };
 
@@ -40,11 +40,12 @@ describe('FormatSelector', () => {
     expect(screen.getByText('Amazon KDP')).toBeInTheDocument();
   });
 
-  it('marks the selected layout as checked', () => {
+  it('marks the selected preset as pressed', () => {
     setup({ selectedLayout: 'a4' });
-    const radios = screen.getAllByRole('radio');
-    const checked = radios.filter((r) => (r as HTMLInputElement).checked);
-    expect(checked).toHaveLength(2); // one layout + one theme
+    const pressed = screen
+      .getAllByRole('button')
+      .filter((b) => b.getAttribute('aria-pressed') === 'true');
+    expect(pressed).toHaveLength(2); // one layout + one theme
   });
 
   it('reports a layout change to the parent rather than holding state itself', async () => {
@@ -56,13 +57,23 @@ describe('FormatSelector', () => {
     expect(onLayoutChange).toHaveBeenCalledWith('kdp-6x9');
   });
 
-  it('exposes real radio semantics, so the group is keyboard navigable', () => {
+  it('presets are real buttons with pressed state - visual choice, keyboard operable', () => {
+    // The radios died (PRODUCT_EXPERIENCE §4.3: presets, not radios). What replaces them must
+    // still be operable: real <button>s with aria-pressed, focusable and Enter-activatable.
     setup();
-    // Radios grouped by `name` are what give arrow-key navigation; a div-based fake would
-    // render identically and be unusable by keyboard.
-    const radios = screen.getAllByRole('radio');
-    expect(radios.length).toBeGreaterThan(1);
-    expect(radios.every((r) => r.getAttribute('name'))).toBe(true);
+    const buttons = screen.getAllByRole('button').filter((b) => b.hasAttribute('aria-pressed'));
+    expect(buttons.length).toBeGreaterThan(2);
+  });
+
+  it('prints the REAL dimensions on the preset card - measured, never invented', () => {
+    setup();
+    // 432pt / 72 = 6in = 152.4mm; 648pt = 9in = 228.6mm.
+    expect(screen.getByText(/152 × 229 mm · 6″ × 9″/)).toBeInTheDocument();
+  });
+
+  it('badges the KDP presets with their platform', () => {
+    setup();
+    expect(screen.getByText('KDP', { exact: true })).toBeInTheDocument();
   });
 
   it('renders themes as well as layouts', () => {

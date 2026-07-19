@@ -19,8 +19,8 @@ import { CommandPalette, type PaletteCommand } from '@/components/studio/Command
 import { BookStructureView } from '@/components/BookStructureView';
 import { FormatSelector } from '@/components/FormatSelector';
 import { PreviewPanel } from '@/components/PreviewPanel';
-import { ExportPanel } from '@/components/ExportPanel';
-import { PublishPanel } from '@/components/PublishPanel';
+import { PublishDesk } from '@/components/studio/PublishDesk';
+import { Timeline } from '@/components/studio/Timeline';
 
 const VIEW_TITLES: Record<StudioView, string> = {
   dashboard: 'Overview',
@@ -246,58 +246,17 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
           />
         )}
         {view === 'editions' && (
-          <>
-            <ExportPanel
-              exporter={async (format) => {
-                const blob = await exportProject(id, format);
-                setStudioFacts({ lastEdition: `${format.toUpperCase()} edition · just now` });
-                return blob;
-              }}
-              downloadName={project.name}
-            />
-            <PublishPanel projectId={id} onPublished={reload} />
-          </>
+          <PublishDesk
+            project={project}
+            exporter={async (format) => {
+              const blob = await exportProject(id, format);
+              setStudioFacts({ lastEdition: `${format.toUpperCase()} edition · just now` });
+              return blob;
+            }}
+            onPublished={reload}
+          />
         )}
-        {view === 'history' && (
-          <div className="flex w-full max-w-2xl flex-col gap-6 text-left">
-            <div>
-              <h3 className="mb-2 text-lg font-semibold text-app-text">Versions</h3>
-              {project.versions.length === 0 ? (
-                <p className="text-sm text-app-text-muted">
-                  No versions yet — publishing snapshots one automatically.
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-1 text-sm text-app-text">
-                  {project.versions.map((version) => (
-                    <li key={version.id}>
-                      Version {version.number}
-                      {version.label && <span className="text-app-text-muted"> · {version.label}</span>}
-                      <span className="text-app-text-muted"> · {new Date(version.createdAt).toLocaleString()}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div>
-              <h3 className="mb-2 text-lg font-semibold text-app-text">Publications</h3>
-              {project.publications.length === 0 ? (
-                <p className="text-sm text-app-text-muted">No publication attempts yet.</p>
-              ) : (
-                <ul className="flex flex-col gap-1 text-sm text-app-text">
-                  {project.publications.map((event, index) => (
-                    <li key={index}>
-                      <span className="font-medium uppercase">{event.target}</span> — {event.status}
-                      {event.versionNumber !== undefined && (
-                        <span className="text-app-text-muted"> · version {event.versionNumber}</span>
-                      )}
-                      <span className="text-app-text-muted"> · {new Date(event.occurredAt).toLocaleString()}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        )}
+        {view === 'history' && <Timeline project={project} />}
       </section>
 
       <aside

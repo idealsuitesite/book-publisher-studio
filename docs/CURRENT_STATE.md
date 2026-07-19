@@ -6,6 +6,14 @@
 >
 > **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed.
 >
+> ### Session of 2026-07-20: P2+P3 complete — the premium build's feature set is DONE
+> **Backend 533/533, frontend 136/136, baseline 21/21 byte-identical twice, axe 3 nodes, build+lint green.**
+> - **Presets, not radios** (`FormatSelector` reborn): true-proportion paper miniatures from REAL dimensions (`LayoutOptionDTO.widthPt/heightPt`, additive, served from the layout registry), mm+inches computed, KDP badges, theme card speaking Gelasio + the honest "More themes are being set" slot.
+> - **The living Proof**: the Generate button is dead. Mount → proof; settings change → debounced re-ink (old page dims, never a blank flash); runId guard so the proof never goes backwards; page count read from the produced PDF's own bytes; failures get an inline Try again.
+> - **PublishDesk** (§4.7 architecture): readiness (one validation, N destinations) · publication history with version links · last-rejection panel · Editions + KDP validate. Built for the RuleProvider future; only real providers render.
+> - **Timeline** (§4.8): day-grouped story from real events; "No versions" is dead — a one-hour-old project already has a narrative. Minute granularity awaits the ProjectEvent log (S11/S12).
+> - **What remains of the approved reviews**: P4 calibration (awaits CTO feelings on `docs/demo/screenshots/atelier/`), engine-rendered preset thumbnails (cached endpoint, noted in PRODUCT_EXPERIENCE §4.3), `EDITOR_EXPERIENCE.md` review, **S11 persistence (SQLite, ADR-0046) — now the single most valuable next step: the studio tells a story a restart still erases.**
+
 > ### Session of 2026-07-19 (night): L'ATELIER SHIPS — P1+P2 of the premium build
 > **Backend 533/533, frontend 134/134, baseline 21/21 byte-identical twice consecutively, axe at 3 nodes, build+lint green.** CTO gave full feu vert on VISUAL_LANGUAGE; implemented:
 > - **Tokens**: warm-paper surface ramp (light+dark), ink text (muted recalibrated to ≥4.5:1 after axe), Prussian accent, warm semantics, motion vars. **Zero zinc literals remain.**

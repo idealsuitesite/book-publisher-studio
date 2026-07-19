@@ -3,29 +3,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Card } from '@/components/ui';
 
-// Sprint 7 commit 9a - real PDF preview (Decision 1: full re-export, not an incremental preview
-// system). "Generate Preview" fires a real POST /api/manuscripts/export?format=pdf for the
-// currently selected layout/theme and embeds the real returned PDF. The page count shown next
-// to it is derived from that same real PDF's bytes (a /MediaBox occurrence count, the same
-// heuristic backend/src/test-utils/extractPdfText.ts already uses for this project's own PDFKit
-// output) - not a live per-option estimate in the selector, which would need one export call per
-// layout before the user has even chosen (see docs/TODO.md's Commit 9a note for why that was
-// rejected). Download (commit 9b) is a separate action, not wired here.
-//
-// Commit 11 redesign (CTO direction): shows the real selected format/theme labels up front, so
-// the user knows what will be generated before clicking - "Estimated pages" still only appears
-// once a preview has actually been generated (a real number from a real PDF), never guessed
-// ahead of a real request. onGenerated is a real-completion callback for ProgressStepper, not a
-// simulated "done" flag.
+/**
+ * The living Proof (PRODUCT_EXPERIENCE §4.5, CTO: "le bouton disparaît"). The proof exists
+ * because you opened it, and refreshes because you changed something — no Generate button.
+ * On mount and on every settings change the panel debounces, then runs the REAL pipeline via
+ * its injected exporter (from the STORED source, Decision 6). While a refresh runs, the old
+ * page stays visible and dims — the re-inking (VISUAL_LANGUAGE §6), never a blank flash.
+ *
+ * Feasibility is measured, not hoped: the full pipeline is ~600ms on the large fixture
+ * (ADR-0041); S13 (Performance) owns making it instant. The page count shown is read from the
+ * produced PDF's own bytes — real, never estimated.
+ */
 interface PreviewPanelProps {
-  /**
-   * Produces the PDF this panel previews. Injected rather than owned (HOME_WORKSPACE.md
-   * Decision 6): the Workspace passes a project-based exporter that renders from the STORED
-   * source, so this panel never needs to know a File exists — the browser holds an id, the
-   * system holds the book.
-   */
+  /** Produces the PDF. Injected (Decision 6): the browser holds an id, the system holds the book. */
   exporter: () => Promise<Blob>;
-  /** Identifies the settings the exporter will use — staleness is detected when it changes. */
+  /** Identifies the settings the exporter will use — a change triggers the living refresh. */
   settingsKey: string;
   layoutLabel: string;
   themeLabel: string;
@@ -34,11 +26,16 @@ interface PreviewPanelProps {
   onPageCount?: (pages: number | null) => void;
 }
 
-type PreviewState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'ready'; blobUrl: string; pageCount: number | null; settingsKey: string }
-  | { status: 'error'; message: string };
+interface ProofState {
+  blobUrl: string | null;
+  pageCount: number | null;
+  refreshing: boolean;
+  error: string | null;
+}
+
+/** Debounce before a settings change re-inks the proof. Long enough to absorb a click-flurry
+ * through presets, short enough to feel alive. */
+const REFRESH_DEBOUNCE_MS = 500;
 
 function countPdfPages(bytes: ArrayBuffer): number | null {
   const text = new TextDecoder('latin1').decode(bytes);
@@ -47,46 +44,60 @@ function countPdfPages(bytes: ArrayBuffer): number | null {
 }
 
 export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, onGenerated, onPageCount }: PreviewPanelProps) {
-  const [state, setState] = useState<PreviewState>({ status: 'idle' });
+  const [state, setState] = useState<ProofState>({ blobUrl: null, pageCount: null, refreshing: true, error: null });
+  const [retry, setRetry] = useState(0);
   const blobUrlRef = useRef<string | null>(null);
+  const runIdRef = useRef(0);
 
-  // Staleness (the current preview no longer matches the selected layout/theme) is a derived
-  // render-time value, not effect-driven state - avoids the cascading-setState-in-effect
-  // anti-pattern a layout-change useEffect would otherwise trigger on every mount.
-  const isStale = state.status === 'ready' && state.settingsKey !== settingsKey;
-
-  // Cleanup-only effect (no setState in the body) - just revokes the last blob URL on unmount,
-  // e.g. when "Import another file" tears this component down.
   useEffect(() => {
     return () => {
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     };
   }, []);
 
-  async function generatePreview() {
-    setState({ status: 'loading' });
-    try {
-      const blob = await exporter();
-      const bytes = await blob.arrayBuffer();
-      const pageCount = countPdfPages(bytes);
-      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-      const blobUrl = URL.createObjectURL(blob);
-      blobUrlRef.current = blobUrl;
-      setState({ status: 'ready', blobUrl, pageCount, settingsKey });
-      onGenerated?.();
-      onPageCount?.(pageCount);
-    } catch (error) {
-      setState({ status: 'error', message: error instanceof Error ? error.message : 'Preview failed.' });
-    }
-  }
+  // The living loop: mount → proof; settingsKey change → debounce → proof. A run that finishes
+  // after a newer one started is discarded (runId guard) — the proof never goes backwards.
+  useEffect(() => {
+    const runId = runIdRef.current + 1;
+    runIdRef.current = runId;
+    setState((current) => ({ ...current, refreshing: true, error: null }));
+
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const blob = await exporter();
+          if (runIdRef.current !== runId) return;
+          const bytes = await blob.arrayBuffer();
+          const pageCount = countPdfPages(bytes);
+          if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+          const blobUrl = URL.createObjectURL(blob);
+          blobUrlRef.current = blobUrl;
+          setState({ blobUrl, pageCount, refreshing: false, error: null });
+          onGenerated?.();
+          onPageCount?.(pageCount);
+        } catch (error) {
+          if (runIdRef.current !== runId) return;
+          setState((current) => ({
+            ...current,
+            refreshing: false,
+            error: error instanceof Error ? error.message : 'The proof could not be produced.',
+          }));
+        }
+      })();
+    }, REFRESH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsKey, retry]);
 
   return (
     <Card className="flex max-w-2xl flex-col gap-4 px-8 py-6 text-left">
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-semibold text-app-text">Proof</h3>
-        <Button onClick={() => void generatePreview()} disabled={state.status === 'loading'}>
-          {state.status === 'loading' ? 'Refreshing…' : state.status === 'ready' ? 'Refresh proof' : 'Create proof'}
-        </Button>
+        {/* No Generate button - the proof is alive. This line narrates its state instead. */}
+        <span className="text-xs text-app-text-muted" aria-live="polite">
+          {state.refreshing ? 'Re-inking…' : state.blobUrl ? 'Up to date' : ''}
+        </span>
       </div>
 
       <dl className="flex flex-wrap gap-6 text-sm">
@@ -98,29 +109,37 @@ export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, o
           <dt className="text-app-text-muted">Theme</dt>
           <dd className="font-medium text-app-text">{themeLabel}</dd>
         </div>
-        {state.status === 'ready' && state.pageCount != null && (
+        {state.pageCount != null && (
           <div>
-            <dt className="text-app-text-muted">Estimated pages</dt>
-            <dd className="font-medium text-app-text">{state.pageCount}</dd>
+            <dt className="text-app-text-muted">Pages</dt>
+            <dd className="font-medium tabular-nums text-app-text">{state.pageCount}</dd>
           </div>
         )}
       </dl>
 
-      {state.status === 'error' && <p className="text-sm text-app-error">{state.message}</p>}
-
-      {isStale && (
-        <p className="text-xs text-app-warning">
-          Layout or theme changed since this proof — refresh it to see the book as it now stands.
+      {state.error && (
+        <p className="text-sm text-app-error">
+          {state.error}{' '}
+          <Button variant="link" onClick={() => setRetry((n) => n + 1)} className="text-sm">
+            Try again
+          </Button>
         </p>
       )}
 
-      {state.status === 'ready' && (
+      {state.blobUrl && (
         <embed
           data-baseline-mask
           src={state.blobUrl}
           type="application/pdf"
-          className={`h-[500px] w-full rounded-lg border border-app-border ${isStale ? 'opacity-50' : ''}`}
+          className={`h-[500px] w-full rounded-lg border border-app-border transition-opacity duration-[var(--motion-view)] ${
+            state.refreshing ? 'opacity-40' : 'opacity-100'
+          }`}
         />
+      )}
+      {!state.blobUrl && state.refreshing && (
+        <div className="flex h-[500px] w-full items-center justify-center rounded-lg border border-app-border bg-app-surface-2">
+          <p className="animate-pulse text-sm text-app-text-muted">Setting the first proof…</p>
+        </div>
       )}
     </Card>
   );
