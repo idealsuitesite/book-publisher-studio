@@ -4,8 +4,14 @@
 
 > ## ▶ START HERE — session handoff (2026-07-18)
 >
-> **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed. Last commit `a13fec6`.
-> **Verified state:** backend **520/520**, frontend **144/144**, `verify-real-export` 16/16, `verify-real-publish` 4/4, baseline green, build + lint clean on both workspaces.
+> **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed. Last commit `d6fa420`.
+> **Verified state:** backend **528/528**, frontend **144/144**, `verify-real-export` 16/16, `verify-real-publish` 4/4, baseline 12/12 byte-identical, build + lint clean on both workspaces.
+>
+> ### Session of 2026-07-19: Commit 5, Phase B, Home/Workspace review
+> - **Sprint 9 Commit 5 done (`5cc5038`)** — the seven components consume `ui/` primitives, **byte-identical baseline on all 12 screens**. Byte-identity forced three corrections INTO the primitives (Button primary's phantom border-2; new `app-text-inverse` token; Card's bg lit 845,581 px at delta 5 — white over the page's real zinc-50). Dropzone state-borders and ProgressStepper stay raw, disclosed.
+> - **Phase B done (`82326f3`)** — line-level paragraph splitting with min-2-lines at both ends (= widow/orphan control). `Page.splitAfterLines`/`startsWithContinuation`; PDF renders segments with binary-search word-boundary cuts on the same metrics pagination measured with; DOCX never forces a break at a continuation. **Proof: a really-split 700-word paragraph renders with `metrics.pageCount` exactly equal to the model's count.** Still atomic, disclosed: quotes/scriptures, drop-cap paragraphs, lists/tables/images.
+> - **`HOME_WORKSPACE.md` written — 🟡 DRAFT awaiting CTO** (their instruction: review before code). First object = Project (already true everywhere but the screen, ADR-0047); zones-vs-screens rule; one backend addition scoped (`GET /api/projects/:id`); Decision 4 owns the Demo-Script/baseline supersession as the Commit-8 restyle. Three open questions with recommendations (URLs now, French UI, no Properties on Home).
+> - **Next:** CTO gate on HOME_WORKSPACE, then its commit plan (which absorbs UI_FOUNDATION Commits 6–8).
 >
 > ### Late session of 2026-07-18: the pagination-quality investigation (CTO real-book report)
 > The CTO exported a **real book**: pages half-empty, chapter titles alone above voids, "ça dépasse → nouvelle page". `LAYOUT_FIDELITY.md` is now **ROUND 2** with the full investigation (§2bis, all evidence line-numbered):
