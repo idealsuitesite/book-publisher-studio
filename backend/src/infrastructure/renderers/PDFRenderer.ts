@@ -26,6 +26,32 @@ const DROP_CAP_SCALE = 2.5;
 /** Resolves which registered font to use for a run, given its bold/italic flags. */
 type FontResolver = (bold: boolean, italic: boolean) => string;
 
+/**
+ * Partitions styled runs at a character offset into the concatenated text (Phase B). The
+ * boundary falls at a word end, so the tail's leading whitespace is trimmed rather than
+ * rendered as a bogus indent at the top of the continuation page.
+ */
+function splitRunsAt(runs: TypeRun[], offset: number): [TypeRun[], TypeRun[]] {
+  const head: TypeRun[] = [];
+  const tail: TypeRun[] = [];
+  let consumed = 0;
+  for (const run of runs) {
+    const end = consumed + run.text.length;
+    if (end <= offset) {
+      head.push(run);
+    } else if (consumed >= offset) {
+      tail.push(run);
+    } else {
+      const cut = offset - consumed;
+      head.push({ ...run, text: run.text.slice(0, cut) });
+      tail.push({ ...run, text: run.text.slice(cut) });
+    }
+    consumed = end;
+  }
+  if (tail.length > 0) tail[0] = { ...tail[0], text: tail[0].text.replace(/^\s+/, '') };
+  return [head.filter((r) => r.text.length > 0), tail.filter((r) => r.text.length > 0)];
+}
+
 // A real-PDFKit-page-index's owner: a domain Page (render its title/header/footer normally),
 // the literal string 'blank' (an intentionally blank page from Chapter.openingPageStyle - draw
 // nothing at all on it, matching real print convention), or undefined (pagination-estimate
@@ -33,6 +59,13 @@ type FontResolver = (bold: boolean, italic: boolean) => string;
 // LayoutEngine estimated, so there's no reliable title, but the page number still falls back to
 // the physical index rather than showing nothing).
 type PageOwner = Page | 'blank' | undefined;
+
+// Phase B (LAYOUT_FIDELITY.md Decision 7): which blocks are split, into which line counts, and
+// which domain Pages their continuations own.
+interface SplitPlan {
+  segments: Map<string, number[]>;
+  continuations: Map<string, Page[]>;
+}
 
 export class PDFRenderer implements Renderer<Buffer> {
   // compress defaults to true for real output; tests pass false so the content stream stays
@@ -85,8 +118,35 @@ export class PDFRenderer implements Renderer<Buffer> {
       // LayoutEngine only computes it there).
       const pageStarts = new Map<string, Page>();
       for (const page of book.pages.slice(1)) {
+        // A continuation page's first block is the TAIL of a block split on the previous page
+        // (Phase B): the split rendering below produces that page break itself, so forcing one
+        // here would double it — and would break the block at its start instead of mid-text.
+        if (page.startsWithContinuation) continue;
         const firstId = page.blocks[0];
         if (firstId) pageStarts.set(firstId, page);
+      }
+
+      // Phase B split plan: per split block, the line counts of every non-final segment, and
+      // the domain Pages its continuations own (so running heads carry the right numbers).
+      const splitSegments = new Map<string, number[]>();
+      const continuationPages = new Map<string, Page[]>();
+      for (const page of book.pages) {
+        if (page.splitAfterLines) {
+          const lastId = page.blocks[page.blocks.length - 1];
+          if (lastId) {
+            const segs = splitSegments.get(lastId) ?? [];
+            segs.push(page.splitAfterLines);
+            splitSegments.set(lastId, segs);
+          }
+        }
+        if (page.startsWithContinuation) {
+          const firstId = page.blocks[0];
+          if (firstId) {
+            const conts = continuationPages.get(firstId) ?? [];
+            conts.push(page);
+            continuationPages.set(firstId, conts);
+          }
+        }
       }
 
       // Real-PDFKit-page-index -> owning domain Page, built up as addPage() actually happens
@@ -140,6 +200,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         book.styledBook.blockTypography,
         pageStarts,
         pageOwners,
+        { segments: splitSegments, continuations: continuationPages },
         true
       );
 
@@ -245,6 +306,7 @@ export class PDFRenderer implements Renderer<Buffer> {
     blockTypography: Record<string, ResolvedTypography> | undefined,
     pageStarts: Map<string, Page>,
     pageOwners: PageOwner[],
+    splits: SplitPlan,
     isTopLevel: boolean
   ): void {
     for (const content of contents) {
@@ -266,13 +328,13 @@ export class PDFRenderer implements Renderer<Buffer> {
       this.renderTitle(doc, content, theme);
 
       for (const block of content.content) {
-        this.renderBlock(doc, block, theme, blockStyles[block.id], blockTypography, pageStarts, pageOwners);
+        this.renderBlock(doc, block, theme, blockStyles[block.id], blockTypography, pageStarts, pageOwners, splits);
       }
 
       if (content.type === 'chapter' && content.sections) {
-        this.renderContent(doc, content.sections, theme, blockStyles, blockTypography, pageStarts, pageOwners, false);
+        this.renderContent(doc, content.sections, theme, blockStyles, blockTypography, pageStarts, pageOwners, splits, false);
       } else if (content.type === 'section' && content.subsections) {
-        this.renderContent(doc, content.subsections, theme, blockStyles, blockTypography, pageStarts, pageOwners, false);
+        this.renderContent(doc, content.subsections, theme, blockStyles, blockTypography, pageStarts, pageOwners, splits, false);
       }
     }
   }
@@ -366,7 +428,8 @@ export class PDFRenderer implements Renderer<Buffer> {
     style: ResolvedBlockStyle | undefined,
     blockTypography: Record<string, ResolvedTypography> | undefined,
     pageStarts: Map<string, Page>,
-    pageOwners: PageOwner[]
+    pageOwners: PageOwner[],
+    splits: SplitPlan
   ): void {
     const ownerPage = pageStarts.get(block.id);
     if (ownerPage) {
@@ -400,6 +463,12 @@ export class PDFRenderer implements Renderer<Buffer> {
         const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
         const dropCap = blockTypography?.[block.id]?.dropCap ?? false;
         const options: PDFKit.Mixins.TextOptions = { align: block.align === 'justify' ? 'justify' : (block.align ?? 'left') };
+        const segments = splits.segments.get(block.id);
+        if (segments && !dropCap) {
+          this.renderSplitRuns(doc, runs, resolveBody, fontSize, color, options, segments, splits.continuations.get(block.id) ?? [], pageOwners);
+          doc.moveDown(spaceAfter / fontSize);
+          return;
+        }
         if (dropCap) {
           this.renderRunsWithDropCap(doc, runs, resolveBody, fontSize, color, options);
         } else {
@@ -526,6 +595,79 @@ export class PDFRenderer implements Renderer<Buffer> {
   // Drop-cap v1 approximation (see DROP_CAP_SCALE above): splits the first character off
   // the paragraph's very first run and renders it at a larger size, inline, before the
   // rest of the paragraph's runs render normally via renderRuns().
+  /**
+   * Renders a paragraph the LayoutEngine split across pages (Phase B, LAYOUT_FIDELITY.md
+   * Decision 7): each non-final segment renders its allotted lines, then a real page break,
+   * with the continuation's own domain Page pushed so running heads carry the right numbers.
+   *
+   * The cut point is found on the SAME metrics pagination measured with (this document's own
+   * font and column width), by binary search over word boundaries — the largest prefix whose
+   * real height fits the allotted lines. Two disclosed residuals: a justified paragraph's
+   * pre-break line renders ragged (PDFKit justifies every line except a text() call's last,
+   * and the segment boundary is one), and bold/italic runs can wrap a word differently than
+   * the plain-text measurement assumed — both are ADR-0013's drift class, bounded to ±1 line.
+   */
+  private renderSplitRuns(
+    doc: PDFKit.PDFDocument,
+    runs: TypeRun[],
+    resolveFont: FontResolver,
+    fontSize: number,
+    color: string,
+    paragraphOptions: PDFKit.Mixins.TextOptions,
+    segments: number[],
+    continuations: Page[],
+    pageOwners: PageOwner[]
+  ): void {
+    const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    doc.font(resolveFont(false, false)).fontSize(fontSize);
+    const lineHeight = doc.heightOfString('x', { width: 10_000 });
+
+    let remaining = runs;
+    let continuationIndex = 0;
+    for (const lines of segments) {
+      const plain = remaining.map((run) => run.text).join('');
+      const budget = lines * lineHeight + lineHeight / 2;
+      const cutAt = this.charsFittingBudget(doc, plain, budget, usableWidth);
+      if (cutAt <= 0 || cutAt >= plain.length) break; // drift guard: render the rest whole
+
+      const [head, tail] = splitRunsAt(remaining, cutAt);
+      this.renderRuns(doc, head, resolveFont, fontSize, color, paragraphOptions);
+      doc.addPage();
+      pageOwners.push(continuations[continuationIndex]);
+      continuationIndex += 1;
+      doc.font(resolveFont(false, false)).fontSize(fontSize);
+      remaining = tail;
+    }
+    this.renderRuns(doc, remaining, resolveFont, fontSize, color, paragraphOptions);
+  }
+
+  /**
+   * Largest word-boundary character offset whose text really fits `budget` points of height at
+   * this width — binary search over word ends, ~log2(words) heightOfString calls. Assumes the
+   * document's font and size are already set to the segment's own.
+   */
+  private charsFittingBudget(doc: PDFKit.PDFDocument, text: string, budget: number, width: number): number {
+    const wordEnds: number[] = [];
+    const re = /\S+/g;
+    for (let m = re.exec(text); m; m = re.exec(text)) wordEnds.push(m.index + m[0].length);
+    if (wordEnds.length < 2) return 0;
+
+    let lo = 1; // at least one word stays behind the cut
+    let hi = wordEnds.length - 1; // at least one word crosses it
+    let best = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const height = doc.heightOfString(text.slice(0, wordEnds[mid - 1]), { width });
+      if (height <= budget) {
+        best = wordEnds[mid - 1];
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return best;
+  }
+
   private renderRunsWithDropCap(
     doc: PDFKit.PDFDocument,
     runs: TypeRun[],

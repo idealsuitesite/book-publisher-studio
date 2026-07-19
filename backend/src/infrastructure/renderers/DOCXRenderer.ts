@@ -259,6 +259,10 @@ export class DOCXRenderer implements Renderer<Buffer> {
   async render(book: PaginatedBook, _context: RenderContext): Promise<RenderResult<Buffer>> {
     const pageStarts = new Map<string, Page>();
     for (const page of book.pages.slice(1)) {
+      // Phase B: a continuation page's first block is the tail of a split paragraph. Word
+      // reflows text itself, so the whole paragraph lives at its start - forcing a page break
+      // here would break it at its FIRST character, which is exactly wrong.
+      if (page.startsWithContinuation) continue;
       const firstId = page.blocks[0];
       if (firstId) pageStarts.set(firstId, page);
     }

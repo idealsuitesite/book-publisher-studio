@@ -512,8 +512,13 @@ describe('LayoutEngine - measured pagination (Decision 6)', () => {
 
     const result = engine.paginate(styled, LETTER_LAYOUT);
 
-    // Title (60 measured + 10 moveDown = 70) + 8 blocks of 68 = 614; the 9th would hit 682 > 648.
-    expect(result.pages[0].blocks).toHaveLength(8);
+    // Title (60 measured + 10 moveDown = 70) + 8 blocks of 68 = 614. Pre-Phase-B the 9th block
+    // (682 > 648) moved whole; now its first 3 lines fill the remainder (34pt -> 3 lines of 10,
+    // block has 6, both sides keep >=2) and the rest continues - the "essai de coupure" the
+    // CTO's investigation found missing.
+    expect(result.pages[0].blocks).toHaveLength(9);
+    expect(result.pages[0].splitAfterLines).toBe(3);
+    expect(result.pages[1].startsWithContinuation).toBe(true);
     expect(result.pages).toHaveLength(2);
   });
 
@@ -557,6 +562,90 @@ describe('LayoutEngine - measured pagination (Decision 6)', () => {
     expect(result.pages.length).toBeGreaterThan(1);
     for (const page of result.pages) {
       expect(page.blocks.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// Phase B (LAYOUT_FIDELITY.md Decision 7): line-level splitting with min-2-lines at both ends
+// of every break — which IS widow/orphan control, not a feature on top of it.
+describe('LayoutEngine - paragraph splitting (Phase B)', () => {
+  // 1 word = 1 line of 10pt, deterministic. Titles cost their word count + a 10pt moveDown.
+  const wordMeasurer: TextMeasurer = {
+    measureHeight: (text) => Math.max(1, text.trim() ? text.trim().split(/\s+/).length : 0) * 10,
+    lineHeight: () => 10,
+  };
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
+  // usable height: 792 - 72 - 72 = 648pt -> 64 whole lines.
+
+  it('fills the remainder of a page with the head of the next paragraph', () => {
+    const styled = styledBookFrom([chapter([paragraph('p-1', words(30)), paragraph('p-2', words(40))])]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    // Title (1 word + moveDown = 20) + p-1 (300+8) = 328; remaining 320 -> 32 lines of p-2 stay.
+    expect(result.pages).toHaveLength(2);
+    expect(result.pages[0].blocks).toEqual(['p-1', 'p-2']);
+    expect(result.pages[0].splitAfterLines).toBe(32);
+    expect(result.pages[1].blocks[0]).toBe('p-2');
+    expect(result.pages[1].startsWithContinuation).toBe(true);
+  });
+
+  it('never strands a single line at the bottom - fewer than 2 lines fitting means no split', () => {
+    // Title 20 + p-1 (610+8) = 638; remaining 10 -> 1 line would fit p-2: orphan, so p-2 moves whole.
+    const styled = styledBookFrom([chapter([paragraph('p-1', words(61)), paragraph('p-2', words(20))])]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages).toHaveLength(2);
+    expect(result.pages[0].splitAfterLines).toBeUndefined();
+    expect(result.pages[0].blocks).toEqual(['p-1']);
+    expect(result.pages[1].blocks).toEqual(['p-2']);
+    expect(result.pages[1].startsWithContinuation).toBeUndefined();
+  });
+
+  it('never strands a single line at the top - the cut moves up to leave 2 for the next page', () => {
+    // Title 20 + p-1 (300+8) = 328; remaining 320 -> 32 lines fit, but p-2 has 33: a 32-line cut
+    // would leave a 1-line widow. The cut retreats to 31, leaving 2.
+    const styled = styledBookFrom([chapter([paragraph('p-1', words(30)), paragraph('p-2', words(33))])]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages[0].splitAfterLines).toBe(31);
+    expect(result.pages[1].blocks).toEqual(['p-2']);
+  });
+
+  it('splits a very long paragraph across several pages, every segment at least 2 lines', () => {
+    const styled = styledBookFrom([chapter([paragraph('p-long', words(200))])]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages.length).toBeGreaterThan(2);
+    for (const page of result.pages) {
+      if (page.splitAfterLines !== undefined) expect(page.splitAfterLines).toBeGreaterThanOrEqual(2);
+      expect(page.blocks).toEqual(['p-long']);
+    }
+    expect(result.pages.at(-1)?.startsWithContinuation).toBe(true);
+    expect(result.pages.at(-1)?.splitAfterLines).toBeUndefined();
+  });
+
+  it('does not split quotes - their continuation indent semantics differ', () => {
+    const styled = styledBookFrom([
+      chapter([paragraph('p-1', words(60)), { type: 'quote', id: 'q-1', text: words(20) } as Block]),
+    ]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    for (const page of result.pages) expect(page.splitAfterLines).toBeUndefined();
+  });
+
+  it('a split never happens without a measurer - the estimate path is unchanged', () => {
+    const styled = styledBookFrom([chapter([paragraph('p-1', words(30)), paragraph('p-2', words(400))])]);
+
+    const result = new LayoutEngine().paginate(styled, LETTER_LAYOUT);
+
+    for (const page of result.pages) {
+      expect(page.splitAfterLines).toBeUndefined();
+      expect(page.startsWithContinuation).toBeUndefined();
     }
   });
 });
