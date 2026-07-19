@@ -30,6 +30,11 @@ export interface EngineFacts {
   lastRenderMs?: number;
   /** Label of the last edition created this session, e.g. "PDF · 2 min ago". */
   lastEdition?: string;
+  /**
+   * ADR-0049: the report carries UNSTRUCTURED_MANUSCRIPT — the chapter count is not a neutral
+   * fact but a blocking-grade state, and the status bar must say so, not just count to zero.
+   */
+  structureNeedsReview?: boolean;
 }
 
 interface StudioState {

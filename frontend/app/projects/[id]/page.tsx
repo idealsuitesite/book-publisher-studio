@@ -9,7 +9,7 @@ import {
   updateProjectSettings,
   exportProject,
 } from '@/lib/api-client';
-import { computeBookFacts } from '@/lib/bookFacts';
+import { computeBookFacts, unstructuredFinding } from '@/lib/bookFacts';
 import { useStudio } from '@/components/studio/StudioContext';
 import { Explorer, buildExplorer, type StudioView } from '@/components/studio/Explorer';
 import { Inspector, inspectorRows } from '@/components/studio/Inspector';
@@ -98,7 +98,12 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
       score: project.report.score.overall,
     });
     const facts = computeBookFacts(project.book);
-    setStudioFacts({ words: project.book.wordCount, chapters: facts.chapters, pages: measuredPages });
+    setStudioFacts({
+      words: project.book.wordCount,
+      chapters: facts.chapters,
+      pages: measuredPages,
+      structureNeedsReview: Boolean(unstructuredFinding(project.report)),
+    });
     return () => {
       setStudioProject(null);
       // Leaving the workspace clears the engine facts too - Home must not wear another
@@ -216,6 +221,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
             book={project.book}
             filename={project.sourceFilename ?? null}
             onReset={() => router.push('/')}
+            structureFinding={unstructuredFinding(project.report)}
           />
         )}
         {view === 'validation' && <ReadyForPrint report={project.report} />}

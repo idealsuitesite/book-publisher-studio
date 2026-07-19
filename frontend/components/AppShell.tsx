@@ -62,12 +62,18 @@ function Header() {
 function StatusBar({ backendUp }: { backendUp: boolean | null }) {
   const { facts } = useStudio();
   const engineFacts = [
-    facts.pages !== undefined && `${facts.pages} pages`,
-    facts.words !== undefined && `${facts.words.toLocaleString('en-US')} words`,
-    facts.chapters !== undefined && `${facts.chapters} chapters`,
-    facts.lastRenderMs !== undefined && `render ${facts.lastRenderMs} ms`,
-    facts.lastEdition,
-  ].filter(Boolean);
+    facts.pages !== undefined && { text: `${facts.pages} pages` },
+    facts.words !== undefined && { text: `${facts.words.toLocaleString('en-US')} words` },
+    facts.chapters !== undefined && {
+      // ADR-0049: "0 chapters" with the unstructured finding is a state, not a count.
+      text: facts.structureNeedsReview
+        ? `${facts.chapters} chapters — needs review`
+        : `${facts.chapters} chapters`,
+      warn: facts.structureNeedsReview,
+    },
+    facts.lastRenderMs !== undefined && { text: `render ${facts.lastRenderMs} ms` },
+    facts.lastEdition !== undefined && { text: facts.lastEdition },
+  ].filter(Boolean) as Array<{ text: string; warn?: boolean }>;
 
   return (
     <footer
@@ -81,7 +87,14 @@ function StatusBar({ backendUp }: { backendUp: boolean | null }) {
       {/* The engine, visible (Manifesto vow 3). Tabular numerals: instrument readings. */}
       {/* Wall-clock render times live here - masked at baseline capture (determinism), never
           hidden from users. */}
-      <span data-baseline-mask className="tabular-nums">{engineFacts.join(' · ')}</span>
+      <span data-baseline-mask className="tabular-nums">
+        {engineFacts.map((fact, index) => (
+          <span key={fact.text} className={fact.warn ? 'font-medium text-app-error' : undefined}>
+            {index > 0 && <span className="font-normal text-app-text-muted"> · </span>}
+            {fact.text}
+          </span>
+        ))}
+      </span>
       <span>{APP_VERSION}</span>
     </footer>
   );

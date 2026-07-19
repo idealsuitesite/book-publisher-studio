@@ -108,4 +108,33 @@ describe('BookStructureView', () => {
       expect(document.querySelector('details ul')?.className).toContain('overflow-y-auto');
     });
   });
+
+  // ADR-0049 (IMPORT_FIDELITY commit 2): "0 chapters detected" renders where the structure
+  // claims to be shown - a blocking-styled state, never a neutral count.
+  describe('unstructured-manuscript banner (ADR-0049)', () => {
+    const finding = {
+      code: 'UNSTRUCTURED_MANUSCRIPT',
+      message: 'No chapters were detected in a 3,060-word manuscript',
+      location: 'mainContent',
+      severity: 'ERROR' as const,
+      suggestion: 'Apply the Word "Heading 1" style to chapter titles in the source document and import again',
+    };
+
+    it('shows the finding, its backend message and its suggestion', () => {
+      render(
+        <BookStructureView book={book({})} filename="notes.docx" onReset={() => {}} structureFinding={finding} />
+      );
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('0 chapters detected — needs review');
+      expect(alert).toHaveTextContent('No chapters were detected in a 3,060-word manuscript');
+      expect(alert).toHaveTextContent('Heading 1');
+    });
+
+    it('renders no banner when the finding is absent', () => {
+      render(<BookStructureView book={book({})} filename="book.docx" onReset={() => {}} />);
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
 });

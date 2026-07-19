@@ -1,13 +1,18 @@
-import type { BookDTO } from 'shared-types';
+import type { BookDTO, ValidationIssueDTO } from 'shared-types';
 import { Button, Card } from '@/components/ui';
 
 // Sprint 7 commit 6 - renders the real BookDTO a successful import returns. Deliberately no
 // validation findings here (report.issues/.score) - that's ValidationSummary's job (commit 7),
-// rendered as a sibling by UploadDropzone.
+// rendered as a sibling by UploadDropzone. ONE exception, by design (ADR-0049): the
+// UNSTRUCTURED_MANUSCRIPT finding renders here too, because "0 chapters detected" is a fact
+// ABOUT the structure this panel claims to show - hiding it behind another tab is how the
+// CTO discovered the state at the Proof instead of at the door.
 interface BookStructureViewProps {
   book: BookDTO;
   filename: string | null;
   onReset: () => void;
+  /** The ADR-0049 finding when the report carries it - message and suggestion come from the backend, never invented here. */
+  structureFinding?: ValidationIssueDTO;
 }
 
 function contentLabel(content: BookDTO['mainContent'][number]): string {
@@ -17,7 +22,7 @@ function contentLabel(content: BookDTO['mainContent'][number]): string {
   return content.title || 'Untitled section';
 }
 
-export function BookStructureView({ book, filename, onReset }: BookStructureViewProps) {
+export function BookStructureView({ book, filename, onReset, structureFinding }: BookStructureViewProps) {
   const stats: Array<{ label: string; value: string }> = [];
   if (book.wordCount != null) stats.push({ label: 'Words', value: book.wordCount.toLocaleString() });
   if (book.pageCount != null) stats.push({ label: 'Pages', value: String(book.pageCount) });
@@ -37,6 +42,16 @@ export function BookStructureView({ book, filename, onReset }: BookStructureView
           Import another file
         </Button>
       </div>
+
+      {structureFinding && (
+        <div role="alert" className="rounded-md border border-app-error bg-app-surface-2 px-4 py-3">
+          <p className="text-sm font-semibold text-app-error">0 chapters detected — needs review</p>
+          <p className="mt-1 text-sm text-app-text">{structureFinding.message}.</p>
+          {structureFinding.suggestion && (
+            <p className="mt-1 text-sm text-app-text-muted">{structureFinding.suggestion}.</p>
+          )}
+        </div>
+      )}
 
       {stats.length > 0 && (
         <dl className="flex gap-6 text-sm">

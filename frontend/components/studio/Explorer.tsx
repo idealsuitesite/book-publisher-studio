@@ -1,7 +1,7 @@
 'use client';
 
 import type { ProjectDTO } from 'shared-types';
-import type { BookFacts } from '@/lib/bookFacts';
+import { unstructuredFinding, type BookFacts } from '@/lib/bookFacts';
 import { cx } from '@/components/ui';
 
 /**
@@ -39,6 +39,9 @@ export function buildExplorer(
 ): ExplorerGroup[] {
   const errors = project.report.issues.filter((issue) => issue.severity === 'ERROR').length;
   const warnings = project.report.issues.length - errors;
+  // ADR-0049: zero detected chapters on a book-length manuscript is a blocking-grade state,
+  // and the tree must say so where the count lives — not display "0 ch" as a neutral fact.
+  const unstructured = unstructuredFinding(project.report);
 
   return [
     {
@@ -51,7 +54,10 @@ export function buildExplorer(
         {
           view: 'structure',
           label: 'Structure',
-          status: `${facts.chapters} ch${facts.sections ? ` · ${facts.sections} sec` : ''}`,
+          status: unstructured
+            ? '0 ch — needs review'
+            : `${facts.chapters} ch${facts.sections ? ` · ${facts.sections} sec` : ''}`,
+          warn: Boolean(unstructured),
         },
         ...(facts.images ? [{ view: 'structure' as const, label: 'Images', status: `${facts.images}` }] : []),
         ...(facts.citations ? [{ view: 'structure' as const, label: 'Citations', status: `${facts.citations}` }] : []),

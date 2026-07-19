@@ -1,4 +1,4 @@
-import type { BookDTO, BlockDTO, ContentDTO } from 'shared-types';
+import type { BookDTO, BlockDTO, ContentDTO, ImportReportDTO, ValidationIssueDTO } from 'shared-types';
 
 /**
  * The book's body, counted from the real AST (PRODUCT_EXPERIENCE §10.6: the Explorer as living
@@ -13,6 +13,16 @@ export interface BookFacts {
   citations: number;
   footnotes: number;
   tables: number;
+}
+
+/**
+ * The ADR-0049 state, read from the REAL report — the UI never re-derives it from counts
+ * (a small chapterless document is legitimate; only the validator knows the threshold).
+ * Every surface that shows chapter counts consults this: Explorer, status bar, Structure
+ * station (IMPORT_FIDELITY.md commit 2).
+ */
+export function unstructuredFinding(report: ImportReportDTO): ValidationIssueDTO | undefined {
+  return report.issues.find((issue) => issue.code === 'UNSTRUCTURED_MANUSCRIPT');
 }
 
 export function computeBookFacts(book: BookDTO): BookFacts {
