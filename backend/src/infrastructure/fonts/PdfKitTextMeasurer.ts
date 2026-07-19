@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import type { TextMeasurer, MeasureOptions } from '../../domain/ports/TextMeasurer';
+import type { Theme } from '../../domain/models/Theme';
 import { PdfFontRegistry } from './PdfFontRegistry';
 
 /**
@@ -29,9 +30,16 @@ export class PdfKitTextMeasurer implements TextMeasurer {
     return this.doc.heightOfString(text, { width: options.width });
   }
 
-  lineHeight(fontSize: number): number {
-    // Line height is a property of size, not family, to within a point at body sizes —
-    // measured with the default font to avoid needing a theme for a spacing question.
+  lineHeight(fontSize: number, font?: { theme: Theme; heading?: boolean }): number {
+    // The old comment here claimed line height was "a property of size, not family, to within
+    // a point" — measured false on the real fonts (12.72 vs 13.96pt at body size, ~10%). When
+    // the caller knows the face the renderer will draw with, we measure THAT face.
+    if (font) {
+      const face = font.heading
+        ? this.fonts.resolveHeading(1, font.theme, true, false)
+        : this.fonts.resolveBody(font.theme, false, false);
+      this.doc.font(face);
+    }
     this.doc.fontSize(fontSize);
     return this.doc.heightOfString('x', { width: 10_000 });
   }

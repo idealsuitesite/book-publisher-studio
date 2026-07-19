@@ -6,6 +6,14 @@
 >
 > **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed.
 >
+> ### Session of 2026-07-21: IMPORT FIDELITY MERGED (PR #14); RENDER DRIFT FIXED — 284 → 246 pages, 3 observable residuals
+> **Backend 556/556, both real harnesses green, baseline byte-identical twice, full gate re-confirmed on `main` post-merge.**
+> - **PR #14 merged** (`d8aff19`): Sprint 9-11 + Import Fidelity onto `main`; the CTO's freeze condition (5 commits merged + harness green) is met. `docs/PUBLICATION_QUALITY_BAR.md` (CTO spec) now tracked, still gated.
+> - **RENDER_DRIFT fixes (CTO feu vert, branch `feature/render-drift`)**: all three, in order, plus TWO further root causes the implementation surfaced: (a) `spendSpaceAfter()` — flat points at every block site (ratio 1.0206 → 1.0008); (b) `TextMeasurer.lineHeight` with real-face context — the "size not family" claim measured false (12.72 vs 13.96pt); (c) **title keep-with-next** (`flushBeforeTitleIfOrphaned` + renderer break-before-title, one invariant both sides); (d) `PAGE_SAFETY_PT` half-line reserve; (e) **observable reconciliation** (CTO amendment): `plannedAddPage()` everywhere deliberate, `RenderMetrics.unplannedPageBreaks` + warn log + `pageOwners` reconciliation — which also closed a hidden defect: unplanned pages shifted running-head/page-number attribution for the rest of the book.
+> - **Measured: 55 → 3 unplanned breaks** (the disclosed bold/italic-run ±1-line residual), 284 → 246 real pages (model 241), near-empty 50 → 3. `PDFRenderer.parity.test.ts` locks the exact numbers on the real corpus — loud in both directions.
+> - **ADR-0050 (Fidelity Is the Product)** and **ADR-0051 (the renderer never breaks a page on its own initiative)** written per CTO direction.
+> - **Next gate (CTO sequence)**: merge + verify this branch closes step 2; only then the PUBLICATION_QUALITY_BAR calibration review opens with real corpus data. Freeze on everything else holds.
+
 > ### Session of 2026-07-20 (night): IMPORT FIDELITY — all 5 commits done, verify-real-import GREEN; RENDER_DRIFT diagnosed
 > **Backend 555/555, frontend 138/138, builds + lint clean, baseline byte-identical twice (one deliberate recapture: Inspector layout rows), `npm run verify-real-import` green on the real corpus.**
 > - **CTO froze all other engine work** until import is bulletproof; approved `IMPORT_FIDELITY.md` with two amendments (KDP-targeted block provisional pending ValidationProfile; threshold in one named constant). All five commits executed and pushed (`1e06f9b`→`08447ea` + harness):

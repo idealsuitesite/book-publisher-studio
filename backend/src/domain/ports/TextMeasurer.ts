@@ -29,6 +29,14 @@ export interface MeasureOptions {
 export interface TextMeasurer {
   /** Height this text will actually occupy at this size in this column, natural line height. */
   measureHeight(text: string, options: MeasureOptions): number;
-  /** Height of a single line at this size — for modelling `moveDown()` and blank-line spacing. */
-  lineHeight(fontSize: number): number;
+  /**
+   * Height of a single line at this size — for modelling `moveDown()` and blank-line spacing.
+   *
+   * Pass `font` whenever the renderer will draw in a themed face: the old assumption that
+   * "line height is a property of size, not family" was MEASURED FALSE on the real book
+   * fonts (RENDER_DRIFT.md follow-up: default 12.72pt vs Gelasio 13.96pt at body size —
+   * ~10% under-charge on every split-page line, a steady source of silent overflow breaks).
+   * Without `font`, the measurer's default face is used (kept for callers with no theme).
+   */
+  lineHeight(fontSize: number, font?: { theme: Theme; heading?: boolean }): number;
 }

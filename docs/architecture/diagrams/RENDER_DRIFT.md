@@ -1,6 +1,6 @@
 # Render Drift — Proof Over-Pagination Investigation (diagnostic only, no fix)
 
-**Status:** 🟡 **FINDINGS — awaiting CTO classification verdict. No code changed.** Ordered by the CTO (2026-07-20) after observing, on the Faith_Alone Proof, pages holding 1-2 lines followed by near-total whitespace, at ~299 total pages where ~150 were expected. Same discipline as `IMPORT_FIDELITY.md`: reproduce live, locate, classify — fix only after validation.
+**Status:** ✅ **CLASSIFICATION VALIDATED and ALL THREE FIXES IMPLEMENTED (CTO feu vert 2026-07-20, with the observability amendment on fix 2). See §6 for the executed result and the two further root causes the implementation surfaced. ADR-0051 records the principle permanently; ADR-0050 records why fidelity wins the argument.** Ordered by the CTO (2026-07-20) after observing, on the Faith_Alone Proof, pages holding 1-2 lines followed by near-total whitespace, at ~299 total pages where ~150 were expected. Same discipline as `IMPORT_FIDELITY.md`: reproduce live, locate, classify — fix only after validation.
 **Date:** 2026-07-20
 **Instruments:** three spikes, all committed, all rerunnable — `spikes/overpagination-spike.ts` (model-side page fill), `spikes/addpage-census-spike.ts` (every real `addPage()` by call site), `spikes/render-drift-spike.ts` (charged-vs-consumed height, block by block).
 
@@ -52,6 +52,19 @@ The 55 auto-breaks are pages **PDFKit inserted on its own initiative** when text
 3. **A drift-parity assertion in the real-manuscript harness** (`verify-real-import`'s sibling for rendering): real PDF page count must equal `pages.length` + front-matter/blank bookkeeping, on the corpus — the regression became invisible because nothing compared the two counts.
 
 Order matters: 1 shrinks the drift, 2 makes remaining drift loud, 3 keeps it dead. All three are small; none is authorized yet.
+
+## 6. Executed (2026-07-20) — measured before/after
+
+The three fixes landed in order, and the implementation surfaced **two further root causes** the §3 census could not see (its drift sampling excluded page-crossing blocks — a selection bias, disclosed):
+
+1. **`spaceAfter` aligned** (fix 1): every block site now spends flat points via `spendSpaceAfter()`; heading/image/divider `moveDown(0.5)` and the unspent table/footnote gaps aligned too. Drift ratio 1.0206 → **1.0008**; 55 auto-breaks → 13.
+2. **Line heights priced in the real face**: `TextMeasurer.lineHeight` gains a font context — the old "line height is a property of size, not family" claim measured FALSE (default 12.72pt vs Gelasio 13.96pt at body size, ~10% under-charge on every split-page line). Title `moveDown` likewise (+2-2.7pt per title × 96 titles).
+3. **Title keep-with-next**: the model charged a section title to the CLOSING page while its first block flushed to the next — the renderer then drew a 40-90pt title into a spent page bottom (10 of the 13 residuals, traced live). `flushBeforeTitleIfOrphaned` + the renderer's matching break-before-title enforce one invariant: a titled content's first block starts a planned page ⇔ its title starts it too.
+4. **`PAGE_SAFETY_PT` (7pt)**: measured pages keep half a line back, so the irreducible ±0.5pt/block render noise (justified wrapping, run-segmented draws) can never overflow silently.
+5. **Observability (fix 2, CTO amendment)**: every deliberate break goes through `plannedAddPage()`; anything else is counted into `RenderMetrics.unplannedPageBreaks`, logged with its trigger block, and reconciled into `pageOwners` — closing a secondary defect the census exposed: unplanned pages shifted every later owner entry, misattributing running heads and page numbers for the rest of the book.
+6. **Drift parity locked** (fix 3): `PDFRenderer.parity.test.ts` on the real corpus asserts exactly **3** reconciliations (the disclosed bold/italic-run wrapping residual, ±1 line each) and the exact page count — loud in both directions.
+
+**Result on the corpus manuscript at kdp-5x8: 284 → 246 real pages (model 241), near-empty pages 50 → 3, ratio 1.0008.** The trace/census/drift spikes remain committed and rerunnable as the measuring instruments.
 
 ## Related
 

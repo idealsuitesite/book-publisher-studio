@@ -1335,3 +1335,41 @@ The two renderers that return `pageCount: undefined` are not gaps - they are the
 **Provisional, by CTO amendment:** the zero-chapter *publication* block applies to the KDP action specifically, never to a generic "publish" — corporate reports and single-flow documents are legitimate product targets. To be re-evaluated as a profile rule the day `ValidationProfile` exists (the `ValidationContext.validationProfile` field already reserves the slot).
 
 **Related:** `IMPORT_FIDELITY.md` (the review; commits 2-5 build on this state), ADR-0025 (mammoth limitation family), ADR-0027 (read-only validation), ADR-0031/0032 (the real-file scars that built the discipline this follows), `REAL_FIXTURE_POLICY.md` (commit 5's `verify-real-import` corpus is its next escalation).
+
+---
+
+## ADR-0050: Fidelity Is the Product
+
+**Status:** APPROVED (CTO-proposed and directed, 2026-07-20)
+**Date:** 2026-07-20
+
+**The principle, quotable in full:**
+
+> Document fidelity — from import to export — outranks everything else: the interface, the features, the aesthetics. A book that loses a word, a chapter, or a piece of formatting is never acceptable, however beautiful the software around it.
+
+**Why it is written down:** an author does not choose publishing software for its interface — they choose it because they can hand it their manuscript and get back something faithful and publishable. Trust is earned once and lost once. This has been the project's founding instinct since the `<s>` and `.trim()` scars ("editing software may never silently alter text") — the CTO now reaffirms it as the standing tiebreaker so that a future sprint (Editorial AI, Layout, Publishing) cannot trade fidelity for a visual or functional gain, which will be proposed sooner or later precisely because it will look reasonable at the time.
+
+**What it changes:** nothing today — Import Fidelity, Layout Fidelity and Render Drift already live by it. What it prevents: any future decision that sacrifices fidelity has to argue against this ADR by name, in the open.
+
+**Related:** ADR-0025/0031/0032 (the scars), ADR-0049 (naming loss instead of hiding it), ADR-0051 (the rendering corollary), `docs/PUBLICATION_QUALITY_BAR.md` §3 ("a quality claim that cannot be checked by a script is a hope").
+
+---
+
+## ADR-0051: The Renderer Never Breaks a Page on Its Own Initiative
+
+**Status:** APPROVED (CTO-directed, 2026-07-20, extending LAYOUT_FIDELITY Decision 3 into a permanent architecture principle). Implemented with the RENDER_DRIFT fixes.
+**Date:** 2026-07-20
+
+**The principle:** pagination decisions belong to the model. A renderer renders what pagination says; when reality forces a deviation — the rendering library breaking a page because real text exceeded the plan — that deviation must be **explicit and measurable**, never silent. A reconciliation that stays quiet reproduces the very defect it corrects: *"the regression became invisible because nothing compared the two counts."*
+
+**What made it necessary (RENDER_DRIFT.md, all measured):** 55 PDFKit-initiated page breaks per real book — uncounted, unlogged, and shifting every subsequent `pageOwners` entry so running heads and page numbers misattributed the rest of the book. Root causes fixed with it: `moveDown(spaceAfter/fontSize)` spending ~+15% over the model's flat charge on every block; line heights priced in the default face while the renderer draws Gelasio (12.72 vs 13.96pt — the old "line height is a property of size, not family" comment measured false); section titles charged to the closing page while their first block flushed to the next.
+
+**The mechanics in force:**
+- Every deliberate break goes through `plannedAddPage()`; anything else reaching `addPage()` is counted into `RenderMetrics.unplannedPageBreaks`, logged with its trigger, and reconciled into page ownership.
+- The model keeps a `PAGE_SAFETY_PT` half-line reserve per measured page, so irreducible render noise (±0.5pt/block) cannot overflow silently; genuinely mismeasured blocks (bold/italic-run wrapping, ±1 line) remain visible in the counter — currently exactly 3 on the corpus manuscript, locked by the drift-parity test.
+- Titles keep-with-next: a titled content whose first block starts a planned page moves WITH its title; model (`flushBeforeTitleIfOrphaned`) and renderer enforce the same invariant.
+- `PDFRenderer.parity.test.ts` asserts the exact reconciliation count and page count on the real corpus — growth means drift returned; shrinkage means measurement improved and the numbers are updated consciously.
+
+**Measured result:** 284 → 246 real pages on the corpus manuscript at kdp-5x8 (model 241); near-empty pages 50 → the 3 disclosed residuals; charged-vs-consumed ratio 1.0206 → 1.0008.
+
+**Related:** LAYOUT_FIDELITY.md Decision 3 (the principle's origin), ADR-0013 (the drift tolerance this bounds and surfaces), ADR-0045 (renderer as metrics authority — now including its own deviations), ADR-0050 (why fidelity wins the argument).

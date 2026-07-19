@@ -517,7 +517,9 @@ describe('LayoutEngine - measured pagination (Decision 6)', () => {
     // block has 6, both sides keep >=2) and the rest continues - the "essai de coupure" the
     // CTO's investigation found missing.
     expect(result.pages[0].blocks).toHaveLength(9);
-    expect(result.pages[0].splitAfterLines).toBe(3);
+    // 2, not 3, since the PAGE_SAFETY_PT reserve (RENDER_DRIFT follow-up): the measured page
+    // budget keeps half a line back so renderer-side noise cannot overflow silently.
+    expect(result.pages[0].splitAfterLines).toBe(2);
     expect(result.pages[1].startsWithContinuation).toBe(true);
     expect(result.pages).toHaveLength(2);
   });
@@ -585,7 +587,8 @@ describe('LayoutEngine - paragraph splitting (Phase B)', () => {
     // Title (1 word + moveDown = 20) + p-1 (300+8) = 328; remaining 320 -> 32 lines of p-2 stay.
     expect(result.pages).toHaveLength(2);
     expect(result.pages[0].blocks).toEqual(['p-1', 'p-2']);
-    expect(result.pages[0].splitAfterLines).toBe(32);
+    // 31, not 32 — the PAGE_SAFETY_PT reserve costs the page half a line (see above).
+    expect(result.pages[0].splitAfterLines).toBe(31);
     expect(result.pages[1].blocks[0]).toBe('p-2');
     expect(result.pages[1].startsWithContinuation).toBe(true);
   });

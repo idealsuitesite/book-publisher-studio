@@ -29,4 +29,13 @@ export interface RenderMetrics {
 
   /** The geometry pagination actually ran against — not what was requested, what was used. */
   pageLayout: PageLayout;
+
+  /**
+   * Pages the RENDERING LIBRARY inserted on its own initiative — never planned by the model
+   * (ADR-0051, RENDER_DRIFT.md fix 2, CTO amendment: reconciliation must be observable).
+   * 55 of these were silently amplifying 2.4 pages of drift into 57 wasted pages before this
+   * field existed; the drift-parity assertion in the real-fixture suite keeps it at 0.
+   * Undefined for renderers where the concept does not apply (DOCX reflows, EPUB has no pages).
+   */
+  unplannedPageBreaks?: number;
 }

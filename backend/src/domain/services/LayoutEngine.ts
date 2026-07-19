@@ -28,7 +28,17 @@ export class LayoutEngine {
   constructor(private readonly measurer?: TextMeasurer) {}
 
   paginate(styled: StyledBook, layout: PageLayout): PaginatedBook {
-    const usableHeight = layout.height - layout.marginTop - layout.marginBottom;
+    // Measured pagination packs pages against this budget EXACTLY — and the renderer's real
+    // consumption carries ±0.5pt/block of irreducible noise (justified wrapping, run-segmented
+    // text() calls vs one measured string). Packing to the last point turned that noise into
+    // silent PDFKit overflow breaks on ~5% of pages (RENDER_DRIFT.md follow-up trace: pages
+    // planned to 501.0 of 504.0). The half-line reserve absorbs the noise class; genuinely
+    // mismeasured blocks (e.g. bold-run wrapping, a full line off) remain and are surfaced by
+    // the renderer's observable reconciliation (ADR-0051), never hidden by a bigger margin.
+    // Only the measured path pays it: the fallback estimator's error dwarfs any tolerance.
+    const PAGE_SAFETY_PT = 7;
+    const usableHeight =
+      layout.height - layout.marginTop - layout.marginBottom - (this.measurer ? PAGE_SAFETY_PT : 0);
     const usableWidth = layout.width - layout.marginLeft - layout.marginRight;
     const pages: Page[] = [];
     let currentPageBlocks: string[] = [];
@@ -110,17 +120,41 @@ export class LayoutEngine {
     // title-above-a-void observation — the model believed the page under a title was taller
     // than it really was. Only chargeable when a measurer exists: the fallback estimator has
     // no line-height source for heading sizes and inventing one would be a new guess.
-    const chargeTitleHeight = (content: Content): void => {
-      if (!this.measurer || !content.title) return;
+    const titleHeightOf = (content: Content): number => {
+      if (!this.measurer || !content.title) return 0;
       const size = content.type === 'chapter' ? 24 : Math.max(12, 22 - content.level * 2);
-      const titleHeight =
+      return (
         this.measurer.measureHeight(content.title, {
           fontSize: size,
           width: usableWidth,
           heading: true,
           theme: styled.theme,
-        }) + this.measurer.lineHeight(size); // renderTitle's moveDown()
-      currentHeight += titleHeight;
+        }) + this.measurer.lineHeight(size, { theme: styled.theme, heading: true }) // renderTitle's moveDown(), in the face it really uses
+      );
+    };
+
+    /**
+     * Keep-with-next for titles (RENDER_DRIFT follow-up, ADR-0051): a title whose content
+     * cannot start under it moves WITH its content to the next page. Before this rule, the
+     * title's charge landed on the closing page while its first block flushed to the next —
+     * so the renderer drew a 40-90pt title into a page-bottom the model had already spent,
+     * and PDFKit broke the page on its own initiative (10 of the 13 residual silent breaks).
+     * The invariant the renderer relies on: a titled content's first block starts a planned
+     * page ⇔ its title starts that page too.
+     */
+    const flushBeforeTitleIfOrphaned = (content: Content, firstBlock: Block): number => {
+      const titleHeight = titleHeightOf(content);
+      if (titleHeight === 0 || currentPageBlocks.length === 0) return titleHeight;
+      const style = styled.blockStyles[firstBlock.id];
+      const fontSize = style?.fontSize ?? styled.theme.fontSizes.body;
+      const line = this.measurer!.lineHeight(fontSize, { theme: styled.theme });
+      const blockHeight = this.estimateBlockHeight(firstBlock, styled, usableWidth);
+      // A block under ~4 lines cannot split (min-2-lines at both ends), so it needs its full
+      // height under the title; a longer one only needs a 2-line start.
+      const blockLines = Math.max(1, Math.round(blockHeight / line));
+      const minStart = blockLines < 4 ? blockHeight : 2 * line;
+      if (currentHeight + titleHeight + minStart > usableHeight) flushPage();
+      return titleHeight;
     };
 
     /**
@@ -187,7 +221,7 @@ export class LayoutEngine {
         if (this.measurer && block.type === 'paragraph' && block.text.trim() && !styled.blockTypography?.[block.id]?.dropCap) {
           const style = styled.blockStyles[block.id];
           const fontSize = style?.fontSize ?? styled.theme.fontSizes.body;
-          const line = this.measurer.lineHeight(fontSize);
+          const line = this.measurer.lineHeight(fontSize, { theme: styled.theme });
           const textHeight = this.measurer.measureHeight(block.text, {
             fontSize,
             width: usableWidth,
@@ -231,9 +265,10 @@ export class LayoutEngine {
             }
           }
           if (isTopLevel) currentTopLevelTitle = content.title;
-          // The title is drawn (and now priced) immediately before this content's first block —
-          // after the chapter's own page break, in the flow for sections.
-          if (isFirstBlock) chargeTitleHeight(content);
+          // The title is drawn (and priced) immediately before this content's first block —
+          // after the chapter's own page break, in the flow for sections; kept with its
+          // content when the page is nearly spent (flushBeforeTitleIfOrphaned's invariant).
+          if (isFirstBlock) currentHeight += flushBeforeTitleIfOrphaned(content, block);
           addBlock(block, false);
           isFirstBlock = false;
         }
@@ -323,7 +358,7 @@ export class LayoutEngine {
       const measure = (text: string, heading = false): number =>
         this.measurer!.measureHeight(text, { fontSize, width: usableWidth, heading, theme: styled.theme }) +
         spaceAfter;
-      const line = this.measurer.lineHeight(fontSize);
+      const line = this.measurer.lineHeight(fontSize, { theme: styled.theme });
 
       switch (block.type) {
         case 'heading':
