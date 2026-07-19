@@ -24,47 +24,79 @@
  * ------------------------------------------------------------------------- */
 
 :root {
-  /* Surfaces */
-  --app-surface: var(--color-white);
-  --app-surface-raised: var(--color-zinc-100);
+  /* ------------------------------------------------------------------
+   * L'ATELIER (VISUAL_LANGUAGE.md, CTO-approved 2026-07-19): a writer's
+   * studio inside a publishing house. Surfaces descend from paper, text
+   * from ink, depth from sheets on a desk. One Prussian-ink accent.
+   * Starting values for the CTO's screenshot calibration loop - the
+   * concept is locked, the exact values graduate through that loop.
+   * ------------------------------------------------------------------ */
 
-  /* Text */
-  --app-text: var(--color-zinc-900);
-  --app-text-muted: var(--color-zinc-500);
-  /* Text drawn ON an app-text-coloured surface (solid buttons). Not app-surface: the product's
-   * solid button uses zinc-50 on zinc-900 (and the inverse in dark), which app-surface's
-   * white/zinc-950 would shift by a perceptible-to-the-diff 5/255. Commit 5 discovered this
-   * gap by refusing to let the swap change a pixel. */
-  --app-text-inverse: var(--color-zinc-50);
+  /* Surfaces - sheets on a desk */
+  --app-surface-0: #f6f4ef;   /* the desk (canvas) */
+  --app-surface-1: #fbfaf7;   /* a sheet (panel) */
+  --app-surface-2: #ffffff;   /* a sheet on the sheet (raised) */
+  --app-surface-3: #ffffff;   /* a lifted sheet (overlay, carries shadow) */
+  /* Legacy aliases kept so existing consumers stay valid */
+  --app-surface: var(--app-surface-1);
+  --app-surface-raised: var(--app-surface-2);
 
-  /* Borders */
-  --app-border: var(--color-zinc-300);
-  --app-border-strong: var(--color-zinc-900);
+  /* Ink - never pure black on pure white (the cheapest fatigue reduction there is) */
+  --app-text: #211d19;
+  --app-text-muted: #686056; /* >=4.5:1 on surface-0 (axe), still warm ink */
+  --app-text-inverse: #f6f4ef;
 
-  /* Severity — mirrors ValidationSummary's existing ERROR/WARNING/INFO/SUGGESTION set
-   * and PublishingReport's ERROR/WARNING, so one token set serves both. */
-  --app-error: var(--color-red-600);
-  --app-warning: var(--color-amber-600);
-  --app-info: var(--color-blue-600);
-  --app-success: var(--color-emerald-600);
+  /* Hairline borders in warm neutrals - the heavy chrome retires */
+  --app-border: #e7e2d9;
+  --app-border-strong: #211d19;
+
+  /* Encre - the one accent (primary action, selection, focus). Used sparingly on purpose. */
+  --app-accent: #1d4e68;
+  --app-accent-ink: #f6f4ef;
+
+  /* Semantics, tuned to the paper world */
+  --app-error: #a83a32;     /* brick - serious without alarm aggression */
+  --app-warning: #9a6210;   /* amber ink */
+  --app-info: #1d4e68;
+  --app-success: #2e6b4f;   /* deep leaf */
+
+  /* Motion grammar (VISUAL_LANGUAGE.md section 6): micro / panel / view */
+  --motion-micro: 120ms;
+  --motion-panel: 200ms;
+  --motion-view: 280ms;
+
+  /* Warm two-layer paper shadow */
+  --shadow-sheet: 0 1px 2px rgba(53, 42, 30, 0.06), 0 4px 12px rgba(53, 42, 30, 0.08);
+  --shadow-lifted: 0 2px 4px rgba(53, 42, 30, 0.08), 0 12px 32px rgba(53, 42, 30, 0.14);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --app-surface: var(--color-zinc-950);
-    --app-surface-raised: var(--color-zinc-900);
+    /* The same room at night: warm charcoals, never blue-gray zinc. */
+    --app-surface-0: #181614;
+    --app-surface-1: #201d1a;
+    --app-surface-2: #282420;
+    --app-surface-3: #2e2a25;
+    --app-surface: var(--app-surface-1);
+    --app-surface-raised: var(--app-surface-2);
 
-    --app-text: var(--color-zinc-50);
-    --app-text-muted: var(--color-zinc-400);
-    --app-text-inverse: var(--color-zinc-900);
+    --app-text: #ece8e1;
+    --app-text-muted: #b0a698; /* >=4.5:1 on dark surface-0 */
+    --app-text-inverse: #211d19;
 
-    --app-border: var(--color-zinc-700);
-    --app-border-strong: var(--color-zinc-50);
+    --app-border: #3a342e;
+    --app-border-strong: #ece8e1;
 
-    --app-error: var(--color-red-400);
-    --app-warning: var(--color-amber-400);
-    --app-info: var(--color-blue-400);
-    --app-success: var(--color-emerald-400);
+    --app-accent: #7faecb;
+    --app-accent-ink: #181614;
+
+    --app-error: #c96b60;
+    --app-warning: #c98a2e;
+    --app-info: #7faecb;
+    --app-success: #6fae8f;
+
+    --shadow-sheet: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lifted: 0 2px 4px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -77,6 +109,14 @@
   --color-app-surface-raised: var(--app-surface-raised);
   --color-app-text: var(--app-text);
   --color-app-text-inverse: var(--app-text-inverse);
+  --color-app-surface-0: var(--app-surface-0);
+  --color-app-surface-1: var(--app-surface-1);
+  --color-app-surface-2: var(--app-surface-2);
+  --color-app-surface-3: var(--app-surface-3);
+  --color-app-accent: var(--app-accent);
+  --color-app-accent-ink: var(--app-accent-ink);
+  --font-sans: var(--font-ui), system-ui, sans-serif;
+  --font-book: var(--font-book), Georgia, serif;
   --color-app-text-muted: var(--app-text-muted);
   --color-app-border: var(--app-border);
   --color-app-border-strong: var(--app-border-strong);
@@ -114,5 +154,5 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-ui), system-ui, sans-serif;
 }

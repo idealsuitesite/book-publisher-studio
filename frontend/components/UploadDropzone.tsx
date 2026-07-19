@@ -52,18 +52,18 @@ export function UploadDropzone() {
 
   if (state.status === 'uploading') {
     return (
-      <div className={`${CARD_CLASSES} border-zinc-300 dark:border-zinc-700`}>
-        <p className="animate-pulse text-lg font-medium text-zinc-900 dark:text-zinc-50">Uploading…</p>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">{state.filename}</p>
+      <div className={`${CARD_CLASSES} border-app-border`}>
+        <p className="animate-pulse text-lg font-medium text-app-text">Uploading…</p>
+        <p className="text-sm text-app-text-muted">{state.filename}</p>
       </div>
     );
   }
 
   if (state.status === 'error') {
     return (
-      <div className={`${CARD_CLASSES} border-red-600`}>
-        <p className="text-lg font-medium text-red-600 dark:text-red-400">Import failed</p>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">{state.message}</p>
+      <div className={`${CARD_CLASSES} border-app-error`}>
+        <p className="text-lg font-medium text-app-error">Import failed</p>
+        <p className="text-sm text-app-text-muted">{state.message}</p>
         <Button variant="link" className="mt-2" onClick={() => setState({ status: 'idle' })}>
           Try again
         </Button>
@@ -91,10 +91,10 @@ export function UploadDropzone() {
         const file = event.dataTransfer.files[0];
         if (file) void handleFile(file);
       }}
-      className={`${CARD_CLASSES} cursor-pointer border-dashed focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900 dark:focus-within:outline-zinc-50 ${
+      className={`${CARD_CLASSES} cursor-pointer border-dashed focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-app-accent ${
         isDragging
-          ? 'border-zinc-900 bg-zinc-100 dark:border-zinc-50 dark:bg-zinc-900'
-          : 'border-zinc-300 dark:border-zinc-700'
+          ? 'border-app-accent bg-app-surface-2'
+          : 'border-app-border'
       }`}
     >
       <input
@@ -110,10 +110,10 @@ export function UploadDropzone() {
           event.target.value = '';
         }}
       />
-      <span className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+      <span className="text-lg font-medium text-app-text">
         Drop your DOCX here, or choose a file
       </span>
-      <span className="text-sm text-zinc-500 dark:text-zinc-400">.docx manuscripts only</span>
+      <span className="text-sm text-app-text-muted">.docx manuscripts only</span>
     </label>
   );
 }

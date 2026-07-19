@@ -6,6 +6,17 @@
 >
 > **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed.
 >
+> ### Session of 2026-07-19 (night): L'ATELIER SHIPS — P1+P2 of the premium build
+> **Backend 533/533, frontend 134/134, baseline 21/21 byte-identical twice consecutively, axe at 3 nodes, build+lint green.** CTO gave full feu vert on VISUAL_LANGUAGE; implemented:
+> - **Tokens**: warm-paper surface ramp (light+dark), ink text (muted recalibrated to ≥4.5:1 after axe), Prussian accent, warm semantics, motion vars. **Zero zinc literals remain.**
+> - **Voices**: IBM Plex Sans (UI, tabular numerals) + Gelasio (the book's own face — header, Explorer, dashboard title speak it).
+> - **Shell v2**: header with project context (● Saved · vN · Ready-for-Print badge), StudioContext channel, status bar with engine facts (words/chapters/pages/render ms).
+> - **Explorer** (domain tree, real counts) · **Inspector** (contextual, never empty, gutter honesty inline) · **Book dashboard** (état/progression/dernière publication/**prochaine action derived from the real top finding** + mise-en-place motion) · **Ready for Print** (sequential-tick checklist over the real categories) · **Ctrl+K palette** + Ctrl+1..7 · resume-where-left (localStorage per project).
+> - Lexicon live: **Proof / Editions / Ready for Print / Bring in a manuscript**.
+> - **Found by the real browser, fixed**: an infinite setState loop (provider setter identity — "Maximum update depth"), **CORS refused PATCH** (settings could never save from a browser; supertest can't see CORS), unhandled settings rejection, nondeterministic status-bar render-ms + async PDF embed (masked at capture, determinism defects #5/#6), and a **backspace control char (0x08)** my own tooling wrote into the capture script's regexes — `/^Layout/` matches nothing, and every later edit no-opped silently against it.
+> - **CTO calibration set**: `docs/demo/screenshots/atelier/` — Home/dashboard/Ready-for-Print × light/dark, unmasked. The screenshot loop (VISUAL_LANGUAGE §9) awaits their feelings.
+> - **Remaining from the approved reviews (next)**: P2's layout presets with engine thumbnails + theme gallery card, P3 (living proof, publish architecture columns, timeline), P4 calibration pass; EDITOR_EXPERIENCE review alongside P3; S11 persistence in parallel.
+
 > ### Session of 2026-07-19 (later): the studio ships — Home, Workspace, stations
 > **Backend 533/533, frontend 140/140, baseline green twice consecutively on the NEW journey, build + lint clean.**
 > - **`HOME_WORKSPACE.md` ROUND 2 approved & fully implemented.** The pipeline metaphor answered (conversion → place; stations, not steps; `ProgressStepper` deleted), Home/Workspace as two contexts (library vs one book), the complete journey mapped and REAL end to end.

@@ -27,9 +27,9 @@ export function BookStructureView({ book, filename, onReset }: BookStructureView
     <Card tone="success" className="flex max-w-2xl flex-col gap-6 px-8 py-8 text-left">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Import complete</p>
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">{book.metadata.title}</h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm font-medium text-app-success">Import complete</p>
+          <h2 className="text-xl font-semibold text-app-text">{book.metadata.title}</h2>
+          <p className="text-sm text-app-text-muted">
             {book.metadata.author} · {filename}
           </p>
         </div>
@@ -42,8 +42,8 @@ export function BookStructureView({ book, filename, onReset }: BookStructureView
         <dl className="flex gap-6 text-sm">
           {stats.map((stat) => (
             <div key={stat.label}>
-              <dt className="text-zinc-500 dark:text-zinc-400">{stat.label}</dt>
-              <dd className="font-medium text-zinc-900 dark:text-zinc-50">{stat.value}</dd>
+              <dt className="text-app-text-muted">{stat.label}</dt>
+              <dd className="font-medium text-app-text">{stat.value}</dd>
             </div>
           ))}
         </dl>
@@ -62,15 +62,15 @@ export function BookStructureView({ book, filename, onReset }: BookStructureView
         opened it can never dominate the page.
       */}
       <details className="group">
-        <summary className="cursor-pointer select-none text-sm font-medium text-zinc-900 underline underline-offset-4 dark:text-zinc-50">
+        <summary className="cursor-pointer select-none text-sm font-medium text-app-text underline underline-offset-4 dark:text-app-text">
           Structure — {book.mainContent.length} {book.mainContent.length === 1 ? 'part' : 'parts'}
         </summary>
         <ul className="mt-3 flex max-h-64 flex-col gap-2 overflow-y-auto pr-2">
           {book.mainContent.map((content) => (
-            <li key={content.id} className="text-sm text-zinc-900 dark:text-zinc-50">
+            <li key={content.id} className="text-sm text-app-text">
               {contentLabel(content)}
               {content.type === 'chapter' && content.sections && content.sections.length > 0 && (
-                <ul className="ml-4 mt-1 flex flex-col gap-1 text-zinc-500 dark:text-zinc-400">
+                <ul className="ml-4 mt-1 flex flex-col gap-1 text-app-text-muted">
                   {content.sections.map((section) => (
                     <li key={section.id}>{section.title || 'Untitled section'}</li>
                   ))}

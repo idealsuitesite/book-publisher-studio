@@ -24,9 +24,9 @@ afterEach(() => {
 describe('ExportPanel', () => {
   it('offers all three real export formats', () => {
     render(<ExportPanel exporter={exporter} downloadName="export" />);
-    expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Download DOCX' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Download EPUB' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'PDF edition' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'DOCX edition' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'EPUB edition' })).toBeInTheDocument();
   });
 
   it('asks its injected exporter for the clicked format - the panel owns no source, per Decision 6', async () => {
@@ -34,7 +34,7 @@ describe('ExportPanel', () => {
     const user = userEvent.setup();
     render(<ExportPanel exporter={exporter} downloadName="export" />);
 
-    await user.click(screen.getByRole('button', { name: 'Download PDF' }));
+    await user.click(screen.getByRole('button', { name: 'PDF edition' }));
 
     await waitFor(() => expect(exporter).toHaveBeenCalledWith('pdf'));
   });
@@ -47,7 +47,7 @@ describe('ExportPanel', () => {
       <ExportPanel exporter={exporter} downloadName="export" onDownloaded={onDownloaded} />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Download DOCX' }));
+    await user.click(screen.getByRole('button', { name: 'DOCX edition' }));
 
     await waitFor(() => expect(onDownloaded).toHaveBeenCalledTimes(1));
   });
@@ -57,9 +57,9 @@ describe('ExportPanel', () => {
     const user = userEvent.setup();
     render(<ExportPanel exporter={exporter} downloadName="export" />);
 
-    await user.click(screen.getByRole('button', { name: 'Download PDF' }));
+    await user.click(screen.getByRole('button', { name: 'PDF edition' }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Download DOCX' })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'DOCX edition' })).toBeDisabled());
   });
 
   it('surfaces a real export failure instead of failing silently', async () => {
@@ -67,7 +67,7 @@ describe('ExportPanel', () => {
     const user = userEvent.setup();
     render(<ExportPanel exporter={exporter} downloadName="export" />);
 
-    await user.click(screen.getByRole('button', { name: 'Download PDF' }));
+    await user.click(screen.getByRole('button', { name: 'PDF edition' }));
 
     expect(await screen.findByText(/Unknown page layout: bad/)).toBeInTheDocument();
   });

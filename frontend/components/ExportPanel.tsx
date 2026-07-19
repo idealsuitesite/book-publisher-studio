@@ -21,9 +21,9 @@ interface ExportPanelProps {
 }
 
 const FORMATS: { format: ExportFormat; label: string }[] = [
-  { format: 'pdf', label: 'Download PDF' },
-  { format: 'docx', label: 'Download DOCX' },
-  { format: 'epub', label: 'Download EPUB' },
+  { format: 'pdf', label: 'PDF edition' },
+  { format: 'docx', label: 'DOCX edition' },
+  { format: 'epub', label: 'EPUB edition' },
 ];
 
 
@@ -54,9 +54,9 @@ export function ExportPanel({ exporter, downloadName, onDownloaded }: ExportPane
 
   return (
     <Card className="flex max-w-2xl flex-col gap-4 px-8 py-6 text-left">
-      <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Export</h3>
+      <h3 className="text-lg font-semibold text-app-text">Editions</h3>
 
-      {errorMessage && <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>}
+      {errorMessage && <p className="text-sm text-app-error">{errorMessage}</p>}
 
       <div className="flex flex-wrap gap-3">
         {FORMATS.map(({ format, label }) => (

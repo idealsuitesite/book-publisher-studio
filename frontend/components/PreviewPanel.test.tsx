@@ -54,7 +54,7 @@ describe('PreviewPanel', () => {
     const user = userEvent.setup();
     setup();
 
-    await user.click(screen.getByRole('button', { name: 'Generate Preview' }));
+    await user.click(screen.getByRole('button', { name: 'Create proof' }));
 
     await waitFor(() => expect(exporter).toHaveBeenCalledTimes(1));
   });
@@ -64,7 +64,7 @@ describe('PreviewPanel', () => {
     const user = userEvent.setup();
     setup();
 
-    await user.click(screen.getByRole('button', { name: /preview/i }));
+    await user.click(screen.getByRole('button', { name: /proof/i }));
 
     expect(await screen.findByText(/5/)).toBeInTheDocument();
   });
@@ -75,7 +75,7 @@ describe('PreviewPanel', () => {
     const user = userEvent.setup();
     setup({ onGenerated });
 
-    await user.click(screen.getByRole('button', { name: /preview/i }));
+    await user.click(screen.getByRole('button', { name: /proof/i }));
 
     await waitFor(() => expect(onGenerated).toHaveBeenCalledTimes(1));
   });
@@ -85,7 +85,7 @@ describe('PreviewPanel', () => {
     const user = userEvent.setup();
     setup();
 
-    await user.click(screen.getByRole('button', { name: /preview/i }));
+    await user.click(screen.getByRole('button', { name: /proof/i }));
 
     expect(await screen.findByText(/Export timed out after 180s/)).toBeInTheDocument();
   });

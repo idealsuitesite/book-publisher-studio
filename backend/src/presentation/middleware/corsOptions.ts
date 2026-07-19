@@ -35,6 +35,9 @@ export function buildCorsOptions(allowedOrigins: string[] = resolveAllowedOrigin
       }
       callback(new Error(`Origin not allowed by CORS: ${origin}`));
     },
-    methods: ['GET', 'POST'],
+    // PATCH joined when project settings became updatable (HOME_WORKSPACE Decision 3) -
+    // found by the real browser refusing the preflight, not by supertest, which never
+    // exercises CORS. The allowlist stays exactly as wide as the API's real surface.
+    methods: ['GET', 'POST', 'PATCH'],
   };
 }

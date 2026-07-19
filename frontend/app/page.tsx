@@ -40,21 +40,21 @@ export default function Home() {
     <div className="flex flex-1 flex-col gap-10 px-8 py-10 lg:px-16">
       <section aria-label="Start" className="flex flex-col gap-6">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h1 className="text-3xl font-semibold tracking-tight text-app-text">
             Your studio
           </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Import a manuscript to create a project, or continue where you left off.
+          <p className="mt-1 text-sm text-app-text-muted">
+            Bring in a manuscript to start a project, or continue where you left off.
           </p>
         </div>
         <UploadDropzone />
       </section>
 
       <section aria-label="Recent projects" className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Recent projects</h2>
-        {loadError && <p className="text-sm text-red-600 dark:text-red-400">{loadError}</p>}
+        <h2 className="text-lg font-semibold text-app-text">Recent projects</h2>
+        {loadError && <p className="text-sm text-app-error">{loadError}</p>}
         {projects && projects.length === 0 && (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-app-text-muted">
             {/* The honest empty state: also the post-restart state until persistence lands
                 (ADR-0046/0047) - a fake-persistent look would be a lie. */}
             No projects yet — import your first manuscript above to create one.
@@ -65,17 +65,17 @@ export default function Home() {
             {projects.map((project) => (
               <li key={project.id}>
                 <Card className="flex h-full flex-col gap-2 px-6 py-5">
-                  <p className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{project.name}</p>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className="text-base font-semibold text-app-text">{project.name}</p>
+                  <p className="text-sm text-app-text-muted">
                     {project.bookTitle} · {project.author}
                   </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  <p className="text-xs text-app-text-muted">
                     {project.versionCount} version{project.versionCount === 1 ? '' : 's'}
                     {project.publishedTargets.length > 0 && ` · published: ${project.publishedTargets.join(', ')}`}
                   </p>
                   <Link
                     href={`/projects/${project.id}`}
-                    className="mt-auto pt-2 text-sm font-medium text-zinc-900 underline underline-offset-4 dark:text-zinc-50"
+                    className="mt-auto pt-2 text-sm font-medium text-app-text underline underline-offset-4 dark:text-app-text"
                   >
                     Continue
                   </Link>
@@ -88,12 +88,12 @@ export default function Home() {
 
       {published.length > 0 && (
         <section aria-label="Recent publications" className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Recent publications</h2>
-          <ul className="flex flex-col gap-1 text-sm text-zinc-900 dark:text-zinc-50">
+          <h2 className="text-lg font-semibold text-app-text">Recent publications</h2>
+          <ul className="flex flex-col gap-1 text-sm text-app-text">
             {published.slice(0, 5).map((entry, index) => (
               <li key={index}>
                 <span className="font-medium uppercase">{entry.target}</span>
-                <span className="text-zinc-500 dark:text-zinc-400"> — {entry.project.bookTitle}</span>
+                <span className="text-app-text-muted"> — {entry.project.bookTitle}</span>
               </li>
             ))}
           </ul>
@@ -103,16 +103,16 @@ export default function Home() {
       {projects && projects.length > 0 && (
         <section aria-label="Statistics" className="flex gap-10 border-t-2 border-app-border pt-6 text-sm">
           <div>
-            <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{projects.length}</p>
-            <p className="text-zinc-500 dark:text-zinc-400">book{projects.length === 1 ? '' : 's'}</p>
+            <p className="text-2xl font-semibold text-app-text">{projects.length}</p>
+            <p className="text-app-text-muted">book{projects.length === 1 ? '' : 's'}</p>
           </div>
           <div>
-            <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{versionCount}</p>
-            <p className="text-zinc-500 dark:text-zinc-400">version{versionCount === 1 ? '' : 's'}</p>
+            <p className="text-2xl font-semibold text-app-text">{versionCount}</p>
+            <p className="text-app-text-muted">version{versionCount === 1 ? '' : 's'}</p>
           </div>
           <div>
-            <p className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{distinctTargets.length}</p>
-            <p className="text-zinc-500 dark:text-zinc-400">
+            <p className="text-2xl font-semibold text-app-text">{distinctTargets.length}</p>
+            <p className="text-app-text-muted">
               publication target{distinctTargets.length === 1 ? '' : 's'}
             </p>
           </div>

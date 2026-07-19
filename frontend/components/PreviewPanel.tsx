@@ -30,6 +30,8 @@ interface PreviewPanelProps {
   layoutLabel: string;
   themeLabel: string;
   onGenerated?: () => void;
+  /** Reports the REAL page count read from the produced PDF, for the shell's engine facts. */
+  onPageCount?: (pages: number | null) => void;
 }
 
 type PreviewState =
@@ -44,7 +46,7 @@ function countPdfPages(bytes: ArrayBuffer): number | null {
   return matches ? matches.length : null;
 }
 
-export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, onGenerated }: PreviewPanelProps) {
+export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, onGenerated, onPageCount }: PreviewPanelProps) {
   const [state, setState] = useState<PreviewState>({ status: 'idle' });
   const blobUrlRef = useRef<string | null>(null);
 
@@ -72,6 +74,7 @@ export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, o
       blobUrlRef.current = blobUrl;
       setState({ status: 'ready', blobUrl, pageCount, settingsKey });
       onGenerated?.();
+      onPageCount?.(pageCount);
     } catch (error) {
       setState({ status: 'error', message: error instanceof Error ? error.message : 'Preview failed.' });
     }
@@ -80,42 +83,43 @@ export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, o
   return (
     <Card className="flex max-w-2xl flex-col gap-4 px-8 py-6 text-left">
       <div className="flex items-center justify-between gap-4">
-        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Preview</h3>
+        <h3 className="text-lg font-semibold text-app-text">Proof</h3>
         <Button onClick={() => void generatePreview()} disabled={state.status === 'loading'}>
-          {state.status === 'loading' ? 'Generating…' : state.status === 'ready' ? 'Regenerate Preview' : 'Generate Preview'}
+          {state.status === 'loading' ? 'Refreshing…' : state.status === 'ready' ? 'Refresh proof' : 'Create proof'}
         </Button>
       </div>
 
       <dl className="flex flex-wrap gap-6 text-sm">
         <div>
-          <dt className="text-zinc-500 dark:text-zinc-400">Format</dt>
-          <dd className="font-medium text-zinc-900 dark:text-zinc-50">{layoutLabel}</dd>
+          <dt className="text-app-text-muted">Format</dt>
+          <dd className="font-medium text-app-text">{layoutLabel}</dd>
         </div>
         <div>
-          <dt className="text-zinc-500 dark:text-zinc-400">Theme</dt>
-          <dd className="font-medium text-zinc-900 dark:text-zinc-50">{themeLabel}</dd>
+          <dt className="text-app-text-muted">Theme</dt>
+          <dd className="font-medium text-app-text">{themeLabel}</dd>
         </div>
         {state.status === 'ready' && state.pageCount != null && (
           <div>
-            <dt className="text-zinc-500 dark:text-zinc-400">Estimated pages</dt>
-            <dd className="font-medium text-zinc-900 dark:text-zinc-50">{state.pageCount}</dd>
+            <dt className="text-app-text-muted">Estimated pages</dt>
+            <dd className="font-medium text-app-text">{state.pageCount}</dd>
           </div>
         )}
       </dl>
 
-      {state.status === 'error' && <p className="text-sm text-red-600 dark:text-red-400">{state.message}</p>}
+      {state.status === 'error' && <p className="text-sm text-app-error">{state.message}</p>}
 
       {isStale && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">
-          Layout or theme changed since this preview was generated — click Regenerate Preview to update it.
+        <p className="text-xs text-app-warning">
+          Layout or theme changed since this proof — refresh it to see the book as it now stands.
         </p>
       )}
 
       {state.status === 'ready' && (
         <embed
+          data-baseline-mask
           src={state.blobUrl}
           type="application/pdf"
-          className={`h-[500px] w-full rounded-lg border border-zinc-200 dark:border-zinc-800 ${isStale ? 'opacity-50' : ''}`}
+          className={`h-[500px] w-full rounded-lg border border-app-border ${isStale ? 'opacity-50' : ''}`}
         />
       )}
     </Card>

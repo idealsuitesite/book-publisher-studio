@@ -1,57 +1,37 @@
 {
-  "capturedAt": "2026-07-19T11:25:48.779Z",
-  "totalViolations": 5,
-  "totalNodes": 5,
+  "capturedAt": "2026-07-19T13:31:20.924Z",
+  "totalViolations": 3,
+  "totalNodes": 3,
   "screens": [
     {
       "screen": "01-home",
       "viewport": "desktop",
       "file": "01-home--desktop.png",
-      "bytes": 37465,
+      "bytes": 45110,
       "status": "captured",
       "violations": []
     },
     {
-      "screen": "02-workspace-manuscript",
+      "screen": "02-dashboard",
       "viewport": "desktop",
-      "file": "02-workspace-manuscript--desktop.png",
-      "bytes": 41559,
+      "file": "02-dashboard--desktop.png",
+      "bytes": 75086,
       "status": "captured",
-      "violations": [
-        {
-          "id": "color-contrast",
-          "impact": "serious",
-          "nodes": 1,
-          "help": "Elements must meet minimum color contrast ratio thresholds"
-        }
-      ]
+      "violations": []
     },
     {
-      "screen": "03-layout-kdp",
+      "screen": "03-ready-for-print",
       "viewport": "desktop",
-      "file": "03-layout-kdp--desktop.png",
-      "bytes": 51905,
+      "file": "03-ready-for-print--desktop.png",
+      "bytes": 76238,
       "status": "captured",
-      "violations": [
-        {
-          "id": "color-contrast",
-          "impact": "serious",
-          "nodes": 1,
-          "help": "Elements must meet minimum color contrast ratio thresholds"
-        },
-        {
-          "id": "heading-order",
-          "impact": "moderate",
-          "nodes": 1,
-          "help": "Heading levels should only increase by one"
-        }
-      ]
+      "violations": []
     },
     {
-      "screen": "04-preview",
+      "screen": "04-layout-kdp",
       "viewport": "desktop",
-      "file": "04-preview--desktop.png",
-      "bytes": 43867,
+      "file": "04-layout-kdp--desktop.png",
+      "bytes": 68636,
       "status": "captured",
       "violations": [
         {
@@ -63,10 +43,10 @@
       ]
     },
     {
-      "screen": "05-publish",
+      "screen": "05-proof",
       "viewport": "desktop",
-      "file": "05-publish--desktop.png",
-      "bytes": 59167,
+      "file": "05-proof--desktop.png",
+      "bytes": 52697,
       "status": "captured",
       "violations": [
         {
@@ -78,10 +58,25 @@
       ]
     },
     {
-      "screen": "06-home-library",
+      "screen": "06-editions-publish",
       "viewport": "desktop",
-      "file": "06-home-library--desktop.png",
-      "bytes": 46182,
+      "file": "06-editions-publish--desktop.png",
+      "bytes": 85307,
+      "status": "captured",
+      "violations": [
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "nodes": 1,
+          "help": "Heading levels should only increase by one"
+        }
+      ]
+    },
+    {
+      "screen": "07-home-library",
+      "viewport": "desktop",
+      "file": "07-home-library--desktop.png",
+      "bytes": 50719,
       "status": "captured",
       "violations": []
     }

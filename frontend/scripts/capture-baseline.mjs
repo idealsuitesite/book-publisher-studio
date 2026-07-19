@@ -157,50 +157,55 @@ async function runDemoScript(browser, viewport) {
   });
   const page = await context.newPage();
 
-  // Deterministic start: imports create real projects server-side (ADR-0047), so without a
-  // reset every capture run would see the accumulated library of every run before it and no
-  // two baselines could ever match. Dev-only route; production never has it.
+  // Deterministic start: imports create real projects server-side (ADR-0047).
   await fetch(`${BACKEND}/api/dev/reset-projects`, { method: 'POST' });
 
-  // Journey step 1 (HOME_WORKSPACE.md §0) - Home, the library, honest empty state.
+  // Journey step 1 - Home, the library, honest empty state.
   await page.goto(FRONTEND, { waitUntil: 'networkidle' });
   await waitForText(page, 'Your studio');
   await scan(page, '01-home', viewport.name);
 
-  // Step 2 - import through the real file input; success IS a redirect to the Workspace.
+  // Step 2 - bring in the manuscript; success IS a redirect. The Workspace opens on the BOOK
+  // DASHBOARD (PRODUCT_EXPERIENCE: the book is the center), after the mise-en-place settles.
   await page.setInputFiles('input[type="file"]', FIXTURE);
   await page.waitForURL(/\/projects\//, { timeout: 60000 });
-  await waitForText(page, 'Import complete');
-  await scan(page, '02-workspace-manuscript', viewport.name);
+  await waitForText(page, 'Progression');
+  await page.waitForTimeout(600); // let the mise-en-place finish (motion-view + staggers)
+  await scan(page, '02-dashboard', viewport.name);
 
-  // Step 3 - Layout station: settings are PROJECT properties; picking KDP persists via PATCH.
-  await page.getByRole('button', { name: 'Layout' }).click();
-  const kdp = page.getByText('KDP 6" x 9"', { exact: false }).first();
-  await kdp.click();
-  // The workspace reloads the project after PATCH; the properties rail/nav reflect it.
+  // Step 3 - Ready for Print (the checklist that replaced 60/100).
+  await page.getByRole('button', { name: /^Ready for Print/ }).click();
+  await waitForText(page, 'Professional Score');
+  await page.waitForTimeout(600); // the checks tick in sequence
+  await scan(page, '03-ready-for-print', viewport.name);
+
+  // Step 4 - Layout: pick the KDP preset; it persists on the project.
+  await page.getByRole('button', { name: /^Layout/ }).click();
+  await page.getByText('KDP 6" x 9"', { exact: false }).first().click();
   await page.waitForTimeout(500);
-  await scan(page, '03-layout-kdp', viewport.name);
+  await scan(page, '04-layout-kdp', viewport.name);
 
-  // Step 4 - Preview station: a real export round trip from the STORED source (Decision 6).
-  await page.getByRole('button', { name: 'Preview' }).click();
-  await page.getByRole('button', { name: /Generate Preview/i }).click();
+  // Step 5 - Proof: a real render from the STORED source.
+  await page.getByRole('button', { name: /^Proof/ }).click();
+  await page.getByRole('button', { name: /Create proof/i }).click();
   await waitForText(page, 'pages', 120000).catch(() => {});
-  await scan(page, '04-preview', viewport.name);
+  await scan(page, '05-proof', viewport.name);
 
-  // Step 5 - Publish station: real KDP validation, recorded into the project history.
-  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  // Step 6 - Editions & Publish: real KDP validation, recorded into history.
+  await page.getByRole('button', { name: /^Editions/ }).click();
   await page.getByRole('button', { name: /Validate for KDP/i }).click();
   await waitForText(page, 'error', 120000).catch(() => {});
-  await scan(page, '05-publish', viewport.name);
+  await scan(page, '06-editions-publish', viewport.name);
 
-  // Step 6 - back Home: the library now shows the project, its publication, the statistics.
+  // Step 7 - back Home: the library shows the project and its record.
   await page.getByRole('link', { name: 'Studio', exact: true }).click();
   await waitForText(page, 'Recent projects');
   await waitForText(page, 'large-book');
-  await scan(page, '06-home-library', viewport.name);
+  await scan(page, '07-home-library', viewport.name);
 
   await context.close();
 }
+
 
 
 async function main() {

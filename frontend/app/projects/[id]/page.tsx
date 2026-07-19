@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ProjectDTO, ManuscriptOptionsDTO } from 'shared-types';
 import {
@@ -9,26 +9,66 @@ import {
   updateProjectSettings,
   exportProject,
 } from '@/lib/api-client';
+import { computeBookFacts } from '@/lib/bookFacts';
+import { useStudio } from '@/components/studio/StudioContext';
+import { Explorer, buildExplorer, type StudioView } from '@/components/studio/Explorer';
+import { Inspector, inspectorRows } from '@/components/studio/Inspector';
+import { BookDashboard } from '@/components/studio/BookDashboard';
+import { ReadyForPrint } from '@/components/studio/ReadyForPrint';
+import { CommandPalette, type PaletteCommand } from '@/components/studio/CommandPalette';
 import { BookStructureView } from '@/components/BookStructureView';
-import { ValidationSummary } from '@/components/ValidationSummary';
 import { FormatSelector } from '@/components/FormatSelector';
 import { PreviewPanel } from '@/components/PreviewPanel';
 import { ExportPanel } from '@/components/ExportPanel';
 import { PublishPanel } from '@/components/PublishPanel';
-import { cx } from '@/components/ui';
 
-// The stations (HOME_WORKSPACE.md §0: stations, not steps). One section at a time; the
-// pipeline's first-pass guidance survives as per-station STATUS in the nav, never as sequence.
-const STATIONS = ['Manuscript', 'Validation', 'Layout', 'Preview', 'Publish', 'History'] as const;
-type Station = (typeof STATIONS)[number];
+const VIEW_TITLES: Record<StudioView, string> = {
+  dashboard: 'Overview',
+  structure: 'Structure',
+  validation: 'Ready for Print',
+  layout: 'Layout',
+  proof: 'Proof',
+  editions: 'Editions & Publish',
+  history: 'History',
+};
+
+const VIEW_ORDER: StudioView[] = ['dashboard', 'structure', 'validation', 'layout', 'proof', 'editions', 'history'];
+
+/** Resume-where-left (PRODUCT_EXPERIENCE §10.1): per-project UI state, client-side until S11. */
+const viewStorageKey = (id: string) => `bps.view.${id}`;
 
 export default function ProjectWorkspace({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const studio = useStudio();
   const [project, setProject] = useState<ProjectDTO | null>(null);
   const [options, setOptions] = useState<ManuscriptOptionsDTO | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [station, setStation] = useState<Station>('Manuscript');
+  // Resume-where-left: lazy initial read so no effect-driven setState is needed.
+  const [view, setViewState] = useState<StudioView>(() => {
+    try {
+      const saved = localStorage.getItem(viewStorageKey(id)) as StudioView | null;
+      if (saved && VIEW_ORDER.includes(saved)) return saved;
+    } catch {
+      /* storage unavailable */
+    }
+    return 'dashboard';
+  });
+  const [measuredPages, setMeasuredPages] = useState<number | undefined>(undefined);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  const setView = useCallback(
+    (next: StudioView) => {
+      setViewState(next);
+      try {
+        localStorage.setItem(viewStorageKey(id), next);
+      } catch {
+        /* storage unavailable is fine - resume is a comfort, not a contract */
+      }
+    },
+    [id]
+  );
 
   const reload = useCallback(() => {
     void getProject(id)
@@ -41,19 +81,62 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
   useEffect(() => {
     reload();
     void getManuscriptOptions().then(setOptions).catch(() => setOptions(null));
-  }, [reload]);
+  }, [id, reload]);
+
+  // Publish real context into the shell (header + status bar) - and clear it on leave.
+  const setStudioProject = studio.setProject;
+  const setStudioFacts = studio.setFacts;
+  useEffect(() => {
+    if (!project) return;
+    const blocking = project.report.issues.filter((issue) => issue.severity === 'ERROR').length;
+    setStudioProject({
+      projectId: project.id,
+      projectName: project.name,
+      bookVoice: 'serif',
+      versionCount: project.versions.length,
+      blockingFindings: blocking,
+      score: project.report.score.overall,
+    });
+    const facts = computeBookFacts(project.book);
+    setStudioFacts({ words: project.book.wordCount, chapters: facts.chapters, pages: measuredPages });
+    return () => {
+      setStudioProject(null);
+      // Leaving the workspace clears the engine facts too - Home must not wear another
+      // room's instruments.
+      setStudioFacts({ words: undefined, chapters: undefined, pages: undefined, lastRenderMs: undefined, lastEdition: undefined });
+    };
+  }, [project, measuredPages, setStudioProject, setStudioFacts]);
+
+  // Expert hands (PRODUCT_EXPERIENCE §10.3): Ctrl+K palette, Ctrl+1..7 views.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && /^[1-7]$/.test(event.key)) {
+        event.preventDefault();
+        setView(VIEW_ORDER[Number(event.key) - 1]);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [setView]);
+
+  const facts = useMemo(() => (project ? computeBookFacts(project.book) : null), [project]);
 
   if (loadError) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
-        <p className="text-lg font-medium text-red-600 dark:text-red-400">Could not open this project</p>
-        <p className="max-w-md text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-lg font-medium text-app-error">Could not open this project</p>
+        <p className="max-w-md text-sm text-app-text-muted">
           {loadError} Projects currently live in memory — after a server restart the library starts
           empty and previous links expire.
         </p>
         <button
           onClick={() => router.push('/')}
-          className="text-sm font-medium text-zinc-900 underline underline-offset-4 dark:text-zinc-50"
+          className="text-sm font-medium text-app-text underline underline-offset-4"
         >
           Back to the studio
         </button>
@@ -61,10 +144,10 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
     );
   }
 
-  if (!project) {
+  if (!project || !facts) {
     return (
       <div className="flex flex-1 items-center justify-center p-10">
-        <p className="animate-pulse text-sm text-zinc-500 dark:text-zinc-400">Opening project…</p>
+        <p className="animate-pulse text-sm text-app-text-muted">Opening project…</p>
       </div>
     );
   }
@@ -75,60 +158,71 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
     options?.themes.find((t) => t.name === project.settings.themeName)?.label ?? project.settings.themeName;
   const settingsKey = `${project.settings.layoutName}/${project.settings.themeName}`;
 
-  // Station status: the pipeline's guidance, demoted from sequence to information.
-  const status: Partial<Record<Station, string>> = {
-    Validation: `${project.report.score.overall}/100`,
-    Layout: layoutLabel,
-    Publish: project.publications.length > 0 ? `${project.publications.length}` : undefined,
-    History: project.versions.length > 0 ? `${project.versions.length}` : undefined,
-  };
+  const commands: PaletteCommand[] = [
+    ...VIEW_ORDER.map((v, index) => ({
+      id: `view-${v}`,
+      label: VIEW_TITLES[v],
+      hint: `Ctrl+${index + 1}`,
+      run: () => setView(v),
+    })),
+    { id: 'home', label: 'Back to the studio', run: () => router.push('/') },
+  ];
 
   async function changeSettings(patch: { layoutName?: string; themeName?: string }) {
-    await updateProjectSettings(id, patch);
-    reload();
+    try {
+      setSettingsError(null);
+      await updateProjectSettings(id, patch);
+      reload();
+    } catch (error) {
+      // Surfaced inline, never swallowed: an unhandled rejection here crashed straight into
+      // the dev overlay when CORS refused PATCH - found by the real browser.
+      setSettingsError(error instanceof Error ? error.message : 'Could not update settings.');
+    }
   }
 
   return (
-    <div className="flex flex-1">
-      <aside aria-label="Project sections" className="w-48 shrink-0 border-r-2 border-app-border px-4 py-6">
-        <nav>
-          <ul className="flex flex-col gap-1">
-            {STATIONS.map((name) => (
-              <li key={name}>
-                <button
-                  onClick={() => setStation(name)}
-                  aria-current={station === name ? 'page' : undefined}
-                  className={cx(
-                    'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm',
-                    station === name
-                      ? 'bg-zinc-200 font-semibold text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50'
-                      : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900'
-                  )}
-                >
-                  {name}
-                  {status[name] && (
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">{status[name]}</span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
+    <div className="flex flex-1 overflow-hidden">
+      <CommandPalette commands={commands} open={paletteOpen} onOpenChange={setPaletteOpen} />
+
+      <aside
+        aria-label="Project explorer"
+        className="w-56 shrink-0 overflow-y-auto border-r border-app-border bg-app-surface-1 px-3 py-5"
+      >
+        <Explorer
+          groups={buildExplorer(project, facts, layoutLabel, measuredPages)}
+          active={view}
+          onSelect={setView}
+        />
       </aside>
 
-      <section aria-label={station} className="flex flex-1 flex-col items-start gap-6 overflow-y-auto px-8 py-8">
-        {/* The page's one h1: the book the Workspace answers for. Visually the stations carry
-            their own headings; structurally the document needs its root. */}
+      <section
+        aria-label={VIEW_TITLES[view]}
+        className="flex flex-1 flex-col items-start gap-6 overflow-y-auto px-8 py-8"
+      >
         <h1 className="sr-only">{project.name}</h1>
-        {station === 'Manuscript' && (
+
+        {view === 'dashboard' && (
+          <BookDashboard
+            project={project}
+            facts={facts}
+            layoutLabel={layoutLabel}
+            themeLabel={themeLabel}
+            measuredPages={measuredPages}
+            onNavigate={setView}
+          />
+        )}
+        {view === 'structure' && (
           <BookStructureView
             book={project.book}
             filename={project.sourceFilename ?? null}
             onReset={() => router.push('/')}
           />
         )}
-        {station === 'Validation' && <ValidationSummary report={project.report} />}
-        {station === 'Layout' && options && (
+        {view === 'validation' && <ReadyForPrint report={project.report} />}
+        {view === 'layout' && settingsError && (
+          <p className="text-sm text-app-error">{settingsError}</p>
+        )}
+        {view === 'layout' && options && (
           <FormatSelector
             options={options}
             selectedLayout={project.settings.layoutName}
@@ -137,59 +231,66 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
             onThemeChange={(themeName) => void changeSettings({ themeName })}
           />
         )}
-        {station === 'Preview' && (
+        {view === 'proof' && (
           <PreviewPanel
-            exporter={() => exportProject(id, 'pdf')}
+            exporter={async () => {
+              const started = performance.now();
+              const blob = await exportProject(id, 'pdf');
+              setStudioFacts({ lastRenderMs: Math.round(performance.now() - started) });
+              return blob;
+            }}
             settingsKey={settingsKey}
             layoutLabel={layoutLabel}
             themeLabel={themeLabel}
+            onPageCount={(pages) => setMeasuredPages(pages ?? undefined)}
           />
         )}
-        {station === 'Publish' && (
+        {view === 'editions' && (
           <>
-            <ExportPanel exporter={(format) => exportProject(id, format)} downloadName={project.name} />
+            <ExportPanel
+              exporter={async (format) => {
+                const blob = await exportProject(id, format);
+                setStudioFacts({ lastEdition: `${format.toUpperCase()} edition · just now` });
+                return blob;
+              }}
+              downloadName={project.name}
+            />
             <PublishPanel projectId={id} onPublished={reload} />
           </>
         )}
-        {station === 'History' && (
+        {view === 'history' && (
           <div className="flex w-full max-w-2xl flex-col gap-6 text-left">
             <div>
-              <h3 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Versions</h3>
+              <h3 className="mb-2 text-lg font-semibold text-app-text">Versions</h3>
               {project.versions.length === 0 ? (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                <p className="text-sm text-app-text-muted">
                   No versions yet — publishing snapshots one automatically.
                 </p>
               ) : (
-                <ul className="flex flex-col gap-1 text-sm text-zinc-900 dark:text-zinc-50">
+                <ul className="flex flex-col gap-1 text-sm text-app-text">
                   {project.versions.map((version) => (
                     <li key={version.id}>
                       Version {version.number}
-                      {version.label && <span className="text-zinc-500 dark:text-zinc-400"> · {version.label}</span>}
-                      <span className="text-zinc-500 dark:text-zinc-400">
-                        {' '}
-                        · {new Date(version.createdAt).toLocaleString()}
-                      </span>
+                      {version.label && <span className="text-app-text-muted"> · {version.label}</span>}
+                      <span className="text-app-text-muted"> · {new Date(version.createdAt).toLocaleString()}</span>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
             <div>
-              <h3 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Publications</h3>
+              <h3 className="mb-2 text-lg font-semibold text-app-text">Publications</h3>
               {project.publications.length === 0 ? (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">No publication attempts yet.</p>
+                <p className="text-sm text-app-text-muted">No publication attempts yet.</p>
               ) : (
-                <ul className="flex flex-col gap-1 text-sm text-zinc-900 dark:text-zinc-50">
+                <ul className="flex flex-col gap-1 text-sm text-app-text">
                   {project.publications.map((event, index) => (
                     <li key={index}>
                       <span className="font-medium uppercase">{event.target}</span> — {event.status}
                       {event.versionNumber !== undefined && (
-                        <span className="text-zinc-500 dark:text-zinc-400"> · version {event.versionNumber}</span>
+                        <span className="text-app-text-muted"> · version {event.versionNumber}</span>
                       )}
-                      <span className="text-zinc-500 dark:text-zinc-400">
-                        {' '}
-                        · {new Date(event.occurredAt).toLocaleString()}
-                      </span>
+                      <span className="text-app-text-muted"> · {new Date(event.occurredAt).toLocaleString()}</span>
                     </li>
                   ))}
                 </ul>
@@ -200,39 +301,17 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
       </section>
 
       <aside
-        aria-label="Project properties"
-        className="hidden w-56 shrink-0 border-l-2 border-app-border px-4 py-6 text-sm xl:block"
+        aria-label="Inspector"
+        className="hidden w-64 shrink-0 overflow-y-auto border-l border-app-border bg-app-surface-1 px-4 py-5 xl:block"
       >
-        <h2 className="mb-3 font-semibold text-zinc-900 dark:text-zinc-50">{project.name}</h2>
-        <dl className="flex flex-col gap-2 text-zinc-600 dark:text-zinc-400">
-          <div>
-            <dt className="text-xs uppercase">Author</dt>
-            <dd className="text-zinc-900 dark:text-zinc-50">{project.book.metadata.author}</dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase">Layout</dt>
-            <dd className="text-zinc-900 dark:text-zinc-50">{layoutLabel}</dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase">Theme</dt>
-            <dd className="text-zinc-900 dark:text-zinc-50">{themeLabel}</dd>
-          </div>
-          {project.sourceFilename && (
-            <div>
-              <dt className="text-xs uppercase">Source</dt>
-              <dd className="break-all text-zinc-900 dark:text-zinc-50">{project.sourceFilename}</dd>
-            </div>
-          )}
-          <div>
-            <dt className="text-xs uppercase">Updated</dt>
-            {/* data-baseline-mask: real wall-clock data the visual baseline masks at capture
-                time — a timestamp that changes every run would make determinism impossible,
-                and hiding the field from users to please a screenshot tool would be backwards. */}
-            <dd data-baseline-mask className="text-zinc-900 dark:text-zinc-50">
-              {new Date(project.updatedAt).toLocaleString()}
-            </dd>
-          </div>
-        </dl>
+        <Inspector
+          title={VIEW_TITLES[view]}
+          rows={inspectorRows(view, project, facts, layoutLabel, themeLabel, measuredPages)}
+        />
+        {/* Real wall-clock data, masked at baseline-capture time (determinism defect #4). */}
+        <p data-baseline-mask className="mt-4 text-xs text-app-text-muted">
+          Updated {new Date(project.updatedAt).toLocaleString()}
+        </p>
       </aside>
     </div>
   );

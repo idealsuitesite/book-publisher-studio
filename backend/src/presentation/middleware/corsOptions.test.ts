@@ -60,6 +60,6 @@ describe('buildCorsOptions', () => {
   });
 
   it('exposes only the methods this API actually serves', () => {
-    expect(options.methods).toEqual(['GET', 'POST']);
+    expect(options.methods).toEqual(['GET', 'POST', 'PATCH']);
   });
 });

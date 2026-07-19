@@ -38,23 +38,23 @@ export function PublishPanel({ projectId, onPublished }: PublishPanelProps) {
   return (
     <Card className="flex max-w-2xl flex-col gap-4 px-8 py-6 text-left">
       <div className="flex items-center justify-between gap-4">
-        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Publish to KDP</h3>
+        <h3 className="text-lg font-semibold text-app-text">Publish to KDP</h3>
         <Button onClick={() => void publish()} disabled={state.status === 'publishing'}>
           {state.status === 'publishing' ? 'Validating…' : 'Validate for KDP'}
         </Button>
       </div>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+      <p className="text-sm text-app-text-muted">
         Runs Amazon KDP&apos;s real submission rules against this book and records the attempt in the
         project&apos;s history. No account is contacted — this validates, it does not submit.
       </p>
 
       {state.status === 'error' && (
-        <p className="text-sm text-red-600 dark:text-red-400">{state.message}</p>
+        <p className="text-sm text-app-error">{state.message}</p>
       )}
 
       {state.status === 'done' && (
         <div className="flex flex-col gap-3">
-          <p className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+          <p className="flex items-center gap-2 text-sm font-medium text-app-text">
             <Badge severity={state.report.status === 'PASS' ? 'success' : 'error'}>
               {state.report.status}
             </Badge>
@@ -66,11 +66,11 @@ export function PublishPanel({ projectId, onPublished }: PublishPanelProps) {
                 <li
                   key={`${issue.code}-${index}`}
                   className={`border-l-2 pl-3 text-sm ${
-                    issue.severity === 'ERROR' ? 'border-red-600' : 'border-amber-500'
+                    issue.severity === 'ERROR' ? 'border-app-error' : 'border-app-warning'
                   }`}
                 >
-                  <span className="text-zinc-900 dark:text-zinc-50">{issue.message}</span>
-                  <span className="block text-xs text-zinc-500 dark:text-zinc-400">{issue.code}</span>
+                  <span className="text-app-text">{issue.message}</span>
+                  <span className="block text-xs text-app-text-muted">{issue.code}</span>
                 </li>
               ))}
             </ul>
