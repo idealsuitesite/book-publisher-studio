@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-07-19T14:19:17.653Z",
+  "capturedAt": "2026-07-19T19:32:38.843Z",
   "totalViolations": 3,
   "totalNodes": 3,
   "screens": [
@@ -31,7 +31,7 @@
       "screen": "04-layout-kdp",
       "viewport": "desktop",
       "file": "04-layout-kdp--desktop.png",
-      "bytes": 89933,
+      "bytes": 88047,
       "status": "captured",
       "violations": [
         {

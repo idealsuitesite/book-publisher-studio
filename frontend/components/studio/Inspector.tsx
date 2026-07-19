@@ -38,9 +38,12 @@ export function inspectorRows(
       return [
         { label: 'Preset', value: layoutLabel },
         { label: 'Theme', value: themeLabel },
-        // Honest to the ADR: the gutter defect is disclosed where layout is inspected.
-        { label: 'Gutter', value: 'not yet applied (ADR-0043)', warn: true },
-        { label: 'Recto/verso', value: 'planned (LAYOUT_FIDELITY)' },
+        // Still honest — the gutter gap (ADR-0043) and mirrored margins (LAYOUT_FIDELITY)
+        // remain disclosed where layout is inspected — but in the AUTHOR'S language
+        // (IMPORT_FIDELITY commit 4, CTO): internal ticket ids never render for end users;
+        // they live here, in the code, where the next engineer looks.
+        { label: 'Gutter', value: 'Coming soon', warn: true },
+        { label: 'Recto/verso', value: 'Coming soon' },
       ];
     case 'validation': {
       const c = project.report.score.categories;
