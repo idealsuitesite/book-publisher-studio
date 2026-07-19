@@ -67,9 +67,10 @@ describe('GET /api/projects', () => {
     expect(res.body.publications).toEqual([]);
   });
 
-  it('404s for a project that does not exist', async () => {
+  it('404s with the PROJECT_NOT_FOUND code for a project that does not exist (ADR-0049)', async () => {
     const res = await request(createApp()).get('/api/projects/nope');
     expect(res.status).toBe(404);
+    expect(res.body.code).toBe('PROJECT_NOT_FOUND');
   });
 
   it('changes settings as PROJECT properties - remembered, not per-request arguments', async () => {

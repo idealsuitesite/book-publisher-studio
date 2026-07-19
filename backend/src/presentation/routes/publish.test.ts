@@ -73,13 +73,14 @@ describe('POST /api/manuscripts/publish', () => {
     expect(response.body.error).toMatch(/publishing target/);
   });
 
-  it('returns 400 for a corrupted DOCX', async () => {
+  it('returns 422 IMPORT_PARSE_FAILED for a corrupted DOCX (ADR-0049)', async () => {
     const response = await request(app)
       .post('/api/manuscripts/publish')
       .field('target', 'kdp')
       .attach('file', Buffer.from('not a docx'), 'bad.docx');
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(422);
+    expect(response.body.code).toBe('IMPORT_PARSE_FAILED');
   });
 
   // Real-fixture regression, same discipline as export.test.ts's own typography-test.docx check.

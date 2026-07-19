@@ -1,4 +1,6 @@
 import type {
+  ApiErrorCode,
+  ApiErrorDTO,
   ImportResponseDTO,
   ManuscriptOptionsDTO,
   ProjectListResponseDTO,
@@ -43,6 +45,33 @@ export class NetworkError extends Error {
 }
 
 /**
+ * The server answered with a NAMED error (ADR-0049, IMPORT_FIDELITY §3) — the third failure
+ * family next to timeout and network. Callers branch on `code` to offer the right recovery
+ * action instead of parroting a string; the message remains the server's human phrasing.
+ */
+export class ApiError extends Error {
+  readonly code?: ApiErrorCode;
+  readonly status: number;
+
+  constructor(message: string, status: number, code?: ApiErrorCode) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+/** Builds the ApiError from a non-ok response's JSON body, tolerating bodies that aren't JSON. */
+async function apiErrorFrom(response: Response, operation: string): Promise<ApiError> {
+  const body = (await response.json().catch(() => null)) as ApiErrorDTO | null;
+  return new ApiError(
+    body?.error ?? `${operation} failed: ${response.status} ${response.statusText}`,
+    response.status,
+    body?.code
+  );
+}
+
+/**
  * Distinguishes the three failure modes a caller genuinely needs to tell apart: the request
  * timed out, the network never delivered it, or the server answered with an error. Previously
  * an offline server surfaced as a raw "Failed to fetch", which tells a user nothing.
@@ -80,8 +109,7 @@ export async function importManuscript(file: File): Promise<ImportResponseDTO> {
     return response.json() as Promise<ImportResponseDTO>;
   }
 
-  const body = (await response.json().catch(() => null)) as { error?: string } | null;
-  throw new Error(body?.error ?? `Import failed: ${response.status} ${response.statusText}`);
+  throw await apiErrorFrom(response, 'Import');
 }
 
 export async function getManuscriptOptions(): Promise<ManuscriptOptionsDTO> {
@@ -93,7 +121,7 @@ export async function getManuscriptOptions(): Promise<ManuscriptOptionsDTO> {
   );
 
   if (!response.ok) {
-    throw new Error(`Fetching options failed: ${response.status} ${response.statusText}`);
+    throw await apiErrorFrom(response, 'Fetching options');
   }
 
   return response.json() as Promise<ManuscriptOptionsDTO>;
@@ -128,10 +156,7 @@ export async function exportManuscript({
   );
 
   if (!response.ok) {
-    // The backend returns a JSON { error } body for 400s (unknown theme, unknown layout,
-    // corrupt file). Surfacing it beats a bare status code the user cannot act on.
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? `Export failed: ${response.status} ${response.statusText}`);
+    throw await apiErrorFrom(response, 'Export');
   }
 
   return response.blob();
@@ -145,7 +170,7 @@ export async function exportManuscript({
 export async function listProjects(): Promise<ProjectListResponseDTO> {
   const response = await request(`${API_BASE_URL}/api/projects`, {}, 'Loading projects', OPTIONS_TIMEOUT_MS);
   if (!response.ok) {
-    throw new Error(`Loading projects failed: ${response.status} ${response.statusText}`);
+    throw await apiErrorFrom(response, 'Loading projects');
   }
   return response.json() as Promise<ProjectListResponseDTO>;
 }
@@ -158,8 +183,7 @@ export async function getProject(id: string): Promise<ProjectDTO> {
     IMPORT_TIMEOUT_MS
   );
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? `Opening project failed: ${response.status} ${response.statusText}`);
+    throw await apiErrorFrom(response, 'Opening project');
   }
   return response.json() as Promise<ProjectDTO>;
 }
@@ -175,8 +199,7 @@ export async function updateProjectSettings(
     OPTIONS_TIMEOUT_MS
   );
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? `Updating settings failed: ${response.status} ${response.statusText}`);
+    throw await apiErrorFrom(response, 'Updating settings');
   }
   const json = (await response.json()) as { settings: ProjectSettingsDTO };
   return json.settings;
@@ -190,8 +213,7 @@ export async function exportProject(id: string, format: ExportFormat): Promise<B
     EXPORT_TIMEOUT_MS
   );
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? `Export failed: ${response.status} ${response.statusText}`);
+    throw await apiErrorFrom(response, 'Export');
   }
   return response.blob();
 }
@@ -204,8 +226,7 @@ export async function publishProject(id: string): Promise<PublishingResponseDTO>
     EXPORT_TIMEOUT_MS
   );
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? `Publish failed: ${response.status} ${response.statusText}`);
+    throw await apiErrorFrom(response, 'Publish');
   }
   return response.json() as Promise<PublishingResponseDTO>;
 }

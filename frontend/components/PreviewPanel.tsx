@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button, Card } from '@/components/ui';
+import { ApiError } from '@/lib/api-client';
 
 /**
  * The living Proof (PRODUCT_EXPERIENCE §4.5, CTO: "le bouton disparaît"). The proof exists
@@ -80,7 +81,14 @@ export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, o
           setState((current) => ({
             ...current,
             refreshing: false,
-            error: error instanceof Error ? error.message : 'The proof could not be produced.',
+            // ADR-0049 §3: RENDER_FAILED gets this surface's own words; the real cause is in
+            // the server log, not in the author's face.
+            error:
+              error instanceof ApiError && error.code === 'RENDER_FAILED'
+                ? 'The Proof could not be generated.'
+                : error instanceof Error
+                  ? error.message
+                  : 'The proof could not be produced.',
           }));
         }
       })();

@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ProjectDTO, ManuscriptOptionsDTO } from 'shared-types';
 import {
+  ApiError,
   getProject,
   getManuscriptOptions,
   updateProjectSettings,
@@ -73,9 +74,20 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
   const reload = useCallback(() => {
     void getProject(id)
       .then(setProject)
-      .catch((error: unknown) =>
-        setLoadError(error instanceof Error ? error.message : 'Could not open this project.')
-      );
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.code === 'PROJECT_NOT_FOUND') {
+          // ADR-0049 §3 recovery: a link to a project that no longer exists must not keep
+          // resurrecting itself — drop its resume-where-left entry along with the message.
+          try {
+            localStorage.removeItem(viewStorageKey(id));
+          } catch {
+            /* storage unavailable */
+          }
+          setLoadError('This project is no longer in your library.');
+          return;
+        }
+        setLoadError(error instanceof Error ? error.message : 'Could not open this project.');
+      });
   }, [id]);
 
   useEffect(() => {
@@ -135,10 +147,9 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
         <p className="text-lg font-medium text-app-error">Could not open this project</p>
-        <p className="max-w-md text-sm text-app-text-muted">
-          {loadError} Projects currently live in memory — after a server restart the library starts
-          empty and previous links expire.
-        </p>
+        {/* Since ADR-0048 the library is durable — the old "projects live in memory" excuse
+            became false the day SQLite landed, so the screen now says only what it knows. */}
+        <p className="max-w-md text-sm text-app-text-muted">{loadError}</p>
         <button
           onClick={() => router.push('/')}
           className="text-sm font-medium text-app-text underline underline-offset-4"

@@ -6,6 +6,7 @@ import { RequiredMetadataFieldsRule } from './RequiredMetadataFieldsRule';
 import { PageCountRule } from './PageCountRule';
 import { CoverPresenceRule } from './CoverPresenceRule';
 import { InteriorFormatAvailabilityRule } from './InteriorFormatAvailabilityRule';
+import { StructurePresenceRule } from './StructurePresenceRule';
 
 // The only ValidationRuleProvider implementation this sprint (Decision 7, ADR-0036). Domain, not
 // Infrastructure - the Commit-0 spike confirmed no file I/O is needed to turn KDPRuleData into
@@ -28,6 +29,8 @@ export class KDPRuleProvider implements ValidationRuleProvider {
       ),
       new CoverPresenceRule(),
       new InteriorFormatAvailabilityRule(this.data.interiorSpec.acceptedFormats),
+      // ADR-0049, provisional (CTO amendment): KDP-specific by design, see the rule's own doc.
+      new StructurePresenceRule(),
     ];
   }
 }

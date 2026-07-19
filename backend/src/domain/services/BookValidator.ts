@@ -1,5 +1,6 @@
-import type { Book, ValidationResult, ValidationError, Block } from '../models/Book';
+import type { Book, ValidationResult, ValidationError } from '../models/Book';
 import { isChapter } from '../models/Book';
+import { countBookWords } from './countBookWords';
 
 /**
  * Below this many words, a chapterless single-flow document (an essay, a corporate report, an
@@ -64,7 +65,7 @@ export class BookValidator {
     // needs the project, the Proof and the Structure station to understand the problem.
     const chapterCount = book.mainContent.filter(isChapter).length;
     if (chapterCount === 0) {
-      const words = this.countWords(book);
+      const words = countBookWords(book);
       if (words > UNSTRUCTURED_WORD_THRESHOLD) {
         errors.push({
           code: 'UNSTRUCTURED_MANUSCRIPT',
@@ -100,33 +101,5 @@ export class BookValidator {
     }
 
     return errors;
-  }
-
-  /**
-   * Word count for the UNSTRUCTURED_WORD_THRESHOLD check only — a threshold needs an order of
-   * magnitude, not `BookMetricsCalculator`'s enriched metrics, and the validator must stay
-   * usable on a book that has not been enriched yet (import validates before metrics run).
-   */
-  private countWords(book: Book): number {
-    let words = 0;
-    const countBlock = (block: Block): void => {
-      if ('text' in block && typeof block.text === 'string') {
-        words += block.text.trim() ? block.text.trim().split(/\s+/).length : 0;
-      } else if (block.type === 'list') {
-        for (const item of block.items) words += item.trim() ? item.trim().split(/\s+/).length : 0;
-      }
-    };
-    const walk = (contents: Book['mainContent']): void => {
-      for (const content of contents) {
-        for (const block of content.content) countBlock(block);
-        if (content.type === 'chapter' && content.sections) {
-          walk(content.sections as unknown as Book['mainContent']);
-        } else if (content.type === 'section' && content.subsections) {
-          walk(content.subsections as unknown as Book['mainContent']);
-        }
-      }
-    };
-    walk(book.mainContent);
-    return words;
   }
 }

@@ -7,6 +7,8 @@ import type { ExportProjectUseCase, ProjectExportFormat } from '../../applicatio
 import type { PublishProjectUseCase } from '../../application/use-cases/PublishProjectUseCase';
 import type { PublishingReportMapper } from '../../application/mappers/PublishingReportMapper';
 import type { ProjectListResponseDTO, UpdateProjectSettingsDTO } from 'shared-types';
+import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
+import { UnknownLayoutError } from '../../shared/errors/UnknownLayoutError';
 
 const EXPORT_CONTENT_TYPE: Record<ProjectExportFormat, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -48,7 +50,7 @@ export class ProjectsController {
     try {
       const dto = await this.getProject.execute(req.params.id);
       if (!dto) {
-        res.status(404).json({ error: 'Project not found' });
+        res.status(404).json({ error: 'Project not found', code: 'PROJECT_NOT_FOUND' });
         return;
       }
       res.json(dto);
@@ -61,7 +63,7 @@ export class ProjectsController {
     try {
       const project = await this.repository.findById(req.params.id);
       if (!project) {
-        res.status(404).json({ error: 'Project not found' });
+        res.status(404).json({ error: 'Project not found', code: 'PROJECT_NOT_FOUND' });
         return;
       }
       const body = req.body as UpdateProjectSettingsDTO;
@@ -80,20 +82,27 @@ export class ProjectsController {
   export = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const format = String(req.query.format ?? 'pdf').toLowerCase() as ProjectExportFormat;
     if (!VALID_FORMATS.has(format)) {
-      res.status(400).json({ error: `Unknown format: ${format}` });
+      res.status(400).json({ error: `Unknown format: ${format}`, code: 'UNKNOWN_FORMAT' });
       return;
     }
     try {
       const buffer = await this.exportProject.execute(req.params.id, format);
       if (!buffer) {
-        res.status(404).json({ error: 'Project not found' });
+        res.status(404).json({ error: 'Project not found', code: 'PROJECT_NOT_FOUND' });
         return;
       }
       res.setHeader('Content-Type', EXPORT_CONTENT_TYPE[format]);
       res.setHeader('Content-Disposition', `attachment; filename="export.${format}"`);
       res.status(200).send(buffer);
     } catch (error) {
-      next(error);
+      if (error instanceof UnknownThemeError || error instanceof UnknownLayoutError) {
+        next(error);
+        return;
+      }
+      // ADR-0049 §3: the screen gets a nameable code; the REAL cause goes to the server log,
+      // never swallowed into a generic string the user cannot act on.
+      console.error(`Export failed for project ${req.params.id}:`, error);
+      res.status(500).json({ error: 'The document could not be generated', code: 'RENDER_FAILED' });
     }
   };
 
@@ -101,12 +110,17 @@ export class ProjectsController {
     try {
       const report = await this.publishProject.execute(req.params.id);
       if (!report) {
-        res.status(404).json({ error: 'Project not found' });
+        res.status(404).json({ error: 'Project not found', code: 'PROJECT_NOT_FOUND' });
         return;
       }
       res.status(200).json(this.publishingReportMapper.map(report));
     } catch (error) {
-      next(error);
+      if (error instanceof UnknownThemeError || error instanceof UnknownLayoutError) {
+        next(error);
+        return;
+      }
+      console.error(`Publish failed for project ${req.params.id}:`, error);
+      res.status(500).json({ error: 'The publication could not be prepared', code: 'RENDER_FAILED' });
     }
   };
 }
