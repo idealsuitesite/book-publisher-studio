@@ -12,6 +12,8 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
+**S11 persistence — ✅ DONE on `feature/sprint-9-ui-foundation` (2026-07-20).** `PERSISTENCE.md` approved, ADR-0048 (Decision 2 formally amended), `SqliteProjectRepository` behind the shared contract suite, wired via `DATABASE_PATH`, restart survival proven live (import → real restart → project + export both intact). Next per the approved plan: P4 calibration (awaits CTO feelings on `docs/demo/screenshots/atelier/`), `EDITOR_EXPERIENCE.md` review, engine-rendered preset thumbnails. See `docs/CURRENT_STATE.md` for the full handoff.
+
 **Sprint 7 ("First Demonstrable Product") is complete, merged, and released.** PR #12 merged (`f17fd65`), `v0.8.0-alpha` tagged and pushed, `feature/sprint-7-first-demonstrable-product` deleted (local + remote). Full commit-by-commit detail (13 implementation commits, Commit 9 split into 9a/9b at CTO direction, ADR-0034) moved to the COMPLETED section below — see there, `docs/CURRENT_STATE.md`'s Sprint 7 section, and `docs/releases/v0.8.0-alpha/SPRINT_7_FINAL_REPORT.md` for full detail.
 
 **Sprint 8 (Publishing Engine) — ✅ COMPLETE AND RELEASED as `v0.9.0-alpha`** (PR #13, merge commit `4a4deaa`). Design Review approved, 9 commits, 386/386 tests, 4/4 real-fixture publish checks. Full detail in the COMPLETED section below and in `docs/releases/v0.9.0-alpha/SPRINT_8_FINAL_REPORT.md`.

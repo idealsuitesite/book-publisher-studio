@@ -89,6 +89,8 @@ The port's behavioural tests become a **shared suite run against BOTH implementa
 | 3 | `SqliteProjectRepository` (schema v1, hydration, transactions) passing the same suite. |
 | 4 | Wiring: `DATABASE_PATH`, app.ts switch, dev-reset repointed; **restart-survival verification** — import, really restart the server, the project is still there. The money shot. |
 
+**✅ EXECUTED (2026-07-20, all four commits).** Contract suite 14/14 on both implementations; backend 542/542, tsc + eslint clean. The money shot was performed live, not simulated: a real DOCX imported over HTTP, the backend process killed and restarted, `GET /api/projects/:id` returned the whole project, and `POST /api/projects/:id/export` produced a 295KB PDF from source bytes that existed only in SQLite. Baseline `--check` byte-identical twice against the durable store — §5's dev-reset amendment holds. One correction found on the way: commit 1's `data/` gitignore line had been appended without a trailing newline (`~$*.docxdata/`), so it ignored nothing; fixed in commit 4.
+
 ## Related
 
 ADR-0041 Constraint 2 (the gate this discharges), ADR-0046 (the spike this executes), ADR-0047 (the in-code amendment + the Buffer lesson §4 institutionalizes), ADR-0044 (`archived_at` indexed), ADR-0048 (the formal amendment), `AGGREGATES_AND_PERSISTENCE.md` (the port this stays faithful to), PRODUCT_EXPERIENCE §10.5 (the events table §3 reserves a migration for).

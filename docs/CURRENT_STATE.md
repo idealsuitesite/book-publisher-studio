@@ -6,6 +6,16 @@
 >
 > **Branch:** `feature/sprint-9-ui-foundation`, working tree clean, everything pushed.
 >
+> ### Session of 2026-07-20 (later): S11 PERSISTENCE SHIPS — a restart is no longer an act of data loss
+> **Backend 542/542 (54 files), tsc + eslint clean, baseline byte-identical twice, restart-survival PROVEN live.**
+> - **`PERSISTENCE.md` ✅ APPROVED + ADR-0048** (Decision 2 formally amended: the backend is stateful and durable; the *pipeline* stays stateless). Commits 1–4 of its plan all executed.
+> - **Shared contract suite** (`backend/src/test-utils/projectRepositoryContract.ts`, 14 behavioural tests incl. the ADR-0047 Buffer `.equals()` scar) now runs against BOTH implementations; `InMemoryProjectRepository.test.ts` collapsed to a two-line contract run. InMemory lives on as the port-honesty second implementation.
+> - **`SqliteProjectRepository`** (`node:sqlite`, zero new deps): schema v1 under `PRAGMA user_version`, WAL, one `BEGIN IMMEDIATE` txn per aggregate write; **versions sharded to own rows** (the 45MB finding), bytes in `blobs` rehydrated as real Buffers, ISO-date reviver at the hydration boundary. Durability tests: restart survival across two instances on one file, migration idempotence, storage-shape assertions.
+> - **Wired in `app.ts`**: `DATABASE_PATH` env → default `backend/data/studio.db` (gitignored — and the `.gitignore` line had been appended without a newline, silently ignoring nothing; fixed), `':memory:'` under test so route E2Es keep per-`createApp` isolation. Dev-reset route survives, repointed (PERSISTENCE §5 amending ADR-0047's death prediction).
+> - **The money shot, done for real**: imported the Faith_Alone DOCX via the API → killed the backend process → fresh start → `GET /api/projects/:id` returns the whole project AND `POST :id/export` produced a real 295KB PDF from source bytes that existed only in SQLite. Baseline `--check` byte-identical twice against the durable store.
+> - **Required for tooling**: backend `@types/node` ^24 + tsconfig ES2022 (tsc couldn't see `node:sqlite` on ^20; the bump surfaced a `.at()` lib gap, also fixed).
+> - **Next per the approved plan**: P4 calibration (awaits CTO feelings on `docs/demo/screenshots/atelier/`), `EDITOR_EXPERIENCE.md` review, engine-rendered preset thumbnails. ADR-0043 (gutter) still OPEN.
+
 > ### Session of 2026-07-20: P2+P3 complete — the premium build's feature set is DONE
 > **Backend 533/533, frontend 136/136, baseline 21/21 byte-identical twice, axe 3 nodes, build+lint green.**
 > - **Presets, not radios** (`FormatSelector` reborn): true-proportion paper miniatures from REAL dimensions (`LayoutOptionDTO.widthPt/heightPt`, additive, served from the layout registry), mm+inches computed, KDP badges, theme card speaking Gelasio + the honest "More themes are being set" slot.
