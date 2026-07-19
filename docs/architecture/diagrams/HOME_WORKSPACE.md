@@ -1,10 +1,54 @@
 # Home & Workspace — the Entry Experience — Level 2 Design Review
 
-**Status:** 🟡 **ROUND 1 — DRAFT. Not approved. No branch, no code — per the CTO's own instruction: "une Design Review complète de la Home/Workspace avant d'écrire du code. Ne commence pas par le CSS."**
+**Status:** ✅ **ROUND 2 — APPROVED for implementation (CTO, 2026-07-19: "Tu as mon feu vert pour implémenter tes choix en prenant en compte mes réflexions"). Round 2 incorporates the CTO's three reflections — the pipeline metaphor, the Home/Workspace separation, and the navigation-first framing — as §0 below.**
 **Date:** 2026-07-19
 **Trigger:** the CTO's product judgment after real use: *"Vous ne construisez pas un convertisseur DOCX → PDF. Vous construisez un Book Publisher Studio."* The current screen — a title and a drop zone — reads as a technical demo, not a professional tool. The instruction is explicit: rebuild the entry architecture so it can evolve for years, rather than polishing an import page that will be replaced entirely.
 
 This review answers the CTO's four functional questions in order, then derives structure from the answers — never the reverse.
+
+---
+
+## 0. Round 2 — the navigation review (CTO reflections, answered)
+
+### "Est-ce que le pipeline vertical est encore la bonne métaphore ?" — No, and here is precisely why
+
+The vertical pipeline was the right metaphor for what the product *was*: a **conversion** — one input, one pass, one output, done. A project tool is not a conversion; it is a **place the user returns to**. Three properties of the pipeline break under that shift:
+
+1. **A pipeline implies completion.** Steps imply an end state, but an author revisits Validation after editing, regenerates Preview after a layout change, publishes twice. There is no "done" to walk toward — there is a book to work on.
+2. **A pipeline implies order.** The stepper enforces a sequence that stops being true after the first pass: on reopening a project, the user's next action is *whatever the book needs*, not "step 1".
+3. **A pipeline grows vertically without bound** — the CTO's own observation. Validation, Layout, Preview, Publish are each becoming screens; stacked, they already outgrew one page (the Import-panel fix was the first symptom, treated locally; this is the systemic treatment).
+
+**The replacement metaphor: stations, not steps.** The Workspace shows ONE section at a time — Manuscript, Validation, Layout, Preview, Publish, History — selected from the workspace navigation. What the pipeline got *right* (guidance for a first pass) survives as **status, not sequence**: each station shows its state in the nav (validation score, layout chosen, preview generated, publications count), so a new project still reads naturally top-to-bottom while nothing is ever locked. Guidance without a straitjacket. The `ProgressStepper` retires; its job is absorbed by station status.
+
+### "Home et Workspace : deux contextes complètement différents" — adopted as the review's sharpest line
+
+| | **Home** answers | **Workspace** answers |
+|---|---|---|
+| Question | *Quels projets ? Que fais-je aujourd'hui ? Que viens-je de publier ?* | *Sur quel livre je travaille ?* |
+| Object | the **library** (many projects) | **one book** |
+| Never shows | any book's content | any other project |
+| URL | `/` | `/projects/:id` |
+
+The round-1 draft still let import's results render where import happened — a Home concern bleeding into Workspace. Corrected: **import lives on Home and ends with a redirect**; everything about the imported book (structure, validation, all of it) is Workspace, reached by navigation, never inlined into Home.
+
+### The complete journey — every arrow real, every future sprint with a slot
+
+| Journey step | URL | Backed by (today) | Future sprints that plug in here |
+|---|---|---|---|
+| Open the studio | `/` | `GET /api/projects` | Cloud login (S15), Licensing (S16) |
+| Import → project created | `/` → redirect | `POST /api/manuscripts/import` (ADR-0047) | Autosave adopts the project (S12) |
+| Open a project | `/projects/:id` | `GET /api/projects/:id` (**built by this review**) | Collaboration presence (S14) |
+| Manuscript station | section | book from the project aggregate | the real editor (S10 UX) |
+| Validation station | section | validation **computed on read** from the stored book | Editorial AI (S18+) |
+| Layout station | section | `PATCH /api/projects/:id/settings` (**built**) | more themes/layouts |
+| Preview station | section | `POST /api/projects/:id/export` (**built**) | incremental preview (S13 perf) |
+| Publish station | section | `POST /api/projects/:id/publish` (**built**) | more targets (Kobo…), real submission |
+| History station | section | versions + publication log from the aggregate | Versions UX (S12), restore |
+| Back Home | `/` | navigation | — |
+
+**The durability decision underneath the table (Decision 6, new): Workspace operations run from the STORED project source, not from a browser-held `File`.** Today's Preview/Export re-upload the just-imported file — which works only in the session that imported it and would silently break "Continuer". The project retains its source bytes precisely so work can resume (`AGGREGATES_AND_PERSISTENCE.md` Q5); these endpoints are that retention finally earning its keep. This is the "logique, durable" architecture the CTO asked for: the browser holds an id, the system holds the book.
+
+*Section navigation is client-side state within `/projects/:id` this round; deep-linkable per-section URLs (`/projects/:id/validation`) are a mechanical upgrade recorded for the sprint that first needs to share such a link.*
 
 ---
 
@@ -77,7 +121,7 @@ The shell's zones map to landmarks (`header`, `nav`, `main`, `aside`, `footer`/s
 ## 3. Open questions — for CTO decision
 
 **Q-A — does the workspace URL encode the project (`/projects/:id`) now, or stay stateful?**
-*Recommendation: `/projects/:id` now.* Deep-linking a project is what makes the browser's back button, refresh and future collaboration links work; retrofitting URLs onto a stateful workspace is the expensive order. The id is meaningless after a restart today — disclosed, and fixed by Sprint 11, not by avoiding URLs.
+**✔ LOCKED: `/projects/:id` now** (CTO feu vert, 2026-07-19; §0's journey table depends on it). Deep-linking a project is what makes the browser's back button, refresh and future collaboration links work; retrofitting URLs onto a stateful workspace is the expensive order. The id is meaningless after a restart today — disclosed, and fixed by Sprint 11, not by avoiding URLs.
 
 **Q-B — French or English UI text?**
 **✔ LOCKED: English** (CTO, 2026-07-19: the product will serve far more anglophones than francophones).
@@ -87,7 +131,7 @@ The shell's zones map to landmarks (`header`, `nav`, `main`, `aside`, `footer`/s
 What this decision does **not** touch, stated so it never gets conflated: **UI language ≠ manuscript language.** The product's handling of French (and every other) manuscript content is governed by the Unicode invariant and is unaffected — an anglophone UI publishing *Le Guide de Jean* flawlessly is exactly the product. French becomes the **first translation target** when a real i18n layer arrives (locale files, a later sprint); until then the discipline that keeps that retrofit mechanical is simply consistent sentence-case English strings living in components, which is already the codebase's habit.
 
 **Q-C — does the Properties zone render on Home at all?**
-*Recommendation: no — absent on Home, present in the workspace.* An empty right rail on a library screen is dead space wearing a zone's name; the zone's *slot* in the grid exists either way, which is all the evolution needs.
+**✔ LOCKED: no** — absent on Home, present in the Workspace (CTO feu vert, 2026-07-19; §0's context separation makes this a corollary, not a style choice). An empty right rail on a library screen is dead space wearing a zone's name; the zone's *slot* in the grid exists either way, which is all the evolution needs.
 
 ---
 
