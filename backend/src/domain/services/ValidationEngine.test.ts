@@ -162,4 +162,36 @@ describe('ValidationEngine', () => {
       categories: { structure: 100, metadata: 100, typography: 100, accessibility: 100 },
     });
   });
+
+  // ADR-0049: explorable errors state gravity without rejecting the import.
+  describe('EXPLORABLE_ERROR_CODES (ADR-0049)', () => {
+    it('stays valid when the only ERROR is explorable - the error and its score cost remain', () => {
+      const registry = new RuleRegistry();
+      registry.register(
+        stubRule('StructuralRule', [
+          { code: 'UNSTRUCTURED_MANUSCRIPT', message: 'no chapters', location: 'mainContent', severity: 'ERROR' },
+        ])
+      );
+      const engine = new ValidationEngine(registry);
+
+      const report = engine.validate(context());
+
+      expect(report.isValid).toBe(true);
+      expect(report.errors.some((e) => e.code === 'UNSTRUCTURED_MANUSCRIPT')).toBe(true);
+      expect(report.score.categories.structure).toBeLessThan(100);
+    });
+
+    it('an explorable error does not shield a rejecting one', () => {
+      const registry = new RuleRegistry();
+      registry.register(
+        stubRule('StructuralRule', [
+          { code: 'UNSTRUCTURED_MANUSCRIPT', message: 'no chapters', location: 'mainContent', severity: 'ERROR' },
+          { code: 'MISSING_TITLE', message: 'no title', location: 'metadata', severity: 'ERROR' },
+        ])
+      );
+      const engine = new ValidationEngine(registry);
+
+      expect(engine.validate(context()).isValid).toBe(false);
+    });
+  });
 });

@@ -6,22 +6,28 @@ import { KDPRuleProvider } from './KDPRuleProvider';
 import { createBook } from '../../models/Book';
 import type { Book } from '../../models/Book';
 import type { PublishingBundle } from '../../models/PublishingBundle';
-import type { RenderedOutputs, PublishingIssue } from '../../models/PublishingReport';
+import type { RenderedOutputs, RenderedOutput, PublishingIssue } from '../../models/PublishingReport';
+import { KDP6x9PageLayout } from '../../layouts/KDP6x9PageLayout';
 import type { ValidationRuleProvider } from '../../ports/ValidationRuleProvider';
 import type { PostRenderValidationRule } from './PostRenderValidationRule';
 
+/** A rendered artifact with its render-time metrics (ADR-0042). */
+const output = (text: string, pageCount?: number): RenderedOutput => ({
+  bytes: Buffer.from(text),
+  metrics: { pageCount, pageLayout: KDP6x9PageLayout },
+});
+
 function compliantBook(): Book {
-  return {
-    ...createBook({ title: 'T', author: 'A', language: 'en', isbn: '978-0' }),
-    pageCount: 200,
-  };
+  // No pageCount here on purpose: compliance rests on the *rendered* count now, and
+  // book.pageCount is the import-time estimate the rule must never fall back to (ADR-0042).
+  return createBook({ title: 'T', author: 'A', language: 'en', isbn: '978-0' });
 }
 
 describe('KDPTarget - real integration (Packaging + SubmissionValidator + KDPRuleProvider)', () => {
   const target = new KDPTarget(new Packaging(), new SubmissionValidator(new KDPRuleProvider()));
 
   it('returns a PASS report with target "kdp" for a fully compliant manuscript', () => {
-    const report = target.prepare(compliantBook(), { pdf: Buffer.from('pdf') });
+    const report = target.prepare(compliantBook(), { pdf: output('pdf', 200) });
 
     expect(report.status).toBe('PASS');
     expect(report.target).toBe('kdp');
@@ -44,7 +50,7 @@ describe('KDPTarget - real integration (Packaging + SubmissionValidator + KDPRul
   });
 
   it('artifacts reflects exactly the bundle\'s formatsIncluded - not a separate computation', () => {
-    const report = target.prepare(compliantBook(), { pdf: Buffer.from('p'), docx: Buffer.from('d') });
+    const report = target.prepare(compliantBook(), { pdf: output('p', 200), docx: output('d') });
 
     expect(report.artifacts).toEqual(['pdf', 'docx']);
   });
@@ -60,7 +66,7 @@ describe('KDPTarget - real integration (Packaging + SubmissionValidator + KDPRul
     const book = compliantBook();
     const snapshot = structuredClone(book);
 
-    target.prepare(book, { pdf: Buffer.from('p') });
+    target.prepare(book, { pdf: output('p') });
 
     expect(book).toEqual(snapshot);
   });
@@ -93,11 +99,29 @@ describe('KDPTarget - is a consumer, never a replacement (CTO requirement, Commi
     };
     const target = new KDPTarget(realPackaging, spyValidator as SubmissionValidator);
     const book = compliantBook();
-    const renderedOutputs: RenderedOutputs = { pdf: Buffer.from('p') };
+    const renderedOutputs: RenderedOutputs = { pdf: output('p') };
 
     target.prepare(book, renderedOutputs);
 
-    expect(receivedBundle).toEqual(realPackaging.assemble(book, renderedOutputs));
+    // Compares everything except `manifest.assembledAt`, deliberately.
+    //
+    // This assertion originally read `toEqual(realPackaging.assemble(...))`, which assembled a
+    // SECOND bundle at a different moment and compared the two. Both stamp `new Date()`, so the
+    // test failed whenever the two calls straddled a millisecond boundary - passing perhaps
+    // nineteen runs in twenty. That intermittent failure was observed on 2026-07-18 and could
+    // not be reproduced across nine subsequent runs; this is it.
+    //
+    // The intent was never "the timestamps match" - it is "the validator received the bundle
+    // Packaging produced, not one KDPTarget rebuilt itself". Asserting that directly makes the
+    // test both correct and deterministic.
+    const expected = realPackaging.assemble(book, renderedOutputs);
+    const { manifest: receivedManifest, ...receivedRest } = receivedBundle!;
+    const { manifest: expectedManifest, ...expectedRest } = expected;
+
+    expect(receivedRest).toEqual(expectedRest);
+    expect(receivedManifest.formatsIncluded).toEqual(expectedManifest.formatsIncluded);
+    expect(receivedManifest.hasCover).toBe(expectedManifest.hasCover);
+    expect(receivedManifest.assembledAt).toBeInstanceOf(Date);
   });
 
   it('uses SubmissionValidator\'s findings verbatim - never adds, drops, or re-derives an issue', () => {
@@ -120,7 +144,7 @@ describe('createKDPTarget', () => {
     const { createKDPTarget } = await import('./createKDPTarget');
     const target = createKDPTarget();
 
-    const report = target.prepare(compliantBook(), { pdf: Buffer.from('pdf') });
+    const report = target.prepare(compliantBook(), { pdf: output('pdf', 200) });
 
     expect(report.target).toBe('kdp');
     expect(report.status).toBe('PASS');

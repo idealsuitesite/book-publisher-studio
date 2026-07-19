@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { exportManuscript, type ExportFormat } from '@/lib/api-client';
+import type { ExportFormat } from '@/lib/api-client';
+import { Button, Card } from '@/components/ui';
 
 // Sprint 7 commit 9b - real export/download, completing the originally-planned Commit 9
 // (export + preview, split at CTO direction into 9a/preview and 9b/this file so an
@@ -11,23 +12,22 @@ import { exportManuscript, type ExportFormat } from '@/lib/api-client';
 // for PDF, so all three formats behave identically. onDownloaded (commit 11) is a
 // real-completion callback for ProgressStepper, fired only after a real successful download.
 interface ExportPanelProps {
-  file: File;
-  layout: string;
-  theme: string;
+  /** Filename stem for downloads, e.g. the project name. */
+  downloadName: string;
+  /** Produces the file for a format. Injected (HOME_WORKSPACE.md Decision 6): the Workspace
+   * passes a project-based exporter rendering from the STORED source. */
+  exporter: (format: ExportFormat) => Promise<Blob>;
   onDownloaded?: () => void;
 }
 
 const FORMATS: { format: ExportFormat; label: string }[] = [
-  { format: 'pdf', label: 'Download PDF' },
-  { format: 'docx', label: 'Download DOCX' },
-  { format: 'epub', label: 'Download EPUB' },
+  { format: 'pdf', label: 'PDF edition' },
+  { format: 'docx', label: 'DOCX edition' },
+  { format: 'epub', label: 'EPUB edition' },
 ];
 
-function baseName(filename: string): string {
-  return filename.replace(/\.[^./]+$/, '');
-}
 
-export function ExportPanel({ file, layout, theme, onDownloaded }: ExportPanelProps) {
+export function ExportPanel({ exporter, downloadName, onDownloaded }: ExportPanelProps) {
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -35,11 +35,11 @@ export function ExportPanel({ file, layout, theme, onDownloaded }: ExportPanelPr
     setExportingFormat(format);
     setErrorMessage(null);
     try {
-      const blob = await exportManuscript({ file, theme, layout, format });
+      const blob = await exporter(format);
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `${baseName(file.name)}.${format}`;
+      link.download = `${downloadName}.${format}`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -53,23 +53,23 @@ export function ExportPanel({ file, layout, theme, onDownloaded }: ExportPanelPr
   }
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-4 rounded-2xl border-2 border-zinc-300 px-8 py-6 text-left dark:border-zinc-700">
-      <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Export</h3>
+    <Card className="flex max-w-2xl flex-col gap-4 px-8 py-6 text-left">
+      <h3 className="text-lg font-semibold text-app-text">Editions</h3>
 
-      {errorMessage && <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>}
+      {errorMessage && <p className="text-sm text-app-error">{errorMessage}</p>}
 
       <div className="flex flex-wrap gap-3">
         {FORMATS.map(({ format, label }) => (
-          <button
+          <Button
             key={format}
+            variant="secondary"
             onClick={() => void handleDownload(format)}
             disabled={exportingFormat !== null}
-            className="rounded-lg border-2 border-zinc-900 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors disabled:opacity-50 dark:border-zinc-50 dark:text-zinc-50"
           >
             {exportingFormat === format ? 'Exporting…' : label}
-          </button>
+          </Button>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }

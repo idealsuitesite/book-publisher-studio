@@ -3,6 +3,7 @@ import type { PageLayout } from '../models/PageLayout';
 import type { Page, PaginatedBook } from '../models/PaginatedBook';
 import type { Content, Block, TOCEntry } from '../models/Book';
 import { countWords } from '../../shared/utils/textMetrics';
+import type { TextMeasurer } from '../ports/TextMeasurer';
 
 const WORDS_PER_LINE = 12;
 const DEFAULT_IMAGE_HEIGHT = 200;
@@ -17,8 +18,18 @@ function blankPagesNeededFor(style: 'right' | 'left' | 'any' | undefined, nextPa
 }
 
 export class LayoutEngine {
+  /**
+   * With a `TextMeasurer`, pagination *measures* block heights with the renderer's own fonts
+   * and line heights (LAYOUT_FIDELITY.md Decision 6). Without one, the historical word-count
+   * estimate applies — kept as the no-dependency fallback, with its measured defect on record:
+   * it overcharges ~1.43× (§2bis), which capped real pages at ~71% fill because PDFRenderer
+   * enforces these breaks on real text.
+   */
+  constructor(private readonly measurer?: TextMeasurer) {}
+
   paginate(styled: StyledBook, layout: PageLayout): PaginatedBook {
     const usableHeight = layout.height - layout.marginTop - layout.marginBottom;
+    const usableWidth = layout.width - layout.marginLeft - layout.marginRight;
     const pages: Page[] = [];
     let currentPageBlocks: string[] = [];
     let currentPageHeights: number[] = [];
@@ -45,6 +56,11 @@ export class LayoutEngine {
       return runningHead.content === 'bookTitle' ? styled.book.metadata.title : currentTopLevelTitle;
     };
 
+    // Phase B split bookkeeping (LAYOUT_FIDELITY.md Decision 7). `splitLinesForCurrentPage`
+    // belongs to the page being closed; `currentPageContinues` to the page being opened.
+    let splitLinesForCurrentPage: number | undefined;
+    let currentPageContinues = false;
+
     const flushPage = (): void => {
       if (currentPageBlocks.length === 0) return;
       pages.push({
@@ -52,8 +68,12 @@ export class LayoutEngine {
         blocks: currentPageBlocks,
         headerFooterTitle: resolveHeaderFooterTitle(),
         blankPagesBefore: pendingBlankPagesBefore || undefined,
+        splitAfterLines: splitLinesForCurrentPage,
+        startsWithContinuation: currentPageContinues || undefined,
       });
       pendingBlankPagesBefore = 0;
+      splitLinesForCurrentPage = undefined;
+      currentPageContinues = false;
       pageNumber += 1;
       currentPageBlocks = [];
       currentPageHeights = [];
@@ -84,14 +104,99 @@ export class LayoutEngine {
       }
     };
 
+    // The renderer draws a chapter/section title (renderTitle: 24pt for chapters,
+    // max(12, 22 - 2·level) for sections, then a full moveDown) before the content blocks.
+    // Until Decision 6 this cost was booked at ZERO, which is half of the CTO's
+    // title-above-a-void observation — the model believed the page under a title was taller
+    // than it really was. Only chargeable when a measurer exists: the fallback estimator has
+    // no line-height source for heading sizes and inventing one would be a new guess.
+    const chargeTitleHeight = (content: Content): void => {
+      if (!this.measurer || !content.title) return;
+      const size = content.type === 'chapter' ? 24 : Math.max(12, 22 - content.level * 2);
+      const titleHeight =
+        this.measurer.measureHeight(content.title, {
+          fontSize: size,
+          width: usableWidth,
+          heading: true,
+          theme: styled.theme,
+        }) + this.measurer.lineHeight(size); // renderTitle's moveDown()
+      currentHeight += titleHeight;
+    };
+
+    /**
+     * Splits a paragraph across pages, line-granular, with min-2-lines at BOTH ends of every
+     * break (Phase B, LAYOUT_FIDELITY.md Decision 7). This is the "essai de coupure" step the
+     * CTO's investigation found missing: before this, a paragraph one line too tall for the
+     * remaining space moved whole, leaving the space empty.
+     *
+     * The rules, in order:
+     *  - remainder fits → place it, done;
+     *  - fewer than 2 lines would sit at the bottom (orphan) → no split, fresh page instead;
+     *  - a split that would strand fewer than 2 lines on the next page (widow) → cut earlier,
+     *    keeping 2 back; if that leaves under 2 at the bottom, again no split.
+     * A block long enough may split repeatedly — every intermediate page keeps ≥2 lines.
+     */
+    const addSplittingText = (block: Block, textHeight: number, spaceAfter: number, line: number): void => {
+      let remainingLines = Math.max(1, Math.round(textHeight / line));
+
+      for (;;) {
+        const remainingSpace = usableHeight - currentHeight;
+        if (remainingLines * line + spaceAfter <= remainingSpace) {
+          currentPageBlocks.push(block.id);
+          currentPageHeights.push(remainingLines * line + spaceAfter);
+          currentHeight += remainingLines * line + spaceAfter;
+          return;
+        }
+
+        const fits = Math.floor(remainingSpace / line);
+        const cut = Math.min(fits, remainingLines - 2);
+
+        if (cut < 2) {
+          if (currentPageBlocks.length === 0) {
+            // A fresh page that still cannot hold a sane split (pathologically small page or
+            // 2-3 line block): place whole, overflow tolerated exactly as before Phase B.
+            currentPageBlocks.push(block.id);
+            currentPageHeights.push(remainingLines * line + spaceAfter);
+            currentHeight += remainingLines * line + spaceAfter;
+            return;
+          }
+          breakPageKeepingLastBlockTogether();
+          continue;
+        }
+
+        currentPageBlocks.push(block.id);
+        currentPageHeights.push(cut * line);
+        currentHeight += cut * line;
+        splitLinesForCurrentPage = cut;
+        flushPage();
+        currentPageContinues = true;
+        remainingLines -= cut;
+      }
+    };
+
     const addBlock = (block: Block, forceNewPage: boolean): void => {
-      const blockHeight = this.estimateBlockHeight(block, styled);
-      const overflow = currentHeight + blockHeight > usableHeight && currentPageBlocks.length > 0;
+      const blockHeight = this.estimateBlockHeight(block, styled, usableWidth);
+      const overflow = currentHeight + blockHeight > usableHeight;
 
       if (forceNewPage) {
         flushPage();
       } else if (overflow) {
-        breakPageKeepingLastBlockTogether();
+        // Try the cut before surrendering the space (measured mode, plain paragraphs only:
+        // quotes/scriptures render with a first-line indent whose continuation semantics
+        // differ, and a drop-cap paragraph's first lines are typographically special).
+        if (this.measurer && block.type === 'paragraph' && block.text.trim() && !styled.blockTypography?.[block.id]?.dropCap) {
+          const style = styled.blockStyles[block.id];
+          const fontSize = style?.fontSize ?? styled.theme.fontSizes.body;
+          const line = this.measurer.lineHeight(fontSize);
+          const textHeight = this.measurer.measureHeight(block.text, {
+            fontSize,
+            width: usableWidth,
+            theme: styled.theme,
+          });
+          addSplittingText(block, textHeight, style?.spaceAfter ?? 8, line);
+          return;
+        }
+        if (currentPageBlocks.length > 0) breakPageKeepingLastBlockTogether();
       }
 
       currentPageBlocks.push(block.id);
@@ -126,6 +231,9 @@ export class LayoutEngine {
             }
           }
           if (isTopLevel) currentTopLevelTitle = content.title;
+          // The title is drawn (and now priced) immediately before this content's first block —
+          // after the chapter's own page break, in the flow for sections.
+          if (isFirstBlock) chargeTitleHeight(content);
           addBlock(block, false);
           isFirstBlock = false;
         }
@@ -203,11 +311,50 @@ export class LayoutEngine {
     return entries;
   }
 
-  private estimateBlockHeight(block: Block, styled: StyledBook): number {
+  private estimateBlockHeight(block: Block, styled: StyledBook, usableWidth: number): number {
     const style = styled.blockStyles[block.id];
     const fontSize = style?.fontSize ?? styled.theme.fontSizes.body;
-    const lineHeight = styled.theme.spacing.lineHeight;
-    const linePoints = fontSize * lineHeight;
+
+    // Decision 6: measured heights when a TextMeasurer is wired. Real font, real glyph widths,
+    // natural line height — the renderer's own numbers — plus the spaceAfter the renderer adds
+    // after every block (moveDown(spaceAfter/fontSize)), which the estimate never modelled.
+    if (this.measurer) {
+      const spaceAfter = style?.spaceAfter ?? 8;
+      const measure = (text: string, heading = false): number =>
+        this.measurer!.measureHeight(text, { fontSize, width: usableWidth, heading, theme: styled.theme }) +
+        spaceAfter;
+      const line = this.measurer.lineHeight(fontSize);
+
+      switch (block.type) {
+        case 'heading':
+          return measure(block.text, true);
+        case 'paragraph':
+        case 'quote':
+        case 'scripture':
+          return measure(block.text);
+        case 'list':
+          // Items render as separate lines; measuring them joined by newlines matches the
+          // renderer's per-item text calls to within wrapping.
+          return measure(block.items.join('\n'));
+        case 'table':
+          return (1 + block.rows.length) * line + spaceAfter;
+        case 'footnote':
+          return line + spaceAfter;
+        case 'image':
+          return (block.height ?? DEFAULT_IMAGE_HEIGHT) + spaceAfter;
+        case 'page-break':
+        case 'divider':
+          return line;
+        default: {
+          const _exhaustive: never = block;
+          throw new Error(`Unsupported block type: ${JSON.stringify(_exhaustive)}`);
+        }
+      }
+    }
+
+    // Historical no-measurer fallback. Its defect is measured and on record (LAYOUT_FIDELITY.md
+    // §2bis: ~1.43× overcharge → ~71% page fill): kept only so the engine works standalone.
+    const linePoints = fontSize * styled.theme.spacing.lineHeight;
 
     switch (block.type) {
       case 'heading':

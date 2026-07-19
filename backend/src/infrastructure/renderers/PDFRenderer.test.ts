@@ -75,7 +75,7 @@ describe('PDFRenderer', () => {
   it('produces a valid PDF starting with the %PDF header', async () => {
     const paginated = paginate([chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1', 'Hello world.')])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
 
     expect(buffer.length).toBeGreaterThan(0);
     expect(buffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
@@ -84,7 +84,7 @@ describe('PDFRenderer', () => {
   it('includes chapter titles and paragraph text', async () => {
     const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')], { title: 'My Chapter' })]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const text = extractPdfText(buffer);
 
     expect(text).toContain('My Chapter');
@@ -95,7 +95,7 @@ describe('PDFRenderer', () => {
     const table: Table = { type: 'table', id: 't-1', headers: ['Name'], rows: [['Alexandre']] };
     const paginated = paginate([chapter([table])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const text = extractPdfText(buffer);
 
     expect(text).toContain('Name');
@@ -115,7 +115,7 @@ describe('PDFRenderer', () => {
 
     it('renders a table with headers, multiple columns', async () => {
       const table: Table = { type: 'table', id: 't-1', headers: ['Name', 'Role'], rows: [['Alexandre', 'Author']] };
-      const buffer = await renderer.render(paginate([chapter([table])]), {});
+      const buffer = (await renderer.render(paginate([chapter([table])]), {})).output;
       const text = extractPdfText(buffer);
 
       expect(pdfStart(buffer)).toBe('%PDF-');
@@ -133,7 +133,7 @@ describe('PDFRenderer', () => {
           ['Alexandre', 'Author'],
         ],
       };
-      const buffer = await renderer.render(paginate([chapter([table])]), {});
+      const buffer = (await renderer.render(paginate([chapter([table])]), {})).output;
       const text = extractPdfText(buffer);
 
       expect(pdfStart(buffer)).toBe('%PDF-');
@@ -143,14 +143,14 @@ describe('PDFRenderer', () => {
 
     it('renders nothing and does not throw for a genuinely empty table (no headers, no rows)', async () => {
       const table: Table = { type: 'table', id: 't-1', headers: [], rows: [] };
-      const buffer = await renderer.render(paginate([chapter([table])]), {});
+      const buffer = (await renderer.render(paginate([chapter([table])]), {})).output;
 
       expect(pdfStart(buffer)).toBe('%PDF-');
     });
 
     it('renders a single-column table with headers', async () => {
       const table: Table = { type: 'table', id: 't-1', headers: ['Only'], rows: [['A'], ['B']] };
-      const buffer = await renderer.render(paginate([chapter([table])]), {});
+      const buffer = (await renderer.render(paginate([chapter([table])]), {})).output;
       const text = extractPdfText(buffer);
 
       expect(pdfStart(buffer)).toBe('%PDF-');
@@ -160,7 +160,7 @@ describe('PDFRenderer', () => {
 
     it('renders a single-column table without headers - column count falls back to the first data row', async () => {
       const table: Table = { type: 'table', id: 't-1', headers: [], rows: [['A'], ['B']] };
-      const buffer = await renderer.render(paginate([chapter([table])]), {});
+      const buffer = (await renderer.render(paginate([chapter([table])]), {})).output;
       const text = extractPdfText(buffer);
 
       expect(pdfStart(buffer)).toBe('%PDF-');
@@ -178,7 +178,7 @@ describe('PDFRenderer', () => {
           ['1', '2', '3', '4'],
         ],
       };
-      const buffer = await renderer.render(paginate([chapter([table])]), {});
+      const buffer = (await renderer.render(paginate([chapter([table])]), {})).output;
       const text = extractPdfText(buffer);
 
       expect(pdfStart(buffer)).toBe('%PDF-');
@@ -193,7 +193,7 @@ describe('PDFRenderer', () => {
     const paginated = paginate([chapter(manyParagraphs)], smallLayout);
     expect(paginated.pages.length).toBeGreaterThan(1);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
 
     expect(countPdfPages(buffer)).toBeGreaterThan(1);
   });
@@ -206,7 +206,7 @@ describe('PDFRenderer', () => {
     ]);
     expect(paginated.pages.map((p) => p.number)).toEqual([1, 101]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const text = extractPdfText(buffer);
 
     expect(text).toContain('Page 1 of');
@@ -222,7 +222,7 @@ describe('PDFRenderer', () => {
     ]);
     expect(paginated.pages.map((p) => p.number)).toEqual([1, 3]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const text = extractPdfText(buffer);
 
     // 3 physical pages: chapter 1's content, one genuinely blank page, chapter 2's content.
@@ -239,7 +239,7 @@ describe('PDFRenderer', () => {
     const a4Layout: PageLayout = { ...LETTER_LAYOUT, pageSize: 'a4', width: 595.28, height: 841.89 };
     const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], a4Layout);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const raw = buffer.toString('latin1');
 
     expect(raw).toContain('/MediaBox [0 0 595.28 841.89]');
@@ -250,7 +250,7 @@ describe('PDFRenderer', () => {
     const image: Image = { type: 'image', id: 'img-1', url: 'https://example.com/a.png', caption: 'A cover' };
     const paginated = paginate([chapter([image])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const text = extractPdfText(buffer);
 
     expect(text).toContain('A cover');
@@ -265,7 +265,7 @@ describe('PDFRenderer', () => {
     const para: Paragraph = { type: 'paragraph', id: 'p-1', text: 'ignored when inlines present', inlines };
     const paginated = paginateWithTypography([chapter([para])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const text = extractPdfText(buffer);
     const runs = extractPdfRuns(buffer);
 
@@ -289,7 +289,7 @@ describe('PDFRenderer', () => {
   it('sizes a level-1 heading from theme.fontSizes.h1, not the old hardcoded per-level formula', async () => {
     const paginated = paginateWithTypography([chapter([heading(1, 'h-1', 'Big Title')])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const raw = buffer.toString('latin1');
 
     // ClassicTheme.fontSizes.h1 = 28. The formula this replaced (max(12, 28 - level*3))
@@ -304,7 +304,7 @@ describe('PDFRenderer', () => {
     const list: List = { type: 'list', id: 'l-1', ordered: false, items: ['ignored', 'ignored'], inlines: inlinesPerItem };
     const paginated = paginateWithTypography([chapter([list])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const text = extractPdfText(buffer);
     const runs = extractPdfRuns(buffer);
 
@@ -319,7 +319,7 @@ describe('PDFRenderer', () => {
     const para: Paragraph = { type: 'paragraph', id: 'p-1', text: 'Once upon a time.', dropCap: true };
     const paginated = paginateWithTypography([chapter([para])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const text = extractPdfText(buffer);
     const raw = buffer.toString('latin1');
 
@@ -333,7 +333,7 @@ describe('PDFRenderer', () => {
     const smallLayout: PageLayout = { ...LETTER_LAYOUT, height: 300 };
     const paginated = paginate([chapter(manyParagraphs)], smallLayout);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const text = extractPdfText(buffer);
     const actualPageCount = countPdfPages(buffer);
 
@@ -348,7 +348,7 @@ describe('PDFRenderer', () => {
     it("shows the real book's title in the running head, not the old hardcoded 'Book Publisher Studio' string", async () => {
       const paginated = paginate([chapter([paragraph('p-1')])]);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const text = extractPdfText(buffer);
 
       expect(text).toContain('T'); // paginate()'s book title
@@ -359,7 +359,7 @@ describe('PDFRenderer', () => {
       const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, show: false } };
       const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const text = extractPdfText(buffer);
 
       expect(text).not.toMatch(/Page \d+ of \d+/);
@@ -369,7 +369,7 @@ describe('PDFRenderer', () => {
       const theme: Theme = { ...ClassicTheme, runningHead: undefined };
       const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])], LETTER_LAYOUT, theme);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const text = extractPdfText(buffer);
 
       expect(text).not.toMatch(/Page \d+ of \d+/);
@@ -385,7 +385,7 @@ describe('PDFRenderer', () => {
       const styled = new ThemeEngine().applyTheme(book, theme);
       const paginated = new LayoutEngine().paginate(styled, LETTER_LAYOUT);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const text = extractPdfText(buffer);
 
       expect(text).toContain('LOWERCASE TITLE');
@@ -413,7 +413,7 @@ describe('PDFRenderer', () => {
         { level: 1, title: 'Chapter Two', pageNumber: 2, headingId: 'c-2' },
       ]);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const text = extractPdfText(buffer);
 
       expect(text).toContain('Table of Contents');
@@ -426,7 +426,7 @@ describe('PDFRenderer', () => {
     it('renders no TOC page when tableOfContents is absent (generateAutomatically not set)', async () => {
       const paginated = paginate([chapter([heading(1, 'h-1', 'Chapter One'), paragraph('p-1')])]);
 
-      const buffer = await renderer.render(paginated, {});
+      const buffer = (await renderer.render(paginated, {})).output;
       const text = extractPdfText(buffer);
 
       expect(text).not.toContain('Table of Contents');

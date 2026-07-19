@@ -1,7 +1,19 @@
+import type { RenderMetrics } from './RenderMetrics';
+
+// One rendered artifact: its bytes, and what was measured while producing them.
+//
+// Metrics are attached per format rather than per bundle (ADR-0042) because a bundle may hold a
+// paginated PDF and a reflowable EPUB at once - a single bundle-level page count would
+// necessarily be wrong about one of them.
+export interface RenderedOutput {
+  bytes: Buffer;
+  metrics: RenderMetrics;
+}
+
 export interface RenderedOutputs {
-  pdf?: Buffer;
-  epub?: Buffer;
-  docx?: Buffer;
+  pdf?: RenderedOutput;
+  epub?: RenderedOutput;
+  docx?: RenderedOutput;
 }
 
 export interface PublishingIssue {

@@ -1,15 +1,138 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+ * AppTheme — interface design tokens (Sprint 9 Commit 1, UI_FOUNDATION.md Decision 2)
+ *
+ * Named AppTheme, never Theme: `Theme` already means "the visual style of a produced
+ * book" in this codebase (ClassicTheme, ThemeEngine, getTheme). The two are unrelated
+ * and must never be conflated.
+ *
+ * Every value references Tailwind's own palette variable rather than a copied oklch
+ * literal, so these tokens cannot drift from the palette the components already use,
+ * and there is no transcription risk.
+ *
+ * The light/dark pairs are not invented — they are the pairs already hand-repeated
+ * across the 7 existing components, measured at Commit 0: text-zinc-900/text-zinc-50
+ * 23 times each, text-zinc-500/text-zinc-400 18 and 20 times, and
+ * border-zinc-300/border-zinc-700 8 times each. Tokenizing them is what stops dark mode
+ * being maintained by hand in every component.
+ *
+ * NOTHING CONSUMES THESE TOKENS YET. Commit 1 is appearance-neutral by Decision 3 — the
+ * components keep their literal Tailwind classes and render identically. Commit 5
+ * refactors them onto these tokens. Defining the layer first is what makes that refactor
+ * a mechanical substitution rather than a redesign.
+ * ------------------------------------------------------------------------- */
+
+:root {
+  /* ------------------------------------------------------------------
+   * L'ATELIER (VISUAL_LANGUAGE.md, CTO-approved 2026-07-19): a writer's
+   * studio inside a publishing house. Surfaces descend from paper, text
+   * from ink, depth from sheets on a desk. One Prussian-ink accent.
+   * Starting values for the CTO's screenshot calibration loop - the
+   * concept is locked, the exact values graduate through that loop.
+   * ------------------------------------------------------------------ */
+
+  /* Surfaces - sheets on a desk */
+  --app-surface-0: #f6f4ef;   /* the desk (canvas) */
+  --app-surface-1: #fbfaf7;   /* a sheet (panel) */
+  --app-surface-2: #ffffff;   /* a sheet on the sheet (raised) */
+  --app-surface-3: #ffffff;   /* a lifted sheet (overlay, carries shadow) */
+  /* Legacy aliases kept so existing consumers stay valid */
+  --app-surface: var(--app-surface-1);
+  --app-surface-raised: var(--app-surface-2);
+
+  /* Ink - never pure black on pure white (the cheapest fatigue reduction there is) */
+  --app-text: #211d19;
+  --app-text-muted: #686056; /* >=4.5:1 on surface-0 (axe), still warm ink */
+  --app-text-inverse: #f6f4ef;
+
+  /* Hairline borders in warm neutrals - the heavy chrome retires */
+  --app-border: #e7e2d9;
+  --app-border-strong: #211d19;
+
+  /* Encre - the one accent (primary action, selection, focus). Used sparingly on purpose. */
+  --app-accent: #1d4e68;
+  --app-accent-ink: #f6f4ef;
+
+  /* Semantics, tuned to the paper world */
+  --app-error: #a83a32;     /* brick - serious without alarm aggression */
+  --app-warning: #9a6210;   /* amber ink */
+  --app-info: #1d4e68;
+  --app-success: #2e6b4f;   /* deep leaf */
+
+  /* Motion grammar (VISUAL_LANGUAGE.md section 6): micro / panel / view */
+  --motion-micro: 120ms;
+  --motion-panel: 200ms;
+  --motion-view: 280ms;
+
+  /* Warm two-layer paper shadow */
+  --shadow-sheet: 0 1px 2px rgba(53, 42, 30, 0.06), 0 4px 12px rgba(53, 42, 30, 0.08);
+  --shadow-lifted: 0 2px 4px rgba(53, 42, 30, 0.08), 0 12px 32px rgba(53, 42, 30, 0.14);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* The same room at night: warm charcoals, never blue-gray zinc. */
+    --app-surface-0: #181614;
+    --app-surface-1: #201d1a;
+    --app-surface-2: #282420;
+    --app-surface-3: #2e2a25;
+    --app-surface: var(--app-surface-1);
+    --app-surface-raised: var(--app-surface-2);
+
+    --app-text: #ece8e1;
+    --app-text-muted: #b0a698; /* >=4.5:1 on dark surface-0 */
+    --app-text-inverse: #211d19;
+
+    --app-border: #3a342e;
+    --app-border-strong: #ece8e1;
+
+    --app-accent: #7faecb;
+    --app-accent-ink: #181614;
+
+    --app-error: #c96b60;
+    --app-warning: #c98a2e;
+    --app-info: #7faecb;
+    --app-success: #6fae8f;
+
+    --shadow-sheet: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lifted: 0 2px 4px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Exposes the tokens above as real Tailwind utilities (bg-app-surface, text-app-text,
+ * border-app-border, …). `inline` so each resolves at use-time to whichever :root value
+ * the active colour scheme set — the same mechanism the original scaffold used for
+ * --color-background/--color-foreground. */
+@theme inline {
+  --color-app-surface: var(--app-surface);
+  --color-app-surface-raised: var(--app-surface-raised);
+  --color-app-text: var(--app-text);
+  --color-app-text-inverse: var(--app-text-inverse);
+  --color-app-surface-0: var(--app-surface-0);
+  --color-app-surface-1: var(--app-surface-1);
+  --color-app-surface-2: var(--app-surface-2);
+  --color-app-surface-3: var(--app-surface-3);
+  --color-app-accent: var(--app-accent);
+  --color-app-accent-ink: var(--app-accent-ink);
+  --font-sans: var(--font-ui), system-ui, sans-serif;
+  --font-book: var(--font-book), Georgia, serif;
+  --color-app-text-muted: var(--app-text-muted);
+  --color-app-border: var(--app-border);
+  --color-app-border-strong: var(--app-border-strong);
+  --color-app-error: var(--app-error);
+  --color-app-warning: var(--app-warning);
+  --color-app-info: var(--app-info);
+  --color-app-success: var(--app-success);
+}
+
+/* Retained from the original scaffold: `body` below still consumes these two, so removing
+ * them would be a visible change, which Decision 3 forbids at this commit. They are
+ * superseded by --app-surface/--app-text above and should be removed at Commit 5, once
+ * body itself is moved onto the token layer. */
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,8 +142,17 @@
   }
 }
 
+/* The rendered font stack is deliberately unchanged.
+ *
+ * Commit 0 confirmed a real defect: layout.tsx downloaded Geist and Geist Mono on every
+ * page load while this rule rendered everything in Arial, and nothing anywhere used the
+ * font-sans/font-mono classes that would have applied them. The fix at this commit is to
+ * stop the wasted download (layout.tsx), NOT to start using Geist — switching the
+ * typeface would change every glyph on every screen, which Decision 3 forbids until
+ * Commit 8. Choosing this product's actual typeface is a design decision, and belongs in
+ * the commit designed for design decisions. */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-ui), system-ui, sans-serif;
 }

@@ -1,3 +1,4 @@
+import { ManualLayoutSelector } from '../../domain/services/ManualLayoutSelector';
 import type { Request, Response } from 'express';
 import type { ManuscriptOptionsDTO, ThemeOptionDTO, LayoutOptionDTO } from 'shared-types';
 import { listThemeNames } from '../../domain/themes/getTheme';
@@ -34,11 +35,19 @@ export class ManuscriptOptionsController {
       label: THEME_LABELS[name] ?? name,
     }));
 
-    const layouts: LayoutOptionDTO[] = listLayoutNames().map((name) => ({
-      name,
-      label: LAYOUT_LABELS[name] ?? name,
-      category: categoryFor(name),
-    }));
+    const selector = new ManualLayoutSelector();
+    const layouts: LayoutOptionDTO[] = listLayoutNames().map((name) => {
+      // Real dimensions from the same registry the export pipeline uses - the preset cards
+      // draw true trim proportions from these (PRODUCT_EXPERIENCE §4.3).
+      const layout = selector.select({ requestedLayoutName: name });
+      return {
+        name,
+        label: LAYOUT_LABELS[name] ?? name,
+        category: categoryFor(name),
+        widthPt: layout.width,
+        heightPt: layout.height,
+      };
+    });
 
     const response: ManuscriptOptionsDTO = { themes, layouts };
     res.status(200).json(response);

@@ -3,11 +3,11 @@ import type { Chapter as EpubChapter, Options as EpubOptions } from 'epub-gen-me
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
+import type { Renderer, RenderContext, RenderResult } from '../../domain/ports/Renderer';
 import type { PaginatedBook } from '../../domain/models/PaginatedBook';
 import type { Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
-import type { Content, Block, Image } from '../../domain/models/Book';
+import type { Content, Block, Image, FrontMatter } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 
@@ -80,7 +80,7 @@ function renderRunsWithDropCap(runs: TypeRun[]): string {
 }
 
 export class EPUBRenderer implements Renderer<Buffer> {
-  async render(book: PaginatedBook, context: RenderContext): Promise<Buffer> {
+  async render(book: PaginatedBook, context: RenderContext): Promise<RenderResult<Buffer>> {
     const { book: domainBook, theme, blockTypography } = book.styledBook;
     // Scoped per render call: images with embedded base64 data are written here and referenced
     // via file:// (ADR-0020, finding 5 - epub-gen-memory unconditionally fetches <img src>, with
@@ -95,7 +95,16 @@ export class EPUBRenderer implements Renderer<Buffer> {
       // this renderer filtered for Chapter only, which silently produced a structurally valid
       // but completely empty EPUB for that file - caught only by inspecting real output, not by
       // any test with a synthetic always-has-a-chapter fixture.
-      const chapters = domainBook.mainContent.map((content) => this.buildChapter(content, blockTypography, tmpDir));
+      // Front matter becomes real, navigable EPUB sections ahead of the body. `Book.frontMatter`
+      // was typed in Sprint 1 and rendered by nothing, so every exported EPUB opened on
+      // Chapter 1 with no title page, copyright or ISBN. `excludeFromToc` keeps them out of the
+      // contents list - a reader expects chapters there, not the copyright notice - while they
+      // remain reachable by paging from the start, exactly as in a print book.
+      const frontMatter = this.buildFrontMatterChapters(domainBook.frontMatter);
+      const chapters = [
+        ...frontMatter,
+        ...domainBook.mainContent.map((content) => this.buildChapter(content, blockTypography, tmpDir)),
+      ];
 
       const options: EpubOptions = {
         title: context.metadata?.title ?? domainBook.metadata.title,
@@ -109,7 +118,9 @@ export class EPUBRenderer implements Renderer<Buffer> {
         verbose: false,
       };
 
-      return await epub(options, chapters);
+      // No pageCount, and that is a real answer rather than a gap: an EPUB is reflowable and
+      // has no pages until a reading device lays it out (ADR-0045).
+      return { output: await epub(options, chapters), metrics: { pageLayout: book.pageLayout } };
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -130,6 +141,49 @@ export class EPUBRenderer implements Renderer<Buffer> {
       table, th, td { border: 1px solid #999; border-collapse: collapse; padding: 4px; }
       ${DROP_CAP_CSS}
     `;
+  }
+
+  /**
+   * Title and copyright pages as real EPUB sections. Every value is escaped: a book titled
+   * `Tom & Jerry <Deluxe>` would otherwise produce invalid XHTML and a reader that refuses to
+   * open the file.
+   */
+  private buildFrontMatterChapters(front: FrontMatter): EpubChapter[] {
+    const chapters: EpubChapter[] = [];
+
+    if (front.titlePage) {
+      const { title, subtitle, tagline, author } = front.titlePage;
+      const parts = [
+        `<div style="text-align:center;margin-top:20%">`,
+        `<h1 style="font-size:2em">${escapeHtml(title)}</h1>`,
+        subtitle ? `<p style="font-size:1.3em;font-style:italic">${escapeHtml(subtitle)}</p>` : '',
+        tagline ? `<p style="font-style:italic">${escapeHtml(tagline)}</p>` : '',
+        `<p style="margin-top:4em;font-size:1.1em">${escapeHtml(author)}</p>`,
+        `</div>`,
+      ].filter(Boolean);
+      chapters.push({ title, content: parts.join('\n'), excludeFromToc: true });
+    }
+
+    if (front.copyrightPage) {
+      const page = front.copyrightPage;
+      // Each line is conditional - an empty "ISBN:" label reads as authored and wrong.
+      const lines = [
+        page.text,
+        page.copyrightText && page.copyrightText !== page.text ? page.copyrightText : undefined,
+        page.legalNotice,
+        page.isbn ? `ISBN: ${page.isbn}` : undefined,
+        page.printingInfo,
+      ].filter((line): line is string => Boolean(line));
+
+      const parts = [
+        `<div style="font-size:0.85em">`,
+        ...lines.map((line) => `<p>${escapeHtml(line)}</p>`),
+        `</div>`,
+      ];
+      chapters.push({ title: 'Copyright', content: parts.join('\n'), excludeFromToc: true });
+    }
+
+    return chapters;
   }
 
   private buildChapter(content: Content, blockTypography: Record<string, ResolvedTypography> | undefined, tmpDir: string): EpubChapter {

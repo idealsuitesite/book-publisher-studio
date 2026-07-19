@@ -1,10 +1,14 @@
 import type { LayoutOptionDTO, ManuscriptOptionsDTO } from 'shared-types';
+import { Badge, Card, cx } from '@/components/ui';
 
-// Sprint 7 commit 8 - real format/layout selector, populated from GET /api/manuscripts/options
-// (fetched once by UploadDropzone). Selection is held in the parent's state, ready for commit
-// 9's export/preview call - no request fires from this component itself. Deliberately no page
-// estimate here (that needs a real LayoutEngine.paginate() run, which only happens inside the
-// export pipeline - commit 9's job, not fabricated here).
+/**
+ * Layout presets and the theme gallery (PRODUCT_EXPERIENCE §4.3–4.4). The radios died: a
+ * premium tool shows presets, chosen visually. Every card is real — the tile's proportions
+ * come from the layout's real dimensions (widthPt/heightPt, the same registry the export
+ * pipeline uses), the mm and inches are computed from them, and the KDP badge marks the
+ * platform presets. The theme gallery ships honest: Classic is the registry's one resident,
+ * shown in its own face; the rest is a designed slot, never seven fake cards.
+ */
 interface FormatSelectorProps {
   options: ManuscriptOptionsDTO;
   selectedLayout: string;
@@ -18,39 +22,67 @@ const CATEGORY_LABELS: Record<LayoutOptionDTO['category'], string> = {
   kdp: 'Amazon KDP',
 };
 
-function RadioCard({
-  name,
-  label,
-  sublabel,
+const PT_PER_INCH = 72;
+const MM_PER_INCH = 25.4;
+
+function dims(layout: LayoutOptionDTO): { label: string; ratio: number } | null {
+  if (!layout.widthPt || !layout.heightPt) return null;
+  const widthIn = layout.widthPt / PT_PER_INCH;
+  const heightIn = layout.heightPt / PT_PER_INCH;
+  const mm = `${Math.round(widthIn * MM_PER_INCH)} × ${Math.round(heightIn * MM_PER_INCH)} mm`;
+  const inches = `${trim(widthIn)}″ × ${trim(heightIn)}″`;
+  return { label: `${mm} · ${inches}`, ratio: layout.widthPt / layout.heightPt };
+}
+
+function trim(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function PresetCard({
+  layout,
   checked,
   onChange,
 }: {
-  name: string;
-  label: string;
-  sublabel?: string;
+  layout: LayoutOptionDTO;
   checked: boolean;
   onChange: () => void;
 }) {
+  const d = dims(layout);
   return (
-    <label
-      className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 transition-colors ${
+    <button
+      onClick={onChange}
+      aria-pressed={checked}
+      className={cx(
+        'flex items-center gap-4 rounded-lg border px-4 py-3 text-left transition-colors duration-[var(--motion-micro)]',
         checked
-          ? 'border-zinc-900 bg-zinc-100 dark:border-zinc-50 dark:bg-zinc-900'
-          : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700'
-      }`}
+          ? 'border-app-accent bg-app-surface-2 shadow-[var(--shadow-sheet)]'
+          : 'border-app-border hover:border-app-text-muted'
+      )}
     >
-      <input
-        type="radio"
-        name={name}
-        checked={checked}
-        onChange={onChange}
-        className="h-4 w-4 accent-zinc-900 dark:accent-zinc-50"
-      />
-      <span className="flex flex-col">
-        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">{label}</span>
-        {sublabel && <span className="text-xs text-zinc-500 dark:text-zinc-400">{sublabel}</span>}
+      {/* The miniature: TRUE trim proportions from the real dimensions, drawn as a sheet. */}
+      {d && (
+        <span
+          aria-hidden
+          className={cx(
+            'flex h-14 shrink-0 flex-col justify-start gap-[3px] rounded-[2px] border p-[5px]',
+            checked ? 'border-app-accent bg-app-surface-3' : 'border-app-border bg-app-surface-2'
+          )}
+          style={{ aspectRatio: `${d.ratio}` }}
+        >
+          <span className="block h-[3px] w-3/5 rounded-sm bg-app-text-muted opacity-60" />
+          <span className="block h-[2px] w-full rounded-sm bg-app-border" />
+          <span className="block h-[2px] w-full rounded-sm bg-app-border" />
+          <span className="block h-[2px] w-4/5 rounded-sm bg-app-border" />
+        </span>
+      )}
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-medium text-app-text">{layout.label}</span>
+          {layout.category === 'kdp' && <Badge severity="info">KDP</Badge>}
+        </span>
+        {d && <span className="text-xs tabular-nums text-app-text-muted">{d.label}</span>}
       </span>
-    </label>
+    </button>
   );
 }
 
@@ -58,22 +90,21 @@ export function FormatSelector({ options, selectedLayout, selectedTheme, onLayou
   const categories = Array.from(new Set(options.layouts.map((layout) => layout.category)));
 
   return (
-    <div className="flex w-full max-w-2xl flex-col divide-y divide-zinc-200 rounded-2xl border-2 border-zinc-300 text-left dark:divide-zinc-800 dark:border-zinc-700">
-      <div className="flex flex-col gap-3 px-8 py-6">
-        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Layout</h3>
+    <Card className="flex max-w-2xl flex-col divide-y divide-app-border text-left">
+      <div className="flex flex-col gap-4 px-8 py-6">
+        <h3 className="text-lg font-semibold text-app-text">Layout</h3>
         {categories.map((category) => (
           <div key={category} className="flex flex-col gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs font-semibold uppercase tracking-wide text-app-text-muted">
               {CATEGORY_LABELS[category]}
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {options.layouts
                 .filter((layout) => layout.category === category)
                 .map((layout) => (
-                  <RadioCard
+                  <PresetCard
                     key={layout.name}
-                    name="layout"
-                    label={layout.label}
+                    layout={layout}
                     checked={selectedLayout === layout.name}
                     onChange={() => onLayoutChange(layout.name)}
                   />
@@ -84,19 +115,37 @@ export function FormatSelector({ options, selectedLayout, selectedTheme, onLayou
       </div>
 
       <div className="flex flex-col gap-3 px-8 py-6">
-        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Theme</h3>
+        <h3 className="text-lg font-semibold text-app-text">Theme</h3>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {options.themes.map((theme) => (
-            <RadioCard
+            <button
               key={theme.name}
-              name="theme"
-              label={theme.label}
-              checked={selectedTheme === theme.name}
-              onChange={() => onThemeChange(theme.name)}
-            />
+              onClick={() => onThemeChange(theme.name)}
+              aria-pressed={selectedTheme === theme.name}
+              className={cx(
+                'flex flex-col gap-1 rounded-lg border px-4 py-3 text-left transition-colors duration-[var(--motion-micro)]',
+                selectedTheme === theme.name
+                  ? 'border-app-accent bg-app-surface-2 shadow-[var(--shadow-sheet)]'
+                  : 'border-app-border hover:border-app-text-muted'
+              )}
+            >
+              {/* The theme speaks in its own face - a real sample, not a swatch. */}
+              <span className="text-base text-app-text" style={{ fontFamily: 'var(--font-book), Georgia, serif' }}>
+                {theme.label}
+              </span>
+              <span className="text-xs text-app-text-muted" style={{ fontFamily: 'var(--font-book), Georgia, serif' }}>
+                The quick brown fox — Chapitre Un
+              </span>
+            </button>
           ))}
+          {/* The honest slot (PRODUCT_EXPERIENCE §10.7): the gallery architecture invites;
+              the content backlog is design work, never fake cards. */}
+          <div className="flex flex-col justify-center gap-1 rounded-lg border border-dashed border-app-border px-4 py-3">
+            <span className="text-sm text-app-text-muted">More themes are being set.</span>
+            <span className="text-xs text-app-text-muted">Classic is the first resident.</span>
+          </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

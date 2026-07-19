@@ -47,11 +47,12 @@ describe('POST /api/manuscripts/import', () => {
     expect(response.body.report.status).toBe('error');
   });
 
-  it('returns 400 for a corrupted DOCX', async () => {
+  it('returns 422 IMPORT_PARSE_FAILED for a corrupted DOCX (ADR-0049: the file is the problem, not the transport)', async () => {
     const response = await request(app)
       .post('/api/manuscripts/import')
       .attach('file', Buffer.from('not a docx'), 'bad.docx');
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(422);
+    expect(response.body.code).toBe('IMPORT_PARSE_FAILED');
   });
 });

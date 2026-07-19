@@ -1,0 +1,84 @@
+{
+  "capturedAt": "2026-07-19T19:32:38.843Z",
+  "totalViolations": 3,
+  "totalNodes": 3,
+  "screens": [
+    {
+      "screen": "01-home",
+      "viewport": "desktop",
+      "file": "01-home--desktop.png",
+      "bytes": 45110,
+      "status": "captured",
+      "violations": []
+    },
+    {
+      "screen": "02-dashboard",
+      "viewport": "desktop",
+      "file": "02-dashboard--desktop.png",
+      "bytes": 75086,
+      "status": "captured",
+      "violations": []
+    },
+    {
+      "screen": "03-ready-for-print",
+      "viewport": "desktop",
+      "file": "03-ready-for-print--desktop.png",
+      "bytes": 76238,
+      "status": "captured",
+      "violations": []
+    },
+    {
+      "screen": "04-layout-kdp",
+      "viewport": "desktop",
+      "file": "04-layout-kdp--desktop.png",
+      "bytes": 88047,
+      "status": "captured",
+      "violations": [
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "nodes": 1,
+          "help": "Heading levels should only increase by one"
+        }
+      ]
+    },
+    {
+      "screen": "05-proof",
+      "viewport": "desktop",
+      "file": "05-proof--desktop.png",
+      "bytes": 52666,
+      "status": "captured",
+      "violations": [
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "nodes": 1,
+          "help": "Heading levels should only increase by one"
+        }
+      ]
+    },
+    {
+      "screen": "06-editions-publish",
+      "viewport": "desktop",
+      "file": "06-editions-publish--desktop.png",
+      "bytes": 109379,
+      "status": "captured",
+      "violations": [
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "nodes": 1,
+          "help": "Heading levels should only increase by one"
+        }
+      ]
+    },
+    {
+      "screen": "07-home-library",
+      "viewport": "desktop",
+      "file": "07-home-library--desktop.png",
+      "bytes": 50719,
+      "status": "captured",
+      "violations": []
+    }
+  ]
+}

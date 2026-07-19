@@ -939,7 +939,11 @@ This is the project's first monorepo-structural change — implements Design Rev
 
 ## ADR-0038: Publishing Engine Cannot See `LayoutEngine`'s Real Pagination Metrics — Deferred Beyond Sprint 8, Question Framed Not Answered
 
-**Status:** OPEN — deferred by explicit CTO decision (2026-07-18). **This ADR deliberately does not decide the answer.** It records a confirmed gap and frames the question a future Design Review must resolve.
+**Status:** ✅ **RESOLVED by ADR-0042** (2026-07-18). The original status is preserved below rather than rewritten, per ADR-0010's annotate-never-rewrite precedent — this ADR did its job by framing a question well enough that a later review could answer it, and that history is worth reading.
+
+> **Resolution note (2026-07-18):** `RENDER_METRICS.md` answered the question below and ADR-0042 records the decision. One correction to this ADR's own framing: it describes a single blocked consumer (`PageCountRule`), but there are **three** — KDP's spine width and its gutter margins are also functions of page count. The third turned out to be a live product defect in its own right, now ADR-0043.
+
+*Original status:* OPEN — deferred by explicit CTO decision (2026-07-18). **This ADR deliberately does not decide the answer.** It records a confirmed gap and frames the question a future Design Review must resolve.
 **Date:** 2026-07-18
 **Decision:** Do **not** change Publishing Engine behavior in Sprint 8 to close this gap. Document it, leave `PageCountRule` reporting `PAGE_COUNT_UNKNOWN` when the information genuinely is not available, and open this record for a dedicated future decision.
 
@@ -1065,3 +1069,269 @@ A checked-in Playwright script makes both **reproducible by anyone on any machin
 - `docs/CURRENT_STATE.md`'s test table becomes self-consistent and stays that way only if future sprints regenerate it rather than appending rows.
 
 **Related:** `docs/architecture/diagrams/UI_FOUNDATION.md` (the Sprint 9 review these correct), ADR-0039 (the reprioritization that made UI Foundation Sprint 9), ADR-0010 (the annotate-never-rewrite precedent Correction 3 follows), ADR-0033 (the last new-dependency decision, for comparison), `docs/DESIGN_REVIEW_PROCESS.md` (the new-dependency rule Correction 2 satisfies)
+
+---
+
+## ADR-0041: Two Scalability Constraints Framed, Not Fixed — Event-Loop Blocking and the Persistence Prerequisite
+
+**Status:** OPEN — both deferred deliberately. **This ADR does not decide either answer.** It records two constraints found by the 2026-07-18 review, with enough evidence that a future Design Review starts from facts rather than rediscovery.
+
+**Date:** 2026-07-18
+**Decision:** Do **not** fix either inside Sprint 9. Both are architectural changes with real blast radius, and Sprint 9's defining constraint is that it touches no backend code and adds no business logic. Fixing them here would break that constraint and bury a significant change inside a UI sprint.
+
+### Constraint 1 — Rendering blocks the Node event loop
+
+**Confirmed by reading the code, not inferred:** `PDFRenderer.render()` is declared `async` and returns a `Promise<Buffer>`, but the work inside is synchronous PDFKit document construction — the `async` wrapper never yields to the event loop. The same shape holds for `DOCXRenderer` and `EPUBRenderer`.
+
+**The measured consequence:** Sprint 7 Commit 10 recorded a real 39,913-word manuscript exporting to PDF in 598ms. That is 598ms during which this single-threaded server **answers no other request** — not a health check, not another user's import. Two concurrent exports serialise; ten make the tenth user wait several seconds before their work even starts.
+
+Today this is invisible: the product has one user at a time and no deployment. It stops being invisible the moment two people use it simultaneously, and `v0.14.0-alpha` (Sprint 13, Performance & Scalability) is where it must be answered.
+
+**The question a future Design Review must answer:**
+> How should rendering be moved off the request thread without breaking the `Renderer<TOutput>` port that three implementations and every export path depend on?
+
+Candidate shapes, **none endorsed here**: a `worker_threads` pool behind the existing port (keeps the contract, adds serialisation cost for the `PaginatedBook`); a job queue with polling or SSE (changes the HTTP contract from synchronous to asynchronous, and would interact with Sprint 12's Autosave work); or accepting the limit and scaling horizontally with multiple processes (cheapest, but caps per-instance throughput at one export).
+
+**A constraint any answer must respect:** ADR-0012 makes `Renderer<TOutput>` a port with three real implementations. Whatever is chosen should not force PDF, DOCX and EPUB renderers to each know they are running in a worker.
+
+### Constraint 2 — Six of nine scheduled sprints need a persistence layer that is currently forbidden
+
+**Confirmed by `grep` across `backend/src/`:** there is no database, no repository, no session, and no cache. Sprint 7 Decision 2 (approved, held without exception through Sprints 8 and 9) states: *"No session, no server-side manuscript cache — every UI action is its own complete round trip."*
+
+**The conflict, from ADR-0039's own roadmap:** Workspace (11), Autosave & Recovery (12), Collaboration (14), Cloud Sync (15), Licensing (16), and Telemetry (17) each fundamentally require remembering something between requests. **Sprint 11 is where this becomes blocking** — projects, recent manuscripts, favourites and history are, definitionally, state.
+
+Sprints 9 and 10 are frontend-only and fully compatible with the backend as it stands, which is part of why ADR-0039 placed them first.
+
+**The question a future Design Review must answer:**
+> What is persisted, where, and does Sprint 7 Decision 2 get amended or superseded?
+
+This is not only a storage choice. It reopens questions the stateless design currently answers for free: what a "project" is as a Domain concept, whether manuscripts are stored as uploaded bytes or as serialised `Book` ASTs (`Book.ts` already declares itself SERIALIZABLE), who owns them once Licensing exists, and what happens to them on deletion.
+
+**Consequences:**
+- Neither constraint blocks Sprints 9 or 10. Both are recorded now so Sprint 11 opens with the problem already framed rather than discovered.
+- Sprint 13's Design Review should treat Constraint 1 as its starting point and re-measure first: the 598ms figure is from Sprint 7 and the pipeline has changed since.
+- Sprint 11's Design Review must resolve Constraint 2 **before** any Workspace code, since amending an approved decision is a governance step, not an implementation detail.
+- If both are still open when a real second user appears, Constraint 1 becomes a live production problem rather than a theoretical one.
+
+**Related:** ADR-0039 (the reordered roadmap that scheduled the six dependent sprints), `docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` Decision 2 (the stateless rule Constraint 2 must amend), ADR-0012 (the `Renderer` port Constraint 1 must not break), ADR-0038 (the other OPEN deferral, also awaiting its own review), `docs/demo/VISIBLE_INCREMENTS.md` (Sprint 7 Commit 10, where the 598ms measurement is recorded)
+
+---
+
+## ADR-0042: Render Metrics Reach the Publishing Engine as a Narrow, Per-Format Value Object
+
+**Status:** APPROVED (CTO, 2026-07-18). **Resolves ADR-0038**, which framed this question and deliberately left it unanswered.
+**Date:** 2026-07-18
+**Decision:** Introduce a `RenderMetrics` Domain model carrying the *real* paginated page count and the `PageLayout` pagination actually used. Attach it per rendered format, transport it through a widened `PublishingTarget.prepare()`, and expose it on `PostRenderValidationContext` where rules read it.
+
+**Why the gap mattered more than ADR-0038 recorded.** ADR-0038 described one blocked consumer (`PageCountRule`). Writing `RENDER_METRICS.md` found three, by reading `KDPRuleData.ts`: KDP's page-count range (24-828), its **spine width** (`spineWidthInPerPage x pages`, so paperback cover dimensions are *derived* from page count), and its **gutter margins** (`marginsByPageCount`). Two of the three were never mentioned.
+
+**The four candidates ADR-0038 listed, adjudicated:**
+
+- *Enrich `Book` with the real count* - **rejected.** `Book.pageCount` is an import-time estimate from word count; writing the real value there gives one field two meanings depending on which path produced it, with no way for a consumer to tell which it holds. A page count is a property of a rendition, not of the work (`AGGREGATES_AND_PERSISTENCE.md` section 1).
+- *Pass `PaginatedBook` into `prepare()`* - **rejected.** It carries `styledBook`, `pages`, `pageLayout` and the TOC. Publishing needs counts, not content; passing it couples the publishing port to the layout engine's internal model.
+- *Widen `RenderedOutputs`* and *add a field to `PostRenderValidationContext`* - **both adopted**, since they solve different hops: the first transports, the second delivers.
+
+**Per-format, not per-bundle.** A bundle may hold a paginated PDF and a reflowable EPUB at once; a single bundle-level page count would necessarily be wrong about one of them. `RenderMetrics.pageCount` is therefore **optional**, and `PAGE_COUNT_UNKNOWN` keeps a legitimate life for reflowable formats - it simply stops firing on every PDF, which was the actual defect.
+
+**No fallback, ever.** `PageCountRule` must not fall back to `Book.pageCount` when metrics are absent. KDP rejects on the real count; validating an estimate against a hard platform limit converts an honest `WARNING` into a `PASS` on a book Amazon will refuse. A false green is worse than a disclosed unknown.
+
+**Consequences:**
+- `PublishingTarget.prepare()`'s signature widens. This is the evolution Sprint 8 Decision 1 explicitly anticipated in the port's own comment, not an unplanned break, and `KDPTarget` is its only implementation.
+- The `Renderer` port (ADR-0012) is **untouched** - `PublishingUseCase` assembles the metrics from the `PaginatedBook` it already holds, so none of the three renderers change.
+- The export path is deliberately not given metrics: `ExportManuscriptUseCase` has no validator to feed, and an unused field is the thing this project's handbook rule exists to prevent.
+- Real page counts may push small fixtures below KDP's 24-page minimum, turning comfortable `WARNING`s into real `ERROR`s. That is the fix working and must not be resolved by loosening the rule.
+
+**Related:** ADR-0038 (resolved by this), ADR-0043 (the defect found alongside it), ADR-0037 (platform-agnostic constraint held), ADR-0012 (`Renderer` port left untouched), ADR-0035 (the KDP spike that supplied the spine and margin data), `docs/architecture/diagrams/RENDER_METRICS.md`
+
+---
+
+## ADR-0043: `PageLayout` Has No Gutter - Every Paperback This Product Generates Is Non-Compliant
+
+**Status:** OPEN - defect confirmed and disclosed, fix deliberately deferred to its own review. **Not** a decision to leave it broken.
+**Date:** 2026-07-18
+**Found by:** writing `RENDER_METRICS.md` - reading `KDPRuleData.ts` against `PageLayout.ts`, not by a failing test.
+
+**The defect.** `PageLayout` offers `marginTop`, `marginBottom`, `marginLeft`, `marginRight` and nothing else. Confirmed by grep: `gutter` appears in neither `PageLayout.ts` nor `LayoutEngine.ts`. KDP requires an inside (gutter) margin that scales with page count:
+
+| Pages | Gutter required |
+|---|---|
+| <=150 | 0.375 in |
+| <=300 | 0.5 in |
+| <=500 | 0.625 in |
+| <=700 | 0.75 in |
+| <=828 | 0.875 in |
+
+Margins are therefore **symmetric**, with no inside/outside distinction and no recto/verso notion - every page is laid out as a loose sheet. A 400-page book generated today owes a 0.625 in gutter and gets whatever `marginLeft` happened to be. **Text runs into the binding.**
+
+**Why 479 passing tests did not catch it.** No test can assert a requirement the model is incapable of expressing. This is the sixth instance of this project's recurring pattern (ADR-0019, 0020, 0031, 0032, 0038) and the first where the blind spot was in a *Domain model's shape* rather than in a library's behaviour - worth noting, because no amount of additional test coverage against the current `PageLayout` would have surfaced it.
+
+**A real circularity, named now rather than discovered mid-implementation.** The required gutter depends on page count; widening the gutter reduces text per page, which increases page count. A book near a threshold (150, 300, 500, 700) can cross it *because of* the margin its own page count demanded.
+
+**Recommended resolution when this is picked up** (not decided here): one re-pagination pass, not convergence to a fixed point - paginate, look up the gutter for the resulting count, re-paginate if it changed, then validate. If the second pass crosses another threshold, report it as an issue rather than looping; an author whose book sits on a boundary needs to be told, not silently handed a third layout.
+
+**Why not fixed alongside ADR-0042.** The fix changes `PageLayout` and `LayoutEngine`, alters the visual output of every existing export, and has visual-baseline consequences. Folded into a metrics-transport change it would produce a commit that cannot be reviewed. Scope discipline here is the same call Sprint 8 made when deferring ADR-0038 itself.
+
+**Consequences:**
+- ADR-0042's work makes the page count *visible and validatable*; it does not make the product compliant. Release notes must say so plainly rather than let a green publish report imply otherwise.
+- Until fixed, print-on-demand output should be treated as not production-ready, regardless of what `SubmissionValidator` reports.
+
+**Related:** ADR-0042 (the work that surfaced this), ADR-0035 (the spike whose data made it visible), ADR-0030 (KDP trim sizes), `docs/architecture/diagrams/RENDER_METRICS.md` section 3
+
+---
+
+## ADR-0044: Archiving and Deletion Are Two Operations, Decided Before the Storage Spike
+
+**Status:** APPROVED (CTO, 2026-07-18). Closes `AGGREGATES_AND_PERSISTENCE.md` Risk 5.
+**Date:** 2026-07-18
+**Decision:** Separate **archive** (reversible, loses nothing, hides from the library) from **delete** (irreversible, removes the whole aggregate including the author's original upload). Deletion is never blocked by history. `ProjectRepository` gains no new method.
+
+**The finding that dissolved the dilemma.** Framed as "keep history or destroy it", the question looks unresolvable. The real problem is that **one verb served two intentions**: "this is finished, get it out of my way" (common, expects to lose nothing) and "this was a mistake, remove it" (rare, expects real erasure). A single destructive delete fails the common case by discarding a publication record the author wanted kept; a single soft delete fails the rare case worse, retaining data the author believes erased. Separating them lets archive absorb the common case - and the publication record then survives because *the project* survives.
+
+**Deletion is not blocked, however much history exists.** The project belongs to the author; refusing because they once published is paternalism dressed as stewardship. Amazon holds its own record of what was published. This also keeps the product defensible under a right-to-erasure request - a "delete" that quietly retains is the shape that causes real trouble later.
+
+**Archiving needs no port surface, and that is evidence.** It is a state change on the aggregate (`archivedAt`), persisted through the existing whole-aggregate `save()`. Only `list()` changes, gaining an options argument and **excluding archived projects by default** - a caller that forgets the flag then shows too few projects, which is visible and reported, rather than leaking archived work into every library view. That a lifecycle change is absorbed without widening the persistence boundary is independent confirmation that the aggregate boundary approved in `AGGREGATES_AND_PERSISTENCE.md` section 2 is drawn correctly.
+
+**Sequenced before the storage spike, deliberately.** Whether the schema carries a nullable `archivedAt` and whether every query filters is determined here. Deciding after a store is chosen means a migration over real author data - the one class of change this project has no way to rehearse.
+
+**CTO override, recorded.** The review recommended offering deletion in the UI immediately. The CTO decided **no**, and the override is correct: a delete button is the one control whose mistakes cannot be walked back, and against a store that loses everything on restart its only real use would be working around a limitation we intend to remove. The review's own "a mis-imported file needs removing" argument is better served by archive, which the same review introduces - the destructive tool was reached for while the reversible one sat on the same page.
+
+**Consequences:**
+- `delete()` stays as designed, correct, and without a UI caller - its state today.
+- Decision 6's typed confirmation is a UI rule with no surface to live on; deferred with the UI.
+- The publication-record export is still built: it is a legitimate read of an author's own history independent of deletion, and it must exist before a delete button can ever be offered.
+- `archivedAt` becomes a filter every future project query must respect. Sprint 11 (Workspace) and Sprint 14 (Collaboration) each add queries and each is a chance to forget it; default-exclude plus a standing regression test are the mitigation.
+- Committing to real deletion before a real store exists makes backup and replica retention a **selection criterion** for the storage spike rather than a later discovery.
+
+**Related:** `AGGREGATES_AND_PERSISTENCE.md` Risk 5 (closed by this) and section 2 (the boundary this confirms), ADR-0041 (persistence prerequisite; this is sequenced before its spike), ADR-0001 (immutability - `archive()` returns a new Project), `docs/architecture/diagrams/PROJECT_LIFECYCLE.md`
+
+---
+
+## ADR-0045: Render Metrics Come From the Renderer - Correcting an Approved Decision, and the Publish/Export Divergence It Exposed
+
+**Status:** APPROVED (implemented 2026-07-18). **Corrects RENDER_METRICS.md Question 1**, which was approved and wrong.
+**Date:** 2026-07-18
+**Found by:** real-fixture verification during ADR-0042's own Commit 4 - not by the 484 tests that were green at the time.
+
+**What the approved review said.** RENDER_METRICS.md Question 1 asked whether the `Renderer` port should produce metrics or `PublishingUseCase` should assemble them. It recommended the use case, reasoning that `Renderer` has three implementations and widening its return type would change all three plus the export path "for no gain", and that this keeps ADR-0012 untouched. The CTO approved it. **It was wrong twice over.**
+
+**First: `PaginatedBook.pages.length` is an estimate the codebase already documented as unreliable.** ADR-0013 recorded that PDFKit's real rendered page count can differ from `LayoutEngine`'s `Page[]` length, and `PDFRenderer` says so in its own comments - it deliberately uses `doc.bufferedPageRange().count` for the "of TOTAL" footer *because* the estimate undershot on real content (ADR-0019 finding 6C). Question 1 selected, as the source of a number used to validate against a hard platform limit, the one figure this project had already written down as untrustworthy.
+
+**Second: renderers emit pages that pagination never sees.** `PDFRenderer` renders the title and copyright pages from `book.frontMatter` itself, outside `LayoutEngine.paginate()`. The estimate therefore counts body pages only.
+
+**The measurement.** On the canonical fixtures the publish pipeline reported a page count of **1** while the exported PDF had **3**. After the fix, reported and real agree exactly: 3/3, 3/3, 3/3, and `large-book.docx` at 32 real pages sits inside KDP's 24-828 range and correctly raises no issue.
+
+**A second, independent defect surfaced by the same investigation.** `PublishingUseCase` did not build front matter at all, while `ExportManuscriptUseCase` did. **The Publishing Engine was validating a document the author would never upload** - no title page, no copyright page, no ISBN page - and reporting on it as though it were the finished book. Fixed in the same work by giving both paths the same `FrontMatterBuilder` step, and locked by a test that renders through both and asserts the publish-reported count equals the real page count of the PDF export actually ships.
+
+**Decision:** `Renderer<TOutput>.render()` returns `RenderResult<TOutput> = { output, metrics }`. Only the renderer knows what it emitted, so only the renderer can report it honestly.
+
+- `PDFRenderer` reports `doc.bufferedPageRange().count`, captured after every `addPage()` and before `end()` flushes.
+- `DOCXRenderer` reports **no** page count. Word repaginates on open against the reader's own fonts and printer metrics; a number here would be invented.
+- `EPUBRenderer` reports **no** page count. Reflowable formats have no pages until a device lays them out.
+
+The two renderers that return `pageCount: undefined` are not gaps - they are the reason `RenderMetrics.pageCount` is optional (ADR-0042), and `PageCountRule`'s `PAGE_COUNT_UNKNOWN` is the correct outcome for them.
+
+**Consequences:**
+- ADR-0012's `Renderer` port **does** change, contrary to ADR-0042's stated consequence. That earlier claim is superseded here rather than edited, per ADR-0010's annotate-never-rewrite precedent.
+- `ExportManuscriptUseCase` discards the metrics: it has no validator to feed, and an unused field is what the handbook's port-vs-class rule exists to prevent. `verify-real-export` stayed 16/16 across the change.
+- Cost of the correction: 55 call sites, almost all of them assertions in the three renderer test suites. Mechanical, and cheap precisely because it was caught during the sprint that introduced the metric rather than after something depended on it.
+- **The deeper issue is left open**: renderers adding pages behind pagination's back means `LayoutEngine` does not model the whole document. That also affects running heads and page numbering, and it is the same class of layout-fidelity problem as ADR-0043's missing gutter. Both belong to one future Design Review on layout fidelity; neither is fixed here.
+
+**The governance lesson, recorded because it is the actionable part.** This project's rule is spike-before-decide for external behaviour (ADR-0019, 0020, 0030, 0035). Question 1 was a decision about **this codebase's own internals**, made by reasoning about blast radius rather than by reading `PDFRenderer` - which contained, in a comment, the exact fact that falsified it. ADR-0031/0032 already recorded that "confirmed, not guessed" applies to our own upstream code too. It applied here and was not honoured, and a design review being approved did not make it true.
+
+**Related:** ADR-0042 (whose Question 1 this corrects and whose `Renderer`-untouched consequence this supersedes), ADR-0013 (the estimate-vs-real drift already on record), ADR-0019 finding 6C (why `bufferedPageRange().count` is the trusted figure), ADR-0012 (the port this widens), ADR-0043 (the sibling layout-fidelity defect), ADR-0031/0032 ("confirmed, not guessed" applied to our own code), `docs/REAL_FIXTURE_POLICY.md` (the verification that caught it), `docs/architecture/diagrams/RENDER_METRICS.md`
+
+---
+
+## ADR-0046: Persistence Store Spike — SQLite via `node:sqlite` Recommended, and the Aggregate Is the Real Cost
+
+**Status:** APPROVED as a spike finding + recommendation (2026-07-18). **Answers AGGREGATES_AND_PERSISTENCE.md Question 6.** Implementation deliberately NOT started: Sprint 7 Decision 2 (stateless backend) must be formally amended by Sprint 11's Design Review first (ADR-0041 Constraint 2) — choosing the store and wiring the store are two gates, not one.
+**Date:** 2026-07-18
+**Spike:** `backend/spikes/persistence-store-spike.ts`, run on this machine (Node v24.18.0, Windows). Round-trips **real domain aggregates** built by the real `ProjectService` — an 80k-word, 20-chapter book, a real 5MB source upload, 50 version snapshots, 200 further projects for the listing — per ADR-0031/0032's "confirmed, not guessed" applied to our own code. ADR-0045, three commits ago, is what guessing costs.
+
+**Candidates and why only these two.** (A) one JSON file per aggregate — the zero-dependency baseline; (B) SQLite via `node:sqlite` — built into Node 24 (verified), so **also zero new dependencies**, which changes the usual calculus. Postgres and document stores were deliberately not spiked: they need a running server, and this product's own reference points (Atticus, Affinity Publisher — the CTO's stated inspirations) are local-first tools. A client-server store is Sprint 15's (Cloud Sync) question, not "where does an author's project live on their machine".
+
+**Measured results (real numbers, this machine):**
+
+| Measure | A: JSON files | B: SQLite |
+|---|---|---|
+| Save aggregate + 5MB blob | 177ms (blob separated) | 3052ms (one transaction) |
+| Load whole aggregate | 571ms | 616ms |
+| `list()` over 201 projects | **7015ms — loads every aggregate** | **317ms — summary columns, zero aggregates loaded** |
+| Crash mid-write | **CORRUPTED, unreadable** without rename discipline | **rolled back**, partial state never visible |
+| Blob embedded in aggregate | 58MB file, 4.9s load | n/a (blobs table by design) |
+
+**Decision basis, stated plainly:**
+- The two measures that decide it are the last two. `list()` is the operation the UI runs constantly, and 7s vs 0.3s is not a tuning gap — the files candidate has no index and structurally cannot have one without building, by hand, the thing SQLite already is. And a store that can hand back a **corrupted, unreadable aggregate** after a crash fails the whole reason the aggregate boundary exists (a consistency boundary that can be torn in half is not one). File-rename discipline mitigates but cannot cover multi-file writes (aggregate + blobs), which SQLite covers with one transaction — measured, not asserted (B4).
+- SQLite's slower save (3s, dominated by binding a 45MB string) is the price of that transaction, paid at save time where it is least felt.
+
+**Recommendation: SQLite via `node:sqlite`.** Schema shape proven in the spike: aggregate as a JSON document column (the port's whole-aggregate contract, kept literally), summary fields as real indexed columns (Question 4's read model becomes a `SELECT`, and ADR-0044's `archived_at IS NULL` filter becomes an index), blobs in their own table written in the same transaction (Question 5's source retention without aggregate bloat — the embedded-blob measurement, 58MB/4.9s, is why this is structural, not stylistic).
+
+**The finding that outranks the question asked:** the blob-stripped aggregate was **45.1MB** — not from the book (~0.9MB) but from **50 full-copy version snapshots**. Version history grows the aggregate linearly, and at that size every candidate is slow at whole-aggregate load (571ms vs 616ms — the store choice is a rounding error next to the shape). This does not change today's model (correct first, compact later, ADR-0001's immutability makes dedup/structural-sharing possible precisely because snapshots never mutate) — but Sprint 11's review must treat **version-snapshot growth** as a first-class design input, not discover it in production.
+
+**Also real, disclosed:** both candidates need an explicit hydration layer (`Date` and `Buffer` do not survive `JSON.parse` naively — the spike's `hydrate()` is the sketch); `node:sqlite` is the one dependency on Node's own API stability, verified available without flags on v24.18.0 and worth re-verifying in CI's Node version before Sprint 11 wires it.
+
+**Related:** `AGGREGATES_AND_PERSISTENCE.md` Question 6 (answered here), Question 4 (the summary read model this schema makes a `SELECT`), Question 5 (blob separation), ADR-0044 (`archivedAt` as an indexed filter), ADR-0041 Constraint 2 (the governance gate implementation waits behind), ADR-0019/0020/0030/0035 (spike-before-decide precedent), ADR-0045 (the freshest reason this spike used real aggregates), `backend/spikes/persistence-store-spike.ts`
+
+---
+
+## ADR-0047: A Successful Import Creates a Project — Decision 2 Amended in Code, by CTO Direction
+
+**Status:** APPROVED (CTO-directed, 2026-07-18)
+**Date:** 2026-07-18
+**Decision:** `ImportManuscriptUseCase` now creates a `Project` around every successfully imported book, retains the original upload as its `'source'` asset byte for byte, and returns `projectId` on the response (additive, optional). `GET /api/projects` lists the library as `ProjectSummaryDTO`s. One `InMemoryProjectRepository` instance is the app's state.
+
+**This is the moment Sprint 7 Decision 2 (stateless backend) stops being amended "in principle only."** The backend now deliberately holds state between requests, by explicit CTO instruction ("le câblage de Project dans l'import"). The state is in-memory and does not survive a restart — disclosed in the repository class, in `app.ts` at the wiring site, and here. The durable store is chosen (SQLite, ADR-0046) but its wiring stays gated behind Sprint 11's Design Review, which must formally restate Decision 2 (ADR-0041 Constraint 2). Holding state and holding it durably are different promises; this ADR makes only the first.
+
+**Product decisions embedded here, each reversible in one place:**
+- **A rejected import creates no project.** The UI treats 422 as "fix your file and try again"; a library accumulating a project per failed attempt fills with orphans the author never asked to keep. Confined to one block in the use case if real authors prove this wrong.
+- **Default settings are the registries' own defaults** (`letter`/`classic`), the same ones the export path applies when nothing is chosen. The project remembers them from birth so they become editable properties later (Decision 1 of `UI_FOUNDATION.md`: layout/theme are book properties, not workflow steps).
+- **The library endpoint is read-only.** No create (import IS create), no delete (ADR-0044's CTO decision — no UI caller until persistence is real), no archive endpoint yet (the control and its consequence should ship together with the library UI, not as an orphaned endpoint first).
+
+**A real defect found by the wiring's own test:** `InMemoryProjectRepository`'s `structuredClone` silently downgraded `Buffer` to `Uint8Array` — bytes intact, prototype gone, so the first caller invoking `asset.data.equals(...)` crashed on a value the type system swears is a `Buffer`. Sixteen existing repository tests missed it because none round-tripped a real asset payload. Fixed in the clone (a prototype-restoring view over the clone's own fresh memory, not a second copy), locked by a regression test at the class that owns the clone. Note for Sprint 11: the SQLite hydration layer has the same class of problem (ADR-0046 already flags `Date`/`Buffer` revival), and this is the concrete proof it bites.
+
+**Verified end to end against the real server:** import of `typography-test.docx` → `projectId` returned → `GET /api/projects` lists the project with its name, zero versions, no publications. The rejected-import path and the Unicode invariant (`supplémentaire` intact through the whole HTTP loop) are locked by route tests.
+
+**Related:** `PRODUCT_OBJECT_MODEL.md` (the project as unit of work), `AGGREGATES_AND_PERSISTENCE.md` Question 5 (source retention — the byte-for-byte test is its proof), ADR-0044 (why delete/archive are absent from the endpoint), ADR-0046 (the chosen store this deliberately does not wire), ADR-0041 Constraint 2 (the governance gate durability still waits behind), Sprint 7 Decision 2 (the stateless rule this amends in code)
+
+---
+
+## ADR-0048: Sprint 7 Decision 2 Formally Amended — the Backend Is Stateful and Durable
+
+**Status:** APPROVED (Sprint 11 review `PERSISTENCE.md`, CTO feu vert 2026-07-20). Discharges ADR-0041 Constraint 2.
+**Date:** 2026-07-20
+
+**The decision:** the backend holds durable state. Projects — with their versions, publications, assets and retained sources — survive restarts, stored in SQLite via `node:sqlite` (ADR-0046's measured choice) behind the unchanged `ProjectRepository` port.
+
+**The history, so nobody re-litigates it:** Decision 2 ("stateless; every request a complete round trip", Sprint 7) was correct for a conversion tool and was retired in three recorded steps — in *principle* by the aggregate design (`AGGREGATES_AND_PERSISTENCE.md`), in *code* by ADR-0047 (imports create in-memory projects, CTO-directed), and *formally* here. ADR-0041 Constraint 2 required exactly this: an approved review amending the decision before Workspace-era persistence code exists. `PERSISTENCE.md` is that review.
+
+**What survives of Decision 2, on purpose:** the rendering pipeline stays stateless — parse→layout→render holds no session and every export is a complete computation from the stored source. Statefulness lives in exactly one place: behind the repository port. That confinement is why this amendment costs no architectural rework.
+
+**Load-bearing consequences:**
+- Versions are sharded into their own rows (same transaction, same whole-aggregate port contract) — the direct answer to ADR-0046's 45MB finding, and the free path to partial loading if Sprint 12 ever needs it.
+- Asset bytes never enter JSON (blobs table) and rehydrate as real `Buffer`s — the `structuredClone` downgrade lesson (ADR-0047) institutionalized as a tested hydration boundary.
+- `PRAGMA user_version` migrations from day one; the future `events` table (PRODUCT_EXPERIENCE §10.5) is a planned v2, not a bolt-on.
+- One shared behavioural contract suite runs against every repository implementation, in-memory included — a future cloud store (S15) starts by passing it.
+- The six-month-author journey (PRODUCT_EXPERIENCE §5) stops being a documented lie.
+
+**Related:** `PERSISTENCE.md` (the review), ADR-0041 (the gate), ADR-0046 (the spike), ADR-0047 (the in-code precursor + the Buffer scar), ADR-0044 (`archived_at` indexed), Sprint 7 Decision 2 (the decision honourably retired).
+
+---
+
+## ADR-0049: An Importer That Finds No Structure Must Say So — Explorable Errors and Normalization Diagnostics
+
+**Status:** APPROVED (CTO verdict 2026-07-20 on `IMPORT_FIDELITY.md`; freeze on other engines in effect until its five commits merge and `verify-real-import` runs green on the real corpus).
+**Date:** 2026-07-20
+
+**The decision:** "no structure detected" is a first-class, *named* state of an imported manuscript — an architecture decision, not a bug patch, exactly as the `<s>` and `.trim()` scars were recorded before it.
+
+**What was happening (reproduced live, `IMPORT_FIDELITY.md` §1-2):** a real book-length DOCX styled visually (bold runs, no Word `Heading` styles) imported into one anonymous section — `chapters: 0`, **Structure 100/100**, no warning anywhere, failure discovered only downstream at the Proof. Separately, a real manuscript's *empty* `Heading 1` was dropped by normalization with no trace (18 h1 → 17 chapters).
+
+**The mechanics now in force:**
+- **`UNSTRUCTURED_MANUSCRIPT`** (severity **ERROR**): a book above `UNSTRUCTURED_WORD_THRESHOLD` words with zero top-level chapters. The threshold lives in ONE named, documented constant (`BookValidator.ts`, 2,000 words) — CTO condition; a candidate `ValidationProfile` parameter later. Below it, a chapterless single-flow document (essay, corporate report) is a legitimate editorial choice and stays silent.
+- **Explorable errors** (`ValidationEngine.EXPLORABLE_ERROR_CODES`): this ERROR caps the structure score and will block "Validate for KDP" (targeted, provisional — see below), but it does **not** reject the import. Severity states gravity; rejection is a separate, narrower decision. Rejecting would destroy the very evidence (the project, its Proof, its Structure station) the author needs to understand the problem — coherent with ADR-0027 (validation informs, never bars exploration). Every other ERROR rejects exactly as before.
+- **`EMPTY_HEADING_DROPPED`** (WARNING, `NormalizationDiagnostic`): the normalizer still drops empty headings — the drop is right, the *silence* was the defect. Import-time evidence only, disclosed: the dropped content does not exist in the Book AST, so re-validation on read cannot rediscover it.
+- **The structure score can no longer say 100 over zero chapters** — the ERROR feeds the existing per-category scoring; no parallel mechanism was added.
+
+**Provisional, by CTO amendment:** the zero-chapter *publication* block applies to the KDP action specifically, never to a generic "publish" — corporate reports and single-flow documents are legitimate product targets. To be re-evaluated as a profile rule the day `ValidationProfile` exists (the `ValidationContext.validationProfile` field already reserves the slot).
+
+**Related:** `IMPORT_FIDELITY.md` (the review; commits 2-5 build on this state), ADR-0025 (mammoth limitation family), ADR-0027 (read-only validation), ADR-0031/0032 (the real-file scars that built the discipline this follows), `REAL_FIXTURE_POLICY.md` (commit 5's `verify-real-import` corpus is its next escalation).

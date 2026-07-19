@@ -6,6 +6,7 @@ import type {
   AnyNormalizedNode,
   DocumentMetadata,
   InlineNode,
+  NormalizationDiagnostic,
 } from '../../domain/models/Normalized';
 import { createIdGenerator } from '../../shared/utils/idGenerator';
 import type { DocumentNormalizer } from '../../domain/ports/DocumentNormalizer';
@@ -15,6 +16,7 @@ export class HtmlNormalizer implements DocumentNormalizer {
     const $ = load(html);
     const ids = this.createIdGenerators();
     const nodes: AnyNormalizedNode[] = [];
+    const diagnostics: NormalizationDiagnostic[] = [];
 
     const root = $('body').length ? $('body') : $(':root');
 
@@ -25,7 +27,20 @@ export class HtmlNormalizer implements DocumentNormalizer {
         const tag = elem.name?.toLowerCase();
         const text = $elem.text().trim();
 
-        if (!text && tag !== 'img' && tag !== 'table') return;
+        if (!text && tag !== 'img' && tag !== 'table') {
+          // Dropping empty elements is right (an empty paragraph is noise) — dropping an
+          // empty HEADING silently is not: a Heading 1 marks a chapter boundary, and a real
+          // manuscript lost one this way with no trace (ADR-0049, IMPORT_FIDELITY.md §1).
+          // The drop stands; the silence does not.
+          const emptyHeading = tag?.match(/^h([1-6])$/);
+          if (emptyHeading) {
+            diagnostics.push({
+              code: 'EMPTY_HEADING_DROPPED',
+              message: `An empty Heading ${emptyHeading[1]} in the source document was dropped - if it marked a chapter or section break, that break is not represented`,
+            });
+          }
+          return;
+        }
 
         const headingMatch = tag?.match(/^h([1-6])$/);
         if (headingMatch) {
@@ -105,6 +120,7 @@ export class HtmlNormalizer implements DocumentNormalizer {
         author: metadata.author,
       },
       nodes,
+      ...(diagnostics.length > 0 ? { diagnostics } : {}),
     };
   }
 

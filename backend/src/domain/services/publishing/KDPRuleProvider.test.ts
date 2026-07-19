@@ -14,17 +14,18 @@ function emptyBundle(): PublishingBundle {
 }
 
 describe('KDPRuleProvider', () => {
-  it('implements ValidationRuleProvider - getRules() returns the 4 real rules, not a promise or a class', () => {
+  it('implements ValidationRuleProvider - getRules() returns the 5 real rules, not a promise or a class', () => {
     const provider = new KDPRuleProvider();
 
     const rules = provider.getRules();
 
-    expect(rules).toHaveLength(4);
+    expect(rules).toHaveLength(5);
     expect(rules.map((r) => r.name).sort()).toEqual([
       'CoverPresenceRule',
       'InteriorFormatAvailabilityRule',
       'PageCountRule',
       'RequiredMetadataFieldsRule',
+      'StructurePresenceRule',
     ]);
   });
 

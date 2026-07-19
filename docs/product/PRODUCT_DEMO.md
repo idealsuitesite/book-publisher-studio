@@ -30,29 +30,25 @@ A stakeholder opens Book Publisher Studio in a browser. They drag in a real manu
 
 ## Demo Script
 
-The literal, numbered sequence this demo runs — also `docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md` §6 commit 10's real-file verification pass, and the basis for the screenshot set in `docs/demo/screenshots/README.md`.
+> **Superseded 2026-07-19 (HOME_WORKSPACE.md §0, CTO-approved):** the vertical-pipeline demo below this box was Sprint 7's script, written when the product was a conversion. The product is now a studio with a Home (the library) and a Workspace (one book, stations). The current script IS the complete user journey the navigation review defined, and `frontend/scripts/capture-baseline.mjs` drives it verbatim with a real browser and the real fixture.
 
 ```
-1. Launch Book Publisher Studio
+1. Launch Book Publisher Studio → Home (the library, honest empty state)
        ↓
-2. Import large-book.docx
+2. Import large-book.docx → a project is created, redirect to its Workspace
        ↓
-3. See the chapters
+3. Manuscript station — the book, its structure collapsed behind "Structure — 15 parts"
        ↓
-4. See the warnings
+4. Layout station — pick KDP 6"×9"; settings persist ON THE PROJECT
        ↓
-5. Change A4 → KDP
+5. Preview station — a real PDF rendered from the STORED source (no re-upload)
        ↓
-6. Preview
+6. Publish station — real KDP validation; the attempt enters the project history
        ↓
-7. Export PDF
-       ↓
-8. Export EPUB
-       ↓
-9. Export DOCX
+7. Back Home — the library shows the project, its version, the statistics
 ```
 
-Uses `backend/verification/large-book.docx` — the canonical fixture already used for pagination/performance verification (`docs/DEVELOPMENT_WORKFLOW.md`'s "Which fixture to use"), real enough (15 real chapters, per Sprint 6's own real-file findings, ADR-0031) to show genuine structure, format switching, and multi-format export in one run.
+Uses `backend/verification/large-book.docx` — the canonical fixture (15 real chapters, ADR-0031). The expected Publish outcome on this fixture is an honest **FAIL** (missing ISBN, no cover image) — the demo deliberately shows the product telling the truth about a manuscript, which is its job.
 
 ## Expected screenshots
 

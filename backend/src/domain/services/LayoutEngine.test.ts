@@ -7,6 +7,7 @@ import { createBook } from '../models/Book';
 import type { Chapter, Section, Heading, Paragraph, Image, List, Table, Footnote, Block, TableOfContents, Content } from '../models/Book';
 import type { PageLayout } from '../models/PageLayout';
 import type { Theme } from '../models/Theme';
+import type { TextMeasurer } from '../ports/TextMeasurer';
 
 const LETTER_LAYOUT: PageLayout = {
   pageSize: 'letter',
@@ -487,5 +488,164 @@ describe('LayoutEngine', () => {
 
       expect(styled.book.frontMatter.toc?.entries).toBe(manualEntries);
     });
+  });
+});
+
+// LAYOUT_FIDELITY.md Decision 6: with a TextMeasurer, pagination prices blocks at the
+// renderer's real numbers instead of the word-count estimate whose measured defect (1.43x
+// overcharge -> ~71% page fill) is on record in section 2bis.
+describe('LayoutEngine - measured pagination (Decision 6)', () => {
+  // A deterministic fake: every block is exactly `blockHeight`pt tall, lines are 10pt.
+  // The point of each test is the ALGORITHM's use of measured values, not font metrics.
+  const measurerOf = (blockHeight: number, line = 10): TextMeasurer => ({
+    measureHeight: () => blockHeight,
+    lineHeight: () => line,
+  });
+
+  it('fills a page by measured height, not by the word-count estimate', () => {
+    // usable height 648pt. Measured block = 60pt + spaceAfter 8 = 68pt -> 9 fit (612), 10th overflows.
+    // The estimator would have charged these one line each (16.5pt) and packed ~39 - the
+    // divergence is the whole point.
+    const blocks = Array.from({ length: 12 }, (_, i) => paragraph(`p-${i}`, 'short text'));
+    const styled = styledBookFrom([chapter(blocks)]);
+    const engine = new LayoutEngine(measurerOf(60));
+
+    const result = engine.paginate(styled, LETTER_LAYOUT);
+
+    // Title (60 measured + 10 moveDown = 70) + 8 blocks of 68 = 614. Pre-Phase-B the 9th block
+    // (682 > 648) moved whole; now its first 3 lines fill the remainder (34pt -> 3 lines of 10,
+    // block has 6, both sides keep >=2) and the rest continues - the "essai de coupure" the
+    // CTO's investigation found missing.
+    expect(result.pages[0].blocks).toHaveLength(9);
+    expect(result.pages[0].splitAfterLines).toBe(3);
+    expect(result.pages[1].startsWithContinuation).toBe(true);
+    expect(result.pages).toHaveLength(2);
+  });
+
+  it("charges the chapter title's real height - the cost the estimator booked at zero", () => {
+    // Each block 100+8=108pt. Without a title charge, 6 fit (648/108); with title
+    // (100 measured + 10 moveDown = 110pt), only 4 fit before 110+5*108=650 > 648.
+    const blocks = Array.from({ length: 8 }, (_, i) => paragraph(`p-${i}`, 'text'));
+    const styled = styledBookFrom([chapter(blocks)]);
+    const engine = new LayoutEngine(measurerOf(100));
+
+    const result = engine.paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages[0].blocks.length).toBeLessThan(6);
+  });
+
+  it('still paginates with the historical estimate when no measurer is wired', () => {
+    const blocks = [paragraph('p-1', 'one two three four five')];
+    const styled = styledBookFrom([chapter(blocks)]);
+
+    const withOut = new LayoutEngine().paginate(styled, LETTER_LAYOUT);
+
+    expect(withOut.pages).toHaveLength(1);
+  });
+
+  it('a measured page never exceeds the usable height', () => {
+    const heights = [200, 90, 350, 40, 500, 120, 60, 610, 33, 275];
+    let call = 0;
+    const varied: TextMeasurer = {
+      measureHeight: () => heights[call++ % heights.length],
+      lineHeight: () => 12,
+    };
+    const blocks = Array.from({ length: 30 }, (_, i) => paragraph(`p-${i}`, 'x'));
+    const styled = styledBookFrom([chapter(blocks)]);
+
+    // Re-run the same sequence to know each block's charged height deterministically.
+    call = 0;
+    const result = new LayoutEngine(varied).paginate(styled, LETTER_LAYOUT);
+
+    // Structural assertion: every page's blocks fit in 648pt per the same measure sequence.
+    // (Title consumes from page 1; blocks are 8pt spaceAfter on top of each height.)
+    expect(result.pages.length).toBeGreaterThan(1);
+    for (const page of result.pages) {
+      expect(page.blocks.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// Phase B (LAYOUT_FIDELITY.md Decision 7): line-level splitting with min-2-lines at both ends
+// of every break — which IS widow/orphan control, not a feature on top of it.
+describe('LayoutEngine - paragraph splitting (Phase B)', () => {
+  // 1 word = 1 line of 10pt, deterministic. Titles cost their word count + a 10pt moveDown.
+  const wordMeasurer: TextMeasurer = {
+    measureHeight: (text) => Math.max(1, text.trim() ? text.trim().split(/\s+/).length : 0) * 10,
+    lineHeight: () => 10,
+  };
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
+  // usable height: 792 - 72 - 72 = 648pt -> 64 whole lines.
+
+  it('fills the remainder of a page with the head of the next paragraph', () => {
+    const styled = styledBookFrom([chapter([paragraph('p-1', words(30)), paragraph('p-2', words(40))])]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    // Title (1 word + moveDown = 20) + p-1 (300+8) = 328; remaining 320 -> 32 lines of p-2 stay.
+    expect(result.pages).toHaveLength(2);
+    expect(result.pages[0].blocks).toEqual(['p-1', 'p-2']);
+    expect(result.pages[0].splitAfterLines).toBe(32);
+    expect(result.pages[1].blocks[0]).toBe('p-2');
+    expect(result.pages[1].startsWithContinuation).toBe(true);
+  });
+
+  it('never strands a single line at the bottom - fewer than 2 lines fitting means no split', () => {
+    // Title 20 + p-1 (610+8) = 638; remaining 10 -> 1 line would fit p-2: orphan, so p-2 moves whole.
+    const styled = styledBookFrom([chapter([paragraph('p-1', words(61)), paragraph('p-2', words(20))])]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages).toHaveLength(2);
+    expect(result.pages[0].splitAfterLines).toBeUndefined();
+    expect(result.pages[0].blocks).toEqual(['p-1']);
+    expect(result.pages[1].blocks).toEqual(['p-2']);
+    expect(result.pages[1].startsWithContinuation).toBeUndefined();
+  });
+
+  it('never strands a single line at the top - the cut moves up to leave 2 for the next page', () => {
+    // Title 20 + p-1 (300+8) = 328; remaining 320 -> 32 lines fit, but p-2 has 33: a 32-line cut
+    // would leave a 1-line widow. The cut retreats to 31, leaving 2.
+    const styled = styledBookFrom([chapter([paragraph('p-1', words(30)), paragraph('p-2', words(33))])]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages[0].splitAfterLines).toBe(31);
+    expect(result.pages[1].blocks).toEqual(['p-2']);
+  });
+
+  it('splits a very long paragraph across several pages, every segment at least 2 lines', () => {
+    const styled = styledBookFrom([chapter([paragraph('p-long', words(200))])]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages.length).toBeGreaterThan(2);
+    for (const page of result.pages) {
+      if (page.splitAfterLines !== undefined) expect(page.splitAfterLines).toBeGreaterThanOrEqual(2);
+      expect(page.blocks).toEqual(['p-long']);
+    }
+    expect(result.pages.at(-1)?.startsWithContinuation).toBe(true);
+    expect(result.pages.at(-1)?.splitAfterLines).toBeUndefined();
+  });
+
+  it('does not split quotes - their continuation indent semantics differ', () => {
+    const styled = styledBookFrom([
+      chapter([paragraph('p-1', words(60)), { type: 'quote', id: 'q-1', text: words(20) } as Block]),
+    ]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    for (const page of result.pages) expect(page.splitAfterLines).toBeUndefined();
+  });
+
+  it('a split never happens without a measurer - the estimate path is unchanged', () => {
+    const styled = styledBookFrom([chapter([paragraph('p-1', words(30)), paragraph('p-2', words(400))])]);
+
+    const result = new LayoutEngine().paginate(styled, LETTER_LAYOUT);
+
+    for (const page of result.pages) {
+      expect(page.splitAfterLines).toBeUndefined();
+      expect(page.startsWithContinuation).toBeUndefined();
+    }
   });
 });

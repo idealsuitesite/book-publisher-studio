@@ -13,15 +13,16 @@ import {
   Footer,
   PageNumber,
   AlignmentType,
+  PageBreak,
   type ISectionOptions,
   type IStylesOptions,
   type ParagraphChild,
 } from 'docx';
-import type { Renderer, RenderContext } from '../../domain/ports/Renderer';
+import type { Renderer, RenderContext, RenderResult } from '../../domain/ports/Renderer';
 import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
-import type { Content, Block, Chapter, Section, TOCEntry } from '../../domain/models/Book';
+import type { Content, Block, Chapter, Section, TOCEntry, FrontMatter } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 
@@ -185,6 +186,57 @@ function buildHeaderFooter(book: PaginatedBook): { headers?: ISectionOptions['he
 // text extraction (this project's Real Export Policy, docs/DEVELOPMENT_WORKFLOW.md) the same way every other
 // renderer output already is; consistency with PDFRenderer's own literal-paragraph approach was
 // also preferred over introducing a second rendering strategy for the same data.
+/**
+ * Front matter as real DOCX paragraphs, each page ended by a page break so the title page,
+ * copyright page and body start on their own sheets — exactly as a printed book does.
+ *
+ * `Book.frontMatter` was typed in Sprint 1 and rendered by nothing but `toc`, so every exported
+ * DOCX opened on Chapter 1 with no title page, copyright or ISBN.
+ */
+function buildFrontMatterParagraphs(front: FrontMatter, theme: Theme): Paragraph[] {
+  const paragraphs: Paragraph[] = [];
+
+  if (front.titlePage) {
+    const { title, subtitle, tagline, author } = front.titlePage;
+    paragraphs.push(
+      new Paragraph({ spacing: { before: 2400, after: 240 }, alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: title, font: theme.fonts.heading, size: 64, bold: true })] })
+    );
+    if (subtitle) {
+      paragraphs.push(new Paragraph({ spacing: { after: 240 }, alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: subtitle, font: theme.fonts.heading, size: 32, italics: true })] }));
+    }
+    if (tagline) {
+      paragraphs.push(new Paragraph({ spacing: { after: 480 }, alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: tagline, font: theme.fonts.body, size: 22, italics: true })] }));
+    }
+    paragraphs.push(new Paragraph({ spacing: { before: 2400 }, alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: author, font: theme.fonts.body, size: 28 })] }));
+    paragraphs.push(new Paragraph({ children: [new PageBreak()] }));
+  }
+
+  if (front.copyrightPage) {
+    const page = front.copyrightPage;
+    // Every line is conditional: an empty "ISBN:" label reads as authored and wrong.
+    const lines = [
+      page.text,
+      page.copyrightText && page.copyrightText !== page.text ? page.copyrightText : undefined,
+      page.legalNotice,
+      page.isbn ? `ISBN: ${page.isbn}` : undefined,
+      page.printingInfo,
+    ].filter((line): line is string => Boolean(line));
+
+    paragraphs.push(new Paragraph({ spacing: { before: 6000 }, children: [] }));
+    for (const line of lines) {
+      paragraphs.push(new Paragraph({ spacing: { after: 60 },
+        children: [new TextRun({ text: line, font: theme.fonts.body, size: 18 })] }));
+    }
+    paragraphs.push(new Paragraph({ children: [new PageBreak()] }));
+  }
+
+  return paragraphs;
+}
+
 function buildTableOfContentsParagraphs(entries: TOCEntry[], theme: Theme): Paragraph[] {
   const paragraphs: Paragraph[] = [
     new Paragraph({ heading: HeadingLevel.HEADING_1, text: 'Table of Contents' }),
@@ -204,15 +256,23 @@ function buildTableOfContentsParagraphs(entries: TOCEntry[], theme: Theme): Para
 }
 
 export class DOCXRenderer implements Renderer<Buffer> {
-  async render(book: PaginatedBook, _context: RenderContext): Promise<Buffer> {
+  async render(book: PaginatedBook, _context: RenderContext): Promise<RenderResult<Buffer>> {
     const pageStarts = new Map<string, Page>();
     for (const page of book.pages.slice(1)) {
+      // Phase B: a continuation page's first block is the tail of a split paragraph. Word
+      // reflows text itself, so the whole paragraph lives at its start - forcing a page break
+      // here would break it at its FIRST character, which is exactly wrong.
+      if (page.startsWithContinuation) continue;
       const firstId = page.blocks[0];
       if (firstId) pageStarts.set(firstId, page);
     }
 
     const tocEntries = book.tableOfContents ?? [];
-    const children: (Paragraph | Table)[] = tocEntries.length > 0 ? buildTableOfContentsParagraphs(tocEntries, book.styledBook.theme) : [];
+    // Front matter first, then the TOC, then the body - real print order.
+    const children: (Paragraph | Table)[] = [
+      ...buildFrontMatterParagraphs(book.styledBook.book.frontMatter, book.styledBook.theme),
+      ...(tocEntries.length > 0 ? buildTableOfContentsParagraphs(tocEntries, book.styledBook.theme) : []),
+    ];
     this.renderContent(
       book.styledBook.book.mainContent,
       book.styledBook.blockStyles,
@@ -253,7 +313,10 @@ export class DOCXRenderer implements Renderer<Buffer> {
       sections: [section],
     });
 
-    return Packer.toBuffer(doc);
+    // No pageCount: DOCX carries no pagination of its own - Word repaginates on open, against
+    // the reader's own fonts and printer metrics. Reporting a number here would be inventing
+    // one, and PageCountRule's honest PAGE_COUNT_UNKNOWN is the correct outcome (ADR-0045).
+    return { output: await Packer.toBuffer(doc), metrics: { pageLayout: book.pageLayout } };
   }
 
   private renderContent(

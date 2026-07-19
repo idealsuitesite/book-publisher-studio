@@ -103,13 +103,14 @@ describe('POST /api/manuscripts/export', () => {
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
 
-  it('returns 400 for a corrupted DOCX', async () => {
+  it('returns 422 IMPORT_PARSE_FAILED for a corrupted DOCX (ADR-0049)', async () => {
     const response = await request(app)
       .post('/api/manuscripts/export')
       .field('theme', 'classic')
       .attach('file', Buffer.from('not a docx'), 'bad.docx');
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(422);
+    expect(response.body.code).toBe('IMPORT_PARSE_FAILED');
   });
 
   it('returns 200 with a valid PDF when format=pdf', async () => {

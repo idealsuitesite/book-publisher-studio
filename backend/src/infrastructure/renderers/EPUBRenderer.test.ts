@@ -73,7 +73,7 @@ describe('EPUBRenderer', () => {
   it('produces a valid EPUB3 zip (mimetype first & uncompressed, OPF declares version 3.0)', async () => {
     const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
 
     const zip = await JSZip.loadAsync(buffer);
     const entryOrder = Object.keys(zip.files);
@@ -88,7 +88,7 @@ describe('EPUBRenderer', () => {
   it('includes chapter titles and paragraph text', async () => {
     const paginated = paginate([chapter([paragraph('p-1', 'Hello world.')], { title: 'My Chapter' })]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const html = await extractChapterHtml(buffer);
 
     expect(html).toContain('My Chapter');
@@ -99,7 +99,7 @@ describe('EPUBRenderer', () => {
     const table: Table = { type: 'table', id: 't-1', headers: ['Name'], rows: [['Alexandre']] };
     const paginated = paginate([chapter([table])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const html = await extractChapterHtml(buffer);
 
     expect(html).toContain('<table>');
@@ -111,7 +111,7 @@ describe('EPUBRenderer', () => {
     const nested = section([paragraph('p-2', 'Nested section text.')], { title: 'A Section', level: 2 });
     const paginated = paginate([chapter([paragraph('p-1', 'Top text.')], { title: 'Chapter One', sections: [nested] })]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const html = await extractChapterHtml(buffer);
 
     expect(html).toContain('<h1>Chapter One</h1>');
@@ -129,7 +129,7 @@ describe('EPUBRenderer', () => {
     const preamble = section([paragraph('p-1', 'Preamble text with no chapter wrapper.')], { title: '' });
     const paginated = paginate([preamble]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const html = await extractChapterHtml(buffer);
 
     expect(html).toContain('Preamble text with no chapter wrapper.');
@@ -139,7 +139,7 @@ describe('EPUBRenderer', () => {
     const image: Image = { type: 'image', id: 'img-1', url: 'https://example.com/a.png', caption: 'A cover' };
     const paginated = paginate([chapter([image])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const html = await extractChapterHtml(buffer);
 
     expect(html).toContain('A cover');
@@ -153,7 +153,7 @@ describe('EPUBRenderer', () => {
     const image: Image = { type: 'image', id: 'img-1', url: 'https://example.com/a.png', base64 };
     const paginated = paginate([chapter([image])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
 
     const zip = await JSZip.loadAsync(buffer);
     const imageFiles = Object.keys(zip.files).filter((f) => /\.png$/i.test(f));
@@ -177,7 +177,7 @@ describe('EPUBRenderer', () => {
     ];
     const paginated = paginateWithTypography([chapter([paragraph('p-1', 'ignored when inlines present', inlines)])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const html = await extractChapterHtml(buffer);
 
     expect(html).toContain('<strong>bold </strong>');
@@ -193,7 +193,7 @@ describe('EPUBRenderer', () => {
     const quote: Quote = { type: 'quote', id: 'q-1', text: 'A quoted line.' };
     const paginated = paginateWithTypography([chapter([quote])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const html = await extractChapterHtml(buffer);
 
     expect(html).toContain('<blockquote><em>A quoted line.</em></blockquote>');
@@ -204,7 +204,7 @@ describe('EPUBRenderer', () => {
     const list: List = { type: 'list', id: 'l-1', ordered: false, items: ['ignored', 'ignored'], inlines: inlinesPerItem };
     const paginated = paginateWithTypography([chapter([list])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const html = await extractChapterHtml(buffer);
 
     expect(html).toContain('<li>First</li>');
@@ -215,7 +215,7 @@ describe('EPUBRenderer', () => {
     const para: Paragraph = { type: 'paragraph', id: 'p-1', text: 'Once upon a time.', dropCap: true };
     const paginated = paginateWithTypography([chapter([para])]);
 
-    const buffer = await renderer.render(paginated, {});
+    const buffer = (await renderer.render(paginated, {})).output;
     const html = await extractChapterHtml(buffer);
 
     expect(html).toContain('<span class="dropcap">O</span>nce upon a time.');

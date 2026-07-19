@@ -1,5 +1,17 @@
 import type { Book, ValidationResult, ValidationError } from '../models/Book';
 import { isChapter } from '../models/Book';
+import { countBookWords } from './countBookWords';
+
+/**
+ * Below this many words, a chapterless single-flow document (an essay, a corporate report, an
+ * article) is a legitimate editorial choice; above it, a book-length manuscript with ZERO
+ * detected chapters almost certainly means the source styled its headings visually (bold,
+ * size) instead of Word's semantic Heading styles, and the import silently found no structure
+ * (ADR-0049, IMPORT_FIDELITY.md §1 — reproduced on a real manuscript). ONE named constant by
+ * CTO direction: a candidate `ValidationProfile` parameter later, never a scattered magic
+ * number.
+ */
+export const UNSTRUCTURED_WORD_THRESHOLD = 2000;
 
 export class BookValidator {
   validate(book: Book): ValidationResult {
@@ -44,6 +56,25 @@ export class BookValidator {
         location: 'mainContent',
       });
       return errors;
+    }
+
+    // ADR-0049: "no structure detected" is a real, nameable state — before this check, a
+    // book-length manuscript whose every paragraph landed in one anonymous section scored
+    // structure 100/100 and nobody said a word (IMPORT_FIDELITY.md §2.3). ERROR severity,
+    // but import remains explorable (ValidationEngine.EXPLORABLE_ERROR_CODES): the author
+    // needs the project, the Proof and the Structure station to understand the problem.
+    const chapterCount = book.mainContent.filter(isChapter).length;
+    if (chapterCount === 0) {
+      const words = countBookWords(book);
+      if (words > UNSTRUCTURED_WORD_THRESHOLD) {
+        errors.push({
+          code: 'UNSTRUCTURED_MANUSCRIPT',
+          message: `No chapters were detected in a ${words.toLocaleString('en-US')}-word manuscript`,
+          location: 'mainContent',
+          suggestion:
+            'Apply the Word "Heading 1" style to chapter titles in the source document and import again',
+        });
+      }
     }
 
     const seenChapterNumbers = new Set<number>();

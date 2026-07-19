@@ -9,3 +9,4 @@ uploads/*
 spikes/output/
 verification/output/
 ~$*.docx
+data/

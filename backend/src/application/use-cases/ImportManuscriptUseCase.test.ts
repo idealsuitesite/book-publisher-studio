@@ -9,6 +9,8 @@ import { MammothParser } from '../../infrastructure/parsers/MammothParser';
 import { buildTestDocxBuffer } from '../../test-utils/buildTestDocx';
 import type { DocumentParser } from '../../domain/ports/DocumentParser';
 import type { ChapterDTO } from '../dto/ChapterDTO';
+import { ProjectService } from '../../domain/services/ProjectService';
+import { InMemoryProjectRepository } from '../../infrastructure/repositories/InMemoryProjectRepository';
 
 class StubParser implements DocumentParser {
   constructor(private html: string) {}
@@ -149,7 +151,11 @@ describe('ImportManuscriptUseCase', () => {
         mimeType: 'x',
       });
 
-      expect(response.book.metadata.title).toBe('my-manuscript.docx');
+      // The extension is stripped: a DOCX rarely carries its own title, so the filename stands
+      // in, and once front matter started rendering a title page reading "my-manuscript.docx"
+      // was visibly wrong. Only the extension goes — underscores and casing are left alone,
+      // since inferring an author's intended punctuation produces confident nonsense.
+      expect(response.book.metadata.title).toBe('my-manuscript');
     });
 
     it('compte correctement les chapitres', async () => {
@@ -218,6 +224,124 @@ describe('ImportManuscriptUseCase', () => {
 
       expect(chapter.type).toBe('chapter');
       expect(chapter.sections?.[0].title).toBe('Section A');
+    });
+  });
+
+  // Sprint 9 detour (PRODUCT_OBJECT_MODEL.md): a successful import IS the creation of a project.
+  describe('Project creation (ADR-0047)', () => {
+    const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    function buildProjectAwareUseCase(repository: InMemoryProjectRepository) {
+      let n = 0;
+      return new ImportManuscriptUseCase(
+        new MammothParser(),
+        new HtmlNormalizer(),
+        new ASTBuilder(),
+        createValidationEngine(),
+        new BookMetricsCalculator(),
+        new BookMapper(),
+        new ProjectService(() => `id-${++n}`),
+        repository
+      );
+    }
+
+    it('creates a project around a successful import and returns its id', async () => {
+      const repository = new InMemoryProjectRepository();
+      const useCase = buildProjectAwareUseCase(repository);
+      const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });
+
+      const response = await useCase.execute({
+        buffer,
+        filename: 'Le Guide de Jean.docx',
+        mimeType: DOCX_MIME,
+      });
+
+      expect(response.projectId).toBeDefined();
+      const project = await repository.findById(response.projectId!);
+      expect(project?.name).toBe(project?.book.metadata.title);
+    });
+
+    it('retains the original upload as the source asset, byte for byte', async () => {
+      const repository = new InMemoryProjectRepository();
+      const useCase = buildProjectAwareUseCase(repository);
+      const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });
+
+      const response = await useCase.execute({
+        buffer,
+        filename: 'Le Guide de Jean.docx',
+        mimeType: DOCX_MIME,
+      });
+
+      const project = await repository.findById(response.projectId!);
+      const source = project?.assets.find((a) => a.id === project.sourceAssetId);
+      expect(source?.kind).toBe('source');
+      expect(source?.filename).toBe('Le Guide de Jean.docx');
+      // Byte-for-byte: this is what lets a future importer fix re-read existing work
+      // (AGGREGATES_AND_PERSISTENCE.md Question 5 - import is lossy today).
+      expect(source?.data?.equals(buffer)).toBe(true);
+    });
+
+    it('creates NO project for a rejected import - a library of orphaned failures helps nobody', async () => {
+      const repository = new InMemoryProjectRepository();
+      const useCase = buildProjectAwareUseCase(repository);
+      const buffer = await buildTestDocxBuffer({}); // empty book -> status 'error'
+
+      const response = await useCase.execute({ buffer, filename: 'empty.docx', mimeType: DOCX_MIME });
+
+      expect(response.report.status).toBe('error');
+      expect(response.projectId).toBeUndefined();
+      expect(await repository.list()).toEqual([]);
+    });
+
+    it('still imports normally when no project collaborators are wired - existing callers unaffected', async () => {
+      const useCase = buildUseCase(); // the original 6-argument construction
+      const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });
+
+      const response = await useCase.execute({ buffer, filename: 'm.docx', mimeType: DOCX_MIME });
+
+      expect(response.report.status).toBe('success');
+      expect(response.projectId).toBeUndefined();
+    });
+  });
+
+  // ADR-0049 - the CTO's Q1 decision: UNSTRUCTURED_MANUSCRIPT is an ERROR, but the import
+  // still succeeds and still creates the project. Rejecting would destroy the very evidence
+  // (Proof, Structure station) the author needs to understand the problem.
+  describe('unstructured manuscripts stay explorable (ADR-0049)', () => {
+    const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    it('imports a book-length manuscript with no headings: success, project created, error named', async () => {
+      const paragraphs = Array.from({ length: 30 }, () => `<p>${'word '.repeat(100).trim()}.</p>`);
+      const repository = new InMemoryProjectRepository();
+      let n = 0;
+      const useCase = new ImportManuscriptUseCase(
+        new StubParser(paragraphs.join('')),
+        new HtmlNormalizer(),
+        new ASTBuilder(),
+        createValidationEngine(),
+        new BookMetricsCalculator(),
+        new BookMapper(),
+        new ProjectService(() => `id-${++n}`),
+        repository
+      );
+
+      const response = await useCase.execute({ buffer: Buffer.from('x'), filename: 'notes.docx', mimeType: DOCX_MIME });
+
+      expect(response.report.status).toBe('success');
+      expect(response.projectId).toBeDefined();
+      expect(response.report.statistics.chapters).toBe(0);
+      const issue = response.report.issues.find((i) => i.code === 'UNSTRUCTURED_MANUSCRIPT');
+      expect(issue?.severity).toBe('ERROR');
+      expect(response.report.score.categories.structure).toBeLessThan(100);
+    });
+
+    it('surfaces a dropped empty heading as an import-time warning', async () => {
+      const useCase = buildUseCase(new StubParser('<h1>One</h1><p>Text.</p><h1></h1><h1>Two</h1><p>More.</p>'));
+
+      const response = await useCase.execute({ buffer: Buffer.from('x'), filename: 'book.docx', mimeType: DOCX_MIME });
+
+      expect(response.report.warnings.some((w) => w.includes('empty Heading 1'))).toBe(true);
+      expect(response.report.issues.some((i) => i.code === 'EMPTY_HEADING_DROPPED' && i.severity === 'WARNING')).toBe(true);
     });
   });
 });
