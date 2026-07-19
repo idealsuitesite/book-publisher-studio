@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 18, 2026 (Sprint 8 "Publishing Engine" released as `v0.9.0-alpha`; Sprint 9 Design Review drafted round 1, not yet approved)
+**Last Updated:** July 21, 2026 — everything merged to `main` (PR #14 Sprints 9-11 + Import Fidelity; PR #15 Render Drift). Last tag `v0.9.0-alpha`. **Next: the CTO opens the `docs/PUBLICATION_QUALITY_BAR.md` calibration review** (its gate — both fidelity defects fixed AND verified in the real harnesses — is met). See `docs/CURRENT_STATE.md`'s executive brief for full context.
 
 ---
 
@@ -12,7 +12,7 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-**RENDER DRIFT — ✅ FIXED on `feature/render-drift` (2026-07-21): 55 → 3 observable reconciliations, 284 → 246 pages, ADR-0050/0051 written, parity test locks the numbers.** Next: merge + verify (closes CTO sequence step 2), then open the PUBLICATION_QUALITY_BAR calibration review with real corpus data.
+**RENDER DRIFT — ✅ FIXED AND MERGED to main via PR #15 (2026-07-21): 55 → 3 observable reconciliations, 284 → 246 pages, ADR-0050/0051 written, parity test locks the numbers, full gate re-confirmed on main.** CTO sequence step 2 is closed; step 3 — the PUBLICATION_QUALITY_BAR calibration review with real corpus data — is unblocked and awaits the CTO opening it.
 
 **IMPORT FIDELITY — ✅ MERGED to main via PR #14 (2026-07-21), full gate re-confirmed on main.** ADR-0049; freeze on Validation-evolution/Editorial-AI/Layout stays until the CTO merges. `RENDER_DRIFT.md` diagnostic delivered (renderer/model coordination defect, fix NOT authorized — awaiting CTO verdict on its §5). `docs/PUBLICATION_QUALITY_BAR.md` (CTO spec) queued behind both gates. See `docs/CURRENT_STATE.md`.
 
