@@ -137,12 +137,6 @@ async function main() {
         const isBoundary =
           i === pages.length - 1 || (next !== undefined && next.blocks[0] !== undefined && contentFirstBlocks.has(next.blocks[0]));
         if (isBoundary) under30Boundary++;
-        else if (name === 'letter') {
-          const nb = next?.blocks[0];
-          console.log(
-            `   NONBOUNDARY p${page.number} fill ${(100 * fill).toFixed(0)}% blocks=[${page.blocks.join(',')}] split=${page.splitAfterLines ?? '-'} cont=${page.startsWithContinuation ?? false} | next first=${nb} nextCont=${next?.startsWithContinuation ?? false}`
-          );
-        }
       }
     }
 

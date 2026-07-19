@@ -54,7 +54,7 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 | 0048 | Sprint 7 Decision 2 Formally Amended — the Backend Is Stateful and Durable | 2026-07-20 | Architecture, Persistence, Governance | APPROVED — discharges ADR-0041 Constraint 2 |
 | 0049 | An Importer That Finds No Structure Must Say So — Explorable Errors and Normalization Diagnostics | 2026-07-20 | Import, Validation, Governance | APPROVED — IMPORT_FIDELITY commit 1 |
 | 0050 | Fidelity Is the Product | 2026-07-20 | Governance, Product | APPROVED — CTO-directed standing principle |
-| 0051 | The Renderer Never Breaks a Page on Its Own Initiative | 2026-07-20 | Rendering, Governance | APPROVED — implemented with RENDER_DRIFT fixes |
+| 0051 | The Renderer Never Breaks a Page on Its Own Initiative | 2026-07-20 | Rendering, Governance | APPROVED — implemented with RENDER_DRIFT fixes; annex 2026-07-21 records the 7th real-fixture bug (ghost pages, found by the quality-bar calibration) |
 
 ## By category
 

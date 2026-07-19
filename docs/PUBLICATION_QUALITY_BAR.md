@@ -135,7 +135,9 @@ This document does not authorize any code. It exists so that step 3 can start im
 
 ## 10. Calibration round 1 — measured data and proposed values (2026-07-21, appended annotation)
 
-*Appended per the CTO's feu vert and its strict framing: this section derives replacements for §8's provisional values from real corpus data. It touches nothing above; the scope stays as written. Values below are PROPOSED until the CTO locks them. Instrument: `backend/spikes/quality-bar-calibration-spike.ts` (committed, rerunnable).*
+*Appended per the CTO's feu vert and its strict framing: this section derives replacements for §8's provisional values from real corpus data. It touches nothing above; the scope stays as written. Instrument: `backend/spikes/quality-bar-calibration-spike.ts` (committed, rerunnable).*
+
+**🔒 LOCKED (CTO verdict, 2026-07-21).** All four §10.3 values are adopted, with one formal amendment on value 1: **the ±8% page-ratio tolerance carries a re-evaluation condition — it must be re-derived as soon as the corpus reaches at least 3 manuscripts of varied structure** (chapter count, density, mixed formats). That condition lives as a NAMED follow-up item in `docs/TODO.md`, not only as this sentence, so that growing the corpus cannot silently outlive the number it was supposed to recalibrate. This lock closes the pagination/structure subset only (§5 criterion 5, §7); the DOCX/EPUB/color/font/link criteria still await the future `verify-publication-quality` harness (§9 step 3), and no frozen engine is unblocked by it.
 
 ### 10.1 The measurement found one more defect first
 
