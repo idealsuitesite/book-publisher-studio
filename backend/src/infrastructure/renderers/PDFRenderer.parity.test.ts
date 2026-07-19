@@ -43,9 +43,14 @@ describe('PDFRenderer — drift parity on the real corpus (ADR-0051)', () => {
 
     const result = await new PDFRenderer().render(paginated, { language: 'en' });
 
-    expect(result.metrics.unplannedPageBreaks).toBe(3);
-    expect(result.metrics.pageCount).toBe(246);
+    // Updated CONSCIOUSLY (as this file's contract demands) after the calibration spike
+    // found and fixed a JS evaluation-order bug in the title keep-with-next flush
+    // (`currentHeight += f()` read the left operand before f()'s flush zeroed it): ghost
+    // near-full pages at section boundaries are gone, one of the three reconciliations
+    // was downstream of one, and the counts dropped accordingly.
+    expect(result.metrics.unplannedPageBreaks).toBe(2);
+    expect(result.metrics.pageCount).toBe(238);
     // The model's own count stays the anchor the renderer answers to.
-    expect(paginated.pages.length).toBe(241);
+    expect(paginated.pages.length).toBe(234);
   }, 120_000);
 });

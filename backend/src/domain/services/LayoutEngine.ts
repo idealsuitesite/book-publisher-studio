@@ -268,7 +268,15 @@ export class LayoutEngine {
           // The title is drawn (and priced) immediately before this content's first block —
           // after the chapter's own page break, in the flow for sections; kept with its
           // content when the page is nearly spent (flushBeforeTitleIfOrphaned's invariant).
-          if (isFirstBlock) currentHeight += flushBeforeTitleIfOrphaned(content, block);
+          if (isFirstBlock) {
+            // Two statements ON PURPOSE: `currentHeight += f()` reads the LEFT operand BEFORE
+            // the call, so the flush inside f() (which zeroes currentHeight) was being
+            // overwritten with the pre-flush value — a JS evaluation-order trap that produced
+            // a ghost near-full page at every section boundary (found by the calibration
+            // spike's fill distribution, of all things).
+            const titleHeight = flushBeforeTitleIfOrphaned(content, block);
+            currentHeight += titleHeight;
+          }
           addBlock(block, false);
           isFirstBlock = false;
         }

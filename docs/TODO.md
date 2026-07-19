@@ -10,6 +10,12 @@ None currently.
 
 ---
 
+## 📌 NAMED FOLLOW-UPS (standing conditions, not sprint tasks)
+
+- **`RECALIBRATE_PAGE_RATIO_TOLERANCE`** — CTO lock condition on PUBLICATION_QUALITY_BAR §10.3 value 1 (2026-07-21): the ±8% page-ratio tolerance was derived from a single book-length manuscript and **must be re-derived the moment `backend/verification/corpus/` reaches ≥3 manuscripts of varied structure** (chapter count, density, mixed formats). Whoever adds the second and third corpus fixtures owns triggering this. Instrument already exists: `npx tsx backend/spikes/quality-bar-calibration-spike.ts`.
+
+---
+
 ## 🟡 IN PROGRESS
 
 **RENDER DRIFT — ✅ FIXED AND MERGED to main via PR #15 (2026-07-21): 55 → 3 observable reconciliations, 284 → 246 pages, ADR-0050/0051 written, parity test locks the numbers, full gate re-confirmed on main.** CTO sequence step 2 is closed; step 3 — the PUBLICATION_QUALITY_BAR calibration review with real corpus data — is unblocked and awaits the CTO opening it.
