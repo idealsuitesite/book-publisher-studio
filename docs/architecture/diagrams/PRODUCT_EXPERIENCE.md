@@ -1,6 +1,6 @@
 # Product Experience 1.0 — Design Review
 
-**Status:** 🟡 **ROUND 1 — DRAFT. Not approved. Zero code before CTO validation — the CTO's own gate: "Aucun code ne doit être écrit avant la validation de cette revue."**
+**Status:** 🔵 **ROUND 2 — ARCHITECTURALLY APPROVED (CTO, 2026-07-19: "La revue est approuvée sur le plan architectural… le centre du logiciel est désormais clairement le livre"). Development remains gated on ONE more review: `VISUAL_LANGUAGE.md` (the identity — the CTO's "dernière itération consacrée au langage visuel"). §10 below folds in the CTO's round-2 additions. Zero code until VISUAL_LANGUAGE is validated.**
 **Date:** 2026-07-19
 **Trigger:** the CTO's product verdict after the studio shipped: *"Vous êtes en train de construire un excellent moteur. Vous n'êtes pas encore en train de construire un logiciel Premium."* Backend 9.8, Domain 9.7, PDF engine 9.5, code 9.8 — **UI/UX Premium 5.5, Expérience 5, Produit 6.** The engine is far ahead of its interface. This review designs the product itself: not UI, not CSS, not components — the software.
 
@@ -233,6 +233,49 @@ Each phase: full baseline recapture (restyle window open by CTO order), axe re-b
 | 8 | La puissance invisible | §0 P4, §2.6, §4.3 thumbnails, living preview |
 | 9 | Couleurs de dev-tool | §3.3 |
 | 10 | Pas de hiérarchie visuelle | §3.1 five weights |
+
+## 10. Round 2 — the CTO's additions, adopted
+
+### 10.1 Daily Author Workflow — the missing 95%
+
+The CTO is right that the review over-weighted the ship-path (import → validate → publish) and under-weighted where an author actually lives: *reprendre, chercher, corriger, changer, prévisualiser*. The daily loop, now first-class:
+
+```
+Open studio → last project resumes WHERE THE AUTHOR LEFT IT (view + Explorer selection persisted)
+   → the dashboard's "what changed / next action" orients in 5 seconds
+   → find: Ctrl+K palette or Explorer search jumps to any chapter/image/finding by name
+   → fix: finding → deep-link → (editing surfaces as they land) → proof re-inks itself
+   → leave: nothing to save, nothing to close — the studio remembers.
+```
+
+Requirements this creates: **per-project UI state persisted** (view, selection, scroll — client-side now, project-attached at S11), **Explorer filter/search**, and **resume-where-left** as a hard P1 behavior. The 6-month author (§5) is this loop, iterated.
+
+### 10.2 The engine becomes helpful, not just visible — actionable findings
+
+Every finding gains the CTO's three-part shape: **consequence · action · destination.**
+`ISBN absent` → **"Cannot publish to Amazon — an ISBN is required. → Add ISBN (opens Metadata)."**
+Contract: validation findings carry an `action` (label + deep-link); the UI never shows a bare defect again. "Corriger automatiquement ?" is admitted only where a fix is genuinely mechanical and reversible — none qualify **today** (honest), and the first candidates (e.g. margin presets) will each name themselves in their own commits. This contract is also the Editorial AI's future socket (S18) — the AI will *propose into* this shape, not invent a new one.
+
+### 10.3 Expert hands — shortcuts and the command palette
+
+Keyboard-first, P1: **Ctrl+K** command palette (actions + objects: chapters, findings, versions — the Radix Dialog's starring role), **Ctrl+1..6** views, **Ctrl+P** Proof, **Ctrl+E** Editions, **Ctrl+Shift+P** Publish, **Ctrl+H** History, `?` shortcut sheet. Every palette entry is a real action — the palette is generated from the same registry the menus use, so it can never lie.
+
+### 10.4 Header v3 — the room's state at a glance
+`Faith Alone · ● Saved · v12 · ⚠ Ready for Print (2) · Exported 2 min ago · [Editions] [Publish]` — readiness and last-export join the header as ambient truth. Nothing opens; everything is known.
+
+### 10.5 Timeline at working granularity
+History narrates the session, not just the milestones: settings changes, proofs, editions, checks — timestamped to the minute. Requires a real **project event log** (Domain: append-only `ProjectEvent`, written by the actions themselves) — designed with S11/S12 persistence so history survives restarts; until then the timeline shows what the aggregate already knows (import, versions, publications) *without faking the rest*.
+
+### 10.6 Explorer, deepened — the living inventory
+Counts the AST already holds, now surfaced: chapters, **citations (quote/scripture blocks), footnotes, tables, images** under Structure; an **Assets** group (fonts actually embedded — real from the theme registry; images; the source manuscript). The Explorer becomes the place where the author *sees their book's body*.
+
+### 10.7 Theme architecture, complete — with one honest resident
+Full gallery architecture in P2 (cards, real engine-rendered thumbnails, selection, per-theme Inspector facts) shipping with Classic alone — plus an explicit, *designed* empty slot: "More themes are being set — Classic is the first." The architecture invites; the content backlog (Elegant, Novel, Academic…) is scheduled as design work (Q-C), never mocked.
+
+### 10.8 The biggest absence, named: `EDITOR_EXPERIENCE.md`
+The editor is the future core and gets its own full review — writing surface, chapter navigation, inline styles vs theme discipline, autosave semantics, and Writing/Focus modes' final form. Scheduled to open **alongside P3**, so the premium shell and the editor's design mature together without blocking each other. Nothing editor-shaped is mocked before it.
+
+---
 
 ## Related
 
