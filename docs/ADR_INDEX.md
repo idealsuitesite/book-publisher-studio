@@ -53,17 +53,19 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 | 0047 | A Successful Import Creates a Project — Decision 2 Amended in Code | 2026-07-18 | Product Object Model, Architecture | APPROVED — CTO-directed |
 | 0048 | Sprint 7 Decision 2 Formally Amended — the Backend Is Stateful and Durable | 2026-07-20 | Architecture, Persistence, Governance | APPROVED — discharges ADR-0041 Constraint 2 |
 | 0049 | An Importer That Finds No Structure Must Say So — Explorable Errors and Normalization Diagnostics | 2026-07-20 | Import, Validation, Governance | APPROVED — IMPORT_FIDELITY commit 1 |
+| 0050 | Fidelity Is the Product | 2026-07-20 | Governance, Product | APPROVED — CTO-directed standing principle |
+| 0051 | The Renderer Never Breaks a Page on Its Own Initiative | 2026-07-20 | Rendering, Governance | APPROVED — implemented with RENDER_DRIFT fixes |
 
 ## By category
 
 - **Architecture** (core Clean Architecture / DDD rules): 0001, 0002, 0003, 0005, 0008, 0033
 - **Import pipeline**: 0004, 0009, 0011, 0025, 0026, 0049
-- **Rendering pipeline** (Theme/Typography/Layout-precursor/Renderer port/PDF/DOCX/EPUB): 0012, 0013, 0014, 0015, 0016, 0018, 0019, 0020, 0022, 0023, 0024, 0043, 0045
+- **Rendering pipeline** (Theme/Typography/Layout-precursor/Renderer port/PDF/DOCX/EPUB): 0012, 0013, 0014, 0015, 0016, 0018, 0019, 0020, 0022, 0023, 0024, 0043, 0045, 0051
 - **Validation Engine** (Sprint 5): 0027, 0028
 - **Professional Layout Engine** (Sprint 6): 0029, 0030, 0031, 0032
 - **First Demonstrable Product** (Sprint 7): 0033, 0034
 - **Publishing Engine** (Sprint 8): 0035, 0036, 0037, 0038, 0042, 0045
-- **Governance** (process, not a specific engine): 0006, 0007, 0010, 0017, 0021, 0032, 0033, 0034, 0036, 0037, 0039, 0040, 0045
+- **Governance** (process, not a specific engine): 0006, 0007, 0010, 0017, 0021, 0032, 0033, 0034, 0036, 0037, 0039, 0040, 0045, 0050, 0051
 - **UI Foundation** (Sprint 9): 0040
 - **Product Object Model / persistence**: 0044, 0046, 0047, 0048
 - **Scalability / open constraints**: ~~0038~~ (resolved by 0042), 0041, 0043

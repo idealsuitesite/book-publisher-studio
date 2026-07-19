@@ -108,7 +108,11 @@ export class PDFRenderer implements Renderer<Buffer> {
       doc.on('end', () =>
         resolve({
           output: Buffer.concat(chunks),
-          metrics: { pageCount: measured.pageCount, pageLayout: book.pageLayout },
+          metrics: {
+            pageCount: measured.pageCount,
+            pageLayout: book.pageLayout,
+            unplannedPageBreaks: reconciliation.unplannedPageBreaks,
+          },
         })
       );
       doc.on('error', (err: unknown) => reject(err instanceof Error ? err : new Error(String(err))));
@@ -163,6 +167,31 @@ export class PDFRenderer implements Renderer<Buffer> {
       // pages falls into the same pagination-estimate-drift bucket as any other overflow).
       const pageOwners: PageOwner[] = [];
 
+      // ADR-0051 (RENDER_DRIFT.md fix 2): the renderer never breaks a page on its own
+      // initiative — but PDFKit CAN, from inside doc.text() when real flow exceeds the plan.
+      // Those breaks were silent and unowned: uncounted, unlogged, and — measured, not
+      // hypothesized — they shifted every later pageOwners entry by one, misattributing
+      // running heads and page numbers for the rest of the book. Every deliberate break in
+      // this file now goes through plannedAddPage(); anything else reaching addPage() is a
+      // reconciliation event: counted into RenderMetrics, logged with its trigger block, and
+      // given an owner so header/footer attribution stays aligned even when a residual drift
+      // (e.g. bold-run wrapping, the ±1-line class) slips past the aligned charges.
+      const reconciliation = { unplannedPageBreaks: 0 };
+      const origAddPage = doc.addPage.bind(doc);
+      (doc as unknown as { addPage: () => PDFKit.PDFDocument }).addPage = () => {
+        const marker = doc as unknown as { __plannedBreak?: boolean; __currentBlockId?: string };
+        const planned = marker.__plannedBreak === true;
+        marker.__plannedBreak = false;
+        if (!planned) {
+          reconciliation.unplannedPageBreaks += 1;
+          console.warn(
+            `[PDFRenderer] unplanned page break #${reconciliation.unplannedPageBreaks} while rendering ${marker.__currentBlockId ?? 'front matter'} — real flow exceeded the plan (ADR-0051)`
+          );
+          pageOwners.push(pageOwners[pageOwners.length - 1] ?? 'blank');
+        }
+        return origAddPage();
+      };
+
       // Front matter renders first, before the TOC and body, matching real print convention:
       // half-title/title page, then copyright (traditionally on the verso), then contents.
       //
@@ -176,19 +205,19 @@ export class PDFRenderer implements Renderer<Buffer> {
       if (frontMatter.titlePage) {
         this.renderTitlePage(doc, frontMatter.titlePage, book.styledBook.theme);
         pageOwners.push('blank');
-        doc.addPage();
+        this.plannedAddPage(doc);
       }
 
       if (frontMatter.copyrightPage) {
         this.renderCopyrightPage(doc, frontMatter.copyrightPage, book.styledBook.theme);
         pageOwners.push('blank');
-        doc.addPage();
+        this.plannedAddPage(doc);
       }
 
       if (book.tableOfContents && book.tableOfContents.length > 0) {
         this.renderTableOfContents(doc, book.tableOfContents, book.styledBook.theme);
         pageOwners.push('blank');
-        doc.addPage();
+        this.plannedAddPage(doc);
       }
       pageOwners.push(book.pages[0]);
 
@@ -298,6 +327,28 @@ export class PDFRenderer implements Renderer<Buffer> {
     }
   }
 
+
+  /**
+   * Every DELIBERATE page break goes through here (ADR-0051): flags the wrapped addPage so it
+   * is not mistaken for a PDFKit-initiated overflow break. The flag lives on the doc because
+   * a renderer instance is shared across concurrent requests; the document is not.
+   */
+  private plannedAddPage(doc: PDFKit.PDFDocument): void {
+    (doc as unknown as { __plannedBreak?: boolean }).__plannedBreak = true;
+    doc.addPage();
+  }
+
+  /**
+   * Spends a block's `spaceAfter` exactly as the model charged it: FLAT POINTS. The previous
+   * `doc.moveDown(spaceAfter / fontSize)` advanced `spaceAfter × (lineHeight / fontSize)` —
+   * about +15% on every block, the dominant cause of the 55 unplanned overflow breaks
+   * (RENDER_DRIFT.md §3, fix 1: "charge what the renderer spends, or spend what the model
+   * charges" — the model's flat-point semantic is the theme's own declared meaning).
+   */
+  private spendSpaceAfter(doc: PDFKit.PDFDocument, spaceAfter: number): void {
+    doc.y += spaceAfter;
+  }
+
   private renderContent(
     doc: PDFKit.PDFDocument,
     contents: Content[],
@@ -318,12 +369,23 @@ export class PDFRenderer implements Renderer<Buffer> {
       // addPage() here is immediately followed by another with nothing drawn in between,
       // then the real content page below starts normally.
       for (let i = 0; i < (ownerPage?.blankPagesBefore ?? 0); i++) {
-        doc.addPage();
+        this.plannedAddPage(doc);
         pageOwners.push('blank');
       }
       if (ownerPage) {
-        doc.addPage();
+        this.plannedAddPage(doc);
         pageOwners.push(ownerPage);
+      }
+      // Keep-with-next (ADR-0051): a non-chapter titled content whose first block begins a
+      // planned page moved WITH its title — the model's flushBeforeTitleIfOrphaned invariant —
+      // so the break comes BEFORE the title, never stranding it at a spent page bottom.
+      if (!ownerPage && content.title && firstBlockId) {
+        const sectionStart = pageStarts.get(firstBlockId);
+        if (sectionStart) {
+          pageStarts.delete(firstBlockId);
+          this.plannedAddPage(doc);
+          pageOwners.push(sectionStart);
+        }
       }
       this.renderTitle(doc, content, theme);
 
@@ -411,6 +473,7 @@ export class PDFRenderer implements Renderer<Buffer> {
   }
 
   private renderTitle(doc: PDFKit.PDFDocument, content: Chapter | Section, theme: Theme): void {
+    (doc as unknown as { __currentBlockId?: string }).__currentBlockId = `title "${content.title.slice(0, 40)}"`;
     const level = content.type === 'chapter' ? 1 : content.level;
     const size = content.type === 'chapter' ? 24 : Math.max(12, 22 - content.level * 2);
     // Chapter/section titles are conceptually headings, so they now resolve through the
@@ -431,11 +494,12 @@ export class PDFRenderer implements Renderer<Buffer> {
     pageOwners: PageOwner[],
     splits: SplitPlan
   ): void {
+    (doc as unknown as { __currentBlockId?: string }).__currentBlockId = `${block.type} ${block.id}`;
     const ownerPage = pageStarts.get(block.id);
     if (ownerPage) {
       // Never carries blankPagesBefore - that only applies at a chapter's own opening break,
       // handled in renderContent above. This is an overflow-triggered continuation page.
-      doc.addPage();
+      this.plannedAddPage(doc);
       pageOwners.push(ownerPage);
       pageStarts.delete(block.id);
     }
@@ -455,7 +519,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         // design review §4 item 3.
         const resolveHeadingFont: FontResolver = (bold, italic) => this.fonts.resolveHeading(block.level, theme, bold, italic);
         this.renderRuns(doc, runs, resolveHeadingFont, fontSize, color, {}, undefined, true);
-        doc.moveDown(0.5);
+        this.spendSpaceAfter(doc, spaceAfter);
         return;
       }
 
@@ -466,7 +530,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         const segments = splits.segments.get(block.id);
         if (segments && !dropCap) {
           this.renderSplitRuns(doc, runs, resolveBody, fontSize, color, options, segments, splits.continuations.get(block.id) ?? [], pageOwners);
-          doc.moveDown(spaceAfter / fontSize);
+          this.spendSpaceAfter(doc, spaceAfter);
           return;
         }
         if (dropCap) {
@@ -474,7 +538,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         } else {
           this.renderRuns(doc, runs, resolveBody, fontSize, color, options);
         }
-        doc.moveDown(spaceAfter / fontSize);
+        this.spendSpaceAfter(doc, spaceAfter);
         return;
       }
 
@@ -484,7 +548,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         // (design review §4 item 9) - no block-level italic override needed here anymore.
         const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
         this.renderRuns(doc, runs, resolveBody, fontSize, color, { indent: 36 });
-        doc.moveDown(spaceAfter / fontSize);
+        this.spendSpaceAfter(doc, spaceAfter);
         return;
       }
 
@@ -494,16 +558,18 @@ export class PDFRenderer implements Renderer<Buffer> {
           const itemRuns = runsOrPlainFallback(blockTypography?.[listItemTypographyKey(block.id, index)], item);
           this.renderRuns(doc, itemRuns, resolveBody, fontSize, color, { indent: 18 }, prefix);
         });
-        doc.moveDown(spaceAfter / fontSize);
+        this.spendSpaceAfter(doc, spaceAfter);
         return;
 
       case 'table':
         this.renderTable(doc, block.headers, block.rows, theme, fontSize);
+        this.spendSpaceAfter(doc, spaceAfter);
         return;
 
       case 'footnote': {
         const runs = runsOrPlainFallback(blockTypography?.[block.id], block.content);
         this.renderRuns(doc, runs, resolveBody, Math.max(7, fontSize - 2), color, {}, `[${block.number}] `);
+        this.spendSpaceAfter(doc, spaceAfter);
         return;
       }
 
@@ -517,16 +583,15 @@ export class PDFRenderer implements Renderer<Buffer> {
           // in a renderer, same rule DOCXRenderer follows). Falls back to a text placeholder.
           doc.font(this.fonts.resolveBody(theme, false, true)).fontSize(fontSize).text(`[Image: ${block.caption ?? block.url}]`);
         }
-        doc.moveDown(0.5);
+        this.spendSpaceAfter(doc, spaceAfter);
         return;
 
       case 'page-break':
-        doc.addPage();
+        this.plannedAddPage(doc);
         return;
 
       case 'divider':
         doc.font(this.fonts.resolveBody(theme, false, false)).fontSize(fontSize).fillColor(color).text('* * *', { align: 'center' });
-        doc.moveDown(0.5);
         return;
 
       default: {
@@ -626,13 +691,16 @@ export class PDFRenderer implements Renderer<Buffer> {
     let continuationIndex = 0;
     for (const lines of segments) {
       const plain = remaining.map((run) => run.text).join('');
-      const budget = lines * lineHeight + lineHeight / 2;
+      // Float-noise epsilon only. The previous half-line slack let a segment render up to
+      // half a line taller than the model charged for it — at 149 splits per book, a steady
+      // source of end-of-page overflows PDFKit resolved on its own (ADR-0051 census).
+      const budget = lines * lineHeight + 0.5;
       const cutAt = this.charsFittingBudget(doc, plain, budget, usableWidth);
       if (cutAt <= 0 || cutAt >= plain.length) break; // drift guard: render the rest whole
 
       const [head, tail] = splitRunsAt(remaining, cutAt);
       this.renderRuns(doc, head, resolveFont, fontSize, color, paragraphOptions);
-      doc.addPage();
+      this.plannedAddPage(doc);
       pageOwners.push(continuations[continuationIndex]);
       continuationIndex += 1;
       doc.font(resolveFont(false, false)).fontSize(fontSize);

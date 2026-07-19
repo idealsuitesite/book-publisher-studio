@@ -12,7 +12,9 @@ None currently.
 
 ## 🟡 IN PROGRESS
 
-**IMPORT FIDELITY — ✅ ALL 5 COMMITS DONE on the branch (2026-07-20), `verify-real-import` green on the real corpus.** ADR-0049; freeze on Validation-evolution/Editorial-AI/Layout stays until the CTO merges. `RENDER_DRIFT.md` diagnostic delivered (renderer/model coordination defect, fix NOT authorized — awaiting CTO verdict on its §5). `docs/PUBLICATION_QUALITY_BAR.md` (CTO spec) queued behind both gates. See `docs/CURRENT_STATE.md`.
+**RENDER DRIFT — ✅ FIXED on `feature/render-drift` (2026-07-21): 55 → 3 observable reconciliations, 284 → 246 pages, ADR-0050/0051 written, parity test locks the numbers.** Next: merge + verify (closes CTO sequence step 2), then open the PUBLICATION_QUALITY_BAR calibration review with real corpus data.
+
+**IMPORT FIDELITY — ✅ MERGED to main via PR #14 (2026-07-21), full gate re-confirmed on main.** ADR-0049; freeze on Validation-evolution/Editorial-AI/Layout stays until the CTO merges. `RENDER_DRIFT.md` diagnostic delivered (renderer/model coordination defect, fix NOT authorized — awaiting CTO verdict on its §5). `docs/PUBLICATION_QUALITY_BAR.md` (CTO spec) queued behind both gates. See `docs/CURRENT_STATE.md`.
 
 **S11 persistence — ✅ DONE on `feature/sprint-9-ui-foundation` (2026-07-20).** `PERSISTENCE.md` approved, ADR-0048 (Decision 2 formally amended), `SqliteProjectRepository` behind the shared contract suite, wired via `DATABASE_PATH`, restart survival proven live (import → real restart → project + export both intact). Next per the approved plan: P4 calibration (awaits CTO feelings on `docs/demo/screenshots/atelier/`), `EDITOR_EXPERIENCE.md` review, engine-rendered preset thumbnails. See `docs/CURRENT_STATE.md` for the full handoff.
 
