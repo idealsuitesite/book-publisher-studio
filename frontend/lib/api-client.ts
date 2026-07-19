@@ -1,4 +1,12 @@
-import type { ImportResponseDTO, ManuscriptOptionsDTO } from 'shared-types';
+import type {
+  ImportResponseDTO,
+  ManuscriptOptionsDTO,
+  ProjectListResponseDTO,
+  ProjectDTO,
+  ProjectSettingsDTO,
+  UpdateProjectSettingsDTO,
+  PublishingResponseDTO,
+} from 'shared-types';
 
 // Sprint 7 Decision 2 (docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md) - the
 // backend stays fully stateless, so every function here is its own complete round trip. No
@@ -127,4 +135,86 @@ export async function exportManuscript({
   }
 
   return response.blob();
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Project endpoints (HOME_WORKSPACE.md §0). The Workspace operates on a project id; the
+ * server holds the book (Decision 6) — no function below ever carries a File.
+ * ---------------------------------------------------------------------------------------- */
+
+export async function listProjects(): Promise<ProjectListResponseDTO> {
+  const response = await request(`${API_BASE_URL}/api/projects`, {}, 'Loading projects', OPTIONS_TIMEOUT_MS);
+  if (!response.ok) {
+    throw new Error(`Loading projects failed: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<ProjectListResponseDTO>;
+}
+
+export async function getProject(id: string): Promise<ProjectDTO> {
+  const response = await request(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(id)}`,
+    {},
+    'Opening project',
+    IMPORT_TIMEOUT_MS
+  );
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Opening project failed: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<ProjectDTO>;
+}
+
+export async function updateProjectSettings(
+  id: string,
+  patch: UpdateProjectSettingsDTO
+): Promise<ProjectSettingsDTO> {
+  const response = await request(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(id)}/settings`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) },
+    'Updating settings',
+    OPTIONS_TIMEOUT_MS
+  );
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Updating settings failed: ${response.status} ${response.statusText}`);
+  }
+  const json = (await response.json()) as { settings: ProjectSettingsDTO };
+  return json.settings;
+}
+
+export async function exportProject(id: string, format: ExportFormat): Promise<Blob> {
+  const response = await request(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(id)}/export?format=${format}`,
+    { method: 'POST' },
+    'Export',
+    EXPORT_TIMEOUT_MS
+  );
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Export failed: ${response.status} ${response.statusText}`);
+  }
+  return response.blob();
+}
+
+export async function publishProject(id: string): Promise<PublishingResponseDTO> {
+  const response = await request(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(id)}/publish`,
+    { method: 'POST' },
+    'Publish',
+    EXPORT_TIMEOUT_MS
+  );
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Publish failed: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<PublishingResponseDTO>;
+}
+
+export async function checkHealth(): Promise<boolean> {
+  try {
+    const response = await request(`${API_BASE_URL}/api/health`, {}, 'Health check', OPTIONS_TIMEOUT_MS);
+    return response.ok;
+  } catch {
+    return false;
+  }
 }

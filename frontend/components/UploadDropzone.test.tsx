@@ -6,8 +6,14 @@ import type { ImportResponseDTO, ImportReportDTO } from 'shared-types';
 
 vi.mock('@/lib/api-client', () => ({
   importManuscript: vi.fn(),
-  getManuscriptOptions: vi.fn(() => Promise.resolve({ themes: [], layouts: [] })),
-  exportManuscript: vi.fn(),
+}));
+
+// HOME_WORKSPACE.md section 0: a successful import ENDS IN A REDIRECT to the project's
+// Workspace. The router is the component's one navigation dependency; mocking it lets the
+// tests assert the redirect as the success contract.
+const push = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
 }));
 
 const { importManuscript } = await import('@/lib/api-client');
@@ -24,6 +30,7 @@ const docx = () =>
 // test, not in the component; the component's contract (a complete BookDTO) matches what the
 // real API actually returns.
 const importResponse = (report: Partial<ImportReportDTO> = {}): ImportResponseDTO => ({
+  projectId: report.status === 'error' ? undefined : 'p1',
   book: {
     id: 'b1',
     metadata: { title: 'Le Guide de Jean', author: 'Jean Dupont', language: 'fr' },
@@ -45,6 +52,7 @@ const importResponse = (report: Partial<ImportReportDTO> = {}): ImportResponseDT
 
 beforeEach(() => {
   vi.mocked(importManuscript).mockReset();
+  push.mockReset();
 });
 
 afterEach(() => {
@@ -67,7 +75,7 @@ describe('UploadDropzone — accessibility of the application entry point', () =
     expect(document.querySelector('input[type="file"]')).toHaveFocus();
   });
 
-  it('accepts a file chosen through the input, not only through a drop event', async () => {
+  it('accepts a file chosen through the input and redirects to the new project - the success contract', async () => {
     vi.mocked(importManuscript).mockResolvedValue(importResponse());
     const user = userEvent.setup();
     render(<UploadDropzone />);
@@ -75,10 +83,7 @@ describe('UploadDropzone — accessibility of the application entry point', () =
     await user.upload(document.querySelector('input[type="file"]') as HTMLInputElement, docx());
 
     await waitFor(() => expect(importManuscript).toHaveBeenCalledTimes(1));
-    // Wait for the success render, not just the API call. Without this the state update lands
-    // after the test has finished, and BookStructureView renders outside any test's awareness -
-    // exactly the unhandled-error race this fixture's old `as never` lie made possible.
-    expect(await screen.findByText(/Import complete/)).toBeInTheDocument();
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/projects/p1'));
   });
 
   it('restricts the picker to .docx rather than offering every file type', () => {

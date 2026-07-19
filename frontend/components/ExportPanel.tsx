@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { exportManuscript, type ExportFormat } from '@/lib/api-client';
+import type { ExportFormat } from '@/lib/api-client';
 import { Button, Card } from '@/components/ui';
 
 // Sprint 7 commit 9b - real export/download, completing the originally-planned Commit 9
@@ -12,9 +12,11 @@ import { Button, Card } from '@/components/ui';
 // for PDF, so all three formats behave identically. onDownloaded (commit 11) is a
 // real-completion callback for ProgressStepper, fired only after a real successful download.
 interface ExportPanelProps {
-  file: File;
-  layout: string;
-  theme: string;
+  /** Filename stem for downloads, e.g. the project name. */
+  downloadName: string;
+  /** Produces the file for a format. Injected (HOME_WORKSPACE.md Decision 6): the Workspace
+   * passes a project-based exporter rendering from the STORED source. */
+  exporter: (format: ExportFormat) => Promise<Blob>;
   onDownloaded?: () => void;
 }
 
@@ -24,11 +26,8 @@ const FORMATS: { format: ExportFormat; label: string }[] = [
   { format: 'epub', label: 'Download EPUB' },
 ];
 
-function baseName(filename: string): string {
-  return filename.replace(/\.[^./]+$/, '');
-}
 
-export function ExportPanel({ file, layout, theme, onDownloaded }: ExportPanelProps) {
+export function ExportPanel({ exporter, downloadName, onDownloaded }: ExportPanelProps) {
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -36,11 +35,11 @@ export function ExportPanel({ file, layout, theme, onDownloaded }: ExportPanelPr
     setExportingFormat(format);
     setErrorMessage(null);
     try {
-      const blob = await exportManuscript({ file, theme, layout, format });
+      const blob = await exporter(format);
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `${baseName(file.name)}.${format}`;
+      link.download = `${downloadName}.${format}`;
       document.body.appendChild(link);
       link.click();
       link.remove();

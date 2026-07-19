@@ -1,68 +1,46 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { ImportResponseDTO, ManuscriptOptionsDTO } from 'shared-types';
-import { getManuscriptOptions, importManuscript } from '@/lib/api-client';
-import { BookStructureView } from '@/components/BookStructureView';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { importManuscript } from '@/lib/api-client';
 import { Button } from '@/components/ui';
-import { ValidationSummary } from '@/components/ValidationSummary';
-import { FormatSelector } from '@/components/FormatSelector';
-import { PreviewPanel } from '@/components/PreviewPanel';
-import { ExportPanel } from '@/components/ExportPanel';
-import { ProgressStepper } from '@/components/ProgressStepper';
 
-// Sprint 7 commit 5 (docs/architecture/diagrams/SPRINT_7_KICKOFF.md) - the dropzone commit 4
-// shipped as static UI now drives the real ThemeEngine/ASTBuilder pipeline via a real
-// POST /api/manuscripts/import. Commit 6 added the real book structure view on success
-// (BookStructureView). Commit 7 added the real validation findings (ValidationSummary).
-// Commit 8 added the format/layout selector (FormatSelector). Commit 9a added the real PDF
-// preview (PreviewPanel) - the success state keeps the real dropped File (not just its name)
-// since the stateless backend needs the real bytes resent for export/preview. Commit 9b added
-// real export/download for all 3 formats (ExportPanel), completing the originally-planned
-// Commit 9. Commit 11 adds ProgressStepper - every step's "done" flag is real state (a real
-// import, a real generated preview, a real completed download), not a fixed/simulated bar -
-// plus human-readable format/theme labels threaded down to PreviewPanel.
+// HOME_WORKSPACE.md §0: import lives on Home and ENDS WITH A REDIRECT. A successful import
+// creates a project (ADR-0047) and the user lands in its Workspace — everything about the
+// imported book (structure, validation, layout, preview, publish) is a Workspace concern,
+// never inlined here. This component's whole job is: get a DOCX in, hand the user their
+// project. The old post-import vertical pipeline it used to render retired with the
+// ProgressStepper (§0, stations-not-steps).
 type State =
   | { status: 'idle' }
   | { status: 'uploading'; filename: string }
-  | { status: 'success'; file: File; result: ImportResponseDTO }
   | { status: 'error'; filename: string; message: string };
 
 const CARD_CLASSES =
   'flex w-full max-w-xl flex-col items-center justify-center gap-3 rounded-2xl border-2 px-10 py-20 text-center transition-colors';
 
 export function UploadDropzone() {
+  const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const [state, setState] = useState<State>({ status: 'idle' });
-  const [options, setOptions] = useState<ManuscriptOptionsDTO | null>(null);
-  const [selectedLayout, setSelectedLayout] = useState<string | null>(null);
-  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
-  const [hasPreviewed, setHasPreviewed] = useState(false);
-  const [hasExported, setHasExported] = useState(false);
-
-  useEffect(() => {
-    if (state.status !== 'success' || options) return;
-    void getManuscriptOptions().then((result) => {
-      setOptions(result);
-      setSelectedLayout(result.layouts[0]?.name ?? null);
-      setSelectedTheme(result.themes[0]?.name ?? null);
-    });
-  }, [state.status, options]);
 
   async function handleFile(file: File) {
     setState({ status: 'uploading', filename: file.name });
 
     try {
       const result = await importManuscript(file);
-      if (result.report.status === 'success') {
-        setState({ status: 'success', file, result });
-      } else {
-        setState({
-          status: 'error',
-          filename: file.name,
-          message: result.report.errors.join(' ') || 'The import pipeline reported errors.',
-        });
+      if (result.report.status === 'success' && result.projectId) {
+        router.push(`/projects/${result.projectId}`);
+        return;
       }
+      setState({
+        status: 'error',
+        filename: file.name,
+        message:
+          result.report.status === 'success'
+            ? 'The import succeeded but no project was created.'
+            : result.report.errors.join(' ') || 'The import pipeline reported errors.',
+      });
     } catch (error) {
       setState({
         status: 'error',
@@ -70,15 +48,6 @@ export function UploadDropzone() {
         message: error instanceof Error ? error.message : 'Something went wrong.',
       });
     }
-  }
-
-  function reset() {
-    setState({ status: 'idle' });
-    setOptions(null);
-    setSelectedLayout(null);
-    setSelectedTheme(null);
-    setHasPreviewed(false);
-    setHasExported(false);
   }
 
   if (state.status === 'uploading') {
@@ -90,61 +59,12 @@ export function UploadDropzone() {
     );
   }
 
-  if (state.status === 'success') {
-    const layoutLabel = options?.layouts.find((l) => l.name === selectedLayout)?.label ?? selectedLayout ?? '';
-    const themeLabel = options?.themes.find((t) => t.name === selectedTheme)?.label ?? selectedTheme ?? '';
-
-    return (
-      <div className="flex w-full max-w-2xl flex-col gap-6">
-        <ProgressStepper
-          steps={[
-            { label: 'Import', done: true },
-            { label: 'Structure', done: true },
-            { label: 'Validation', done: true },
-            { label: 'Layout', done: Boolean(selectedLayout && selectedTheme) },
-            { label: 'Preview', done: hasPreviewed },
-            { label: 'Export', done: hasExported },
-          ]}
-        />
-        <BookStructureView book={state.result.book} filename={state.file.name} onReset={reset} />
-        <ValidationSummary report={state.result.report} />
-        {options && selectedLayout && selectedTheme && (
-          <FormatSelector
-            options={options}
-            selectedLayout={selectedLayout}
-            selectedTheme={selectedTheme}
-            onLayoutChange={setSelectedLayout}
-            onThemeChange={setSelectedTheme}
-          />
-        )}
-        {selectedLayout && selectedTheme && (
-          <PreviewPanel
-            file={state.file}
-            layout={selectedLayout}
-            theme={selectedTheme}
-            layoutLabel={layoutLabel}
-            themeLabel={themeLabel}
-            onGenerated={() => setHasPreviewed(true)}
-          />
-        )}
-        {selectedLayout && selectedTheme && (
-          <ExportPanel
-            file={state.file}
-            layout={selectedLayout}
-            theme={selectedTheme}
-            onDownloaded={() => setHasExported(true)}
-          />
-        )}
-      </div>
-    );
-  }
-
   if (state.status === 'error') {
     return (
       <div className={`${CARD_CLASSES} border-red-600`}>
         <p className="text-lg font-medium text-red-600 dark:text-red-400">Import failed</p>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">{state.message}</p>
-        <Button variant="link" className="mt-2" onClick={reset}>
+        <Button variant="link" className="mt-2" onClick={() => setState({ status: 'idle' })}>
           Try again
         </Button>
       </div>
@@ -154,11 +74,11 @@ export function UploadDropzone() {
   return (
     // A <label> wrapping a real file input, not a bare <div>.
     //
-    // Before this fix the dropzone had no input, no tabIndex, no role and no keyboard handler -
-    // only onDrop. Importing is this application's single entry point, so keyboard users,
-    // screen reader users, and anyone who clicks instead of dragging could not use the product
-    // at all (found by Sprint 9 Commit 0's accessibility baseline). Drag-and-drop is retained
-    // as an additional convenience, not as the only way in.
+    // The dropzone once had no input, no tabIndex, no role and no keyboard handler - only
+    // onDrop. Importing is this application's single entry point, so keyboard users, screen
+    // reader users, and anyone who clicks instead of dragging could not use the product at all
+    // (found by Sprint 9 Commit 0's accessibility baseline). Drag-and-drop is retained as an
+    // additional convenience, not as the only way in.
     <label
       onDragOver={(event) => {
         event.preventDefault();

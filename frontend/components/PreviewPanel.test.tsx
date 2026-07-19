@@ -3,16 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PreviewPanel } from './PreviewPanel';
 
-vi.mock('@/lib/api-client', () => ({
-  exportManuscript: vi.fn(),
-}));
-
-const { exportManuscript } = await import('@/lib/api-client');
-
-const file = () =>
-  new File(['x'], 'large-book.docx', {
-    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  });
+const exporter = vi.fn<() => Promise<Blob>>();
 
 /** A minimal PDF-shaped blob with two /MediaBox markers — the real page-count heuristic. */
 const pdfBlob = (pages: number) =>
@@ -22,9 +13,8 @@ type Props = React.ComponentProps<typeof PreviewPanel>;
 
 function setup(overrides: Partial<Props> = {}) {
   const props: Props = {
-    file: file(),
-    layout: 'kdp-6x9',
-    theme: 'classic',
+    exporter,
+    settingsKey: 'kdp-6x9/classic',
     layoutLabel: 'KDP 6" x 9"',
     themeLabel: 'Classic',
     ...overrides,
@@ -34,7 +24,7 @@ function setup(overrides: Partial<Props> = {}) {
 }
 
 beforeEach(() => {
-  vi.mocked(exportManuscript).mockReset();
+  exporter.mockReset();
   vi.stubGlobal('URL', {
     ...URL,
     createObjectURL: vi.fn(() => 'blob:fake'),
@@ -59,22 +49,18 @@ describe('PreviewPanel', () => {
     expect(screen.queryByText(/Estimated pages/i)).not.toBeInTheDocument();
   });
 
-  it('requests a real PDF export for the selected layout and theme', async () => {
-    vi.mocked(exportManuscript).mockResolvedValue(pdfBlob(3));
+  it('asks its injected exporter for the preview - the panel owns no source, per Decision 6', async () => {
+    exporter.mockResolvedValue(pdfBlob(2));
     const user = userEvent.setup();
     setup();
 
-    await user.click(screen.getByRole('button', { name: /preview/i }));
+    await user.click(screen.getByRole('button', { name: 'Generate Preview' }));
 
-    await waitFor(() =>
-      expect(exportManuscript).toHaveBeenCalledWith(
-        expect.objectContaining({ format: 'pdf', layout: 'kdp-6x9', theme: 'classic' })
-      )
-    );
+    await waitFor(() => expect(exporter).toHaveBeenCalledTimes(1));
   });
 
   it('derives the page count from the real returned PDF, not from an estimate', async () => {
-    vi.mocked(exportManuscript).mockResolvedValue(pdfBlob(5));
+    exporter.mockResolvedValue(pdfBlob(5));
     const user = userEvent.setup();
     setup();
 
@@ -84,7 +70,7 @@ describe('PreviewPanel', () => {
   });
 
   it('notifies the parent once a preview really completed', async () => {
-    vi.mocked(exportManuscript).mockResolvedValue(pdfBlob(2));
+    exporter.mockResolvedValue(pdfBlob(2));
     const onGenerated = vi.fn();
     const user = userEvent.setup();
     setup({ onGenerated });
@@ -95,7 +81,7 @@ describe('PreviewPanel', () => {
   });
 
   it('surfaces a real failure rather than leaving the panel blank', async () => {
-    vi.mocked(exportManuscript).mockRejectedValue(new Error('Export timed out after 180s'));
+    exporter.mockRejectedValue(new Error('Export timed out after 180s'));
     const user = userEvent.setup();
     setup();
 
@@ -105,13 +91,13 @@ describe('PreviewPanel', () => {
   });
 
   it('is operable by keyboard', async () => {
-    vi.mocked(exportManuscript).mockResolvedValue(pdfBlob(1));
+    exporter.mockResolvedValue(pdfBlob(1));
     const user = userEvent.setup();
     setup();
 
     await user.tab();
     await user.keyboard('{Enter}');
 
-    await waitFor(() => expect(exportManuscript).toHaveBeenCalled());
+    await waitFor(() => expect(exporter).toHaveBeenCalled());
   });
 });

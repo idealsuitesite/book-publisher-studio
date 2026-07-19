@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { exportManuscript } from '@/lib/api-client';
 import { Button, Card } from '@/components/ui';
 
 // Sprint 7 commit 9a - real PDF preview (Decision 1: full re-export, not an incremental preview
@@ -19,9 +18,15 @@ import { Button, Card } from '@/components/ui';
 // ahead of a real request. onGenerated is a real-completion callback for ProgressStepper, not a
 // simulated "done" flag.
 interface PreviewPanelProps {
-  file: File;
-  layout: string;
-  theme: string;
+  /**
+   * Produces the PDF this panel previews. Injected rather than owned (HOME_WORKSPACE.md
+   * Decision 6): the Workspace passes a project-based exporter that renders from the STORED
+   * source, so this panel never needs to know a File exists — the browser holds an id, the
+   * system holds the book.
+   */
+  exporter: () => Promise<Blob>;
+  /** Identifies the settings the exporter will use — staleness is detected when it changes. */
+  settingsKey: string;
   layoutLabel: string;
   themeLabel: string;
   onGenerated?: () => void;
@@ -30,7 +35,7 @@ interface PreviewPanelProps {
 type PreviewState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; blobUrl: string; pageCount: number | null; layout: string; theme: string }
+  | { status: 'ready'; blobUrl: string; pageCount: number | null; settingsKey: string }
   | { status: 'error'; message: string };
 
 function countPdfPages(bytes: ArrayBuffer): number | null {
@@ -39,14 +44,14 @@ function countPdfPages(bytes: ArrayBuffer): number | null {
   return matches ? matches.length : null;
 }
 
-export function PreviewPanel({ file, layout, theme, layoutLabel, themeLabel, onGenerated }: PreviewPanelProps) {
+export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, onGenerated }: PreviewPanelProps) {
   const [state, setState] = useState<PreviewState>({ status: 'idle' });
   const blobUrlRef = useRef<string | null>(null);
 
   // Staleness (the current preview no longer matches the selected layout/theme) is a derived
   // render-time value, not effect-driven state - avoids the cascading-setState-in-effect
   // anti-pattern a layout-change useEffect would otherwise trigger on every mount.
-  const isStale = state.status === 'ready' && (state.layout !== layout || state.theme !== theme);
+  const isStale = state.status === 'ready' && state.settingsKey !== settingsKey;
 
   // Cleanup-only effect (no setState in the body) - just revokes the last blob URL on unmount,
   // e.g. when "Import another file" tears this component down.
@@ -59,13 +64,13 @@ export function PreviewPanel({ file, layout, theme, layoutLabel, themeLabel, onG
   async function generatePreview() {
     setState({ status: 'loading' });
     try {
-      const blob = await exportManuscript({ file, theme, layout, format: 'pdf' });
+      const blob = await exporter();
       const bytes = await blob.arrayBuffer();
       const pageCount = countPdfPages(bytes);
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
       const blobUrl = URL.createObjectURL(blob);
       blobUrlRef.current = blobUrl;
-      setState({ status: 'ready', blobUrl, pageCount, layout, theme });
+      setState({ status: 'ready', blobUrl, pageCount, settingsKey });
       onGenerated?.();
     } catch (error) {
       setState({ status: 'error', message: error instanceof Error ? error.message : 'Preview failed.' });
