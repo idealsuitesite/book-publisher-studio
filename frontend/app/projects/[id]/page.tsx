@@ -233,7 +233,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
             onNavigate={setView}
           />
         )}
-        {view === 'structure' && <StructureEditor project={project} />}
+        {view === 'structure' && <StructureEditor project={project} onEdited={setProject} />}
         {view === 'validation' && <ReadyForPrint report={project.report} />}
         {view === 'layout' && settingsError && (
           <p className="text-sm text-app-error">{settingsError}</p>
