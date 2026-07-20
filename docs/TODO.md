@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 21, 2026 — everything merged to `main` (PR #14 Sprints 9-11 + Import Fidelity; PR #15 Render Drift). Last tag `v0.9.0-alpha`. **Next: the CTO opens the `docs/PUBLICATION_QUALITY_BAR.md` calibration review** (its gate — both fidelity defects fixed AND verified in the real harnesses — is met). See `docs/CURRENT_STATE.md`'s executive brief for full context.
+**Last Updated:** July 21, 2026 (late) — `main` at **PR #21** (Import Fidelity, Render Drift, Book Presentation Phases 0-2 + per-chapter word counts, Table-Duplication A/B, list-height fix). Last tag `v0.9.0-alpha`. **THREE branches await a CTO decision, none merged:** (1) **PR #22** — Art-of-Captivating as 2nd corpus fixture + `LIST_SPLITTING_ACROSS_PAGES` tech-debt (open, ready to merge); (2) **`feature/book-presentation-p3`** — Phase 3 C1 (quote presentation as theme value), resume Phase 3 from here; (3) **`investigate/first-screen-error`** — `FIRST_SCREEN_ERROR.md` report (stale deep-link, not a resume bug), fix sketched not implemented. Calibration round 1 LOCKED; `RECALIBRATE_PAGE_RATIO_TOLERANCE` at 2 of 3 fixtures. Real-bug lineage at eleven. See `docs/CURRENT_STATE.md`'s executive brief + the 2026-07-21 (late) session entry for full context.
 
 ---
 
