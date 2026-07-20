@@ -149,3 +149,46 @@ describe('GET /api/projects', () => {
     expect(res.body.projects[0].name).toContain('supplémentaire');
   });
 });
+
+describe('POST /api/projects/:id/structure — manual structure editing (STRUCTURE_EDITING.md phase 2)', () => {
+  async function seedProject(): Promise<{ app: ReturnType<typeof createApp>; id: string }> {
+    const app = createApp();
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });
+    const imported = await request(app)
+      .post('/api/manuscripts/import')
+      .attach('file', buffer, { filename: 'b.docx', contentType: DOCX_MIME });
+    return { app, id: imported.body.projectId as string };
+  }
+
+  it('renames a chapter, persists a snapshot, and returns the updated project', async () => {
+    const { app, id } = await seedProject();
+    const got = await request(app).get(`/api/projects/${id}`);
+    const chapterId = got.body.book.mainContent[0].id;
+
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'rename', id: chapterId, title: 'Renamed' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.book.mainContent[0].title).toBe('Renamed');
+    expect(res.body.versions).toHaveLength(1); // snapshot-before-edit
+  });
+
+  it('400 INVALID_MUTATION on a malformed command', async () => {
+    const { app, id } = await seedProject();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'bogus' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_MUTATION');
+  });
+
+  it('404 PROJECT_NOT_FOUND on an unknown project', async () => {
+    const res = await request(createApp()).post('/api/projects/nope/structure').send({ type: 'rename', id: 'c1', title: 'X' });
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('PROJECT_NOT_FOUND');
+  });
+
+  it('400 CONTENT_NOT_FOUND on an unknown chapter id inside a real project', async () => {
+    const { app, id } = await seedProject();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'rename', id: 'ghost', title: 'X' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('CONTENT_NOT_FOUND');
+  });
+});

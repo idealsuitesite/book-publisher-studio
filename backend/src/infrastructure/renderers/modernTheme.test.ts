@@ -58,7 +58,7 @@ describe('Modern theme — parity lock + tri-format accent/fonts (real corpus)',
     const kdp = await new PDFRenderer().render(paginate('modern', KDP6x9PageLayout), { language: 'en' });
     expect(kdp.metrics.pageCount).toBe(158); // Modern's own number (Classic is 159 — tighter heading spacing)
     expect(kdp.metrics.unplannedPageBreaks).toBe(2);
-  });
+  }, 30_000); // renders the 40k-word corpus twice — needs headroom under full-suite parallel load
 
   it('the accent reaches all three formats (colors.accent exercised by a real theme)', async () => {
     const paginated = paginate('modern', LetterPageLayout);
@@ -71,11 +71,11 @@ describe('Modern theme — parity lock + tri-format accent/fonts (real corpus)',
     const ez = await JSZip.loadAsync(epub.output);
     const css = await ez.file(Object.keys(ez.files).find((n) => n.endsWith('.css'))!)!.async('string');
     expect(css).toMatch(new RegExp(ACCENT, 'i'));
-  });
+  }, 30_000);
 
   it('Classic stays byte-unaffected — its export never carries Modern\'s accent', async () => {
     const classicDocx = await new DOCXRenderer().render(paginate('classic', LetterPageLayout), { language: 'en' });
     const cstyles = await (await JSZip.loadAsync(classicDocx.output)).file('word/styles.xml')!.async('string');
     expect(cstyles).not.toContain(ACCENT);
-  });
+  }, 30_000);
 });
