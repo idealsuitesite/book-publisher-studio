@@ -8,6 +8,7 @@ import type { ThemeEngine } from '../../domain/services/ThemeEngine';
 import type { TypographyResolver } from '../../domain/services/TypographyResolver';
 import type { LayoutEngine } from '../../domain/services/LayoutEngine';
 import type { PageLayout } from '../../domain/models/PageLayout';
+import type { Book } from '../../domain/models/Book';
 import type { PublishingReport } from '../../domain/models/PublishingReport';
 import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 import { getTheme } from '../../domain/themes/getTheme';
@@ -41,18 +42,30 @@ export class PublishingUseCase implements UseCase<PublishRequest, PublishingRepo
     const raw = await this.parser.parse(request.buffer);
     const normalized = this.normalizer.normalize(raw.html, { fileName: request.filename });
     const built = this.builder.build(normalized);
+    return this.publishBook(built, request.themeName, request.pageLayout);
+  }
 
+  /**
+   * Publishes an already-built `Book` — the render tail plus the `PublishingTarget` step.
+   *
+   * Mirrors `ExportManuscriptUseCase.renderBook`: `execute()` feeds it a book parsed from upload
+   * bytes, and the project publish path (`PublishProjectUseCase`) feeds it the project's STORED
+   * book so structure edits reach what KDP validates. Publishing the stored book instead of
+   * re-parsing source bytes also keeps publish and export rendering the *same* book by
+   * construction (ADR-0045's original concern), now that both go through the stored book.
+   */
+  async publishBook(source: Book, themeName: string, pageLayout: PageLayout): Promise<PublishingReport> {
     // Front matter is built here for the same reason ExportManuscriptUseCase builds it, and it
-    // must be the *same* book. Until this line existed, publish validated a manuscript with no
-    // title or copyright page while export shipped one with both - so the Publishing Engine was
-    // approving a document the author would never upload. Found by real-fixture verification:
-    // the exported PDFs had 3 pages and the reported page count said 1 (ADR-0045).
-    const book = { ...built, frontMatter: this.frontMatterBuilder.build(built) };
+    // must be the *same* book. Until this existed, publish validated a manuscript with no title
+    // or copyright page while export shipped one with both - so the Publishing Engine was
+    // approving a document the author would never upload (ADR-0045). Synthesised here still, as
+    // before; Q3 moves it to import time.
+    const book = { ...source, frontMatter: this.frontMatterBuilder.build(source) };
 
-    const theme = getTheme(request.themeName);
+    const theme = getTheme(themeName);
     const styled = this.themeEngine.applyTheme(book, theme);
     const typeset = this.typographyResolver.resolve(styled);
-    const paginated = this.layoutEngine.paginate(typeset, request.pageLayout);
+    const paginated = this.layoutEngine.paginate(typeset, pageLayout);
 
     // Metrics come from the renderer, not from `paginated` (ADR-0045). RENDER_METRICS.md
     // Question 1 answered this the other way and was wrong twice over: ADR-0013 already recorded

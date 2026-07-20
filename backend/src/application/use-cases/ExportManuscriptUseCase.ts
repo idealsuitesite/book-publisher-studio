@@ -8,6 +8,7 @@ import type { TypographyResolver } from '../../domain/services/TypographyResolve
 import type { LayoutEngine } from '../../domain/services/LayoutEngine';
 import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 import type { PageLayout } from '../../domain/models/PageLayout';
+import type { Book } from '../../domain/models/Book';
 import { getTheme } from '../../domain/themes/getTheme';
 
 export interface ExportRequest {
@@ -33,18 +34,30 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
     const raw = await this.parser.parse(request.buffer);
     const normalized = this.normalizer.normalize(raw.html, { fileName: request.filename });
     const built = this.builder.build(normalized);
+    return this.renderBook(built, request.themeName, request.pageLayout);
+  }
 
-    // ASTBuilder sets `frontMatter: {}` on every import, so until now every exported book
-    // opened directly on Chapter 1 - no title page, no copyright page, no ISBN. Generated here
-    // rather than inside ASTBuilder because it is a presentation decision about the finished
-    // book, not a fact recovered from the source document; the import path (which feeds the
-    // structure view and validation) is deliberately left untouched.
-    const book = { ...built, frontMatter: this.frontMatterBuilder.build(built) };
+  /**
+   * Renders an already-built `Book` through the theme -> typography -> layout -> renderer tail.
+   *
+   * Two entry points share this: `execute()` above, which parses raw upload bytes, and the
+   * project export path (`ExportProjectUseCase`), which passes the project's STORED book so a
+   * manual structure edit (reorder/rename) actually reaches the output. Before this existed the
+   * project path re-parsed the original source bytes and silently discarded every stored edit -
+   * the manuscript in the Structure station and the manuscript in the export were two different
+   * books (STRUCTURE_EDITING.md §5/§9; the defect is logged in DECISIONS.md and TODO.md).
+   *
+   * Front matter is still synthesised here, exactly as before, so output is unchanged for an
+   * unedited book. Moving it to import time is Q3's separate commit; this commit only changes
+   * *which* book gets rendered.
+   */
+  async renderBook(source: Book, themeName: string, pageLayout: PageLayout): Promise<Buffer> {
+    const book = { ...source, frontMatter: this.frontMatterBuilder.build(source) };
 
-    const theme = getTheme(request.themeName);
+    const theme = getTheme(themeName);
     const styled = this.themeEngine.applyTheme(book, theme);
     const typeset = this.typographyResolver.resolve(styled);
-    const paginated = this.layoutEngine.paginate(typeset, request.pageLayout);
+    const paginated = this.layoutEngine.paginate(typeset, pageLayout);
 
     // Metrics are discarded here on purpose: the export path has no validator to feed, and an
     // unused field is what the handbook's port-vs-class rule exists to prevent (ADR-0045).

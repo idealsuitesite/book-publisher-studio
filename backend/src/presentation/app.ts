@@ -156,7 +156,8 @@ export function createApp(): Express {
     new ExportProjectUseCase(
       projectRepository,
       { docx: exportDocxUseCase, pdf: exportPdfUseCase, epub: exportEpubUseCase },
-      new ManualLayoutSelector()
+      new ManualLayoutSelector(),
+      projectService
     ),
     new PublishProjectUseCase(projectRepository, projectService, publishUseCase, new ManualLayoutSelector()),
     new PublishingReportMapper(),
