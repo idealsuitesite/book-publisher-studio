@@ -1,5 +1,6 @@
 import type { BookDTO, ValidationIssueDTO } from 'shared-types';
 import { Button, Card } from '@/components/ui';
+import { countContentWords } from '@/lib/bookFacts';
 
 // Sprint 7 commit 6 - renders the real BookDTO a successful import returns. Deliberately no
 // validation findings here (report.issues/.score) - that's ValidationSummary's job (commit 7),
@@ -84,10 +85,20 @@ export function BookStructureView({ book, filename, onReset, structureFinding }:
           {book.mainContent.map((content) => (
             <li key={content.id} className="text-sm text-app-text">
               {contentLabel(content)}
+              {/* Per-part words (EXPLORER_PARITY §4, CTO-approved): real counts from the same
+                  AST walk the global figure uses — tabular-nums, instrument reading. */}
+              <span className="ml-2 text-xs tabular-nums text-app-text-muted">
+                {countContentWords(content).toLocaleString('en-US')} words
+              </span>
               {content.type === 'chapter' && content.sections && content.sections.length > 0 && (
                 <ul className="ml-4 mt-1 flex flex-col gap-1 text-app-text-muted">
                   {content.sections.map((section) => (
-                    <li key={section.id}>{section.title || 'Untitled section'}</li>
+                    <li key={section.id}>
+                      {section.title || 'Untitled section'}
+                      <span className="ml-2 text-xs tabular-nums">
+                        {countContentWords(section).toLocaleString('en-US')} words
+                      </span>
+                    </li>
                   ))}
                 </ul>
               )}

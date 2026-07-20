@@ -1,6 +1,6 @@
 # Explorer Parity — Gap Audit vs the Reedsy Sidebar (Phase 0, Book Presentation System)
 
-**Status:** 🔍 **AUDIT — findings only, no fixes proposed (CTO mandate).** Phase 0 of the Book Presentation System roadmap (CTO direction 2026-07-19: book first, magazine deferred). Same discipline as `IMPORT_FIDELITY.md`/`RENDER_DRIFT.md`: every claim below was verified live or in the real code, none assumed.
+**Status:** 🔍 **AUDIT — CTO verdict rendered (2026-07-21):** diagnosis validated (one capability class, not four widgets). **Structure editing (drag-drop reorder, inline rename, manipulable front/back matter) is NOT unblocked** — it needs its own Level-1 Design Review (AST mutation service, versioning/undo implications, and validating `replaceBook`+`snapshot` as the entry seam), now with two legitimate demandeurs (Import Fidelity's manual correction + this audit), rising in priority but not authorized. **Per-chapter word counts approved for immediate build** — the one genuinely shallow gap (client-side walk, zero backend). Phase 0 of the Book Presentation System roadmap (CTO direction 2026-07-19: book first, magazine deferred). Same discipline as `IMPORT_FIDELITY.md`/`RENDER_DRIFT.md`: every claim below was verified live or in the real code, none assumed.
 **Date:** 2026-07-21
 **Method:** code search across `frontend/` and `backend/` (dependency manifest, handlers, routes, services) + live DOM inspection of the real Explorer on a freshly imported real 17-chapter manuscript (`faith-alone-styled.docx`, project `1784503831189-qd10msrg7`).
 

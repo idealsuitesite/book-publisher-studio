@@ -25,6 +25,27 @@ export function unstructuredFinding(report: ImportReportDTO): ValidationIssueDTO
   return report.issues.find((issue) => issue.code === 'UNSTRUCTURED_MANUSCRIPT');
 }
 
+/**
+ * Words in ONE chapter/section, nested sections included — the per-part figure Reedsy shows in
+ * its sidebar (EXPLORER_PARITY.md §4, the one gap the CTO approved for immediate build: a
+ * client-side walk, zero backend). Same tokenization as the global count: split on whitespace.
+ */
+export function countContentWords(content: ContentDTO): number {
+  let words = 0;
+  for (const block of content.content ?? []) {
+    if ('text' in block && typeof block.text === 'string') {
+      words += block.text.trim() ? block.text.trim().split(/\s+/).length : 0;
+    } else if (block.type === 'list') {
+      for (const item of block.items ?? []) {
+        words += item.trim() ? item.trim().split(/\s+/).length : 0;
+      }
+    }
+  }
+  const children = content.type === 'chapter' ? content.sections : content.subsections;
+  for (const child of children ?? []) words += countContentWords(child as ContentDTO);
+  return words;
+}
+
 export function computeBookFacts(book: BookDTO): BookFacts {
   const facts: BookFacts = { chapters: 0, sections: 0, images: 0, citations: 0, footnotes: 0, tables: 0 };
 
