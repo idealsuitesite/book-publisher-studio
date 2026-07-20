@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-07-19T19:32:38.843Z",
+  "capturedAt": "2026-07-20T00:24:03.621Z",
   "totalViolations": 3,
   "totalNodes": 3,
   "screens": [
@@ -15,7 +15,7 @@
       "screen": "02-dashboard",
       "viewport": "desktop",
       "file": "02-dashboard--desktop.png",
-      "bytes": 75086,
+      "bytes": 75083,
       "status": "captured",
       "violations": []
     },
@@ -61,7 +61,7 @@
       "screen": "06-editions-publish",
       "viewport": "desktop",
       "file": "06-editions-publish--desktop.png",
-      "bytes": 109379,
+      "bytes": 107211,
       "status": "captured",
       "violations": [
         {

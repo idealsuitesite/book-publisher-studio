@@ -69,7 +69,10 @@ export function PublishDesk({ project, exporter, onPublished }: PublishDeskProps
                     <span className="text-app-text-muted"> · v{event.versionNumber}</span>
                   )}
                 </span>
-                <span className="shrink-0 text-xs tabular-nums text-app-text-muted">
+                {/* Wall-clock date - masked at baseline capture (determinism defect #7: an
+                    unmasked DATE only reveals itself when a session crosses midnight), never
+                    hidden from users. Same treatment as the Inspector/Timeline timestamps. */}
+                <span data-baseline-mask className="shrink-0 text-xs tabular-nums text-app-text-muted">
                   {new Date(event.occurredAt).toLocaleDateString()}
                 </span>
               </li>
@@ -80,7 +83,8 @@ export function PublishDesk({ project, exporter, onPublished }: PublishDeskProps
           <div className="mt-1 border-t border-app-border pt-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-app-text-muted">Last rejection</p>
             <p className="mt-1 text-sm text-app-text">
-              {lastFail.target.toUpperCase()} · {new Date(lastFail.occurredAt).toLocaleDateString()} — a
+              {lastFail.target.toUpperCase()} ·{' '}
+              <span data-baseline-mask>{new Date(lastFail.occurredAt).toLocaleDateString()}</span> — a
               rejection is exactly the history an author needs; the findings live in Ready for Print.
             </p>
           </div>
