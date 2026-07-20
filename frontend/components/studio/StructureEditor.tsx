@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Card, cx } from '@/components/ui';
+import { Button, Card, cx } from '@/components/ui';
 import { countContentWords, unstructuredFinding } from '@/lib/bookFacts';
 import { editStructure, ApiError } from '@/lib/api-client';
 
@@ -96,6 +96,33 @@ export async function applyRename(
     deps.onError(
       error instanceof ApiError ? 'That rename could not be saved.' : 'Could not reach the server to save the rename.'
     );
+  }
+}
+
+/**
+ * Undo the last edit: restore the snapshot each reorder/rename takes *before* applying (backend
+ * snapshot-before-edit). `restoreVersion` takes no new snapshot and deletes nothing (append-only
+ * log), so this is single-level "undo the last change"; the History station holds the full log for
+ * deeper restores. Returns whether it succeeded so the caller can drop the undo affordance.
+ */
+export async function applyUndo(
+  projectId: string,
+  versionId: string,
+  deps: {
+    editStructure: typeof editStructure;
+    onEdited: (updated: ProjectDTO) => void;
+    onError: (message: string) => void;
+  }
+): Promise<boolean> {
+  try {
+    const updated = await deps.editStructure(projectId, { type: 'restoreVersion', versionId });
+    deps.onEdited(updated);
+    return true;
+  } catch (error) {
+    deps.onError(
+      error instanceof ApiError ? 'That undo could not be applied.' : 'Could not reach the server to undo.'
+    );
+    return false;
   }
 }
 
@@ -241,6 +268,15 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
   const items = book.mainContent.map((c) => c.id);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The snapshot to restore to undo the last edit — set when an edit lands, cleared once undone.
+  const [undoVersionId, setUndoVersionId] = useState<string | null>(null);
+
+  // An edit returns the fresh project whose newest version is the pre-edit snapshot: the undo target.
+  function captureUndo(updated: ProjectDTO) {
+    onEdited(updated);
+    const latest = updated.versions[updated.versions.length - 1];
+    setUndoVersionId(latest ? latest.id : null);
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -266,7 +302,7 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
     setPending(true);
     await applyReorder(project.id, items, String(active.id), String(over.id), {
       editStructure,
-      onEdited,
+      onEdited: captureUndo,
       onError: setError,
     });
     setPending(false);
@@ -275,7 +311,16 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
   async function onRename(id: string, title: string) {
     setError(null);
     setPending(true);
-    await applyRename(project.id, id, title, { editStructure, onEdited, onError: setError });
+    await applyRename(project.id, id, title, { editStructure, onEdited: captureUndo, onError: setError });
+    setPending(false);
+  }
+
+  async function onUndo() {
+    if (!undoVersionId) return;
+    setError(null);
+    setPending(true);
+    const ok = await applyUndo(project.id, undoVersionId, { editStructure, onEdited, onError: setError });
+    if (ok) setUndoVersionId(null);
     setPending(false);
   }
 
@@ -288,9 +333,16 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
             {book.mainContent.length} {book.mainContent.length === 1 ? 'part' : 'parts'} · drag to reorder, click a title to rename
           </p>
         </div>
-        <span className="text-xs text-app-text-muted" aria-live="polite">
-          {pending ? 'Saving…' : ''}
-        </span>
+        <div className="flex shrink-0 items-center gap-3">
+          {undoVersionId && (
+            <Button variant="link" onClick={() => void onUndo()} disabled={pending} className="text-sm">
+              Undo last change
+            </Button>
+          )}
+          <span className="text-xs text-app-text-muted" aria-live="polite">
+            {pending ? 'Saving…' : ''}
+          </span>
+        </div>
       </div>
 
       {finding && (

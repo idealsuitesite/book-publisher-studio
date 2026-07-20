@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ProjectDTO } from 'shared-types';
-import { StructureEditor, applyReorder, applyRename } from './StructureEditor';
+import { StructureEditor, applyReorder, applyRename, applyUndo } from './StructureEditor';
 import { editStructure } from '@/lib/api-client';
 import type { editStructure as editStructureFn } from '@/lib/api-client';
 
@@ -170,5 +170,53 @@ describe('inline rename UX (Phase 3 commit 5)', () => {
 
     expect(vi.mocked(editStructure)).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Rename Chapter 2: Method' })).toBeInTheDocument();
+  });
+});
+
+describe('applyUndo (undo handler — Phase 3 commit 6)', () => {
+  it('restores the given snapshot, applies the result, and returns true', async () => {
+    const editStructure = vi.fn().mockResolvedValue({ id: 'p1' }) as unknown as typeof editStructureFn;
+    const onEdited = vi.fn();
+    const onError = vi.fn();
+
+    const ok = await applyUndo('p1', 'v9', { editStructure, onEdited, onError });
+
+    expect(editStructure).toHaveBeenCalledWith('p1', { type: 'restoreVersion', versionId: 'v9' });
+    expect(onEdited).toHaveBeenCalledWith({ id: 'p1' });
+    expect(ok).toBe(true);
+  });
+
+  it('returns false and surfaces an error on failure', async () => {
+    const editStructure = vi.fn().mockRejectedValue(new Error('down')) as unknown as typeof editStructureFn;
+    const onEdited = vi.fn();
+    const onError = vi.fn();
+
+    const ok = await applyUndo('p1', 'v9', { editStructure, onEdited, onError });
+
+    expect(ok).toBe(false);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onEdited).not.toHaveBeenCalled();
+  });
+});
+
+describe('undo UX (Phase 3 commit 6)', () => {
+  it('is hidden until an edit, then appears and restores the snapshot the edit took', async () => {
+    const user = userEvent.setup();
+    // The edit returns a project whose newest version is the pre-edit snapshot (the undo target).
+    const edited = project({ versions: [{ id: 'v9', number: 1 }] } as unknown as Partial<ProjectDTO>);
+    vi.mocked(editStructure).mockResolvedValue(edited);
+    render(<StructureEditor project={project()} onEdited={() => {}} />);
+
+    expect(screen.queryByRole('button', { name: /Undo/ })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Chapter 1: Intro' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Rename Chapter 1: Intro' }));
+    await user.type(screen.getByRole('textbox', { name: 'Rename Chapter 1: Intro' }), 'Preface{Enter}');
+
+    const undo = await screen.findByRole('button', { name: /Undo/ });
+    vi.mocked(editStructure).mockClear();
+    await user.click(undo);
+
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'restoreVersion', versionId: 'v9' });
   });
 });
