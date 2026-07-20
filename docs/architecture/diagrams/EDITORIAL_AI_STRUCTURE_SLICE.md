@@ -1,5 +1,7 @@
 # Editorial AI — Minimal Structure-Normalization Slice: Investigation & Cost Estimate
 
+> **⛔ FROZEN by `NO_PAID_AI_BEFORE_REVENUE` (founder constraint, 2026-07-21).** The chiffrage below **still holds, unchanged** — but spike A itself is now gated by a **cost constraint** (no dependency on a paid AI API before the product generates revenue), not only by ADR-0039's strategic priority. `spike/editorial-structure-detection` stays on its branch: **not run, not deleted**, no key, no network call. Nothing is closed permanently — the `AIProvider` port is agnostic by design and a local/self-hosted model reopens this path with no re-architecture. See `docs/DECISIONS.md` → Governance Record `NO_PAID_AI_BEFORE_REVENUE`.
+
 **Status:** INVESTIGATION Design Review / CHIFFRAGE for the CTO to carry to the founder. **No code. No sprint commitment. Not a reopening of the full Editorial AI Engine** — Grammar / Style / Humanization / AIRewrite / Readability / Consistency / Citation all remain at Sprint 18+ (ADR-0039), no exception. This document answers exactly one question: **what does the minimal structure-normalization slice really cost, isolated from the rest of the engine?**
 **Date:** 2026-07-20 (session), grounded in the code on `main` at `04b1ffa`. Founder feu vert received (per CTO directive 2026-07-21).
 **Parent:** `EDITORIAL_AI_ENGINE.md` (the full engine, deferred). This slice reuses that draft's already-reconciled infrastructure decisions and narrows the *service* to one.

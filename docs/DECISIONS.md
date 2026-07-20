@@ -1545,3 +1545,19 @@ indent", i.e. "no bug". It was caught by a plausibility check, not by the toolch
 
 **Related:** `MINI_DR_TEXTMEASURER_PORT.md`, `MINI_DR_DROPCAP_OVERLAP.md`, ADR-0051,
 `TODO.md` → `DROPCAP_TEXT_OVERLAP`.
+
+---
+
+## Governance Record — 2026-07-21: `NO_PAID_AI_BEFORE_REVENUE` (founder cost constraint)
+
+**Status:** PERMANENT constraint (founder-directed via the CTO, 2026-07-21). Not an architecture decision — a standing cost condition that gates a chantier. **Distinct from ADR-0039, and superimposed on it.**
+
+**The constraint.** No part of the product may depend on a **paid AI API before the product generates revenue.** This is separate from ADR-0039's *strategic* deferral of the Editorial AI Engine to Sprint 18+: ADR-0039 said "not yet, for product-sequencing reasons"; this says "not on a metered third-party dependency at all, until there is revenue to justify it." Both hold at once; either one alone freezes the paid-AI path.
+
+**What it does NOT close.** Nothing is closed permanently. The `AIProvider` port stays **agnostic by design** (ADR-0037 dependency direction; the roadmap's own provider list includes OpenAI/Claude/Gemini/Mistral/DeepSeek **and local/self-hosted models**). The day the constraint is reconsidered — revenue exists, or a **local/self-hosted model** removes the paid dependency entirely — the path reopens with no re-architecture: a new adapter behind the existing port. A local model even satisfies the constraint directly (no paid API), at the cost of compute infrastructure worth having only then.
+
+**Immediate effect.** The Editorial AI structure-normalization slice (`EDITORIAL_AI_STRUCTURE_SLICE.md`) — including its investigation spike `spike/editorial-structure-detection` — is **frozen on this criterion**, not only on ADR-0039. The spike is **not run, not deleted**: it stays on its branch, no network call, no key, ready if the constraint changes. Its chiffrage remains valid and unchanged; only its *activation* is gated.
+
+**Why recorded as a governance constraint rather than folded into ADR-0039.** ADR-0039 is a priority ordering later sprints can legitimately revisit; this is a hard cost gate whose trigger is a business fact (revenue), not a sequencing judgment. Merging them would let a future re-prioritization silently lift the cost gate. Kept separate so lifting one never lifts the other by accident.
+
+**Related:** ADR-0039 (the strategic deferral this superimposes on), ADR-0037 (`AIProvider` provider-agnostic direction that keeps the reopen cheap), `EDITORIAL_AI_ENGINE.md` / `EDITORIAL_AI_STRUCTURE_SLICE.md` (the frozen chantier), `docs/VISION.md` §AI Features (provider-agnostic ground rule; local models in scope), `TODO.md` → `NO_PAID_AI_BEFORE_REVENUE`.
