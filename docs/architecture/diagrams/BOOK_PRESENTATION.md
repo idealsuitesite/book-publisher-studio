@@ -43,6 +43,36 @@ Two rules make the boundary load-bearing rather than decorative:
 | 5 | Real images | Populate `Block.base64` at import (parse mammoth's inline data-URLs in `HtmlNormalizer` — renderers already consume); themed sizing/caption | image height enters the model from REAL dimensions, not `DEFAULT_IMAGE_HEIGHT` | PQB already wrote the checks: §5 crit 6, §4 crit 6, §6 crit 4 |
 | 6 | Typography variations | New themes declare fonts — **hard constraint: only faces `PdfFontRegistry` really embeds** (PQB "NO_FONT_FALLBACK"); DOCX/EPUB name the same families | line heights differ per face — already handled (`lineHeight(size, {theme})`, the RENDER_DRIFT fix) | font-object inspection (PDF), `fonts.xml` (DOCX), CSS `font-family` (EPUB) |
 
+### Amendment to §4 row 4 — Drop caps (CTO-approved 2026-07-21, after the feasibility measurement)
+
+**The row as originally approved read, verbatim:**
+
+> | 4 | Drop caps per theme | trigger stays `TypographyResolver`; **form** (scale, face, span) moves to `Theme` | span is already priced atomic (Phase B exclusion) — formalize | PDF: first-glyph size/position (PQB §5 crit 4); EPUB: `::first-letter` CSS; DOCX: run-format check |
+
+**Two things in it are now known to be false. Both were found by measuring before designing
+(`backend/spikes/dropcap-feasibility-spike.ts`), which is why the row is amended rather than built on.**
+
+1. **"trigger stays `TypographyResolver`" assumed a trigger exists. It does not.** `Block.dropCap` is
+   declared (`Book.ts:166`), read by `TypographyResolver`, `LayoutEngine`, `BookMetricsCalculator`,
+   `TypographyRule` and all three renderers — and **written by nothing in the import path**. Measured:
+   **0 drop caps across 2,152 real paragraphs in all 4 corpus manuscripts.** Theming the *form* of a
+   trigger that never fires would have produced a second frozen capability. **Scope amended, CTO-approved:
+   the theme declares WHEN a drop cap applies as well as what it looks like** — as a positional
+   typographic convention (first paragraph of a chapter), never an inference about content. This does not
+   reopen §6 Q1: Q1 forbids guessing an authorial intent the document never expressed; a theme-imposed
+   convention consults only structure (is this the chapter's first paragraph), never intent.
+2. **"span is already priced atomic (Phase B exclusion) — formalize" conflates two different things.**
+   The Phase B exclusion (`LayoutEngine.ts:222`) prevents a drop-cap paragraph from being *split*. It does
+   **not** price the drop cap's extra height: `estimateBlockHeight` never mentions `dropCap` at all, so the
+   model charges a drop-cap paragraph as if its first character were body-sized while the renderer draws it
+   at `DROP_CAP_SCALE` (2.5×). **Height impact is therefore NOT "already handled" — it is real, unpriced,
+   and currently invisible only because no drop cap ever renders.** See `MINI_DR_DROP_CAPS.md`.
+
+**Also fixed by the CTO in the same verdict:** this capability themes a **known v1 approximation** — an
+enlarged first character with **no text wrap-around**. The theme may vary scale and form *within* that
+approximation, not beyond it. Real wrap-around, if it is ever needed, is its own chantier with its own R2,
+never a silent extension of this one.
+
 ## 4bis. Phase 2 — ✅ EXECUTED and CTO-validated (2026-07-21)
 
 Real image embedding shipped tri-format, exactly along §2.5's narrow path: `HtmlNormalizer` parses mammoth's data-URLs into `Block.base64`; the in-repo PNG/JPEG/GIF probe (Q4 as locked, zero dependency) supplies real intrinsic dimensions; `renderedImageSize()` is THE shared fit-to-column formula consumed by `estimateBlockHeight` (both branches) and `PDFRenderer` — R2 traced by named tests. DOCX now sniffs the real format (was hardcoded `'png'` at 300×200 — lineage bug #9) and EPUB writes the real extension. PDF gained a decode guard: an undecodable image degrades to an observable placeholder (warn + text), never killing the export; **DOCX/EPUB need no equivalent guard — verified empirically, not assumed: both embed the bytes verbatim without ever decoding them (the reader application is their decoder), confirmed by rendering a malformed PNG through both with no throw.** Found on the way: the `images.docx` fixture had carried a malformed PNG its whole life (lineage bug #8). Proof: `imageEmbedding.triformat.test.ts` on the real fixture — PDF `/Subtype /Image` XObject, DOCX `word/media/` bytes, EPUB packaged file, zero placeholders. Backend 567/567, `verify-real-export` 16/16 now exercising real embedding.
