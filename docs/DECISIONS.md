@@ -1421,3 +1421,31 @@ next time: a second intention noticed while writing a commit is raised before it
 in the closure report.**
 
 **Related:** ADR-0010 (annotate, never rewrite), `REAL_FIXTURE_POLICY.md` (disclosure over silence).
+
+---
+
+## Note — `Block.dropCap` is deprecated (2026-07-21)
+
+**Status:** DEPRECATED, deliberately NOT removed (CTO decision 2026-07-21, during the drop-cap
+mini Design Review).
+
+**The facts, measured:** `Block.dropCap` (`Book.ts:166`) is read by `TypographyResolver`,
+`LayoutEngine`, `BookMetricsCalculator`, `TypographyRule` and all three renderers, and **has never
+had a producer** — nothing in the import path has ever written it. Measured on the real corpus:
+**0 drop caps across 2,152 paragraphs in 4 manuscripts** (`backend/spikes/dropcap-feasibility-spike.ts`).
+
+**Why it is deprecated rather than kept as a future override path.** The obvious-looking reading —
+keep it alive as a per-block override for a future structure-editing capability — was proposed and
+**rejected by the CTO**, because BOOK_PRESENTATION.md Phase 1 already locked the opposite rule:
+*"block presentation lives in `Theme` as declared styles, never per-block AST overrides"* (§6 Q2,
+one of the five points approved when the chantier opened). Keeping the field alive as an override
+mechanism would contradict a locked decision, even while nobody activates it. Drop-cap presentation
+now goes through the theme (`Theme.presentation.dropCap`), per that decision.
+
+**Why it is not removed now.** Removing it is a model change touching `Book.ts` and several
+consumers; it deserves its own review if it is ever done, not a side effect of a capability's design
+review. **The field stays exactly as it is, with no planned use.**
+
+**Recorded so a future session does not rediscover it and hesitate between the two readings.**
+
+**Related:** BOOK_PRESENTATION.md §4 row 4 (as amended) and `MINI_DR_DROP_CAPS.md` §5.
