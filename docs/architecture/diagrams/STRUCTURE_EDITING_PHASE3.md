@@ -1,6 +1,6 @@
 # Manual Structure Editing — Phase 3 (Frontend) — Level-2 Design Review
 
-**Status:** 🟡 ROUND 1 — OPENED, awaiting CTO review. **No code, no branch** (two-gate discipline: this document is the deliverable; approval of the design and approval to start implementing are separate gates). Opened on the CTO's feu vert after phase 2 backend merged (`7298df2`).
+**Status:** ✅ APPROVED (CTO 2026-07-21, round 1 — all four §9 questions resolved). **Implementation authorized, starting with the D1 spike as the first step — no real `StructureEditor` code before the spike confirms `@dnd-kit`.** Locked answers: **D1** `@dnd-kit`, spike-gated (approved); **D2** separate `StructureEditor` (approved); **D3** interactions as specified (approved); **D4 — front-matter editing is Phase 3b, NOT folded into Phase 3** (a real architecture fork needing a new `editFrontMatter` backend command; folding it in would reopen the backend inside a "frontend" phase — the scope-slippage refused before on first-screen and the TextMeasurer port); **D5** Proof-correct-on-switch is sufficient, **no** live inline mini-Proof this phase (the ~600ms-per-drag cost is not worth it for this reader now; named as a future enhancement); **D6** confirmed apply, **not** optimistic (consistent with Q5 — no concurrency to manage today). Commit plan §7 approved in order, the D1 spike first. Report at each green commit (one step, one report). Phase 3b (front-matter editing) stays explicitly out of this chantier, reopened separately once Phase 3 closes.
 **Date:** 2026-07-21, grounded in the real frontend code on `main` (`c86c50a`) — every "the code does X" claim below was read, not assumed (Level-2 shape item 2; non-negotiable #7).
 **Parent:** `STRUCTURE_EDITING.md` (Level-1, six decisions locked, phases 1–2 shipped). This review is phase 3, the "Frontend" row of that Level-1's §4/§8 — the Explorer's evolution from navigator to editor.
 
@@ -91,12 +91,12 @@ Each is a recommendation with rationale; the CTO locks, amends, or rejects per r
 - The editor holds the studio at **0 axe nodes**; the desktop baseline is recaptured intentionally, with attribution.
 - No backend rendering test changes value (no R2 impact); the backend suite stays green after D1/D7.
 
-## 9. Open questions for the CTO (round 1)
+## 9. Open questions for the CTO (round 1) — ALL RESOLVED (2026-07-21)
 
-1. **D4 — front-matter editing:** accept the Phase 3 = reorder/rename/undo, front matter = Phase 3b split? Or fold front-matter editing (new `editFrontMatter` backend command) into Phase 3?
-2. **D5 — Proof:** is "the Proof station is correct the moment you open it after editing" sufficient, or do you want a live inline mini-Proof beside the editor in Phase 3 despite the ~600ms cost?
-3. **D6 — feel:** confirmed-apply first (recommended), or optimistic reorder required in Phase 3?
-4. **D1 — dependency:** OK to add `@dnd-kit` (pending the spike), given `UI_FOUNDATION` Decision 1's "headless library only where accessibility is hard" rule?
+1. **D4 — front-matter editing:** ✅ **Phase 3b split** — front-matter editing is out of Phase 3 (needs a new `editFrontMatter` backend command; folding it in would reopen the backend inside a frontend phase). Phase 3 stays reorder/rename/undo.
+2. **D5 — Proof:** ✅ **Proof-correct-on-switch is sufficient**; no live inline mini-Proof this phase (the ~600ms drag cost isn't worth it now). Named as a future enhancement.
+3. **D6 — feel:** ✅ **Confirmed-apply**, not optimistic (consistent with Q5).
+4. **D1 — dependency:** ✅ **`@dnd-kit` approved, spike-gated** — the spike is the first authorized step; no real component code before it confirms.
 
 ## Related
 `STRUCTURE_EDITING.md` (Level-1 parent; phases 1–2), `EXPLORER_PARITY.md` (the audit this closes), ADR-0052 (export/publish render the stored book — the reason an edit is even visible in output), ADR-0051 (R2 untouched), ADR-0027 (validation read-only after an edit), `UI_FOUNDATION.md` Decision 1 (build-in-house-except-accessibility, the D1 precedent), `PRODUCT_EXPERIENCE.md` §2.3/§4.5 (Explorer-as-navigator, living Proof), `PreviewPanel.tsx`/`Explorer.tsx`/`BookStructureView.tsx`/`app/projects/[id]/page.tsx` (the real code §2 measured), `FORMATTING_TOOLS_AUDIT.md` (the per-theme fine-tuning report queued *after* this closes).
