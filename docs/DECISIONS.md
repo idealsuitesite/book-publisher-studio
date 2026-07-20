@@ -1472,3 +1472,39 @@ frozen branch, where a fresh session would never see it. Documentation only — 
 code and is therefore not subject to C1's freeze.
 
 **Related:** `MINI_DR_C1_QUOTES.md`, `BOOK_PRESENTATION.md` §4 row 2.
+
+---
+
+## Reversal — the drop-cap pricing removal of 2026-07-21 is annulled (2026-07-21, same day)
+
+**Status:** REVERSAL, recorded as formally as the decision it annuls (CTO-directed). A future
+session must be able to reconstruct *why* pricing came back, not merely observe that it did.
+
+**What was decided, and on what basis.** Earlier on 2026-07-21 the CTO removed `estimateBlockHeight`
+pricing for `dropCap` blocks from the drop-cap capability's scope. The basis was a real end-to-end
+measurement (`backend/spikes/dropcap-height-spike.ts`): 120 drop-cap paragraphs versus 120 identical
+plain ones produced **model 25 → 25 pages, real 25 → 25 pages, reconciliations 0 → 0**. Charged
+equalled consumed, so there appeared to be nothing to charge, and adding a term would have
+over-charged and produced under-full pages.
+
+**Why it is annulled.** Word's own layout engine, measured on the same fixture
+(`backend/spikes/dropcap-render-docx.ts` + Word 16.0 COM), reports for two documents differing only
+by the drop cap: **`plain.docx` 3 pages / 61 lines / 397 words** versus **`with-dropcaps.docx` 4
+pages / 61 lines / 397 words**. Same lines, same words, one more page — Word grows the line boxes to
+fit the enlarged run. PDFKit's page count stayed flat on the same content **because it does not grow
+the lines: it overlaps them** (`DROPCAP_TEXT_OVERLAP`).
+
+**The height invariance was therefore the SIGNATURE of the bug, not evidence of its absence.**
+
+**The principle this establishes, which outlives this decision.** *R2 verifies that charged equals
+consumed. It does not verify that what is consumed is correct.* The two questions are independent,
+and agreement between the model and the renderer can be agreement on a shared description of a
+corrupt layout. A cost of exactly zero where a cost was expected is itself a finding to investigate,
+not a result to accept.
+
+**Consequence.** Pricing returns to the scope of the overlap fix, where it is the central subject
+rather than a compliance item: indenting the overlapped lines narrows their wrap width, which adds
+lines, which adds height — the cost Word already demonstrates. It is the **fix** that creates the
+height cost, not the drop cap; the original decision was correct for the behaviour as it stood.
+
+**Related:** `TODO.md` → `DROPCAP_TEXT_OVERLAP`, `MINI_DR_DROP_CAPS.md` §3, ADR-0051.
