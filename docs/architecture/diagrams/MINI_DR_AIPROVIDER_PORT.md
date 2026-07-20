@@ -17,6 +17,14 @@
 
 The founder's direction overrides this **deliberately and narrowly**: the value here is the *anchor*, not a working capability — a fixed point the future engine attaches to, declaring the architectural intent (an agnostic AI boundary, ADR-0037) while every implementation stays suspended. This review records it as a **disclosed, deliberate exception**, not an oversight. The mitigation is minimality (§3): the less the shape asserts, the less a real first consumer can later prove wrong.
 
+## 2bis. The exit condition — mandatory, so this exception is not permanent debt
+
+A disclosed exception without an exit condition is permanent debt wearing a decision's clothes. This one has a hard trigger, non-negotiable:
+
+> **When Sprint 18 unblocks (`NO_PAID_AI_BEFORE_REVENUE` lifted), the port's shape MUST be revalidated against a real implementation — even `FakeAIProvider` alone, with no paid adapter — BEFORE any wiring into the pipeline (`ASTBuilder` / `ThemeEngine` / a use case). It is NOT assumed correct by default because it compiled on paper months earlier.**
+
+The shape written here is *provisional until confronted with real code*. If the first real implementation reveals it is wrong, it is refined then — expected, not churn. This is exactly how every other port in this project earned its shape (`ValidationRuleProvider`, `Renderer` — each proven by a real implementation in the same sprint). This port is the deliberate exception; this trigger is what keeps its validation **deferred, not skipped**. The trigger is recorded as a standing condition in `TODO.md` (`NO_PAID_AI_BEFORE_REVENUE`), not only here, so lifting the suspension surfaces it.
+
 ## 3. The proposed shape (minimal, agnostic — for CTO approval)
 
 A single Domain port with one method and the smallest agnostic request/response that still fits any provider (OpenAI-compatible chat, Anthropic messages, or a local model). No vendor name anywhere (ADR-0037). Placed at `backend/src/domain/ports/AIProvider.ts`, beside `Renderer`, `DocumentParser`, `LayoutSelector`.
@@ -54,7 +62,7 @@ export interface AIProvider {
 - `maxTokens`/`temperature` are optional agnostic hints, not required — an adapter may ignore them.
 
 ## 4. Risks
-1. **Speculative shape, no consumer to validate it** — the §2 tension. Accepted deliberately (founder direction); mitigated by minimality and an explicit "provisional" doc-comment so a future refinement reads as expected, not as churn.
+1. **Speculative shape, no consumer to validate it** — the §2 tension. Accepted deliberately (founder direction); mitigated by minimality, an explicit "provisional" doc-comment, and the **mandatory §2bis revalidation trigger** (the exception has a hard exit condition, not an open-ended pass).
 2. **An exported interface with no implementation and no test** — correct and acceptable: an interface has no behaviour to test, and an unused *export* is not an eslint/tsc error. Coverage is unaffected (types carry none).
 3. **The anchor could invite premature wiring** — guarded by the doc-comment and this review's out-of-scope list; the port compiles and sits inert, exactly like `Block.dropCap` did before it had a producer.
 
