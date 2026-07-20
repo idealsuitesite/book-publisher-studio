@@ -1,6 +1,6 @@
 # Second Book Presentation Theme — Level-2 Design Review (short)
 
-**Status:** 🟡 DRAFT — awaiting CTO approval **and an aesthetic direction** (§4 is the CTO's call, not mine). The **active** chantier (CTO arbitration 2026-07-21: second theme in code first, structure review in parallel).
+**Status:** ✅ APPROVED (mechanism) + direction **A "Modern"** chosen; **steps 1-3 MERGED** to `main` (`e5954e9` — theme + registry + gallery + own parity/calibration `§10.4`). **One thing still open: the CTO's screenshot-loop judgment of the exact accent shade (`#1D4E68`)** on real pages — the studio's PDF proof cannot be captured in the headless env, so the CTO judges locally (the accent is objectively correct in the render; only the shade preference remains).
 **Date:** 2026-07-21, grounded in code on `main` at `87f555d` and verified **live** in L'Atelier this session.
 **Scope (CTO's words):** data + one registry line + a clean parity/calibration verification, then code. Deliberately short — no new architecture.
 

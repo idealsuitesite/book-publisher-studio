@@ -1,6 +1,6 @@
 # Manual Structure Editing — Level-1 Design Review (round 1, OPENED)
 
-**Status:** 🟡 ROUND 1 — OPENED, awaiting CTO review. **No code, no branch.** Opened in parallel with the second-theme chantier (CTO arbitration 2026-07-21: theme in code first, this review runs alongside, no code before it is separately approved). This is the "own Level-1 Design Review" `EXPLORER_PARITY.md` and `IMPORT_FIDELITY.md` both defer to.
+**Status:** ✅ APPROVED (CTO 2026-07-21, six decisions locked — §5). **Phase 1 MERGED** to `main` (`992688b`, `BookEditingService`). **Phase 2 CORE on `feature/structure-editing-phase2`** (`8b9f65a`, UNMERGED, green — `EditBookUseCase` + generic mutation route + undo). **The ONE remaining phase-2 commit is front-matter-as-user-content (Q3):** `FrontMatterBuilder` stops synthesising and the three renderers render stored content — split out for its blast radius, to land before phase 3 (frontend). This is the "own Level-1 Design Review" `EXPLORER_PARITY.md` and `IMPORT_FIDELITY.md` both defer to.
 **Date:** 2026-07-21, grounded in code on `main` at `87f555d` and the live audit in `EXPLORER_PARITY.md`.
 
 ---

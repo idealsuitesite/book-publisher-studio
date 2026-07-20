@@ -1,6 +1,6 @@
 # Mini Design Review — the `AIProvider` port as an architectural anchor (interface only)
 
-**Status:** 🟡 MINI DESIGN REVIEW — awaiting CTO approval. **No code written.** A Domain interface commits a *shape*, not just a line of code (the standing rule, `DESIGN_REVIEW_PROCESS.md`), so even this small artifact is reviewed before it is written.
+**Status:** ✅ APPROVED (CTO 2026-07-21, all three §5 points) and **MERGED** to `main` (`aab9af9`, `backend/src/domain/ports/AIProvider.ts` — interface only, §6 verified: zero vendor names, no implementation, inert). The §2bis exit-condition ships in the file's own doc-comment. A Domain interface commits a *shape*, not just a line of code (the standing rule, `DESIGN_REVIEW_PROCESS.md`), which is why it was reviewed before it was written.
 **Date:** 2026-07-21
 **Scope (strict, founder-directed):** produce **one** artifact — an empty, provider-agnostic `AIProvider` Domain interface, as an anchor point. **Nothing else.**
 **Explicitly out of scope, suspended with the rest** (`NO_PAID_AI_BEFORE_REVENUE`, `EDITORIAL_AI_STRUCTURE_SLICE.md` §3 "items B"): `FakeAIProvider`, any real adapter, secret management, and any wiring into `ASTBuilder` / `ThemeEngine` / a use case. This review authorizes an interface, not a functional brick.
