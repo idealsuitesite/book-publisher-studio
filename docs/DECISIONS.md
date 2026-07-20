@@ -1449,3 +1449,26 @@ review. **The field stays exactly as it is, with no planned use.**
 **Recorded so a future session does not rediscover it and hesitate between the two readings.**
 
 **Related:** BOOK_PRESENTATION.md §4 row 4 (as amended) and `MINI_DR_DROP_CAPS.md` §5.
+
+---
+
+## Note — the tri-format quote unification will change the shipped EPUB inset (2026-07-21)
+
+**Status:** TRACEABILITY NOTE, recorded on `main` ahead of the change (CTO-directed 2026-07-21).
+
+Phase 3 C1 unifies the three divergent quote presentations onto one declared theme value,
+`Theme.presentation.quote.indentPt` (36pt). Today the three renderers disagree **in kind, not only
+in number**: PDF applies a FIRST-LINE indent of 36pt, DOCX a true block inset of 720 twips, EPUB a
+`1.5em` margin (~16.5pt). "Indented quote" therefore means three different things in three formats.
+
+**When C1 merges, the shipped EPUB inset changes from ~16.5pt to 36pt.** That is the intended
+unification, not a regression — but it is a real change to delivered output and is recorded here
+deliberately.
+
+**Why this note is on `main` while the change is not.** C1 is frozen without a date
+(`TODO.md` → `C1_QUOTE_PRESENTATION_UNBLOCK`: 0 of 4 corpus manuscripts contain a quote block, and
+the CTO refuses to unblock it with a fabricated fixture). Its own record of this change lives on the
+frozen branch, where a fresh session would never see it. Documentation only — this note touches no
+code and is therefore not subject to C1's freeze.
+
+**Related:** `MINI_DR_C1_QUOTES.md`, `BOOK_PRESENTATION.md` §4 row 2.
