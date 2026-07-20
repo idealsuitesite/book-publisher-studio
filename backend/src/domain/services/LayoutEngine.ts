@@ -377,9 +377,16 @@ export class LayoutEngine {
         case 'scripture':
           return measure(block.text);
         case 'list':
-          // Items render as separate lines; measuring them joined by newlines matches the
-          // renderer's per-item text calls to within wrapping.
-          return measure(block.items.join('\n'));
+          // Each item renders WITH its bullet/number prefix ('• ' / 'N. '), which the old
+          // join omitted — so a near-boundary item wrapped one line further at draw time than
+          // at measure time, a systematic under-charge that made atomic lists overflow into
+          // silent reconciliation pages (LIST_PAGINATION_DRIFT.md, the list analogue of
+          // RENDER_DRIFT fix 1: charge what the renderer spends). PDFKit's per-item indent
+          // shifts only the first line, so the wrap width stays the full column — measure at
+          // usableWidth, prefixes included, still joined by newline (each item is its own line).
+          return measure(
+            block.items.map((item, i) => (block.ordered ? `${i + 1}. ` : '• ') + item).join('\n')
+          );
         case 'table':
           return (1 + block.rows.length) * line + spaceAfter;
         case 'footnote':
