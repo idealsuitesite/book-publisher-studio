@@ -8,6 +8,9 @@ import type { Chapter, Section, Heading, Paragraph, Image, List, Table, Footnote
 import type { PageLayout } from '../models/PageLayout';
 import type { Theme } from '../models/Theme';
 import type { TextMeasurer } from '../ports/TextMeasurer';
+import { PdfKitTextMeasurer } from '../../infrastructure/fonts/PdfKitTextMeasurer';
+import { getTheme } from '../themes/getTheme';
+import { LetterPageLayout } from '../layouts/LetterPageLayout';
 
 const LETTER_LAYOUT: PageLayout = {
   pageSize: 'letter',
@@ -152,6 +155,46 @@ describe('LayoutEngine', () => {
     const result = engine.paginate(styled, LETTER_LAYOUT);
 
     expect(result.pages[0].blocks).toEqual(['l-1', 't-1', 'f-1']);
+  });
+
+  // LIST_PAGINATION_DRIFT.md: the measured-mode list estimate must charge for the bullet/number
+  // PREFIX each item renders with — omitting it under-charged near-boundary items by a line
+  // and made atomic lists overflow into silent reconciliation pages. The honest property
+  // (docs/TESTING_STRATEGY.md): assert the charge INCLUDES the prefix, not merely "does not
+  // throw". An item long enough to wrap right at the column edge charges more WITH its prefix.
+  it('charges a list for its item prefixes (measured mode, LIST_PAGINATION_DRIFT)', () => {
+    const measurer = new PdfKitTextMeasurer();
+    const measuredEngine = new LayoutEngine(measurer);
+    const theme = getTheme('classic');
+    const uw = LetterPageLayout.width - LetterPageLayout.marginLeft - LetterPageLayout.marginRight;
+    const fontSize = 11;
+    const H = (t: string) => measurer.measureHeight(t, { fontSize, width: uw, theme });
+
+    // Deterministically find an item that is exactly one line bare but wraps to two WITH the
+    // '• ' prefix — the near-boundary case the old join-without-prefix under-charged.
+    const oneLine = H('word');
+    let item = 'word';
+    for (let n = 2; n < 400; n++) {
+      const candidate = 'word '.repeat(n).trim();
+      if (H(candidate) <= oneLine && H('• ' + candidate) > oneLine) {
+        item = candidate;
+        break;
+      }
+    }
+    expect(H(item)).toBeLessThanOrEqual(oneLine); // sanity: bare fits one line
+    expect(H('• ' + item)).toBeGreaterThan(oneLine); // and the prefix pushes it to two
+
+    const styled = styledBookFrom([chapter([list('l-x', [item])])]);
+    const est = measuredEngine as unknown as {
+      estimateBlockHeight(b: unknown, s: unknown, w: number): number;
+    };
+    const withPrefix = est.estimateBlockHeight(styled.book.mainContent[0].content[0], styled, uw);
+    const spaceAfter = styled.blockStyles['l-x']?.spaceAfter ?? 8;
+
+    // The honest property: the estimate charges the PREFIXED measurement, not the bare text —
+    // so it is a full line taller than the old formula would have charged for this item.
+    expect(withPrefix).toBeCloseTo(H('• ' + item) + spaceAfter, 5);
+    expect(withPrefix).toBeGreaterThan(H(item) + spaceAfter);
   });
 
   it('paginates blocks nested in sections and subsections, in document order', () => {

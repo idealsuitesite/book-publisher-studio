@@ -1,8 +1,30 @@
 # List-Dense Pagination Drift — Investigation (diagnostic only, no fix)
 
-**Status:** 🔍 **FINDINGS — awaiting CTO. No code changed.** Ordered by the CTO (2026-07-21) after a real 9,280-word manuscript ("The Art of Captivating and Selling" — bullet-list-dense, single-line paragraphs, structurally undetected / 0 chapters) showed the near-empty-page pattern again. Same discipline as `RENDER_DRIFT.md`: reproduce live, measure, classify — **and explicitly do not assume this is the already-disclosed prose residual.** It is not.
+**Status:** ✅ **REAL DOCUMENT MEASURED + LIST ESTIMATE TIGHTENED (CTO-authorized 2026-07-21). See §5.** The measurement fix improves accuracy (a real fidelity gain, zero prose regression) but does NOT bring the list-dense document under the locked `≤ 2` threshold — that is the calibration question, still gated on ≥3 corpus manuscripts. Classified: quality defect, not an ADR-0050 violation. Ordered by the CTO (2026-07-21) after a real 9,280-word manuscript ("The Art of Captivating and Selling" — bullet-list-dense, single-line paragraphs, structurally undetected / 0 chapters) showed the near-empty-page pattern again. Same discipline as `RENDER_DRIFT.md`: reproduce live, measure, classify — **and explicitly do not assume this is the already-disclosed prose residual.** It is not.
 
 **Date:** 2026-07-21
+
+---
+
+## 5. Executed (2026-07-21) — real document measured, list estimate tightened
+
+**The real manuscript arrived** (CTO dropped it in `backend/uploads/`, gitignored — measured, not committed to the corpus). Direct measurement corrected the proxy extrapolation:
+
+| | proxy prediction | **real document** |
+|---|---|---|
+| words / chapters / tables | — | 9,280 / **0** / **0** (confirms: not Défaut A) |
+| lists / items | — | **214 / 1,067** (extremely list-dense) |
+| unplanned reconciliations | ~7 (extrapolated) | **5** (rate 3.7/100, not the proxy's 8.3) |
+
+**5 > the locked `≤ 2`** — the under-calibration hypothesis is confirmed on real data; the proxy had the direction right and the magnitude wrong (exactly why the file was needed). The "near-empty pages" the CTO saw ARE these 5 reconciliation pages (each holding 1-2 lines of atomic-list overflow) — the model-page fill metric can't see them, which is why it reported only 1 page < 30%.
+
+**List-height estimate tightened (CTO-authorized, this branch).** The old estimate measured `items.join('
+')` WITHOUT the bullet/number prefix each item renders with; PDFKit's per-item indent shifts only the first line, so the wrap width is the full column, and the omitted 2-char prefix let a near-boundary item wrap one line further at draw than at measure — a systematic under-charge. Fixed: measure the items WITH prefixes. Measured effect (real fixtures, no synthetic):
+- PM-notes: per-list estimate error **4.7 → 0.0pt**, under-charges **1 → 0**, reconciliations **1 → 0**.
+- Art of Captivating: per-list under-charges **11 → 8**; Faith (prose): **unchanged, zero regression**.
+- **Honest limit:** Art's **5 reconciliations did NOT drop** — the residual is not the prefix under-charge but pure atomicity (a list that genuinely does not fit the page remainder overflows regardless of how precisely it is charged). Locked by a property test (`LayoutEngine.test.ts`: the estimate charges the prefixed measurement).
+
+**What this fix does and does not do:** it closes the *measurement* gap (the list analogue of RENDER_DRIFT fix 1), improving accuracy and eliminating one document's reconciliations — a real fidelity gain. It does **not** bring Art under the `≤ 2` threshold; that is the calibration question (`RECALIBRATE_PAGE_RATIO_TOLERANCE`, still gated on ≥3 corpus manuscripts, CTO not authorized) and/or a future list-splitting capability (LAYOUT_FIDELITY Decision 7 excludes lists today) — neither in scope here. The 5 reconciliations remain fully observable (ADR-0051): loud, not silent.
 
 ---
 
