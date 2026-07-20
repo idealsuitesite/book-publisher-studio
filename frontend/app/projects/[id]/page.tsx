@@ -17,7 +17,7 @@ import { Inspector, inspectorRows } from '@/components/studio/Inspector';
 import { BookDashboard } from '@/components/studio/BookDashboard';
 import { ReadyForPrint } from '@/components/studio/ReadyForPrint';
 import { CommandPalette, type PaletteCommand } from '@/components/studio/CommandPalette';
-import { BookStructureView } from '@/components/BookStructureView';
+import { StructureEditor } from '@/components/studio/StructureEditor';
 import { FormatSelector } from '@/components/FormatSelector';
 import { PreviewPanel } from '@/components/PreviewPanel';
 import { PublishDesk } from '@/components/studio/PublishDesk';
@@ -233,14 +233,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
             onNavigate={setView}
           />
         )}
-        {view === 'structure' && (
-          <BookStructureView
-            book={project.book}
-            filename={project.sourceFilename ?? null}
-            onReset={() => router.push('/')}
-            structureFinding={unstructuredFinding(project.report)}
-          />
-        )}
+        {view === 'structure' && <StructureEditor project={project} />}
         {view === 'validation' && <ReadyForPrint report={project.report} />}
         {view === 'layout' && settingsError && (
           <p className="text-sm text-app-error">{settingsError}</p>
