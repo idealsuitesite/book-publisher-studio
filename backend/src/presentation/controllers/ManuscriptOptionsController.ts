@@ -13,6 +13,7 @@ import { listLayoutNames } from '../../domain/services/ManualLayoutSelector';
 // degrades the display, it never removes the option from the response.
 const THEME_LABELS: Record<string, string> = {
   classic: 'Classic',
+  modern: 'Modern',
 };
 
 const LAYOUT_LABELS: Record<string, string> = {
