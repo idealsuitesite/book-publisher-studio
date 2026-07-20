@@ -12,7 +12,7 @@ A global publishing software platform (DOCX import, AST-based book model, PDF/EP
 2. **Never expose Domain objects to Presentation** — DTOs and Mappers only. → `docs/DEVELOPER_HANDBOOK.md`
 3. **Always use Dependency Inversion** — constructor injection, ports over concrete classes where more than one real implementation is plausible. → `docs/DEVELOPER_HANDBOOK.md`
 4. **A Design Review precedes non-trivial code** — new engines, new ports, new dependencies, or an approach with two genuinely different options all need one, approved before a branch exists. → `docs/DESIGN_REVIEW_PROCESS.md`
-5. **Real fixtures over synthetic ones** — for import, pagination, TOC, renderer, and publishing changes, verify against a real manuscript, not only hand-built test objects. This project has shipped nine real bugs that passed 100% synthetic-fixture coverage (ADR-0019, ADR-0020, ADR-0031, IMPORT_FIDELITY commit 3, RENDER_DRIFT, the ADR-0051 annex, the ADR-0050 annex — full lineage in the policy doc). → `docs/REAL_FIXTURE_POLICY.md`
+5. **Real fixtures over synthetic ones** — for import, pagination, TOC, renderer, and publishing changes, verify against a real manuscript, not only hand-built test objects. This project has shipped eleven real bugs that passed 100% synthetic-fixture coverage (ADR-0019, ADR-0020, ADR-0031, IMPORT_FIDELITY commit 3, RENDER_DRIFT, the ADR-0051 annex, the ADR-0050 annex, TABLE_DUPLICATION Défaut A/B — full lineage in the policy doc). → `docs/REAL_FIXTURE_POLICY.md`
 6. **No feature is done until Code, Product, and Documentation all pass** — this is now a formal governance principle, not just a habit. → `docs/DECISIONS.md` (ADR-0032) and `docs/QUALITY_GATE.md`
 
 ## Where everything lives

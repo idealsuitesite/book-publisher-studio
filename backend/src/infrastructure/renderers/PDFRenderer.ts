@@ -294,9 +294,29 @@ export class PDFRenderer implements Renderer<Buffer> {
     const runningHead = book.styledBook.theme.runningHead;
     const range = doc.bufferedPageRange();
 
+    // TABLE_DUPLICATION.md Défaut B: an unplanned (reconciliation) page copies the PREVIOUS
+    // page's owner (PDFRenderer.ts, the addPage wrapper) — right for the running-head TITLE
+    // (the spilled text belongs to the same chapter) but wrong for the page NUMBER, which
+    // must still advance. One field, two jobs; ADR-0051 fixed the title, silently broke the
+    // number. The fix separates them: the copied owner keeps carrying the title, and the
+    // displayed number becomes `owner.number + insertionsSoFar` — every reconciliation shifts
+    // the physical sequence one ahead of the model's own numbering, so this offset re-aligns
+    // it into a strictly-increasing run. A reconciliation page is identified by REFERENCE
+    // equality with the previous owner (planned pages each push a DISTINCT `Page` object; only
+    // the wrapper pushes a duplicate reference). `startPageNumber` — never populated by the
+    // real pipeline today, but honored via `owner.number` — keeps working: its reset rides
+    // along in `owner.number`, and the offset stays consistent within the new sequence.
+    let insertions = 0;
+    let prevOwner: PageOwner = undefined;
+
     for (let i = range.start; i < range.start + range.count; i++) {
       const owner = pageOwners[i];
-      if (owner === 'blank') continue;
+      if (owner === 'blank') {
+        prevOwner = owner;
+        continue;
+      }
+      const isReconciliation = owner !== undefined && owner === prevOwner;
+      if (isReconciliation) insertions += 1;
 
       doc.switchToPage(i);
       const { width, height, margins } = doc.page;
@@ -314,7 +334,10 @@ export class PDFRenderer implements Renderer<Buffer> {
         }
 
         if (runningHead.pageNumber) {
-          const displayNumber = owner?.number ?? i + 1;
+          // owner.number honors startPageNumber; +insertions re-aligns physical progression
+          // past reconciliation pages (see the block comment above). Drift/undefined owners
+          // (ADR-0013) still fall back to the physical index.
+          const displayNumber = owner?.number !== undefined ? owner.number + insertions : i + 1;
           doc.font(this.fonts.resolveDefault(false, false)).fontSize(runningHead.size ?? 9).fillColor('#000');
           doc.text(`Page ${displayNumber} of ${range.count}`, margins.left, height - 50, {
             width: contentWidth,
@@ -325,6 +348,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       }
 
       doc.page.margins.bottom = savedBottom;
+      prevOwner = owner;
     }
   }
 

@@ -64,7 +64,12 @@ const CORPUS: CorpusExpectation[] = [
   {
     file: 'pm-notes-unstyled-fr.docx',
     chapters: 0,
-    words: 1_424,
+    // 1,403, not the pre-fix 1,424: the TABLE_DUPLICATION fix (ADR-0050) stopped a NESTED
+    // list's items from being counted twice (once by the parent list's descendant find, once
+    // by the inner list emitted separately). This harness caught the change — closing the
+    // class, not just the observed table symptom. Ground truth (mammoth, tags stripped) is
+    // 1,396; 1,403 is the honest tokenized count, 1,424 was inflated by the duplication.
+    words: 1_403,
     mustFind: [],
     mustNotFind: ['UNSTRUCTURED_MANUSCRIPT', 'EMPTY_HEADING_DROPPED'],
     createsProject: true,
