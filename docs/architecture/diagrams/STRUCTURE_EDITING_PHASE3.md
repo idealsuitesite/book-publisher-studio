@@ -45,6 +45,19 @@ Each is a recommendation with rationale; the CTO locks, amends, or rejects per r
 
 - **D7 — `StructureMutation` moves to `shared-types`.** The Level-1 review pre-committed this ("when the frontend needs it, this moves to shared-types"). Phase 3 is that moment: the type becomes the shared contract the new client call and the backend both import, so the discriminated union can never drift between the two sides.
 
+## 3bis. D1 spike result (2026-07-21) — `@dnd-kit` confirmed stack-compatible; a verification-approach finding
+
+The D1 spike ran (throwaway `app/spike-dnd` route + a throwaway vitest, both deleted; the `@dnd-kit/core` 6.3.1 / `@dnd-kit/sortable` 10.0.0 / `@dnd-kit/utilities` dependency is kept). **What it confirmed, positively:**
+- Installs under React 19.2 / Next 16.2 with **no peer-dependency conflict** (no `ERESOLVE`); compiles (`tsc` clean); renders in the real browser.
+- The **KeyboardSensor activates** a drag (Space → `onDragStart` fired), **collision detection runs** (`onDragOver` fired), and dnd-kit's **accessibility scaffolding is real and active**: a built-in screen-reader-instructions region, a live `status` region, and drag-lifecycle announcements that fire and are observable.
+- **Zero console errors and zero React-19 warnings.** The frontend gate stays green with the dependency added (tsc, eslint, 139/139).
+
+**What it could NOT reproduce, and why (disclosed, not hidden):** a *completed* reorder — the item actually changing position on drop. The drag **starts** everywhere but the **move step** (ArrowDown advancing `over`, or a pointer drag streaming past the next item) never lands, in **both** automated environments, for **environmental** reasons:
+- **jsdom** has no layout engine and doesn't drive the `requestAnimationFrame`/measuring pipeline dnd-kit's keyboard coordinate-getter depends on (trace stopped at `start c1 → over c1->c1`; forcing `MeasuringStrategy.Always`, dispatching the arrow on `document`, and a synchronous rAF stub did not change it).
+- The **browser-automation harness** doesn't produce genuine OS-level pointer input, so dnd-kit's PointerSensor (pointer-capture + coordinate deltas) never sees a faithful gesture — even a hand-streamed `pointermove` sequence with real coordinates left `over` on the origin.
+
+Neither is evidence of a dnd-kit or React-19 defect (dnd-kit sortable is used at scale on React 18/19); both are limits of *these test harnesses*. **This is a real spike outcome with a plan consequence:** reorder-*completion* cannot be proven by a jsdom component test (commit 4's original assumption). See the revised verification approach in §7/§8 and open question 5.
+
 ## 4. Architecture impact
 
 - **No rendering-pipeline change, no engine, no R2 surface.** Editing produces a new `Book`; the same deterministic `ThemeEngine → TypographyResolver → LayoutEngine → Renderer` re-paginates it (already true since phase 2). The charged-vs-consumed contract (ADR-0051) is untouched. **No parity re-lock.** The *only* backend touch in Phase 3 is D7 (move a type to shared-types) — additive, no signature break.
@@ -74,17 +87,17 @@ Each is a recommendation with rationale; the CTO locks, amends, or rejects per r
 1. **`shared-types`: add `StructureMutation`** (D7); backend imports it (no behaviour change; backend suite stays green).
 2. **`editStructure` client function** + unit tests (mirror `updateProjectSettings.test`).
 3. **`StructureEditor` — read-only parity first:** renders the chapter/section list + the unstructured banner, no editing yet; wired at the `structure` station; **baseline recapture** (intentional desktop change).
-4. **Reorder** (dnd-kit, mouse + keyboard) → `editStructure({reorderChapters})` → server-authoritative update (D6); renumber reflected; announcement; component test incl. keyboard-only reorder.
-5. **Inline rename** (click-to-edit, Enter/Esc/empty-reject) → `editStructure({rename})`; component test for commit + cancel.
+4. **Reorder** (dnd-kit, mouse + keyboard) → `editStructure({reorderChapters})` → server-authoritative update (D6); renumber reflected; announcement. **Verification split per the §3bis spike:** unit-test our own `onDragEnd` **handler** directly (given `{active, over}`, it calls `arrayMove` + `editStructure` with the right indices, and applies the returned `ProjectDTO`) — decoupled from dnd-kit's gesture pipeline, which jsdom cannot drive; the *gesture itself* is proven in commit 8.
+5. **Inline rename** (click-to-edit, Enter/Esc/empty-reject) → `editStructure({rename})`; component test for commit + cancel (plain inputs, fully jsdom-testable).
 6. **Undo** affordance → `editStructure({restoreVersion})`; test that undo restores the prior order/title.
 7. **Living Proof link** (D5): compose the Proof key with `versions.length`; test that an edit advances the key.
-8. **Real end-to-end verification + docs/ADR reconciliation:** reorder a real imported book in the running studio (Browser pane), switch to Proof, confirm the PDF shows the new order with no manual export; axe 0 nodes on the editor; undo restores. Reconcile `STRUCTURE_EDITING.md` (phase 3 done), `CURRENT_STATE`/`TODO`, and record any ADR (e.g., the dnd-kit dependency decision).
+8. **Real end-to-end verification (real browser) + docs/ADR reconciliation:** a **Playwright** test (the project already has Playwright for baselines — its real mouse/keyboard input drives dnd-kit faithfully, unlike jsdom) drags a chapter in the running studio and asserts the new order persists; plus a manual Browser-pane pass — reorder a real imported book, switch to Proof, confirm the PDF shows the new order with no manual export; axe 0 nodes on the editor; undo restores. Reconcile `STRUCTURE_EDITING.md` (phase 3 done), `CURRENT_STATE`/`TODO`, and record an ADR for the dnd-kit dependency + the §3bis verification-split finding.
 
 *(Phase 3b, separate: `editFrontMatter` backend command + front-matter form — only if the CTO doesn't fold it into Phase 3 per D4.)*
 
 ## 8. Acceptance criteria (concrete, inspectable)
 
-- A chapter can be moved from position 5 to position 1 **by keyboard alone**, with an audible-to-AT announcement; chapters renumber; the change persists across a reload.
+- A chapter can be moved from position 5 to position 1 (mouse and keyboard), with an AT announcement; chapters renumber; the change persists across a reload. **Proven in a real browser (Playwright), not jsdom** (§3bis) — our `onDragEnd` handler is unit-tested separately.
 - A chapter/section can be renamed inline; Enter commits, Esc cancels, an empty title is refused.
 - After any edit, **switching to the Proof station shows the new structure already re-inked — no Generate, no manual re-export** (the D5 payoff, verified in the real browser).
 - **Undo** restores the immediately-prior state (order or title), and the History station shows the versions the edits created.
@@ -96,7 +109,11 @@ Each is a recommendation with rationale; the CTO locks, amends, or rejects per r
 1. **D4 — front-matter editing:** ✅ **Phase 3b split** — front-matter editing is out of Phase 3 (needs a new `editFrontMatter` backend command; folding it in would reopen the backend inside a frontend phase). Phase 3 stays reorder/rename/undo.
 2. **D5 — Proof:** ✅ **Proof-correct-on-switch is sufficient**; no live inline mini-Proof this phase (the ~600ms drag cost isn't worth it now). Named as a future enhancement.
 3. **D6 — feel:** ✅ **Confirmed-apply**, not optimistic (consistent with Q5).
-4. **D1 — dependency:** ✅ **`@dnd-kit` approved, spike-gated** — the spike is the first authorized step; no real component code before it confirms.
+4. **D1 — dependency:** ✅ **`@dnd-kit` approved, spike-gated** — the spike is the first authorized step; no real component code before it confirms. **Spike done (§3bis): stack-compatibility CONFIRMED; dependency kept.**
+
+**New open question raised by the spike (round 2 — for the CTO):**
+
+5. **Reorder verification approach (from §3bis).** The spike showed reorder-*completion* can't be driven in jsdom or the headless browser-automation harness (both environmental, not a dnd-kit defect). The proposed split: **unit-test our `onDragEnd` handler logic** (jsdom, reliable) + **prove the real gesture with a Playwright real-browser test** at commit 8. Is that acceptable, or do you want reorder-completion gated some other way (e.g., accept a documented manual Browser-pane verification instead of Playwright)? This is the one thing I'd like your call on before building commit 4.
 
 ## Related
 `STRUCTURE_EDITING.md` (Level-1 parent; phases 1–2), `EXPLORER_PARITY.md` (the audit this closes), ADR-0052 (export/publish render the stored book — the reason an edit is even visible in output), ADR-0051 (R2 untouched), ADR-0027 (validation read-only after an edit), `UI_FOUNDATION.md` Decision 1 (build-in-house-except-accessibility, the D1 precedent), `PRODUCT_EXPERIENCE.md` §2.3/§4.5 (Explorer-as-navigator, living Proof), `PreviewPanel.tsx`/`Explorer.tsx`/`BookStructureView.tsx`/`app/projects/[id]/page.tsx` (the real code §2 measured), `FORMATTING_TOOLS_AUDIT.md` (the per-theme fine-tuning report queued *after* this closes).
