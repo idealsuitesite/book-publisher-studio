@@ -1353,6 +1353,8 @@ The two renderers that return `pageCount: undefined` are not gaps - they are the
 
 **Related:** ADR-0025/0031/0032 (the scars), ADR-0049 (naming loss instead of hiding it), ADR-0051 (the rendering corollary), `docs/PUBLICATION_QUALITY_BAR.md` §3 ("a quality claim that cannot be checked by a script is a hope").
 
+**Annex (2026-07-21, CTO-directed — the eighth and ninth real-fixture bugs, recorded here because their pattern is this ADR's own argument):** the day Phase 2 (BOOK_PRESENTATION.md) made image embedding REAL, two long-lived lies surfaced at once. **#8**: the `images.docx` verification fixture had carried a malformed PNG (bad IDAT length) its entire life — invisible because, before Phase 2 populated `Block.base64`, nothing ever decoded those bytes; the strict PDFKit decoder refused what browsers had silently tolerated. **#9**: `DOCXRenderer` hardcoded `type: 'png'` and 300×200 for every image regardless of real format or size — a format lottery that no test could see while no image bytes ever flowed. Both fixed the same day (generator + fixture regenerated; format sniffed, dimensions probed and proportional), both locked by the tri-format embedding test. The lineage (`docs/REAL_FIXTURE_POLICY.md`) stands at **nine for nine** — nine bugs invisible to fully green synthetic suites, each caught only when something real flowed through the code.
+
 ---
 
 ## ADR-0051: The Renderer Never Breaks a Page on Its Own Initiative

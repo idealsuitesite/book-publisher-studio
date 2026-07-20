@@ -137,4 +137,38 @@ describe('BookStructureView', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
   });
+
+  // EXPLORER_PARITY §4 (CTO-approved immediate build): per-part word counts, computed
+  // client-side from the same AST walk the global figure uses.
+  describe('per-chapter word counts', () => {
+    it('shows real word counts per chapter and per section', async () => {
+      const user = userEvent.setup();
+      const chapters = [
+        {
+          type: 'chapter' as const,
+          id: 'c-1',
+          number: 1,
+          title: 'Counted',
+          content: [{ type: 'paragraph' as const, id: 'p-1', text: 'one two three four five' }],
+          sections: [
+            {
+              type: 'section' as const,
+              id: 's-1',
+              level: 2,
+              title: 'Sub',
+              content: [{ type: 'paragraph' as const, id: 'p-2', text: 'six seven' }],
+            },
+          ],
+        },
+      ];
+      render(
+        <BookStructureView book={book({ mainContent: chapters })} filename="b.docx" onReset={() => {}} />
+      );
+      await user.click(screen.getByText(/Structure — 1 part/));
+
+      // chapter total includes its sections (5 + 2), the section shows its own 2
+      expect(screen.getByText('7 words')).toBeVisible();
+      expect(screen.getByText('2 words')).toBeVisible();
+    });
+  });
 });
