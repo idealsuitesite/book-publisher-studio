@@ -1,4 +1,5 @@
 import type { StyledBook } from '../models/Theme';
+import { DROP_CAP_SCALE, dropCapGeometry } from './dropCapMetrics';
 import type { PageLayout } from '../models/PageLayout';
 import type { Page, PaginatedBook } from '../models/PaginatedBook';
 import type { Content, Block, TOCEntry } from '../models/Book';
@@ -355,6 +356,85 @@ export class LayoutEngine {
     return entries;
   }
 
+  /**
+   * Height of a paragraph that opens with a drop cap, priced the way `PDFRenderer` really draws
+   * it: `bandLines` lines running beside the glyph in a narrowed column, then the remainder at
+   * full width below. Never shorter than the glyph's own ink, since nothing may start inside it.
+   *
+   * Mirrors the renderer step for step ON PURPOSE — same `dropCapGeometry`, same budget, same
+   * word-boundary cut. Any cleverness that made the two differ would recreate exactly the
+   * charged-vs-consumed disagreement this whole chantier exists to close.
+   */
+  private priceDropCapParagraph(
+    text: string,
+    styled: StyledBook,
+    usableWidth: number,
+    fontSize: number,
+    spaceAfter: number,
+    bodyLine: number
+  ): number {
+    const measurer = this.measurer!;
+    const theme = styled.theme;
+    const plain = (t: string, width: number): number =>
+      measurer.measureHeight(t, { fontSize, width, theme }) + spaceAfter;
+
+    const dropSize = fontSize * DROP_CAP_SCALE;
+    let geometry;
+    try {
+      geometry = dropCapGeometry({
+        fontSize,
+        usableWidth,
+        glyphWidth: measurer.measureWidth(text[0], { fontSize: dropSize, heading: true, theme }),
+        capPt: measurer.capHeight(dropSize, { theme, heading: true }),
+        bodyLine,
+      });
+    } catch {
+      // The font-metric guard refused. The renderer degrades this paragraph to ordinary text and
+      // counts it (RenderMetrics.degradedDropCaps) — so the model must price the SAME ordinary
+      // paragraph. Both consult the same metric and reach the same verdict; if they did not, the
+      // degradation would itself open the charged-vs-consumed gap it is meant to avoid.
+      return plain(text, usableWidth);
+    }
+
+    const remainder = text.slice(1);
+    if (!remainder.trim()) return Math.max(geometry.capPt, bodyLine) + spaceAfter;
+
+    // Does ALL of it fit beside the glyph? Asked directly and FIRST, mirroring the renderer: the
+    // word-boundary search below always leaves a word past the cut, so it can never answer this.
+    const budget = geometry.bandLines * bodyLine + 0.5; // float-noise epsilon, matching the renderer
+    if (measurer.measureHeight(remainder, { fontSize, width: geometry.narrowWidth, theme }) <= budget) {
+      return Math.max(plain(remainder, geometry.narrowWidth), geometry.capPt + spaceAfter);
+    }
+
+    // Otherwise: the largest word-boundary prefix that really fits the band at the narrowed column.
+    const wordEnds: number[] = [];
+    for (const match of remainder.matchAll(/\S+/g)) wordEnds.push(match.index + match[0].length);
+
+    let cutAt = 0;
+    let lo = 1;
+    let hi = wordEnds.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const height = measurer.measureHeight(remainder.slice(0, wordEnds[mid - 1]), {
+        fontSize,
+        width: geometry.narrowWidth,
+        theme,
+      });
+      if (height <= budget) {
+        cutAt = wordEnds[mid - 1];
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+
+    if (cutAt <= 0 || cutAt >= remainder.length) {
+      // Everything sits beside the glyph — but never shorter than the glyph inks.
+      return Math.max(plain(remainder, geometry.narrowWidth), geometry.capPt + spaceAfter);
+    }
+    return geometry.bandLines * bodyLine + plain(remainder.slice(cutAt).replace(/^\s+/, ''), usableWidth);
+  }
+
   private estimateBlockHeight(block: Block, styled: StyledBook, usableWidth: number): number {
     const style = styled.blockStyles[block.id];
     const fontSize = style?.fontSize ?? styled.theme.fontSizes.body;
@@ -372,7 +452,17 @@ export class LayoutEngine {
       switch (block.type) {
         case 'heading':
           return measure(block.text, true);
-        case 'paragraph':
+        case 'paragraph': {
+          // A drop cap makes the paragraph's first lines wrap in a NARROWED column, beside the
+          // glyph (DROPCAP_TEXT_OVERLAP). Charging it at full width under-charges by exactly the
+          // lines the narrowing pushes down — the charged-vs-consumed class RENDER_DRIFT closed.
+          // The geometry is computed by the SAME domain function the renderer uses, on the same
+          // measured inputs, so model and renderer cannot disagree about it.
+          if (styled.blockTypography?.[block.id]?.dropCap && block.text.trim()) {
+            return this.priceDropCapParagraph(block.text, styled, usableWidth, fontSize, spaceAfter, line);
+          }
+          return measure(block.text);
+        }
         case 'quote':
         case 'scripture':
           return measure(block.text);

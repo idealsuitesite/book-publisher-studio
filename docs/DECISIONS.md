@@ -1472,3 +1472,76 @@ frozen branch, where a fresh session would never see it. Documentation only — 
 code and is therefore not subject to C1's freeze.
 
 **Related:** `MINI_DR_C1_QUOTES.md`, `BOOK_PRESENTATION.md` §4 row 2.
+
+---
+
+## Reversal — the drop-cap pricing removal of 2026-07-21 is annulled (2026-07-21, same day)
+
+**Status:** REVERSAL, recorded as formally as the decision it annuls (CTO-directed). A future
+session must be able to reconstruct *why* pricing came back, not merely observe that it did.
+
+**What was decided, and on what basis.** Earlier on 2026-07-21 the CTO removed `estimateBlockHeight`
+pricing for `dropCap` blocks from the drop-cap capability's scope. The basis was a real end-to-end
+measurement (`backend/spikes/dropcap-height-spike.ts`): 120 drop-cap paragraphs versus 120 identical
+plain ones produced **model 25 → 25 pages, real 25 → 25 pages, reconciliations 0 → 0**. Charged
+equalled consumed, so there appeared to be nothing to charge, and adding a term would have
+over-charged and produced under-full pages.
+
+**Why it is annulled.** Word's own layout engine, measured on the same fixture
+(`backend/spikes/dropcap-render-docx.ts` + Word 16.0 COM), reports for two documents differing only
+by the drop cap: **`plain.docx` 3 pages / 61 lines / 397 words** versus **`with-dropcaps.docx` 4
+pages / 61 lines / 397 words**. Same lines, same words, one more page — Word grows the line boxes to
+fit the enlarged run. PDFKit's page count stayed flat on the same content **because it does not grow
+the lines: it overlaps them** (`DROPCAP_TEXT_OVERLAP`).
+
+**The height invariance was therefore the SIGNATURE of the bug, not evidence of its absence.**
+
+**The principle this establishes, which outlives this decision.** *R2 verifies that charged equals
+consumed. It does not verify that what is consumed is correct.* The two questions are independent,
+and agreement between the model and the renderer can be agreement on a shared description of a
+corrupt layout. A cost of exactly zero where a cost was expected is itself a finding to investigate,
+not a result to accept.
+
+**Consequence.** Pricing returns to the scope of the overlap fix, where it is the central subject
+rather than a compliance item: indenting the overlapped lines narrows their wrap width, which adds
+lines, which adds height — the cost Word already demonstrates. It is the **fix** that creates the
+height cost, not the drop cap; the original decision was correct for the behaviour as it stood.
+
+**Related:** `TODO.md` → `DROPCAP_TEXT_OVERLAP`, `MINI_DR_DROP_CAPS.md` §3, ADR-0051.
+
+---
+
+## Governance note — `PdfKitTextMeasurer.capHeight` depends on a PDFKit private field (2026-07-21)
+
+**Status:** ACCEPTED RISK, CTO-approved, recorded outside the code deliberately. Not a full ADR — a
+one-entry governance trace, so that someone debugging a broken export in six months finds it without
+reading the port line by line.
+
+**The dependency.** `TextMeasurer.capHeight()` returns a glyph's real ink height above the baseline.
+Its only implementation, `PdfKitTextMeasurer`, obtains it from **`doc._font.capHeight`** — a
+**private/internal PDFKit field**, normalised by PDFKit to a 1000-unit em. This is the **first
+private-API dependency** in a class otherwise built entirely on public PDFKit API (`font`,
+`fontSize`, `heightOfString`, `widthOfString`).
+
+**Why no public route exists.** PDFKit exposes no public font-metric accessor. The metric that *is*
+public — `measureHeight` of a single character — returns the **line box**, not the ink: measured
+34.91pt versus a real cap height of 19.05pt on Gelasio-Bold at 27.5pt, an ~83% over-report. **The
+reachable metric is the wrong one; the correct one is private.** Deriving it from a constant
+fraction of the font size was rejected: that is the reasoning that produced the list-prefix
+under-charge (`LIST_PAGINATION_DRIFT.md`).
+
+**The risk.** A future PDFKit version renames, removes, or rescales `_font.capHeight`. A *rescale* is
+the dangerous case: it would return a plausible-looking number that is quietly wrong, producing a
+wrong drop-cap indent that renders and prices without complaint.
+
+**The mitigation, in three layers** (`MINI_DR_TEXTMEASURER_PORT.md` §3, §5):
+1. **A plausibility guard in the implementation** — a cap height outside **0.6–0.8 em** for a Latin face is a measurement failure, not a font property, and the method **throws** rather than returning a number. It never invents a fallback: inventing one is the failure being guarded against.
+2. **A CI test over every registered face**, so a PDFKit upgrade that breaks the metric fails the suite before reaching an author. The condition is environment-wide (library version + embedded faces), never manuscript-dependent, so this test is decisive rather than best-effort.
+3. **Graceful degradation at runtime** — the port throws, the *caller* degrades: the affected paragraph renders as a normal paragraph with no drop cap, counted and surfaced in `RenderMetrics` (ADR-0051's logic applied to presentation: loud, never silent). **The book still exports.** Refusing the ornament is proportionate; refusing the book is not.
+
+**Precedent already earned:** this guard, in its spike form, caught a real conversion error — dividing
+by the inner font's `unitsPerEm` on top of PDFKit's per-mille value gave 0.34 em, i.e. "no lines to
+indent", i.e. "no bug". It was caught by a plausibility check, not by the toolchain.
+
+**Related:** `MINI_DR_TEXTMEASURER_PORT.md`, `MINI_DR_DROPCAP_OVERLAP.md`, ADR-0051,
+`TODO.md` → `DROPCAP_TEXT_OVERLAP`.

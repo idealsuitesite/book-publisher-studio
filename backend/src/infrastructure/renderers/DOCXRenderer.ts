@@ -27,6 +27,7 @@ import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTy
 import type { Content, Block, Chapter, Section, TOCEntry, FrontMatter } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
+import { DROP_CAP_SCALE } from '../../domain/services/dropCapMetrics';
 
 const HEADING_LEVEL_BY_NUMBER: Record<number, (typeof HeadingLevel)[keyof typeof HeadingLevel]> = {
   1: HeadingLevel.HEADING_1,
@@ -37,9 +38,10 @@ const HEADING_LEVEL_BY_NUMBER: Record<number, (typeof HeadingLevel)[keyof typeof
   6: HeadingLevel.HEADING_6,
 };
 
-// Same v1 drop-cap approximation as PDFRenderer (enlarged first character, no real
-// line-aware text wrap-around) - documented simplification, not a silent gap.
-const DROP_CAP_SCALE = 2.5;
+// The drop-cap scale is shared with the model and PDFRenderer (domain/services/dropCapMetrics):
+// it used to be an identical private constant here, which the pagination model could not see.
+// DOCX's own strategy stays what it was - Word grows the line box, so nothing is hidden here
+// (confirmed in Word 16.0: same 61 lines and 397 words, 3 -> 4 pages).
 
 // docx's `heading: HeadingLevel.HEADING_N` shorthand (used below, both here and in
 // renderTitle) applies Word's own default "Heading N" style, which has its own fixed

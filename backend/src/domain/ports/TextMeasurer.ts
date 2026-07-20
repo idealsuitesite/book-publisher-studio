@@ -39,4 +39,29 @@ export interface TextMeasurer {
    * Without `font`, the measurer's default face is used (kept for callers with no theme).
    */
   lineHeight(fontSize: number, font?: { theme: Theme; heading?: boolean }): number;
+  /**
+   * Advance width this text really occupies at this size in this face — NO wrapping.
+   *
+   * The counterpart of `measureHeight`, minus its `width`: an advance width has no column to
+   * wrap in, so the option that means "the column" is deliberately absent rather than ignored.
+   * A caller who wants a wrapped result wants `measureHeight`.
+   */
+  measureWidth(text: string, options: Omit<MeasureOptions, 'width'>): number;
+  /**
+   * Cap height — the real INK above the baseline — at this size, in points.
+   *
+   * NOT `measureHeight` of a single character. That returns the LINE BOX, which includes ascent
+   * and descent the glyph never inks. Measured on Gelasio-Bold at 27.5pt: line box **34.91pt**
+   * (2.50 body lines) versus real cap height **19.05pt** (1.36 body lines) — an ~83% over-report.
+   * A caller who reaches for the obvious method reserves far too much space, and the result looks
+   * plausible in both the render and the pricing, so nothing complains.
+   *
+   * This warning lives here, in the port, because this is the file the next caller will read.
+   *
+   * Implementations MUST refuse to answer rather than invent: a ratio outside a physically
+   * reasonable range for the face is a measurement failure, not a font property, and must throw.
+   * Deciding what a *product* does about that is the caller's job, not this port's
+   * (see MINI_DR_TEXTMEASURER_PORT.md §5 — the port throws, the caller degrades).
+   */
+  capHeight(fontSize: number, font?: { theme: Theme; heading?: boolean }): number;
 }

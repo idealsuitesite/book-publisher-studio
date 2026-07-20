@@ -543,6 +543,11 @@ describe('LayoutEngine - measured pagination (Decision 6)', () => {
   const measurerOf = (blockHeight: number, line = 10): TextMeasurer => ({
     measureHeight: () => blockHeight,
     lineHeight: () => line,
+    // Deterministic stubs: adding methods to a port is a breaking change for every implementer,
+    // test doubles included. These doubles exist to test the ALGORITHM, not font metrics, so they
+    // answer in the same fixed units as the rest of the fake.
+    measureWidth: (text) => text.length * 5,
+    capHeight: (fontSize) => fontSize * 0.7,
   });
 
   it('fills a page by measured height, not by the word-count estimate', () => {
@@ -594,6 +599,8 @@ describe('LayoutEngine - measured pagination (Decision 6)', () => {
     const varied: TextMeasurer = {
       measureHeight: () => heights[call++ % heights.length],
       lineHeight: () => 12,
+      measureWidth: (text) => text.length * 5,
+      capHeight: (fontSize) => fontSize * 0.7,
     };
     const blocks = Array.from({ length: 30 }, (_, i) => paragraph(`p-${i}`, 'x'));
     const styled = styledBookFrom([chapter(blocks)]);
@@ -618,6 +625,8 @@ describe('LayoutEngine - paragraph splitting (Phase B)', () => {
   const wordMeasurer: TextMeasurer = {
     measureHeight: (text) => Math.max(1, text.trim() ? text.trim().split(/\s+/).length : 0) * 10,
     lineHeight: () => 10,
+    measureWidth: (text) => text.length * 5,
+    capHeight: (fontSize) => fontSize * 0.7,
   };
   const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
   // usable height: 792 - 72 - 72 = 648pt -> 64 whole lines.

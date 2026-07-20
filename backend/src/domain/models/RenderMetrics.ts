@@ -38,4 +38,18 @@ export interface RenderMetrics {
    * Undefined for renderers where the concept does not apply (DOCX reflows, EPUB has no pages).
    */
   unplannedPageBreaks?: number;
+
+  /**
+   * Drop caps the renderer had to abandon, rendering the paragraph as ordinary text instead.
+   *
+   * Happens only when the font-metric guard refuses to answer — a cap height outside the
+   * physically plausible range, which means PDFKit changed `_font.capHeight` under us
+   * (docs/DECISIONS.md). The book still exports, complete and readable; it loses an ornament.
+   * Refusing the ornament is proportionate, refusing the book is not.
+   *
+   * It is COUNTED rather than silent for the same reason `unplannedPageBreaks` is: ADR-0051's
+   * rule that a deviation from what was declared must be observable. A drop cap that quietly
+   * vanished would reopen the exact defect that field was created to close.
+   */
+  degradedDropCaps?: number;
 }

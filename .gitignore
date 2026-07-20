@@ -7,3 +7,4 @@ dist/
 frontend/.next/
 backend/.next/
 *.swp
+backend/verification/dropcap-visual/

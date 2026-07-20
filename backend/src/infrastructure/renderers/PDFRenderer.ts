@@ -16,13 +16,13 @@ import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
 import { renderedImageSize } from '../../domain/services/renderedImageSize';
+import { DROP_CAP_SCALE, dropCapGeometry, type DropCapGeometry } from '../../domain/services/dropCapMetrics';
+import { assertPlausibleCapHeight } from '../fonts/PdfKitTextMeasurer';
 
-// Simple v1 drop-cap approximation: render the paragraph's first character at a larger
-// size inline, with no text wrap-around (a real drop cap needs line-aware layout, which
-// this heuristic renderer does not do - matches the "best-effort, not authoritative"
-// framing already established for pagination, ADR-0013). Documented simplification, not
-// a silent gap.
-const DROP_CAP_SCALE = 2.5;
+// The drop-cap scale now lives in the Domain (dropCapMetrics), because the pagination model
+// must price exactly what this renderer draws. It used to be a private constant here AND an
+// identical private constant in DOCXRenderer - the same declared value in two places, which
+// the model could not see at all.
 
 /** Resolves which registered font to use for a run, given its bold/italic flags. */
 type FontResolver = (bold: boolean, italic: boolean) => string;
@@ -60,6 +60,25 @@ function splitRunsAt(runs: TypeRun[], offset: number): [TypeRun[], TypeRun[]] {
 // LayoutEngine estimated, so there's no reliable title, but the page number still falls back to
 // the physical index rather than showing nothing).
 type PageOwner = Page | 'blank' | undefined;
+
+/** Per-document tally of drop caps abandoned because the font-metric guard refused (RenderMetrics.degradedDropCaps). */
+interface DegradationTally { degradedDropCaps: number }
+
+function degradationTally(doc: PDFKit.PDFDocument): DegradationTally {
+  const holder = doc as unknown as { __degradation?: DegradationTally };
+  holder.__degradation ??= { degradedDropCaps: 0 };
+  return holder.__degradation;
+}
+
+function countDegradedDropCap(doc: PDFKit.PDFDocument, error: unknown): void {
+  const tally = degradationTally(doc);
+  tally.degradedDropCaps += 1;
+  const where = (doc as unknown as { __currentBlockId?: string }).__currentBlockId ?? 'unknown block';
+  console.warn(
+    `[PDFRenderer] drop cap #${tally.degradedDropCaps} abandoned on ${where}; rendered as ordinary ` +
+      `text so the book still exports. Cause: ${error instanceof Error ? error.message : String(error)}`
+  );
+}
 
 // Phase B (LAYOUT_FIDELITY.md Decision 7): which blocks are split, into which line counts, and
 // which domain Pages their continuations own.
@@ -113,6 +132,7 @@ export class PDFRenderer implements Renderer<Buffer> {
             pageCount: measured.pageCount,
             pageLayout: book.pageLayout,
             unplannedPageBreaks: reconciliation.unplannedPageBreaks,
+            degradedDropCaps: degradationTally(doc).degradedDropCaps,
           },
         })
       );
@@ -801,12 +821,86 @@ export class PDFRenderer implements Renderer<Buffer> {
     const remainderOfFirstRun = firstRun.text.slice(1);
     const remainingRuns: TypeRun[] = remainderOfFirstRun ? [{ ...firstRun, text: remainderOfFirstRun }, ...restRuns] : restRuns;
 
-    doc.font(resolveFont(true, firstRun.italic)).fontSize(fontSize * DROP_CAP_SCALE).fillColor(color);
-    doc.text(dropCapChar, { ...paragraphOptions, continued: remainingRuns.length > 0 });
+    const dropSize = fontSize * DROP_CAP_SCALE;
+    const dropFont = resolveFont(true, firstRun.italic);
 
-    if (remainingRuns.length > 0) {
-      this.renderRuns(doc, remainingRuns, resolveFont, fontSize, color, {});
+    // Metrics first, because they can refuse. Measured on THIS document, in the very faces this
+    // renderer draws with — the same numbers LayoutEngine priced through TextMeasurer.
+    let geometry: DropCapGeometry;
+    let bodyLine: number;
+    try {
+      doc.font(dropFont).fontSize(dropSize);
+      const glyphWidth = doc.widthOfString(dropCapChar);
+      const capEm = ((doc as unknown as { _font?: { capHeight?: number } })._font?.capHeight ?? Number.NaN) / 1000;
+      assertPlausibleCapHeight(capEm, dropFont);
+      doc.font(resolveFont(false, false)).fontSize(fontSize);
+      bodyLine = doc.heightOfString('x', { width: 10_000 });
+      geometry = dropCapGeometry({
+        fontSize,
+        usableWidth: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+        glyphWidth,
+        capPt: capEm * dropSize,
+        bodyLine,
+      });
+    } catch (error) {
+      // The guard refused: PDFKit's private cap-height metric is no longer trustworthy
+      // (docs/DECISIONS.md). Drop the ORNAMENT, never the book — the paragraph renders as
+      // ordinary text and the loss is counted, never silent (ADR-0051 applied to presentation).
+      countDegradedDropCap(doc, error);
+      doc.font(resolveFont(false, false)).fontSize(fontSize);
+      this.renderRuns(doc, runs, resolveFont, fontSize, color, paragraphOptions);
+      return;
     }
+
+    const xLeft = doc.page.margins.left;
+    const usableWidth = doc.page.width - xLeft - doc.page.margins.right;
+    const y0 = doc.y;
+
+    // The glyph itself: drawn at the margin, NOT joined to the text flow. The old
+    // `{ continued: true }` is exactly what caused DROPCAP_TEXT_OVERLAP — the following lines
+    // wrapped at full column width and started underneath the glyph, hiding four characters.
+    doc.font(dropFont).fontSize(dropSize).fillColor(color);
+    doc.text(dropCapChar, xLeft, y0, { lineBreak: false });
+    doc.font(resolveFont(false, false)).fontSize(fontSize);
+
+    if (remainingRuns.length === 0) {
+      doc.y = y0 + geometry.capPt;
+      doc.x = xLeft;
+      return;
+    }
+
+    // How much text fills the indented band beside the glyph, measured at the narrowed column.
+    const plain = remainingRuns.map((run) => run.text).join('');
+    const budget = geometry.bandLines * bodyLine + 0.5; // float-noise epsilon only
+    const beside = { ...paragraphOptions, width: geometry.narrowWidth };
+
+    // Ask "does ALL of it fit beside the glyph?" DIRECTLY. charsFittingBudget cannot answer it:
+    // its contract is to always leave at least one word past the cut (correct for a page split,
+    // where something must cross to the next page). Using it here pushed the last word of a
+    // short paragraph below the band for no reason -- caught by the pre-existing drop-cap test,
+    // which is exactly what it was written to catch.
+    const fitsEntirely = doc.heightOfString(plain, { width: geometry.narrowWidth }) <= budget;
+    const cutAt = fitsEntirely ? plain.length : this.charsFittingBudget(doc, plain, budget, geometry.narrowWidth);
+
+    if (cutAt <= 0 || cutAt >= plain.length) {
+      // The whole remainder sits beside the glyph.
+      doc.x = xLeft + geometry.indentPt;
+      doc.y = y0;
+      this.renderRuns(doc, remainingRuns, resolveFont, fontSize, color, beside);
+      doc.x = xLeft;
+      // Never let the next block start inside the glyph's ink.
+      if (doc.y < y0 + geometry.capPt) doc.y = y0 + geometry.capPt;
+      return;
+    }
+
+    const [head, tail] = splitRunsAt(remainingRuns, cutAt);
+    doc.x = xLeft + geometry.indentPt;
+    doc.y = y0;
+    this.renderRuns(doc, head, resolveFont, fontSize, color, beside);
+    // Below the band the column is whole again.
+    doc.x = xLeft;
+    doc.y = y0 + geometry.bandLines * bodyLine;
+    this.renderRuns(doc, tail, resolveFont, fontSize, color, { ...paragraphOptions, width: usableWidth });
   }
 
   // PDFKit has no table primitive (ADR-0019, finding 4): draw a grid manually, using
