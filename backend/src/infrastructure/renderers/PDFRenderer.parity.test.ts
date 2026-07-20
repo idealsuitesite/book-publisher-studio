@@ -53,4 +53,49 @@ describe('PDFRenderer — drift parity on the real corpus (ADR-0051)', () => {
     // The model's own count stays the anchor the renderer answers to.
     expect(paginated.pages.length).toBe(234);
   }, 120_000);
+
+  // TABLE_DUPLICATION.md Défaut B, the class-closing assertion (CTO-required): the drawn
+  // footer numbers form a STRICTLY INCREASING sequence across the whole book. Before the fix,
+  // every reconciliation page copied the previous owner and drew a DUPLICATE number (faith
+  // showed "Page 1" twice and "Page 20" twice — exactly the 2 unplanned breaks). The parity
+  // test above counts breaks; this one guarantees the counter never repeats regardless.
+  it('draws a strictly increasing footer page-number sequence, even across reconciliation pages', async () => {
+    const buffer = readFileSync(FIXTURE);
+    const raw = await new MammothParser().parse(buffer);
+    const normalized = new HtmlNormalizer().normalize(raw.html, { fileName: 'faith.docx' });
+    const built = new ASTBuilder().build(normalized);
+    const book = { ...built, frontMatter: new FrontMatterBuilder().build(built) };
+    const styled = new ThemeEngine().applyTheme(book, getTheme('classic'));
+    const typeset = new TypographyResolver().resolve(styled);
+    const paginated = new LayoutEngine(new PdfKitTextMeasurer()).paginate(typeset, KDP5x8PageLayout);
+
+    // Capture every "Page N of M" the header/footer pass draws, in physical order.
+    const drawn: number[] = [];
+    const renderer = new PDFRenderer();
+    const proto = Object.getPrototypeOf(renderer) as Record<string, unknown>;
+    const origDraw = proto.drawHeadersAndFooters as (...a: unknown[]) => unknown;
+    proto.drawHeadersAndFooters = function (this: unknown, doc: PDFKit.PDFDocument, ...rest: unknown[]) {
+      const realText = doc.text.bind(doc);
+      (doc as unknown as { text: (...a: unknown[]) => unknown }).text = (t: unknown, ...args: unknown[]) => {
+        if (typeof t === 'string') {
+          const m = /^Page (\d+) of \d+/.exec(t);
+          if (m) drawn.push(Number(m[1]));
+        }
+        return realText(t as string, ...(args as [number, number, PDFKit.Mixins.TextOptions]));
+      };
+      return origDraw.call(this, doc, ...rest);
+    };
+
+    try {
+      await renderer.render(paginated, { language: 'en' });
+    } finally {
+      proto.drawHeadersAndFooters = origDraw;
+    }
+
+    expect(drawn.length).toBeGreaterThan(0);
+    const nonIncreasing = drawn.filter((n, i) => i > 0 && n <= drawn[i - 1]);
+    expect(nonIncreasing, `footer numbers must strictly increase; got repeats: ${JSON.stringify(nonIncreasing)}`).toEqual([]);
+    // And it starts at 1 (no startPageNumber in the corpus) and ends at the content-page count.
+    expect(drawn[0]).toBe(1);
+  }, 120_000);
 });

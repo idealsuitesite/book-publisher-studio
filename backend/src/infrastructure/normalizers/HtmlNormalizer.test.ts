@@ -262,4 +262,29 @@ describe('HtmlNormalizer', () => {
       expect(doc.diagnostics).toBeUndefined();
     });
   });
+
+  // TABLE_DUPLICATION.md (ADR-0050): mammoth wraps table cells / blockquote text /
+  // list-item content in inner <p>, and a descendant `.find` used to emit each of them
+  // BOTH inside its container AND again as a top-level block. The tree walk now treats
+  // those containers as leaves — closing the whole class, not just tables.
+  describe('no double emission of container content (TABLE_DUPLICATION.md)', () => {
+    it('a table cell wrapped in <p> is not also emitted as a standalone paragraph', () => {
+      const doc = normalizer.normalize(
+        '<p>Before.</p><table><tr><td><p>Name</p></td><td><p>Role</p></td></tr></table><p>After.</p>'
+      );
+      const types = doc.nodes.map((n) => n.type);
+      expect(types).toEqual(['paragraph', 'table', 'paragraph']);
+      expect(doc.nodes.filter((n) => n.type === 'paragraph')).toHaveLength(2);
+    });
+
+    it('blockquote text wrapped in <p> yields one quote, not a quote plus a duplicate paragraph', () => {
+      const doc = normalizer.normalize('<blockquote><p>A quoted sentence.</p></blockquote>');
+      expect(doc.nodes.map((n) => n.type)).toEqual(['quote']);
+    });
+
+    it('a multi-paragraph list item does not re-emit its paragraphs as body paragraphs', () => {
+      const doc = normalizer.normalize('<ul><li><p>Item para.</p></li></ul>');
+      expect(doc.nodes.map((n) => n.type)).toEqual(['list']);
+    });
+  });
 });

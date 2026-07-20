@@ -25,6 +25,16 @@ export class HtmlNormalizer implements DocumentNormalizer {
       .each((_: number, elem: Element) => {
         const $elem = $(elem);
         const tag = elem.name?.toLowerCase();
+
+        // The DOM is a TREE, not a flat list (TABLE_DUPLICATION.md, ADR-0050). `.find()` is a
+        // DESCENDANT match, and mammoth wraps the content of tables/lists/blockquotes in inner
+        // <p> (e.g. `<td><p>Name</p></td>`, `<blockquote><p>…</p></blockquote>`). Those
+        // containers each parse their own children internally below, so any element sitting
+        // INSIDE one of them must not also be emitted as a top-level block — that is exactly
+        // how a table's cells, a blockquote's text, and a multi-paragraph list item's
+        // paragraphs were each rendered twice. The container is a leaf to this top-level walk.
+        if ($elem.parents('table, ul, ol, blockquote').length > 0) return;
+
         const text = $elem.text().trim();
 
         if (!text && tag !== 'img' && tag !== 'table') {
