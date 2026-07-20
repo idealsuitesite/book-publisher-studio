@@ -82,6 +82,19 @@ const CORPUS: CorpusExpectation[] = [
     mustNotFind: [],
     createsProject: true,
   },
+  {
+    // Second real varied-structure fixture (CTO-authorized 2026-07-21, LIST_PAGINATION_DRIFT.md):
+    // a real 9,280-word, chapterless, list-dense manuscript (214 lists / 1,067 items, 0 tables).
+    // The DIRECT measurement that corrected the PM-notes proxy extrapolation and confirmed the
+    // list-dense reconciliation phenomenon on real data. Kept here so the shape stays covered;
+    // its pagination behaviour is the ongoing calibration evidence toward the CTO's >=3 trigger.
+    file: 'art-of-captivating-list-dense.docx',
+    chapters: 0,
+    words: 9_280,
+    mustFind: ['UNSTRUCTURED_MANUSCRIPT'],
+    mustNotFind: ['EMPTY_HEADING_DROPPED'],
+    createsProject: true,
+  },
 ];
 
 interface Failure {

@@ -12,7 +12,9 @@ None currently.
 
 ## 📌 NAMED FOLLOW-UPS (standing conditions, not sprint tasks)
 
-- **`RECALIBRATE_PAGE_RATIO_TOLERANCE`** — CTO lock condition on PUBLICATION_QUALITY_BAR §10.3 value 1 (2026-07-21): the ±8% page-ratio tolerance was derived from a single book-length manuscript and **must be re-derived the moment `backend/verification/corpus/` reaches ≥3 manuscripts of varied structure** (chapter count, density, mixed formats). Whoever adds the second and third corpus fixtures owns triggering this. Instrument already exists: `npx tsx backend/spikes/quality-bar-calibration-spike.ts`.
+- **`RECALIBRATE_PAGE_RATIO_TOLERANCE`** — CTO lock condition on PUBLICATION_QUALITY_BAR §10.3 value 1 (2026-07-21): the ±8% page-ratio tolerance was derived from a single book-length manuscript and **must be re-derived the moment `backend/verification/corpus/` reaches ≥3 manuscripts of varied structure** (chapter count, density, mixed formats). Whoever adds the second and third corpus fixtures owns triggering this. Instrument already exists: `npx tsx backend/spikes/quality-bar-calibration-spike.ts`. **Status 2026-07-21: at 2 of 3** — `art-of-captivating-list-dense.docx` added as the second varied-structure fixture (list-dense, chapterless); the CTO's ≥3 condition holds, recalibration NOT unblocked, one more real varied manuscript away.
+
+- **`LIST_SPLITTING_ACROSS_PAGES`** — accepted disclosed tech debt (CTO decision 2026-07-21, LIST_PAGINATION_DRIFT.md §5). Lists are atomic (LAYOUT_FIDELITY Decision 7): a list that does not fit the remaining page space overflows into a reconciliation page regardless of how precisely its height is charged. On the list-dense real fixture this produces 5 reconciliations (> the locked `unplannedPageBreaks ≤ 2`) — **fully observable, never silent (ADR-0051)**, a quality defect not an ADR-0050 fidelity violation. Fully resolving it needs a list-splitting capability (split a list across a page break at item boundaries, the list analogue of Phase B paragraph splitting) — **its own Design Review, not authorized now**. This is a candidate for that future review, not a hidden gap.
 
 ---
 
