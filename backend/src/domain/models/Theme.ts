@@ -18,6 +18,23 @@ export interface RunningHead {
   size?: number;
 }
 
+/**
+ * Declared block presentation (BOOK_PRESENTATION.md §4.2, Phase 3): ONE source of truth for
+ * what used to be three per-renderer magic values that disagreed in kind as well as number —
+ * PDF drew a FIRST-LINE indent of 36pt, DOCX a true block indent of 36pt (720 twips), EPUB a
+ * 1.5em margin. Renderers consume this; the pagination model prices quote text at the
+ * narrowed column (R2, the height contract). Absent presentation falls back to the historical
+ * constants so a theme without it keeps rendering.
+ */
+export interface QuotePresentation {
+  /** Uniform left inset of quote/scripture blocks, in points — all lines, every format. */
+  indentPt: number;
+}
+
+export interface BlockPresentation {
+  quote: QuotePresentation;
+}
+
 export interface Theme {
   name: string;
   fonts: {
@@ -46,6 +63,9 @@ export interface Theme {
   // Additive (ADR-0022/ADR-0027 pattern) - no existing Theme consumer breaks. undefined/show:false
   // means no running head at all, matching every theme's behavior before this sprint.
   runningHead?: RunningHead;
+  // Additive, same pattern (Phase 3, BOOK_PRESENTATION.md): block dress declared here,
+  // consumed by all three renderers AND priced by the layout model.
+  presentation?: BlockPresentation;
 }
 
 export interface ResolvedBlockStyle {

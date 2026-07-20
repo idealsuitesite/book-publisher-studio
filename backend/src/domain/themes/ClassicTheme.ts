@@ -34,6 +34,12 @@ export const ClassicTheme: Theme = {
   // Matches today's pre-Sprint-6 PDF running-head/footer defaults (top running head, "Page N
   // of TOTAL" footer, size-9 default font) minus the hardcoded 'Book Publisher Studio' literal
   // it's replacing (ADR-0029 Decision 6) - content is now the book's real title.
+  // Phase 3: the value PDF and DOCX already agreed on (36pt / 720 twips); EPUB's 1.5em
+  // (~16.5pt) was the odd one out and unifies onto this declared figure - disclosed, and the
+  // PDF's first-line-only indent becomes a true block indent (what an inset quote means).
+  presentation: {
+    quote: { indentPt: 36 },
+  },
   runningHead: {
     show: true,
     position: 'right',

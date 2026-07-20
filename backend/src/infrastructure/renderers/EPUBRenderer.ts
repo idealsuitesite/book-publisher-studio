@@ -141,7 +141,7 @@ export class EPUBRenderer implements Renderer<Buffer> {
          own — headings simply inherited body's, so this rule is added rather than changed. */
       h1, h2, h3, h4, h5, h6 { color: ${theme.colors.accent}; }
       p { font-size: ${theme.fontSizes.body}pt; margin: 0 0 ${theme.spacing.paragraphSpacing}pt; }
-      blockquote { margin-left: 1.5em; }
+      blockquote { margin-left: ${theme.presentation?.quote.indentPt ?? 36}pt; }
       table, th, td { border: 1px solid #999; border-collapse: collapse; padding: 4px; }
       ${DROP_CAP_CSS}
     `;

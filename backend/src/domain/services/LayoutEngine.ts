@@ -373,9 +373,21 @@ export class LayoutEngine {
         case 'heading':
           return measure(block.text, true);
         case 'paragraph':
-        case 'quote':
-        case 'scripture':
           return measure(block.text);
+        case 'quote':
+        case 'scripture': {
+          // R2: quotes render inset (Theme.presentation.quote.indentPt) — price them at the
+          // column they really wrap in. Before Phase 3 they were measured full-width and
+          // drawn narrower: the same charged-vs-consumed disagreement class as RENDER_DRIFT.
+          const indent = styled.theme.presentation?.quote.indentPt ?? 36;
+          return (
+            this.measurer!.measureHeight(block.text, {
+              fontSize,
+              width: usableWidth - indent,
+              theme: styled.theme,
+            }) + spaceAfter
+          );
+        }
         case 'list':
           // Each item renders WITH its bullet/number prefix ('• ' / 'N. '), which the old
           // join omitted — so a near-boundary item wrapped one line further at draw time than

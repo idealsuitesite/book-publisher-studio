@@ -694,4 +694,43 @@ describe('LayoutEngine - paragraph splitting (Phase B)', () => {
       expect(page.startsWithContinuation).toBeUndefined();
     }
   });
+
+  // R2, the height contract (BOOK_PRESENTATION.md §3): quotes render inset by the theme's
+  // declared indentPt, so the model must price them at the NARROWED column. Before Phase 3
+  // they were measured full-width and drawn narrower - the RENDER_DRIFT disagreement class.
+  describe('quote pricing at the inset column (R2, Phase 3)', () => {
+    it('prices a quote at usableWidth minus the theme quote indent', () => {
+      const measurer = new PdfKitTextMeasurer();
+      const engine = new LayoutEngine(measurer);
+      const theme = getTheme('classic');
+      // Long enough that the narrowed column MUST wrap onto more lines than the full one
+      const text = 'quoted words '.repeat(150).trim();
+      const book = createBook({ title: 'T', author: 'A', language: 'en' }, [
+        {
+          type: 'chapter' as const,
+          id: 'c1',
+          number: 1,
+          title: 'One',
+          content: [{ type: 'quote' as const, id: 'q1', text, inlines: [], quoteType: 'block' as const }],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]);
+      const styled = new ThemeEngine().applyTheme(book, theme);
+      const typeset = new TypographyResolver().resolve(styled);
+
+      const usableWidth = LetterPageLayout.width - LetterPageLayout.marginLeft - LetterPageLayout.marginRight;
+      const priced = (
+        engine as unknown as { estimateBlockHeight(b: unknown, s: unknown, w: number): number }
+      ).estimateBlockHeight(typeset.book.mainContent[0].content[0], typeset, usableWidth);
+
+      const indent = theme.presentation?.quote.indentPt ?? 36;
+      const spaceAfter = typeset.blockStyles['q1']?.spaceAfter ?? 8;
+      const expected = measurer.measureHeight(text, { fontSize: typeset.blockStyles['q1']?.fontSize ?? 11, width: usableWidth - indent, theme }) + spaceAfter;
+      const fullWidth = measurer.measureHeight(text, { fontSize: typeset.blockStyles['q1']?.fontSize ?? 11, width: usableWidth, theme }) + spaceAfter;
+
+      expect(priced).toBeCloseTo(expected, 5);
+      expect(priced).toBeGreaterThan(fullWidth); // the narrowed column really costs more
+    });
+  });
 });

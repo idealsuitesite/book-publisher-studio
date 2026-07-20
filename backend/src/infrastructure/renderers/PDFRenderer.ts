@@ -576,8 +576,17 @@ export class PDFRenderer implements Renderer<Buffer> {
       case 'scripture': {
         // Italics are already forced onto every run by TypographyResolver
         // (design review §4 item 9) - no block-level italic override needed here anymore.
+        //
+        // Phase 3 (BOOK_PRESENTATION.md §4.2): a TRUE block indent from the theme. The old
+        // `{ indent: 36 }` was PDFKit's FIRST-LINE indent — only line one moved, unlike the
+        // DOCX renderer's uniform 720-twip inset. Shifting the cursor and narrowing the
+        // column indents every line, exactly what the model now prices (R2).
         const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
-        this.renderRuns(doc, runs, resolveBody, fontSize, color, { indent: 36 });
+        const quoteIndent = theme.presentation?.quote.indentPt ?? 36;
+        const quoteWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right - quoteIndent;
+        doc.x = doc.page.margins.left + quoteIndent;
+        this.renderRuns(doc, runs, resolveBody, fontSize, color, { width: quoteWidth });
+        doc.x = doc.page.margins.left;
         this.spendSpaceAfter(doc, spaceAfter);
         return;
       }

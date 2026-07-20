@@ -285,6 +285,7 @@ export class DOCXRenderer implements Renderer<Buffer> {
       pageStarts,
       true,
       children,
+      book.styledBook.theme,
       tocEntries.length > 0
     );
 
@@ -331,6 +332,7 @@ export class DOCXRenderer implements Renderer<Buffer> {
     pageStarts: Map<string, Page>,
     isTopLevel: boolean,
     out: (Paragraph | Table)[],
+    theme: Theme,
     forceBreakOnFirst = false
   ): void {
     let isFirstContent = true;
@@ -354,13 +356,13 @@ export class DOCXRenderer implements Renderer<Buffer> {
       isFirstContent = false;
 
       for (const block of content.content) {
-        out.push(...this.renderBlock(block, blockStyles[block.id], blockTypography, pageStarts));
+        out.push(...this.renderBlock(block, blockStyles[block.id], blockTypography, pageStarts, theme));
       }
 
       if (content.type === 'chapter' && content.sections) {
-        this.renderContent(content.sections, blockStyles, blockTypography, pageStarts, false, out);
+        this.renderContent(content.sections, blockStyles, blockTypography, pageStarts, false, out, theme);
       } else if (content.type === 'section' && content.subsections) {
-        this.renderContent(content.subsections, blockStyles, blockTypography, pageStarts, false, out);
+        this.renderContent(content.subsections, blockStyles, blockTypography, pageStarts, false, out, theme);
       }
     }
   }
@@ -384,7 +386,8 @@ export class DOCXRenderer implements Renderer<Buffer> {
     block: Block,
     style: ResolvedBlockStyle | undefined,
     blockTypography: Record<string, ResolvedTypography> | undefined,
-    pageStarts: Map<string, Page>
+    pageStarts: Map<string, Page>,
+    theme: Theme
   ): (Paragraph | Table)[] {
     const pageBreakBefore = pageStarts.has(block.id);
     const font = style?.fontFamily;
@@ -427,11 +430,13 @@ export class DOCXRenderer implements Renderer<Buffer> {
         // Italics are already forced onto every run by TypographyResolver
         // (design review §4 item 9) - no block-level italic override needed here anymore.
         const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
+        // Theme-declared inset (Phase 3): points -> twips. 36pt was the old hardcoded 720.
+        const quoteIndentTwips = Math.round((theme.presentation?.quote.indentPt ?? 36) * 20);
         return [
           new Paragraph({
             pageBreakBefore,
             spacing,
-            indent: { left: 720 },
+            indent: { left: quoteIndentTwips },
             children: buildRuns(runs, font, size, color),
           }),
         ];
