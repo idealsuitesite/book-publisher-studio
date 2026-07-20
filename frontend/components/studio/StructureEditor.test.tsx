@@ -1,8 +1,19 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ProjectDTO } from 'shared-types';
-import { StructureEditor, applyReorder } from './StructureEditor';
+import { StructureEditor, applyReorder, applyRename } from './StructureEditor';
+import { editStructure } from '@/lib/api-client';
 import type { editStructure as editStructureFn } from '@/lib/api-client';
+
+// Real gestures aside, the inline-rename UX (a plain input) is fully jsdom-testable. Mock only the
+// network call; keep ApiError real so applyReorder/applyRename's `instanceof` branch is unaffected.
+vi.mock('@/lib/api-client', async (importActual) => {
+  const actual = await importActual<typeof import('@/lib/api-client')>();
+  return { ...actual, editStructure: vi.fn() };
+});
+
+beforeEach(() => vi.mocked(editStructure).mockReset());
 
 function project(overrides: Partial<ProjectDTO> = {}): ProjectDTO {
   const base = {
@@ -37,8 +48,10 @@ describe('StructureEditor (read-only, phase 3 commit 3)', () => {
   it('lists chapters and their sections with real word counts', () => {
     render(<StructureEditor project={project()} onEdited={() => {}} />);
 
-    expect(screen.getByText('Chapter 1: Intro')).toBeInTheDocument();
-    expect(screen.getByText('Chapter 2: Method')).toBeInTheDocument();
+    // The heading is now a "Chapter N:" prefix + an editable title (a rename button).
+    expect(screen.getByRole('button', { name: 'Rename Chapter 1: Intro' })).toBeInTheDocument();
+    expect(screen.getByText('Intro')).toBeInTheDocument();
+    expect(screen.getByText('Method')).toBeInTheDocument();
     expect(screen.getByText('Background')).toBeInTheDocument();
     expect(screen.getByText(/2 parts/)).toBeInTheDocument();
     // Chapter 1 = its paragraph (3) + the section (2) = 5; the section itself = 2.
@@ -105,5 +118,57 @@ describe('applyReorder (reorder handler — Phase 3 commit 4)', () => {
 
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onEdited).not.toHaveBeenCalled();
+  });
+});
+
+describe('applyRename (rename handler — Phase 3 commit 5)', () => {
+  it('renames by id with a trimmed title, then applies the returned project', async () => {
+    const editStructure = vi.fn().mockResolvedValue({ id: 'p1' }) as unknown as typeof editStructureFn;
+    const onEdited = vi.fn();
+    const onError = vi.fn();
+
+    await applyRename('p1', 's1', '  Background  ', { editStructure, onEdited, onError });
+
+    expect(editStructure).toHaveBeenCalledWith('p1', { type: 'rename', id: 's1', title: 'Background' });
+    expect(onEdited).toHaveBeenCalledWith({ id: 'p1' });
+  });
+
+  it('refuses an empty title without calling the API', async () => {
+    const editStructure = vi.fn() as unknown as typeof editStructureFn;
+    const onEdited = vi.fn();
+    const onError = vi.fn();
+
+    await applyRename('p1', 's1', '   ', { editStructure, onEdited, onError });
+
+    expect(editStructure).not.toHaveBeenCalled();
+    expect(onEdited).not.toHaveBeenCalled();
+  });
+});
+
+describe('inline rename UX (Phase 3 commit 5)', () => {
+  it('click a title → type → Enter commits the rename through the client', async () => {
+    const user = userEvent.setup();
+    vi.mocked(editStructure).mockResolvedValue(project());
+    render(<StructureEditor project={project()} onEdited={() => {}} />);
+
+    await user.click(screen.getByRole('button', { name: 'Rename Chapter 1: Intro' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Chapter 1: Intro' });
+    await user.clear(input);
+    await user.type(input, 'Preface{Enter}');
+
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'rename', id: 'c1', title: 'Preface' });
+  });
+
+  it('Esc cancels — no rename call, the title stays', async () => {
+    const user = userEvent.setup();
+    render(<StructureEditor project={project()} onEdited={() => {}} />);
+
+    await user.click(screen.getByRole('button', { name: 'Rename Chapter 2: Method' }));
+    const input = screen.getByRole('textbox', { name: 'Rename Chapter 2: Method' });
+    await user.clear(input);
+    await user.type(input, 'Whatever{Escape}');
+
+    expect(vi.mocked(editStructure)).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Rename Chapter 2: Method' })).toBeInTheDocument();
   });
 });
