@@ -33,13 +33,23 @@ Classic theme at kdp-5x8 (`backend/spikes/dropcap-span-spike.ts`):
 | glyph width | **19.83pt** of a 216pt column |
 | indented wrap width | **196.17pt (90.8% of the column)** |
 
-**Two honest qualifications, neither resolved yet:**
-- **Lines affected is 2, not 1** — the CTO was right to challenge the assumption. The visual capture
-  showed only line 2 clearly corrupted, but the glyph spans 2.5 line boxes, so **line 3 is partly
-  covered too**. The capture under-reported the defect.
-- **Em-box is not ink.** 34.91pt is the *line box*; the glyph's actual ink (cap height) is smaller.
-  How many lines are covered by *ink* must be measured from font metrics before the indent count is
-  fixed — **an open measurement item, deliberately not guessed.**
+**Ink measured — and it CORRECTS what I told the CTO.** I reported that the glyph spans 2.50 line
+boxes and therefore that line 3 was affected too, agreeing with the CTO's challenge against my own
+capture. **The ink measurement refutes that: the capture was right and my correction was wrong.**
+
+| | measured | lines |
+|---|---|---|
+| glyph **line box** | 34.91pt | 2.50 — **over-reports** |
+| glyph **real ink** (cap height) | **19.05pt** | **1.36** |
+
+**Lines to indent beyond line 1: exactly 1.** The line box includes ascent/descent padding the glyph
+does not ink. This matches the visual evidence precisely: line 2 corrupted, line 3 clean.
+
+*Method note, recorded because a wrong number was nearly published:* PDFKit normalises
+`_font.capHeight` to a **1000-unit em** (1419 font units x scale 0.48828125 = 692.87), so it converts
+with `/1000`, not with the inner font's `unitsPerEm` of 2048. Doing both gave 9.30pt -- a 0.34 em cap
+height, implausible on its face and contradicted by the visual. Caught by a plausibility check, not
+by the toolchain.
 
 ## 3. R2 — the central subject, per the CTO
 
@@ -88,7 +98,7 @@ recorded so it is not rediscovered.
 
 ## 5. Risks
 
-- **The indent count is wrong** (em-box vs ink, §2). Too few → residual overlap on line 3; too many → a needless gap. Mitigation: measure ink metrics before fixing the count; assert the absence of overlap directly.
+- **The indent count is wrong.** Now measured (§2): 1 line. Residual risk: cap height is not the only inking metric — a descending drop cap (`J`, `Q`) or another theme face changes the span, so the count must be **derived from the font metrics at render time, never hardcoded to 1**. Asserted by the no-overlap test.
 - **The pricing is wrong.** Under-charge → overflow and reconciliations; over-charge → under-full pages. This is the risk the whole review exists for, and §3's method plus §3bis's criterion (a) are its instruments.
-- **Justified text interacts badly** with a mid-paragraph width change — PDFKit justifies to the width in force. Must be checked on a justified paragraph, not only a ragged-right one.
+- **Justified text — baseline verified CLEAN, post-fix behaviour cannot yet be.** A justified fixture alternating drop-cap and plain paragraphs (`verification/dropcap-visual/justified.pdf`) renders flush right with even word spacing throughout: justification survives the drop cap, because `continued: true` carries the first `text()` call's options through the flow. **But the CTO's concern was a mid-block width change, which does not exist yet — the fix creates it.** This therefore closes the *baseline*, not the question, and becomes a **gate on the implementation** (assert even spacing on a justified drop-cap paragraph once the indent lands) rather than a precondition closable beforehand.
 - **`DROPCAP_PARAGRAPH_ATOMICITY` is untouched** by this fix: the paragraph stays unsplittable. Accepted debt, unchanged, still to be made observable.

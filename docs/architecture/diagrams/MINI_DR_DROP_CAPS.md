@@ -77,6 +77,21 @@ all three renderers. The theme may vary scale and form *within* that approximati
 This is accepted for this scope, explicitly, not overlooked. Real wrap-around — a line-aware layout
 problem — would be **its own chantier with its own R2**, never a silent extension of this one.
 
+## 4bis. OPEN — three renderers, three strategies (must be settled before wiring the theme)
+
+**Recorded here, in the document that will be reopened, rather than left in the fix's review.**
+
+Measured during the `DROPCAP_TEXT_OVERLAP` investigation: the three renderers implement drop caps by
+three *different* strategies — **EPUB wraps text around the glyph** (`float: left`, correct);
+**DOCX grows the line box** (a big first letter, degraded but lossless, confirmed in Word 16.0);
+**PDF will indent the overlapped lines** once the fix lands. A single theme-declared drop-cap
+*scale* therefore means three different things in three formats, and produces three different
+paragraph heights for the same declared value.
+
+**To settle before any theme wiring:** is that divergence acceptable under ADR-0050 (the declared
+value reaches each format's native mechanism), or must the strategies converge first? **Not decided.
+Not to be rediscovered.**
+
 ## 5. Risks, and one open question
 
 - **The pricing is wrong in either direction.** Under-charge → overflow and reconciliation pages; over-charge → under-full pages. Instrument: §3.1 plus parity. This is the single largest risk, and the reason §3.1 insists the added height be measured rather than computed from the scale factor.
