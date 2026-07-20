@@ -34,26 +34,27 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
     const raw = await this.parser.parse(request.buffer);
     const normalized = this.normalizer.normalize(raw.html, { fileName: request.filename });
     const built = this.builder.build(normalized);
-    return this.renderBook(built, request.themeName, request.pageLayout);
+
+    // The raw-bytes route (/api/manuscripts/export) has no stored book, so front matter is
+    // synthesised HERE, at the boundary — never inside renderBook. Since Q3, the project path
+    // populates front matter at import instead and renders stored content untouched; keeping
+    // synthesis out of the shared render tail is what lets those two facts coexist.
+    const book = { ...built, frontMatter: this.frontMatterBuilder.build(built) };
+    return this.renderBook(book, request.themeName, request.pageLayout);
   }
 
   /**
    * Renders an already-built `Book` through the theme -> typography -> layout -> renderer tail.
+   * **Renders the book's front matter exactly as given — no synthesis.**
    *
-   * Two entry points share this: `execute()` above, which parses raw upload bytes, and the
-   * project export path (`ExportProjectUseCase`), which passes the project's STORED book so a
-   * manual structure edit (reorder/rename) actually reaches the output. Before this existed the
-   * project path re-parsed the original source bytes and silently discarded every stored edit -
-   * the manuscript in the Structure station and the manuscript in the export were two different
-   * books (STRUCTURE_EDITING.md §5/§9; the defect is logged in DECISIONS.md and TODO.md).
-   *
-   * Front matter is still synthesised here, exactly as before, so output is unchanged for an
-   * unedited book. Moving it to import time is Q3's separate commit; this commit only changes
-   * *which* book gets rendered.
+   * Two entry points share this: `execute()` above (raw upload bytes, front matter synthesised at
+   * the boundary before calling in) and the project export path (`ExportProjectUseCase`, which
+   * passes the project's STORED book — front matter populated at import, structure edits included).
+   * Before the render tail existed, the project path re-parsed the original source bytes and
+   * silently discarded every stored edit — the Structure station and the export were two different
+   * books (STRUCTURE_EDITING.md §5/§9; ADR-0052).
    */
-  async renderBook(source: Book, themeName: string, pageLayout: PageLayout): Promise<Buffer> {
-    const book = { ...source, frontMatter: this.frontMatterBuilder.build(source) };
-
+  async renderBook(book: Book, themeName: string, pageLayout: PageLayout): Promise<Buffer> {
     const theme = getTheme(themeName);
     const styled = this.themeEngine.applyTheme(book, theme);
     const typeset = this.typographyResolver.resolve(styled);

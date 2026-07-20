@@ -42,26 +42,25 @@ export class PublishingUseCase implements UseCase<PublishRequest, PublishingRepo
     const raw = await this.parser.parse(request.buffer);
     const normalized = this.normalizer.normalize(raw.html, { fileName: request.filename });
     const built = this.builder.build(normalized);
-    return this.publishBook(built, request.themeName, request.pageLayout);
+
+    // Raw-bytes route (/api/manuscripts/publish): no stored book, so front matter is synthesised
+    // here at the boundary — the same book export ships (ADR-0045), never inside publishBook.
+    // Since Q3, the project path populates front matter at import and publishes stored content.
+    const book = { ...built, frontMatter: this.frontMatterBuilder.build(built) };
+    return this.publishBook(book, request.themeName, request.pageLayout);
   }
 
   /**
    * Publishes an already-built `Book` — the render tail plus the `PublishingTarget` step.
+   * **Publishes the book's front matter exactly as given — no synthesis.**
    *
    * Mirrors `ExportManuscriptUseCase.renderBook`: `execute()` feeds it a book parsed from upload
-   * bytes, and the project publish path (`PublishProjectUseCase`) feeds it the project's STORED
-   * book so structure edits reach what KDP validates. Publishing the stored book instead of
-   * re-parsing source bytes also keeps publish and export rendering the *same* book by
-   * construction (ADR-0045's original concern), now that both go through the stored book.
+   * bytes (front matter synthesised at the boundary), and the project publish path
+   * (`PublishProjectUseCase`) feeds it the project's STORED book so structure edits and stored
+   * front matter reach what KDP validates. Publishing the stored book also keeps publish and
+   * export rendering the *same* book by construction (ADR-0045's original concern; ADR-0052).
    */
-  async publishBook(source: Book, themeName: string, pageLayout: PageLayout): Promise<PublishingReport> {
-    // Front matter is built here for the same reason ExportManuscriptUseCase builds it, and it
-    // must be the *same* book. Until this existed, publish validated a manuscript with no title
-    // or copyright page while export shipped one with both - so the Publishing Engine was
-    // approving a document the author would never upload (ADR-0045). Synthesised here still, as
-    // before; Q3 moves it to import time.
-    const book = { ...source, frontMatter: this.frontMatterBuilder.build(source) };
-
+  async publishBook(book: Book, themeName: string, pageLayout: PageLayout): Promise<PublishingReport> {
     const theme = getTheme(themeName);
     const styled = this.themeEngine.applyTheme(book, theme);
     const typeset = this.typographyResolver.resolve(styled);

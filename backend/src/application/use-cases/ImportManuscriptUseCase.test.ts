@@ -261,6 +261,24 @@ describe('ImportManuscriptUseCase', () => {
       expect(project?.name).toBe(project?.book.metadata.title);
     });
 
+    it('populates front matter as stored user content on the project book (Q3)', async () => {
+      const repository = new InMemoryProjectRepository();
+      const useCase = buildProjectAwareUseCase(repository);
+      const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });
+
+      const response = await useCase.execute({
+        buffer,
+        filename: 'Le Guide de Jean.docx',
+        mimeType: DOCX_MIME,
+      });
+
+      // Before Q3 the stored book carried `frontMatter: {}` and the title page was re-synthesised
+      // at every export. Now it is populated once, here, and owned by the project — a title page
+      // the author can later edit rather than one the exporter reinvents.
+      const project = await repository.findById(response.projectId!);
+      expect(project?.book.frontMatter.titlePage?.title).toBe('Le Guide de Jean');
+    });
+
     it('retains the original upload as the source asset, byte for byte', async () => {
       const repository = new InMemoryProjectRepository();
       const useCase = buildProjectAwareUseCase(repository);
