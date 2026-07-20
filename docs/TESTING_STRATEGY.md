@@ -34,6 +34,18 @@ Already in the suite: `PDFRenderer.test.ts` and `DOCXRenderer.test.ts`'s real-ou
 
 **Why the split matters:** a Level 1 failure means `LayoutEngine`'s own logic is wrong and both renderers will inherit the mistake identically. A Level 2 failure localized to one renderer means the *decision* was right and one specific renderer's drawing code is wrong. Without the split, a single failing "PDF has wrong page count" test doesn't tell you which layer to look at first; a passing Level 1 test plus a failing Level 2 test does.
 
+## Principle — a test is only as honest as the property it measures
+
+> A green suite proves the tests' assertions hold, never that they assert the *right* thing. A verified fix stays blind to a defect the test never measured.
+
+Named as a standing principle (CTO direction, 2026-07-21) after the pattern recurred a third time — it is the through-line of the real-fixture bug lineage (`docs/REAL_FIXTURE_POLICY.md`), not a coincidence:
+
+- **Structure scored 100/100 over 0 chapters** (ADR-0049): every validation test passed; none asserted that a book-length manuscript with no chapters cannot score full marks. The suite measured "does scoring run", never "does the score tell the truth".
+- **The renderer inserted 55 silent pages, then a stuck footer counter** (ADR-0051 / TABLE_DUPLICATION Défaut B): the parity test asserted the *count* of unplanned breaks; it never asserted the drawn page numbers form a strictly increasing sequence. Measuring the wrong property let our own verified fix ship a regression.
+- **Tables/blockquotes/nested lists rendered their content twice** (TABLE_DUPLICATION Défaut A): `verify-real-export` asserted "valid, non-trivial output"; it never asserted "each cell's text appears exactly once". Valid ≠ faithful.
+
+**The operational rule this yields:** when a real defect is found, the fix is not done until a test asserts the *property that was actually violated* — not a proxy for it, not an adjacent property that happens to correlate. "Close the class, not the symptom" (the CTO's standing phrase) is this principle applied: the class IS the property; the symptom is one observation of its violation. Every entry in the lineage was invisible precisely because a real capability, or a real measurement, exercised a property no assertion named — which is also why `docs/REAL_FIXTURE_POLICY.md` (real files) and real measurement (the calibration spikes) keep catching what synthetic coverage cannot.
+
 ## How this composes with the Quality Gate
 
 `docs/QUALITY_GATE.md`'s "Tests PASS" item assumes both taxonomies exist as a diagnostic tool, not a gate of their own — a test doesn't need to declare its category to count toward "Tests PASS." The categorization is a maintenance aid for triage, most valuable once a regression is reported and someone needs to find "which existing tests cover this" quickly.
@@ -49,3 +61,4 @@ Already in the suite: `PDFRenderer.test.ts` and `DOCXRenderer.test.ts`'s real-ou
 - `docs/QUALITY_GATE.md` — the per-commit gate this taxonomy supports
 - `docs/REAL_FIXTURE_POLICY.md` — the real-vs-synthetic-fixture policy this taxonomy's Level 2 category depends on
 - ADR-0031/ADR-0032 — the real bug (empty TOC on real import) that motivated formalizing both taxonomies now rather than later
+- `docs/REAL_FIXTURE_POLICY.md` — the eleven-bug lineage the "honest property" principle above is drawn from
