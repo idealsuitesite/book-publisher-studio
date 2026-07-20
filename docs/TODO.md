@@ -30,6 +30,19 @@ None currently.
 
   **Do not reopen an investigation on C1 until one of the two has actually happened.** The question is settled and measured; re-deriving it would waste a session.
 
+- **`HEURISTIC_STRUCTURE_DETECTION` — CLOSED ON EVIDENCE, not paused for want of an idea** (2026-07-21). Detecting chapters in a DOCX whose author applied no Word heading styles is **out of reach with the material the import pipeline can obtain** — not "we have not found the right algorithm yet". **Nobody should reopen this believing a better heuristic would solve it.**
+
+  **The structural reason, which is what makes this closed rather than open:** the properties that survive to us are precisely the ones a real author never uses to mark a heading. Word stores heading formatting in the paragraph *style*; mammoth reports only *directly-set* properties. So an author who marks headings properly makes them invisible to every signal we can read, and an author who bolds them by hand drowns them among hundreds of other bold paragraphs.
+
+  **Measured in three steps, each closing an avenue at the cost of a spike rather than a chantier** (`backend/spikes/heuristic-signals-spike.ts`, `mammoth-capability-spike.ts`, `ooxml-inheritance-spike.ts`, `heuristic-signals2-spike.ts` — on branch `spike/heuristic-structure`, unmerged):
+  1. **HTML conversion discards formatting** — surviving attributes: NONE. But `transformDocument` *does* expose `fontSize`, `isBold`, `isAllCaps`, `alignment` on the underlying document objects, with no new library and no port change.
+  2. **`fontSize` is populated only where it is not needed** — 725/836 runs on the already-styled book, **0 of 2698 / 0 of 141 / 0 of 30** on the unstyled ones. Resolving the full OOXML inheritance chain (`docDefaults` → style → direct) yields **12pt for every one of 2660 paragraphs**: the size is absent from the source, not merely dropped by mammoth. **The raw-OOXML avenue is therefore closed too, and was closed before any integration was costed.**
+  3. **`alignment` and `isAllCaps` are empty on all four fixtures.** Against the only ground truth available (faith-alone, 17 real `Heading 1`), the best candidate rule scores **precision 0.0%, recall 0.0%** — it finds 16 paragraphs, not one of which is a real title.
+
+  **CTO threshold, fixed BEFORE the measurement so it could not move to fit the result:** under 5% false positives would have been usable *as a suggestion, never as silent truth* (the ADR-0049 explorable-finding pattern — a false chapter accepted silently is worse than an honest "0 chapters detected", because the first invites misplaced trust and the second invites correction). The result is nowhere near it.
+
+  **Still open, deliberately unmeasured:** the *semantic* half (quotes, dialogue). It probably suffers the same mechanism — `<blockquote>` is already known to appear only when the author applied Word's Quote style (`C1_QUOTE_PRESENTATION_UNBLOCK`) — but **probably is not measured**, and this chantier demonstrated three times why that distinction is what stops a session wasting itself on an unverified conclusion. Not prioritised.
+
 - **`DROPCAP_TEXT_OVERLAP`** — **real rendering defect, PDF only, latent** (found 2026-07-21, CTO-classified). Named independently of the Book Presentation chantier: this is a text-layout bug that the theme work merely uncovered, not a theming question.
 
   **Measured proof.** Source text: `"Every paragraph in this measurement carries the same words…"`. Rendered PDF output, visually verified at 100% in a real viewer: line 1 reads `"Every paragraph in this measurement"`, line 2 reads `"ies the same words so that the only"` — **the characters `carr` are painted over by the drop-cap glyph and unreadable.** Four characters lost on every drop-cap paragraph, at exactly the spot chosen for visual emphasis. Reproduce with `npx tsx backend/spikes/dropcap-render-pdf.ts`.
