@@ -43,6 +43,13 @@ Two rules make the boundary load-bearing rather than decorative:
 | 5 | Real images | Populate `Block.base64` at import (parse mammoth's inline data-URLs in `HtmlNormalizer` — renderers already consume); themed sizing/caption | image height enters the model from REAL dimensions, not `DEFAULT_IMAGE_HEIGHT` | PQB already wrote the checks: §5 crit 6, §4 crit 6, §6 crit 4 |
 | 6 | Typography variations | New themes declare fonts — **hard constraint: only faces `PdfFontRegistry` really embeds** (PQB "NO_FONT_FALLBACK"); DOCX/EPUB name the same families | line heights differ per face — already handled (`lineHeight(size, {theme})`, the RENDER_DRIFT fix) | font-object inspection (PDF), `fonts.xml` (DOCX), CSS `font-family` (EPUB) |
 
+**Shipped-output change, recorded (capability 2, Phase 3 C1, CTO-directed 2026-07-21):** unifying the
+three divergent quote presentations onto one declared `Theme.presentation.quote.indentPt` (36pt)
+**changes the shipped EPUB inset from `1.5em` (~16.5pt) to 36pt.** This is the intended unification —
+PDF indented only the first line, DOCX inset the whole block by 720 twips, EPUB by ~16.5pt, so
+"indented quote" meant three different things — but it is a real change to delivered output and is
+recorded here rather than only inside the review that proposed it. See `MINI_DR_C1_QUOTES.md`.
+
 ## 4bis. Phase 2 — ✅ EXECUTED and CTO-validated (2026-07-21)
 
 Real image embedding shipped tri-format, exactly along §2.5's narrow path: `HtmlNormalizer` parses mammoth's data-URLs into `Block.base64`; the in-repo PNG/JPEG/GIF probe (Q4 as locked, zero dependency) supplies real intrinsic dimensions; `renderedImageSize()` is THE shared fit-to-column formula consumed by `estimateBlockHeight` (both branches) and `PDFRenderer` — R2 traced by named tests. DOCX now sniffs the real format (was hardcoded `'png'` at 300×200 — lineage bug #9) and EPUB writes the real extension. PDF gained a decode guard: an undecodable image degrades to an observable placeholder (warn + text), never killing the export; **DOCX/EPUB need no equivalent guard — verified empirically, not assumed: both embed the bytes verbatim without ever decoding them (the reader application is their decoder), confirmed by rendering a malformed PNG through both with no throw.** Found on the way: the `images.docx` fixture had carried a malformed PNG its whole life (lineage bug #8). Proof: `imageEmbedding.triformat.test.ts` on the real fixture — PDF `/Subtype /Image` XObject, DOCX `word/media/` bytes, EPUB packaged file, zero placeholders. Backend 567/567, `verify-real-export` 16/16 now exercising real embedding.
