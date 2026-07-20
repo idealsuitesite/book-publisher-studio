@@ -10,7 +10,7 @@ import {
   updateProjectSettings,
   exportProject,
 } from '@/lib/api-client';
-import { computeBookFacts, unstructuredFinding } from '@/lib/bookFacts';
+import { computeBookFacts, unstructuredFinding, proofRefreshKey } from '@/lib/bookFacts';
 import { useStudio } from '@/components/studio/StudioContext';
 import { Explorer, buildExplorer, type StudioView } from '@/components/studio/Explorer';
 import { Inspector, inspectorRows } from '@/components/studio/Inspector';
@@ -178,7 +178,9 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
     options?.layouts.find((l) => l.name === project.settings.layoutName)?.label ?? project.settings.layoutName;
   const themeLabel =
     options?.themes.find((t) => t.name === project.settings.themeName)?.label ?? project.settings.themeName;
-  const settingsKey = `${project.settings.layoutName}/${project.settings.themeName}`;
+  // The living Proof re-inks whenever this key changes — layout, theme, or a structure edit
+  // (STRUCTURE_EDITING_PHASE3.md D5, keyed on updatedAt so undo re-inks too). See proofRefreshKey.
+  const settingsKey = proofRefreshKey(project);
 
   const commands: PaletteCommand[] = [
     ...VIEW_ORDER.map((v, index) => ({
