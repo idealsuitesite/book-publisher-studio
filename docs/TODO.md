@@ -22,6 +22,8 @@ None currently.
 
   **Do not reopen an investigation on C1 until one of the two has actually happened.** The question is settled and measured; re-deriving it would waste a session.
 
+- **`DROPCAP_PARAGRAPH_ATOMICITY`** — accepted disclosed tech debt (CTO decision 2026-07-21, same status as its cousin `LIST_SPLITTING_ACROSS_PAGES` above). A paragraph carrying a drop cap is excluded from Phase B line-splitting (`LayoutEngine.ts:222`, deliberate — a drop cap's first lines are typographically special), so a drop-cap paragraph that does not fit the remaining page space cannot split: it moves whole and, if the page cannot hold it, produces a reconciliation page. **Not corrected now, and correcting it is not planned.** Distinct from the pricing gap: the model does not currently charge a drop cap's extra height at all (`estimateBlockHeight` never mentions `dropCap`) — that one IS in scope for the drop-cap capability and is not debt. **The CTO's condition: the debt may stay uncorrected but may not stay unmeasured.** The drop-cap mini Design Review must ship a test proving the property — a drop-cap paragraph too long for the page remainder yields a *measured reconciliation*, never a silent overflow — the letter of ADR-0051: loud, not silent. Candidate for a future splitting review alongside its cousin, not a hidden gap.
+
 ---
 
 ## 🟡 IN PROGRESS
