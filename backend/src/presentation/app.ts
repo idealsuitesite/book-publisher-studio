@@ -32,6 +32,8 @@ import { PublishingReportMapper } from '../application/mappers/PublishingReportM
 import { createKDPTarget } from '../domain/services/publishing/createKDPTarget';
 import { SqliteProjectRepository } from '../infrastructure/repositories/SqliteProjectRepository';
 import { ProjectService } from '../domain/services/ProjectService';
+import { BookEditingService } from '../domain/services/BookEditingService';
+import { EditBookUseCase } from '../application/use-cases/EditBookUseCase';
 import { ProjectSummaryMapper } from '../application/mappers/ProjectSummaryMapper';
 import { ProjectsController } from './controllers/ProjectsController';
 import { projectRoutes } from './routes/projects';
@@ -154,10 +156,12 @@ export function createApp(): Express {
     new ExportProjectUseCase(
       projectRepository,
       { docx: exportDocxUseCase, pdf: exportPdfUseCase, epub: exportEpubUseCase },
-      new ManualLayoutSelector()
+      new ManualLayoutSelector(),
+      projectService
     ),
     new PublishProjectUseCase(projectRepository, projectService, publishUseCase, new ManualLayoutSelector()),
-    new PublishingReportMapper()
+    new PublishingReportMapper(),
+    new EditBookUseCase(projectRepository, projectService, new BookEditingService())
   );
   app.use('/api/projects', projectRoutes(projectsController));
 

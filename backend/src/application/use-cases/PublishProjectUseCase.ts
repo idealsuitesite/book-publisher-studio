@@ -32,23 +32,18 @@ export class PublishProjectUseCase {
     const project = await this.repository.findById(projectId);
     if (!project) return undefined;
 
-    const source = project.sourceAssetId
-      ? project.assets.find((asset) => asset.id === project.sourceAssetId)
-      : undefined;
-    if (!source?.data) {
-      throw new Error(`Project ${projectId} has no retained source to publish from`);
-    }
-
     const withVersion = this.projectService.snapshot(project, 'publication');
     const version = withVersion.versions[withVersion.versions.length - 1];
 
+    // Publishes `project.book`, not the retained source bytes — so a manual structure edit is
+    // part of what KDP validates, and so publish and export render the exact same book (see
+    // ExportProjectUseCase and STRUCTURE_EDITING.md §5/§9; defect recorded in DECISIONS.md).
     const pageLayout = this.layoutSelector.select({ requestedLayoutName: project.settings.layoutName });
-    const report = await this.publisher.execute({
-      buffer: source.data,
-      filename: source.filename,
-      themeName: project.settings.themeName,
-      pageLayout,
-    });
+    const report = await this.publisher.publishBook(
+      this.projectService.currentBook(project),
+      project.settings.themeName,
+      pageLayout
+    );
 
     const recorded = this.projectService.recordPublication(withVersion, report, version.id);
     await this.repository.save(recorded);

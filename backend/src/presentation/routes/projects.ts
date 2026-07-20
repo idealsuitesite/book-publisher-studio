@@ -12,6 +12,8 @@ export function projectRoutes(controller: ProjectsController): Router {
   // 598ms) and mirrors the existing manuscript export route's verb.
   router.post('/:id/export', controller.export);
   router.post('/:id/publish', controller.publish);
+  // One generic, typed mutation command (STRUCTURE_EDITING.md Q4) — not a route per verb.
+  router.post('/:id/structure', express.json(), controller.editStructure);
 
   return router;
 }

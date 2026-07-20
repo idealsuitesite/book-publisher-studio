@@ -6,9 +6,27 @@ import type { GetProjectUseCase } from '../../application/use-cases/GetProjectUs
 import type { ExportProjectUseCase, ProjectExportFormat } from '../../application/use-cases/ExportProjectUseCase';
 import type { PublishProjectUseCase } from '../../application/use-cases/PublishProjectUseCase';
 import type { PublishingReportMapper } from '../../application/mappers/PublishingReportMapper';
+import type { EditBookUseCase, StructureMutation } from '../../application/use-cases/EditBookUseCase';
 import type { ProjectListResponseDTO, UpdateProjectSettingsDTO } from 'shared-types';
 import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
 import { UnknownLayoutError } from '../../shared/errors/UnknownLayoutError';
+import { ContentNotFoundError } from '../../shared/errors/ContentNotFoundError';
+
+/** Validates an untrusted request body into a StructureMutation, or returns null. */
+function parseMutation(body: unknown): StructureMutation | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const m = body as Record<string, unknown>;
+  if (m.type === 'reorderChapters' && typeof m.fromIndex === 'number' && typeof m.toIndex === 'number') {
+    return { type: 'reorderChapters', fromIndex: m.fromIndex, toIndex: m.toIndex };
+  }
+  if (m.type === 'rename' && typeof m.id === 'string' && typeof m.title === 'string' && m.title.trim()) {
+    return { type: 'rename', id: m.id, title: m.title };
+  }
+  if (m.type === 'restoreVersion' && typeof m.versionId === 'string' && m.versionId) {
+    return { type: 'restoreVersion', versionId: m.versionId };
+  }
+  return null;
+}
 
 const EXPORT_CONTENT_TYPE: Record<ProjectExportFormat, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -32,8 +50,42 @@ export class ProjectsController {
     private projectService: ProjectService,
     private exportProject: ExportProjectUseCase,
     private publishProject: PublishProjectUseCase,
-    private publishingReportMapper: PublishingReportMapper
+    private publishingReportMapper: PublishingReportMapper,
+    private editBook: EditBookUseCase
   ) {}
+
+  /**
+   * Applies a typed structure mutation (STRUCTURE_EDITING.md Q4: one generic command route).
+   * Returns the fresh project DTO — re-fetched via GetProjectUseCase so validation recomputes
+   * against the edited book (ADR-0027: validation stays read-only, never through the edit).
+   */
+  editStructure = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const mutation = parseMutation(req.body);
+    if (!mutation) {
+      res.status(400).json({ error: 'Invalid structure mutation', code: 'INVALID_MUTATION' });
+      return;
+    }
+    try {
+      const found = await this.editBook.execute(req.params.id, mutation);
+      if (!found) {
+        res.status(404).json({ error: 'Project not found', code: 'PROJECT_NOT_FOUND' });
+        return;
+      }
+      res.json(await this.getProject.execute(req.params.id));
+    } catch (error) {
+      // A bad target INSIDE a real project (unknown chapter/section id, or unknown version) is a
+      // client error, not a server fault — nameable, not a 500.
+      if (error instanceof ContentNotFoundError) {
+        res.status(400).json({ error: error.message, code: 'CONTENT_NOT_FOUND' });
+        return;
+      }
+      if (error instanceof Error && error.message.startsWith('No such version')) {
+        res.status(400).json({ error: error.message, code: 'VERSION_NOT_FOUND' });
+        return;
+      }
+      next(error);
+    }
+  };
 
   list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {

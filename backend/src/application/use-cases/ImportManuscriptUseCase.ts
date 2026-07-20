@@ -12,6 +12,7 @@ import type { ImportResponseDTO } from '../dto/ImportResponseDTO';
 import { buildImportReport } from '../mappers/ImportReportMapper';
 import type { ProjectService } from '../../domain/services/ProjectService';
 import type { ProjectRepository } from '../../domain/ports/ProjectRepository';
+import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 
 export class ImportManuscriptUseCase implements UseCase<ImportRequest, ImportResponseDTO> {
   constructor(
@@ -25,7 +26,11 @@ export class ImportManuscriptUseCase implements UseCase<ImportRequest, ImportRes
     // ones. Both or neither: a service without a repository could create projects nobody can
     // ever find again.
     private projectService?: ProjectService,
-    private projectRepository?: ProjectRepository
+    private projectRepository?: ProjectRepository,
+    // Front matter is now stored user content (STRUCTURE_EDITING.md Q3), populated once at import
+    // and thereafter editable — no longer synthesised afresh on every export. Defaulted so the
+    // 6- and 8-argument construction sites and tests keep working.
+    private frontMatterBuilder: FrontMatterBuilder = new FrontMatterBuilder()
   ) {}
 
   async execute(request: ImportRequest): Promise<ImportResponseDTO> {
@@ -55,7 +60,17 @@ export class ImportManuscriptUseCase implements UseCase<ImportRequest, ImportRes
     // for real authors, the change is confined to this one block.
     let projectId: string | undefined;
     if (report.status === 'success' && this.projectService && this.projectRepository) {
-      let project = this.projectService.create(enrichedBook, {
+      // Q3: front matter is populated ONCE, here, and stored as user content on the project's
+      // book — the title and copyright pages become something the author owns and edits, not
+      // something re-invented at every export. The export/publish paths render this stored front
+      // matter as-is (they no longer synthesise); only the legacy raw-bytes routes, which have no
+      // stored book, still synthesise. It lives on the stored book only: the import report and
+      // Structure view describe mainContent, and front matter has never been part of that DTO.
+      const bookWithFrontMatter = {
+        ...enrichedBook,
+        frontMatter: this.frontMatterBuilder.build(enrichedBook),
+      };
+      let project = this.projectService.create(bookWithFrontMatter, {
         layoutName: 'letter',
         themeName: 'classic',
       });
