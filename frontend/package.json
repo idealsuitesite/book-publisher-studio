@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "baseline": "node scripts/capture-baseline.mjs",
+    "verify-structure-editing": "node scripts/verify-structure-editing.mjs",
     "test": "vitest --run",
     "test:watch": "vitest"
   },
