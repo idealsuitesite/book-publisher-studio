@@ -8,6 +8,7 @@ import type {
   ProjectSettingsDTO,
   UpdateProjectSettingsDTO,
   PublishingResponseDTO,
+  StructureMutation,
 } from 'shared-types';
 
 // Sprint 7 Decision 2 (docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md) - the
@@ -216,6 +217,26 @@ export async function exportProject(id: string, format: ExportFormat): Promise<B
     throw await apiErrorFrom(response, 'Export');
   }
   return response.blob();
+}
+
+/**
+ * Applies a manual structure edit (reorder / rename / undo) to a project and returns the fresh
+ * project (STRUCTURE_EDITING.md phase 3). The backend re-fetches through GetProjectUseCase so the
+ * returned DTO already carries recomputed validation (ADR-0027) — the caller sets it straight into
+ * state, no separate reload (Phase 3 D6, server-authoritative). A bad target (unknown id/version)
+ * comes back as an ApiError with the backend's code, surfaced in the editor's own words.
+ */
+export async function editStructure(id: string, mutation: StructureMutation): Promise<ProjectDTO> {
+  const response = await request(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(id)}/structure`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mutation) },
+    'Editing structure',
+    IMPORT_TIMEOUT_MS
+  );
+  if (!response.ok) {
+    throw await apiErrorFrom(response, 'Editing structure');
+  }
+  return response.json() as Promise<ProjectDTO>;
 }
 
 export async function publishProject(id: string): Promise<PublishingResponseDTO> {

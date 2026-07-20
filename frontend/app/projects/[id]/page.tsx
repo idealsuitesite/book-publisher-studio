@@ -10,14 +10,14 @@ import {
   updateProjectSettings,
   exportProject,
 } from '@/lib/api-client';
-import { computeBookFacts, unstructuredFinding } from '@/lib/bookFacts';
+import { computeBookFacts, unstructuredFinding, proofRefreshKey } from '@/lib/bookFacts';
 import { useStudio } from '@/components/studio/StudioContext';
 import { Explorer, buildExplorer, type StudioView } from '@/components/studio/Explorer';
 import { Inspector, inspectorRows } from '@/components/studio/Inspector';
 import { BookDashboard } from '@/components/studio/BookDashboard';
 import { ReadyForPrint } from '@/components/studio/ReadyForPrint';
 import { CommandPalette, type PaletteCommand } from '@/components/studio/CommandPalette';
-import { BookStructureView } from '@/components/BookStructureView';
+import { StructureEditor } from '@/components/studio/StructureEditor';
 import { FormatSelector } from '@/components/FormatSelector';
 import { PreviewPanel } from '@/components/PreviewPanel';
 import { PublishDesk } from '@/components/studio/PublishDesk';
@@ -178,7 +178,9 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
     options?.layouts.find((l) => l.name === project.settings.layoutName)?.label ?? project.settings.layoutName;
   const themeLabel =
     options?.themes.find((t) => t.name === project.settings.themeName)?.label ?? project.settings.themeName;
-  const settingsKey = `${project.settings.layoutName}/${project.settings.themeName}`;
+  // The living Proof re-inks whenever this key changes — layout, theme, or a structure edit
+  // (STRUCTURE_EDITING_PHASE3.md D5, keyed on updatedAt so undo re-inks too). See proofRefreshKey.
+  const settingsKey = proofRefreshKey(project);
 
   const commands: PaletteCommand[] = [
     ...VIEW_ORDER.map((v, index) => ({
@@ -233,14 +235,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
             onNavigate={setView}
           />
         )}
-        {view === 'structure' && (
-          <BookStructureView
-            book={project.book}
-            filename={project.sourceFilename ?? null}
-            onReset={() => router.push('/')}
-            structureFinding={unstructuredFinding(project.report)}
-          />
-        )}
+        {view === 'structure' && <StructureEditor project={project} onEdited={setProject} />}
         {view === 'validation' && <ReadyForPrint report={project.report} />}
         {view === 'layout' && settingsError && (
           <p className="text-sm text-app-error">{settingsError}</p>

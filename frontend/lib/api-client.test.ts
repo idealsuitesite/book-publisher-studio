@@ -3,6 +3,8 @@ import {
   importManuscript,
   getManuscriptOptions,
   exportManuscript,
+  editStructure,
+  ApiError,
   RequestTimeoutError,
   NetworkError,
 } from './api-client';
@@ -158,5 +160,36 @@ describe('exportManuscript', () => {
     const error = await exportManuscript({ file: docx(), format: 'pdf' }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(RequestTimeoutError);
     expect((error as Error).message).toMatch(/180s/);
+  });
+});
+
+describe('editStructure', () => {
+  it('POSTs the typed mutation to the project structure route and returns the fresh project', async () => {
+    const spy = mockFetch(() => json({ id: 'p1', book: { mainContent: [] }, versions: [{ number: 1 }] }));
+
+    const project = await editStructure('p1', { type: 'reorderChapters', fromIndex: 2, toIndex: 0 });
+
+    const [url, init] = spy.mock.calls[0];
+    expect(url).toBe('http://localhost:5000/api/projects/p1/structure');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(init?.body as string)).toEqual({ type: 'reorderChapters', fromIndex: 2, toIndex: 0 });
+    expect(project.id).toBe('p1');
+  });
+
+  it('encodes the project id in the path', async () => {
+    const spy = mockFetch(() => json({ id: 'a/b' }));
+
+    await editStructure('a/b', { type: 'rename', id: 'c1', title: 'New' });
+
+    expect(spy.mock.calls[0][0]).toBe('http://localhost:5000/api/projects/a%2Fb/structure');
+  });
+
+  it('throws a coded ApiError on a bad target so the editor can name it (CONTENT_NOT_FOUND)', async () => {
+    mockFetch(() => json({ error: 'no chapter or section with id "ghost"', code: 'CONTENT_NOT_FOUND' }, 400));
+
+    const error = await editStructure('p1', { type: 'rename', id: 'ghost', title: 'X' }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).code).toBe('CONTENT_NOT_FOUND');
   });
 });

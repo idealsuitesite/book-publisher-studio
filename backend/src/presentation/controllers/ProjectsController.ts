@@ -6,8 +6,8 @@ import type { GetProjectUseCase } from '../../application/use-cases/GetProjectUs
 import type { ExportProjectUseCase, ProjectExportFormat } from '../../application/use-cases/ExportProjectUseCase';
 import type { PublishProjectUseCase } from '../../application/use-cases/PublishProjectUseCase';
 import type { PublishingReportMapper } from '../../application/mappers/PublishingReportMapper';
-import type { EditBookUseCase, StructureMutation } from '../../application/use-cases/EditBookUseCase';
-import type { ProjectListResponseDTO, UpdateProjectSettingsDTO } from 'shared-types';
+import type { EditBookUseCase } from '../../application/use-cases/EditBookUseCase';
+import type { ProjectListResponseDTO, UpdateProjectSettingsDTO, StructureMutation } from 'shared-types';
 import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
 import { UnknownLayoutError } from '../../shared/errors/UnknownLayoutError';
 import { ContentNotFoundError } from '../../shared/errors/ContentNotFoundError';

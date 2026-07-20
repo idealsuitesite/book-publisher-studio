@@ -1,4 +1,15 @@
-import type { BookDTO, BlockDTO, ContentDTO, ImportReportDTO, ValidationIssueDTO } from 'shared-types';
+import type { BookDTO, BlockDTO, ContentDTO, ImportReportDTO, ValidationIssueDTO, ProjectDTO } from 'shared-types';
+
+/**
+ * The key that drives the living Proof's re-ink (PreviewPanel). It must change whenever the
+ * rendered book would change: layout, theme, OR a structure edit (STRUCTURE_EDITING_PHASE3.md D5).
+ * The structure token is `updatedAt`, not `versions.length`, because undo (`restoreVersion`)
+ * mutates the book without taking a snapshot — `updatedAt` advances on every book mutation, so
+ * switching to the Proof after a reorder/rename/undo shows the new content with no manual re-export.
+ */
+export function proofRefreshKey(project: ProjectDTO): string {
+  return `${project.settings.layoutName}/${project.settings.themeName}/${project.updatedAt}`;
+}
 
 /**
  * The book's body, counted from the real AST (PRODUCT_EXPERIENCE §10.6: the Explorer as living

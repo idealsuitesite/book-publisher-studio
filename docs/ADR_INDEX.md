@@ -56,6 +56,7 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 | 0050 | Fidelity Is the Product | 2026-07-20 | Governance, Product | APPROVED — CTO-directed standing principle |
 | 0051 | The Renderer Never Breaks a Page on Its Own Initiative | 2026-07-20 | Rendering, Governance | APPROVED — implemented with RENDER_DRIFT fixes; annex 2026-07-21 records the 7th real-fixture bug (ghost pages, found by the quality-bar calibration) |
 | 0052 | Project Export/Publish Render the Stored Book, Not the Source Bytes — a Real Defect in Merged Phase-2 Code | 2026-07-21 | Architecture, Rendering, Product Object Model | APPROVED — CTO-directed; fixes structure edits silently discarded on export/publish; amends HOME_WORKSPACE Decision 6 |
+| 0053 | `@dnd-kit` for Drag-and-Drop, and Why the Reorder Gesture Is Proven in a Real Browser, Not jsdom | 2026-07-21 | UI Foundation, Testing, Governance | APPROVED — spike-gated dependency; reorder gesture verified by Playwright (`verify-structure-editing`), handler logic in jsdom |
 
 ## By category
 
@@ -67,7 +68,7 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 - **First Demonstrable Product** (Sprint 7): 0033, 0034
 - **Publishing Engine** (Sprint 8): 0035, 0036, 0037, 0038, 0042, 0045
 - **Governance** (process, not a specific engine): 0006, 0007, 0010, 0017, 0021, 0032, 0033, 0034, 0036, 0037, 0039, 0040, 0045, 0050, 0051
-- **UI Foundation** (Sprint 9): 0040
+- **UI Foundation** (Sprint 9): 0040, 0053
 - **Product Object Model / persistence**: 0044, 0046, 0047, 0048, 0052
 - **Scalability / open constraints**: ~~0038~~ (resolved by 0042), 0041, 0043
 
