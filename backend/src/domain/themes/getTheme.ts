@@ -1,9 +1,11 @@
 import type { Theme } from '../models/Theme';
 import { ClassicTheme } from './ClassicTheme';
+import { ModernTheme } from './ModernTheme';
 import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
 
 const THEMES: Record<string, Theme> = {
   classic: ClassicTheme,
+  modern: ModernTheme,
 };
 
 export function getTheme(name: string): Theme {
