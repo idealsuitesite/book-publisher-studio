@@ -14,6 +14,7 @@ A global publishing software platform (DOCX import, AST-based book model, PDF/EP
 4. **A Design Review precedes non-trivial code** — new engines, new ports, new dependencies, or an approach with two genuinely different options all need one, approved before a branch exists. → `docs/DESIGN_REVIEW_PROCESS.md`
 5. **Real fixtures over synthetic ones** — for import, pagination, TOC, renderer, and publishing changes, verify against a real manuscript, not only hand-built test objects. This project has shipped eleven real bugs that passed 100% synthetic-fixture coverage (ADR-0019, ADR-0020, ADR-0031, IMPORT_FIDELITY commit 3, RENDER_DRIFT, the ADR-0051 annex, the ADR-0050 annex, TABLE_DUPLICATION Défaut A/B — full lineage in the policy doc). → `docs/REAL_FIXTURE_POLICY.md`
 6. **No feature is done until Code, Product, and Documentation all pass** — this is now a formal governance principle, not just a habit. → `docs/DECISIONS.md` (ADR-0032) and `docs/QUALITY_GATE.md`
+7. **Re-verify a cited ADR against the current code before building on it** — an ADR records what was true when written, not a standing guarantee; any ADR (or prior decision) cited as a chantier's foundation must be re-measured, not just re-read. Three precedents: ADR-0048 amending Sprint 7 Decision 2, the drop-cap pricing reversal, ADR-0043's premise invalidated by `GUTTER_SCOPE.md`. → `docs/DESIGN_REVIEW_PROCESS.md`
 
 ## Where everything lives
 

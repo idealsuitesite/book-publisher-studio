@@ -29,6 +29,18 @@ A bug fix, a refactor with no behavior change, or a small addition that obviousl
 
 A **spike** (`backend/spikes/*.ts`, throwaway, not part of `src/`, not test-covered) is a hard prerequisite before any Level 2 review locks a decision that depends on real external behavior — a third-party library's actual capabilities (ADR-0019 PDFKit spike, ADR-0020 EPUB library spike) or real published specs this project doesn't control (ADR-0030 KDP trim-size spike). "Confirmed, not guessed" applies to this project's own upstream code too (ADR-0031/ADR-0032's lesson) — a Design Review's own wording can encode an unverified assumption about existing code just as easily as about a library.
 
+## Re-verify a cited ADR against the current code before building on it (non-negotiable)
+
+An ADR — like a prior CTO decision or an earlier Design Review — records what was true and decided *when it was written*. It is not a standing guarantee about the code today. **Any ADR, prior decision, or earlier review cited as the foundation of a new chantier must be re-measured against the current code before it is taken for granted: read *and confirmed against source*, not merely read.** If the re-measurement contradicts the cited document, that contradiction *is* the finding — record it (an amendment, a reversal, or a scope report) before proceeding, the same way a mid-implementation surprise is handled under "After approval: implementation discipline" below.
+
+This is not new discipline. It names what this project has already done three times, each time avoiding a chantier built on a premise that had quietly gone false:
+
+- **Sprint 7 Decision 2** ("the backend is stateless") — re-measured against the persistence requirement and formally amended by **ADR-0048**; the backend is now stateful and durable, the pipeline still stateless.
+- **The drop-cap height invariance** (25→25 pages, 0→0 reconciliations) — cited as "no cost, remove the pricing," then re-measured against Word's own layout and **reversed in `docs/DECISIONS.md`**: the invariance was the *signature* of `DROPCAP_TEXT_OVERLAP`, not evidence of no cost.
+- **ADR-0043** ("every paperback is non-compliant, text runs into the binding") — re-measured against the shipped layout presets in `docs/architecture/diagrams/GUTTER_SCOPE.md`: every preset ships 72pt inside margins, exceeding KDP's *maximum* required gutter (63pt) across the whole 24–828 page range, so the urgency premise did not survive.
+
+The rule that generalizes all three: *a decision only days old, never re-measured against code that changed since, can rest on a premise that is no longer true.* Reading the ADR tells you what was decided; only re-measuring tells you whether it still holds. Item 2 of the Level 2 shape already demands reading real code before writing a review — this is that same rule applied specifically to the documents a review leans on as settled.
+
 ## The approval gate
 
 A Level 2 review is not implementation-ready until it says **✅ APPROVED** with a date, following explicit CTO review — often across multiple rounds, each resolving open questions raised in the previous one (`PROFESSIONAL_LAYOUT_ENGINE.md`'s "round 2" is typical, not exceptional). No branch is created and no code is written before this gate closes. This project's CTO has been consistent about this: an approved Design Review with "no code yet, no branch yet" is a normal, expected state to leave a session in (see `docs/CURRENT_STATE.md`'s history across Sprints 4-6) — approval of the design and approval to start implementing are two separate, sequential gates, not one.
