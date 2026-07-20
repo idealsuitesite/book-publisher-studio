@@ -6,9 +6,9 @@
 
 ---
 
-## 0. First, a counting discrepancy to resolve
+## 0. Criterion count — RESOLVED: all ten, no subset
 
-The chantier says *"the eight criteria."* `PUBLICATION_QUALITY_BAR.md` §4 actually lists **9 numbered rows plus a separate "Colors and alignment (DOCX)" criterion = 10**. This assessment covers all ten and labels each; **please confirm which set is "the eight"** (my guess: rows 1–8, with row 9 "no fragmentation" and the colors paragraph folded into §7's composite gate — but that is a guess, and it changes what "B is done" means).
+The chantier originally said *"the eight criteria."* **Resolved by the CTO (2026-07-21): there is no chosen subset — all ten count** (the 9 numbered §4 rows + the "Colors and alignment (DOCX)" criterion). "Eight" was a mis-read of the table, not a deliberate selection. `verify-publication-quality` covers all ten, each carrying its own verdict — *verifiable-now* / *disclosed-gap* / *disclosed-out-of-scope* — and none is dropped. **This question is closed.**
 
 ---
 
@@ -44,7 +44,20 @@ Separately, the older `verify-real-export` fixtures in `backend/verification/` d
 | 9 | No paragraph fragmentation | ✅ DOCX never splits a paragraph (`startsWithContinuation` skipped, `:269-275`) | ✅ all | **Verifiable as written** |
 | C | Colors resolve to theme values in `styles.xml` | ✅ accent → heading styles (`:59`); body color from style (`:394`) | ⚠️ Classic is all-black | **Needs a non-black theme — see note** |
 
-**Ready to implement now, no decision needed: 1, 4, 8, 9** (four, not five — colours criterion C turned out *not* honestly assertable against the only shipped theme; see the note). **§4.8 fonts is now IMPLEMENTED and green** on `feature/verify-publication-quality-docx` (`backend/src/infrastructure/renderers/publicationQuality.docx.corpus.test.ts`, real corpus `faith-alone`, 590/590 suite). Criteria 1, 4, 9 remain to add on the same pipeline-composition pattern.
+**Implementation status — COMPLETE (all ten have a verdict; 599/599, tsc + eslint clean).** Eight criteria are implemented and green in `backend/src/infrastructure/renderers/publicationQuality.docx.corpus.test.ts`; two are disclosed gaps with no runnable fixture anywhere in the repo (not fabricated). Final verdict table:
+
+| §4 | Verdict | Fixture / basis (measured) |
+|---|---|---|
+| 1 headings | ✅ green | `faith-alone`: heading paras == chapters+sections (96 == 17+79) |
+| 2 underline | ✅ green (split) | `typography-test` real round-trip (bold/italic/strike) + **synthetic** `<w:u/>` emission, labelled synthetic |
+| 3 footnotes | ⚠️ disclosed gap | inline-`[N]` proxy accepted; 0 `footnoteReference` repo-wide, no fixture fabricated |
+| 4 lists | ✅ green | `art`: `<w:numPr>` == AST list items (1067) |
+| 5 tables | ✅ green | `tables.docx`: `<w:tbl>`==2, `<w:tc>`==18, + a real cell's text |
+| 6 images | ✅ green | `images.docx`: `word/media/`==2, `<w:drawing>`==2 |
+| 7 hyperlinks | ⚠️ disclosed (external-only + gap) | 0 hyperlink repo-wide; internal anchors out of scope |
+| 8 fonts | ✅ green | `faith-alone`: theme fonts in `styles.xml` + body runs |
+| 9 no-frag | ✅ green | `faith-alone`: body paras == AST paragraphs (681) |
+| C colours | ✅ green (2 halves) | non-black mechanism + negative control **and** Classic `accent === text` invariant (CTO decision 6) |
 
 > **The colours trap — found while implementing, recorded not smoothed over.** The Classic theme is all-black: `colors.accent === colors.text === #000000` (`ClassicTheme.ts`). A black *fallback* is therefore indistinguishable from the theme's real black, so "the accent appears in `styles.xml`" cannot fail for the right reason — it passes whether or not the renderer honoured the theme. Criterion C is meaningful only against a **non-black theme** (exactly why `accentColors.triformat.test.ts` uses a synthetic `#1D4E68`, never Classic). C therefore moves from "ready now" to the decision pile: export the corpus under a non-black theme for this check, or assert C only under such a theme. This is §3's honest-property rule catching a would-be meaningless gate before it shipped — the same discipline this whole assessment exists to serve.
 
@@ -59,7 +72,10 @@ Separately, the older `verify-real-export` fixtures in `backend/verification/` d
 
 ---
 
-## 4. The decisions this come-back needs (before any harness code)
+## 4. The decisions this come-back needed — ALL RESOLVED (CTO, 2026-07-21)
+
+*All six below were decided by the CTO and are implemented; see the verdict table in §2. Preserved here as the record of what was asked and answered.*
+
 
 1. **Which "eight"?** Confirm the criterion set (§0).
 2. **Corpus vs. per-criterion fixtures.** "The real corpus" cannot cover tables/images/footnotes/hyperlinks. Approve running `verify-publication-quality` against a **per-criterion fixture set** (import corpus for structure/lists/fonts/colors; `tables.docx`/`images.docx` and new link/footnote fixtures for the rest), or direct that real manuscripts covering those features be added to the corpus first.
