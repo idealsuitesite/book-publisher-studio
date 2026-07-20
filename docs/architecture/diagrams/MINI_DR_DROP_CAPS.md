@@ -15,8 +15,8 @@ Declaring `Theme.presentation.dropCap` is a theme value. **Two things go past it
 | Site | Change | Beyond a theme value? |
 |---|---|---|
 | `TypographyResolver` | must decide `dropCap` from the theme's rule + the block's **position** (is this the chapter's first paragraph). Today `resolveBlockTypography` is strictly per-block and has **no positional context at all** — it never learns where a block sits. | **YES — new information must reach the resolver** |
-| `LayoutEngine.estimateBlockHeight` | must charge a drop cap's added height, which it currently does not do in any form | **YES — this is the R2 height contract** |
-| The three renderers | consume `dropCap` **already**, at `DROP_CAP_SCALE`. Only the scale becomes theme-sourced. | value swap |
+| `LayoutEngine.estimateBlockHeight` | ~~must charge a drop cap's added height, which it currently does not do in any form~~ — **DONE, shipped with the overlap fix (PR #26)**: a drop-cap paragraph is priced as `bandLines` beside the glyph plus the remainder at full width. This capability inherits the pricing instead of building it. | no longer pending |
+| The three renderers | consume `dropCap` **already**, at `DROP_CAP_SCALE` — which since PR #26 lives in `domain/services/dropCapMetrics`, no longer duplicated privately in each renderer and now visible to the model. Making it theme-sourced is therefore **one substitution point, not three**. | value swap |
 
 **Not touched, deliberately:** `Block.dropCap` stays in the model as the explicit per-block path.
 It is not deleted and not populated. **Open question for the CTO in §5.**
@@ -77,14 +77,19 @@ all three renderers. The theme may vary scale and form *within* that approximati
 This is accepted for this scope, explicitly, not overlooked. Real wrap-around — a line-aware layout
 problem — would be **its own chantier with its own R2**, never a silent extension of this one.
 
-## 4bis. OPEN — three renderers, three strategies (must be settled before wiring the theme)
+## 4bis. OPEN — three renderers, three strategies (**THE FIRST POINT to settle when this review reopens**)
+
+**CTO ruling, 2026-07-21:** when this document is reopened for implementation, this question is
+**the first item of the Design Review, not a note in passing.** A single theme-declared scale
+masking three different behaviours is exactly the class of divergence this whole chantier refused
+to leave invisible. It must be *decided*, not rediscovered at the moment of writing the theme.
 
 **Recorded here, in the document that will be reopened, rather than left in the fix's review.**
 
 Measured during the `DROPCAP_TEXT_OVERLAP` investigation: the three renderers implement drop caps by
 three *different* strategies — **EPUB wraps text around the glyph** (`float: left`, correct);
 **DOCX grows the line box** (a big first letter, degraded but lossless, confirmed in Word 16.0);
-**PDF will indent the overlapped lines** once the fix lands. A single theme-declared drop-cap
+**PDF indents the overlapped lines** (shipped, PR #26). A single theme-declared drop-cap
 *scale* therefore means three different things in three formats, and produces three different
 paragraph heights for the same declared value.
 
