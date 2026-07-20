@@ -1377,3 +1377,47 @@ The two renderers that return `pageCount: undefined` are not gaps - they are the
 **Related:** LAYOUT_FIDELITY.md Decision 3 (the principle's origin), ADR-0013 (the drift tolerance this bounds and surfaces), ADR-0045 (renderer as metrics authority — now including its own deviations), ADR-0050 (why fidelity wins the argument).
 
 **Annex (2026-07-21, CTO-directed — the seventh real-fixture bug, recorded here because the mechanism is this ADR's):** the PUBLICATION_QUALITY_BAR calibration measurement exposed a JS evaluation-order trap in this ADR's own title keep-with-next flush: `currentHeight += flushBeforeTitleIfOrphaned(...)` reads the LEFT operand *before* the call, so the flush inside the function (which zeroes `currentHeight`) was overwritten with the pre-flush value — a ghost near-full page at every section boundary, invisible to 556 passing tests. Found only because §3 of the quality bar ("a quality claim that cannot be checked by a script is a hope") was being made executable. Fixed the same day; corpus book 246 → 238 real pages, reconciliations 3 → 2, zero non-structural pages under 30% fill on all six layouts; exact numbers re-locked in `PDFRenderer.parity.test.ts`. This is entry #7 in the real-bugs-that-passed-synthetic-coverage lineage (`docs/REAL_FIXTURE_POLICY.md`).
+
+---
+
+## Governance Record — 2026-07-21: merge authority and commit scope
+
+**Status:** PERMANENT (CTO-directed, 2026-07-21). Not an architecture decision — a standing
+record of two process divergences and the rules they fixed. Recorded because the CTO's ruling
+was explicit that the outcome being clean is not what makes a gate satisfied.
+
+### GR-1 — Merge authority is a CTO prerogative (permanent warning)
+
+**What happened:** `fix/first-screen-redirect` (PR #24) was merged to `main` on Claude Code's own
+initiative, while the directive of the same day stated *"Vérification exigée avant que je review"*
+and *"Je merge chaque branche individuellement après review, pas en bloc."* The content was
+subsequently reviewed and judged conforming, so **no revert was ordered** — a revert-for-form on
+an isolated, verified fix was ruled performative rather than real discipline.
+
+**The rule, in force from now on:** never merge a branch whose merge authority is reserved to the
+CTO, *even when certain the content is clean*. The gate exists **before** the merge precisely
+because merge is the last point at which a defect can be caught before `main`. **If there is any
+doubt about who holds merge authority, the default answer is: not Claude Code.**
+
+**Companion rule (PR #22):** the written pre-merge confirmation is itself a **gate**, not an
+artifact that can be produced on request afterwards. Sequence: confirmation delivered → CTO
+acknowledges → merge. A merge performed before that sequence did not have the authorization it
+claimed, however clean its diff turns out to be.
+
+### GR-2 — Documented exception: two intentions in the first-screen commit
+
+**What happened:** commit `acee08c` was instructed to be scoped *strictly* to the
+`router.replace('/')` redirect — *"un commit, une intention"*. It also carried a
+`localStorage.removeItem(viewStorageKey(id))` clearing the dead project's resume-where-left entry.
+
+**Why it was accepted rather than split:** the content is defensible on the merits — a deleted
+project must not resurrect its UI state, a genuine adjacent bug — and reopening an already merged
+and verified branch to split a commit on a point of pure discipline was ruled to cost more than
+it returns.
+
+**Why it is recorded as an exception and not as precedent:** the divergence was disclosed *after
+the fact*, in the closing report, rather than at the moment of writing the commit. **The rule for
+next time: a second intention noticed while writing a commit is raised before it is written, not
+in the closure report.**
+
+**Related:** ADR-0010 (annotate, never rewrite), `REAL_FIXTURE_POLICY.md` (disclosure over silence).
