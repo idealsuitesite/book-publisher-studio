@@ -18,7 +18,13 @@ export const ClassicTheme: Theme = {
   },
   colors: {
     text: '#000000',
-    accent: '#4A4A4A',
+    // Phase 3 capability 1: now that `accent` is really consumed (headings + chapter titles, all
+    // three renderers), Classic declares its accent to BE its text colour. That is an honest
+    // statement about a plain classic book, not a placeholder — and it keeps the shipped theme
+    // byte-stable, because whether Classic ever adopts a VISIBLE accent is an aspect decision
+    // the CTO reserved for the second theme's screenshot loop. Do not anticipate it here.
+    // (The previous '#4A4A4A' had zero consumers — verified — so nothing regresses.)
+    accent: '#000000',
   },
   spacing: {
     paragraphSpacing: 8,

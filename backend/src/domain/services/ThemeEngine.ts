@@ -40,7 +40,11 @@ export class ThemeEngine {
       return {
         fontFamily: theme.fonts.heading,
         fontSize: theme.fontSizes[sizeKey],
-        color: theme.colors.text,
+        // Phase 3 capability 1 (MINI_DR_ACCENT_COLORS.md): headings are the accent's first real
+        // consumer — `colors.accent` was declared since the Theme model existed and read by
+        // nothing. A theme whose accent equals its text colour (ClassicTheme) renders exactly as
+        // before; the aspect decision for Classic stays reserved for the screenshot loop.
+        color: theme.colors.accent,
         spaceBefore: theme.spacing.headingSpacing,
         spaceAfter: theme.spacing.headingSpacing,
       };

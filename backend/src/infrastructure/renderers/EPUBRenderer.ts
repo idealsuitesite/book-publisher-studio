@@ -137,6 +137,9 @@ export class EPUBRenderer implements Renderer<Buffer> {
       h4 { font-size: ${theme.fontSizes.h4}pt; }
       h5 { font-size: ${theme.fontSizes.h5}pt; }
       h6 { font-size: ${theme.fontSizes.h6}pt; }
+      /* Phase 3 capability 1: headings carry the theme accent. EPUB had NO title colour of its
+         own — headings simply inherited body's, so this rule is added rather than changed. */
+      h1, h2, h3, h4, h5, h6 { color: ${theme.colors.accent}; }
       p { font-size: ${theme.fontSizes.body}pt; margin: 0 0 ${theme.spacing.paragraphSpacing}pt; }
       blockquote { margin-left: 1.5em; }
       table, th, td { border: 1px solid #999; border-collapse: collapse; padding: 4px; }

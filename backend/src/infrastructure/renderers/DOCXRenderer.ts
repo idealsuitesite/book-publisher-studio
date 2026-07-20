@@ -51,7 +51,10 @@ const DROP_CAP_SCALE = 2.5;
 // Chapter/Section titles (renderTitle) at once, since both just reference these same
 // style IDs.
 function buildHeadingStyles(theme: Theme): IStylesOptions['default'] {
-  const color = theme.colors.text.replace(/^#/, '');
+  // Phase 3 capability 1: accent, not text — and because these are Word's *default* Heading-N
+  // style definitions, this single line colours both Heading blocks and Chapter/Section titles
+  // (renderTitle), exactly as the comment above already describes. No signature change needed.
+  const color = theme.colors.accent.replace(/^#/, '');
   const styleFor = (sizeKey: keyof Theme['fontSizes']) => ({
     run: { font: theme.fonts.heading, size: Math.round(theme.fontSizes[sizeKey] * 2), bold: true, color },
     paragraph: {

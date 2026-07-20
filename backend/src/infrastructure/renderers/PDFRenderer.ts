@@ -505,7 +505,12 @@ export class PDFRenderer implements Renderer<Buffer> {
     // same heading role as Heading blocks (Sprint 4 commit 7 amendment) - previously they
     // used the generic "default" chrome font, a real inconsistency with Heading blocks
     // rendering in the theme's actual heading family.
-    doc.font(this.fonts.resolveHeading(level, theme, true, false)).fontSize(size).fillColor('#000').text(content.title);
+    // Phase 3 capability 1: the title colour comes from the theme's accent, like Heading blocks
+    // (ThemeEngine). This '#000' was the ONLY hardcoded title colour of the three renderers —
+    // DOCX already resolved it through buildHeadingStyles, EPUB inherits it from CSS. The other
+    // hardcoded colours here (running heads, title page, copyright) are front matter and chrome,
+    // a different surface, deliberately untouched — see MINI_DR_ACCENT_COLORS.md §1.
+    doc.font(this.fonts.resolveHeading(level, theme, true, false)).fontSize(size).fillColor(theme.colors.accent).text(content.title);
     doc.moveDown();
   }
 
