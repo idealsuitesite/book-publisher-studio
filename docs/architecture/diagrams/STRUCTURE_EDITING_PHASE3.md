@@ -1,0 +1,102 @@
+# Manual Structure Editing — Phase 3 (Frontend) — Level-2 Design Review
+
+**Status:** 🟡 ROUND 1 — OPENED, awaiting CTO review. **No code, no branch** (two-gate discipline: this document is the deliverable; approval of the design and approval to start implementing are separate gates). Opened on the CTO's feu vert after phase 2 backend merged (`7298df2`).
+**Date:** 2026-07-21, grounded in the real frontend code on `main` (`c86c50a`) — every "the code does X" claim below was read, not assumed (Level-2 shape item 2; non-negotiable #7).
+**Parent:** `STRUCTURE_EDITING.md` (Level-1, six decisions locked, phases 1–2 shipped). This review is phase 3, the "Frontend" row of that Level-1's §4/§8 — the Explorer's evolution from navigator to editor.
+
+---
+
+## 1. Objectives
+
+Give the author the *hands* the phase-2 backend already gave the system: reorder chapters, rename chapters/sections, and undo — directly, in the studio, with the result visible in the living Proof rather than requiring a re-export to check. This closes the gap the Reedsy-parity audit named (`EXPLORER_PARITY.md` §0: the one missing capability class is structure editing) and completes the "organize half of finalizing a book" (`STRUCTURE_EDITING.md` §1). It serves precisely the founder's target reader — a **non-technical author** — so the bar is not "editing is possible" but "editing is obvious and unscary."
+
+## 2. Current state — evidence, not assumptions (read on `main` `c86c50a`)
+
+The Level-1 review said "editable Explorer nodes (per-chapter, which don't exist today)." Reading the real code corrects two premises that copy rested on — both material to this design:
+
+- **The sidebar Explorer is station-navigation, not chapter-navigation.** `frontend/components/studio/Explorer.tsx` builds groups of *views* (`dashboard | structure | validation | layout | proof | editions | history`); "Structure — 17 ch · 79 sec" is **one nav button** (`buildExplorer`, the `structure` node), not a list of chapters. Chapters are **not** nodes in the sidebar. So the editable surface is **the Structure station's content**, not the sidebar. *(This is exactly `EXPLORER_PARITY.md` §2's live measurement — confirmed still true.)*
+- **The Structure station today renders a read-only import-confirmation panel.** `app/projects/[id]/page.tsx` routes `view === 'structure'` to `BookStructureView` (`frontend/components/BookStructureView.tsx`) — the Sprint-7 "what did I import?" card: a stats row plus a collapsed `<details>` list of parts with per-part word counts. Its language is import-flow (`onReset` = "Import another file"). It has **zero** editing affordances: `[draggable]` = 0, no `contenteditable`, no `<input>`. It is reused, read-only, in both the import confirmation and the workspace station.
+- **The backend exposes exactly three mutations, and front-matter *editing* is NOT one of them.** `EditBookUseCase.StructureMutation` (backend-only today) is `{ reorderChapters, fromIndex, toIndex } | { rename, id, title } | { restoreVersion, versionId }`. `POST /:id/structure` validates and applies these and **returns the fresh `ProjectDTO`** (re-fetched through `GetProjectUseCase`, so validation recomputes read-only, ADR-0027). There is **no** command to edit a title/copyright page's fields. Q3 made front matter *stored and rendered*; it did not add a way to *edit* it.
+- **The living Proof re-inks on `settingsKey` only.** `frontend/components/PreviewPanel.tsx` re-runs the real export pipeline (debounced 500ms, runId-guarded, old page dims never blanks) whenever its `settingsKey` prop changes. The workspace passes `settingsKey = ` `${layoutName}/${themeName}` (`page.tsx`). A structure edit changes `project.book` / `updatedAt` / `versions` but **not** layout or theme — so with today's key **a reorder would not re-ink the Proof.** This is the single most important wiring fact for the CTO's third requirement.
+- **State flow is server-authoritative and already re-entrant.** The workspace holds `project` in `useState`; `changeSettings` calls the API then `reload()` (`getProject`) and re-renders. A `StudioContext` effect republishes header/status facts on every `project` change. `ProjectDTO` carries `versions: [{ number, ... }]` and `updatedAt` — both usable as a structure-revision token.
+- **No drag-drop dependency exists.** `frontend/package.json`: React 19.2, Next 16.2, Radix primitives (dialog/popover/menu/tooltip/focus-scope), no dnd library. Accessibility is a standing contract here (axe in the Playwright baseline, `@axe-core/playwright`; the studio targets 0 axe nodes).
+
+**Net:** phase 3 is *not* "make Explorer nodes editable." It is: **build a real editable Structure station** (a new component), wire it to the three existing backend mutations through a new typed client call, and **teach the Proof to re-ink on a structure change** — without regressing accessibility or confusing a non-technical author.
+
+## 3. Locked-decision proposals (for CTO — the load-bearing ones)
+
+Each is a recommendation with rationale; the CTO locks, amends, or rejects per round.
+
+- **D1 — Drag-drop library: `@dnd-kit` (`@dnd-kit/core` + `@dnd-kit/sortable`), spike-gated before lock.** Rationale: (a) **accessibility-first** — a built-in keyboard sensor and screen-reader live-region announcements, which for our non-technical + axe-tested context is the whole ballgame (rolling our own HTML5 DnD would put keyboard reorder and touch support on us); (b) **light and self-contained** — zero runtime dependencies, tree-shakeable, and its `sortable` preset maps one-to-one onto "reorder a vertical list"; (c) **React 19 / Next 16 compatible** (hooks-based, no legacy context). This matches `UI_FOUNDATION.md` Decision 1's rule exactly — build in-house *except* where accessibility is genuinely hard and a headless library earns its place (the same judgment that admitted Radix). **Rejected alternatives:** `react-beautiful-dnd` (archived/deprecated, not React 19); `@hello-pangea/dnd` (maintained RBD fork, good DX but heavier and less a11y-complete than dnd-kit); native HTML5 DnD (poor touch + a11y burden). **Per DESIGN_REVIEW_PROCESS §"spike": a throwaway `backend/spikes`-style frontend spike must confirm dnd-kit's keyboard sensor + announcements work in *this* React 19 / Next 16 install before this decision locks** — "confirmed, not guessed" (ADR-0019/0020 precedent). The spike is the first authorized step *after* approval, not part of this document.
+
+- **D2 — A new `StructureEditor` component for the workspace `structure` station; `BookStructureView` stays the read-only import-confirmation card.** Two different needs (the same lesson as §2's information-hierarchy note): "what did I import?" (a confirmation, read-only, import flow) vs. "organize my book" (an editor, workspace). Reworking the shared read-only card in place would entangle the import flow with editing. So the workspace `structure` view routes to `StructureEditor`; the import confirmation keeps `BookStructureView` unchanged.
+
+- **D3 — Interaction design, tuned for a non-technical author** (answers the CTO's requirement 2 for reorder + rename):
+  - **Reorder:** each chapter row carries an explicit **drag handle** (a `⠿` grip, its own control) — dragging is initiated only from the handle, so "click a chapter" and "drag a chapter" never collide, and the affordance is visible rather than discovered. Keyboard path (dnd-kit sortable default): focus the handle → Space to lift → ↑/↓ to move → Space to drop, Esc to cancel, with a polite live-region announcement ("Chapter 3 moved to position 1 of 12"). Sections reorder within their chapter is **out of Phase 3 scope** (the backend `reorderChapters` operates on top-level `mainContent`; nested section reorder would need a new command — see D4's sibling reasoning). Chapters visibly **renumber** on drop (the backend already renumbers; the UI reflects it).
+  - **Rename:** **click-to-edit inline.** A chapter/section title is a button showing the title with a quiet hover affordance (pencil); activating it swaps the text for the `ui/Input` primitive pre-filled and selected; **Enter** or blur commits, **Esc** cancels, empty is rejected (mirrors the backend's `title.trim()` validation). This never opens a modal — inline keeps the author's place in the book.
+  - **Undo:** every edit snapshots a version (backend `snapshot`-before-edit), so **undo = `restoreVersion`** of the version just before it. Surface: a transient, dismissible "Chapter moved · **Undo**" affordance after each edit (and the History station remains the durable list). Undo calls `POST /:id/structure` `{ restoreVersion }`.
+  - **Feedback while a mutation is in flight:** the row shows a subtle pending state; on the server's response the whole station reconciles to the returned `ProjectDTO` (D6). Errors (400 `CONTENT_NOT_FOUND`, 409-class, network) surface inline in this surface's own words (ADR-0049 §3 pattern), never a dev-overlay crash (the CORS-PATCH scar, `page.tsx` `changeSettings`).
+
+- **D4 — Front-matter editing: NAMED, but its own follow-on (Phase 3b), because it needs a new backend command.** The CTO's requirement 2 lists "front matter" among the operations. Read against the code, front-matter *editing* is **not** one of the backend's three mutations — Q3 stored and rendered front matter but added no `editFrontMatter` command, and its fields (title-page title/subtitle/author; copyright text/isbn/notice) are form editing, not reorder/rename. **Recommendation: Phase 3 ships reorder + rename + undo** (the three the backend already supports, one coherent "organize" capability with the living-Proof payoff), **and front-matter field editing is Phase 3b** — a small backend commit adding an `editFrontMatter` `StructureMutation` variant + a front-matter form in the editor, its own one-intention change. This keeps Phase 3 focused and avoids smuggling a backend feature into a "frontend" phase. **CTO decision needed:** accept the split, or fold front-matter editing into Phase 3 (which then also opens the backend again). *(If folded in, this review must grow a §5 command spec for `editFrontMatter` and the backend commit moves ahead of the UI.)*
+
+- **D5 — Living Proof reflects structure edits by keying the Proof on a structure revision** (answers requirement 3). The minimal, no-new-engine change: the workspace composes the Proof's refresh key as `${layoutName}/${themeName}/${structureRev}`, where `structureRev` is a monotonic token that advances on every edit — `project.versions.length` is the natural choice (each committed edit snapshots exactly one version, phase-2 Q2), with `project.updatedAt` as an alternative. Because an edit returns a new `ProjectDTO` with an incremented `versions.length` and the workspace sets it into state, **switching to the Proof after editing shows the new order already re-inked — no manual re-export.** That is exactly the CTO's "ne pas se demander s'il faut réexporter." **A live inline mini-Proof *beside* the editor** (see it move as you drag) is deliberately **out of Phase 3 scope**: the full pipeline is ~600ms (ADR-0041; S13 "Performance" owns making it instant), so re-inking on every drag would feel heavy — named here as a future enhancement, not hidden. **Open question for CTO:** is "the Proof station is correct the moment you open it after editing" enough for now, or do you want the inline mini-Proof in Phase 3 despite the cost?
+
+- **D6 — Server-authoritative state; confirmed (non-optimistic) apply first.** `POST /:id/structure` already returns the full fresh `ProjectDTO`; the editor sets it into workspace state directly (no separate `reload()` round-trip). Rationale: the backend is fast and single-author (Q5, no optimistic concurrency), validation recomputes read-only on the returned project, and confirmed-apply is simpler and impossible to desync. **Optimistic reorder** (move the row instantly, reconcile on response, roll back on error) is a **later refinement** if confirmed-apply feels sluggish — named, not built. **Open question for CTO:** accept confirmed-first, or require optimistic reorder in Phase 3 for feel?
+
+- **D7 — `StructureMutation` moves to `shared-types`.** The Level-1 review pre-committed this ("when the frontend needs it, this moves to shared-types"). Phase 3 is that moment: the type becomes the shared contract the new client call and the backend both import, so the discriminated union can never drift between the two sides.
+
+## 4. Architecture impact
+
+- **No rendering-pipeline change, no engine, no R2 surface.** Editing produces a new `Book`; the same deterministic `ThemeEngine → TypographyResolver → LayoutEngine → Renderer` re-paginates it (already true since phase 2). The charged-vs-consumed contract (ADR-0051) is untouched. **No parity re-lock.** The *only* backend touch in Phase 3 is D7 (move a type to shared-types) — additive, no signature break.
+- **Frontend, additive:** one new client function (`editStructure`), one new component (`StructureEditor`) replacing `BookStructureView` at the `structure` station only, one new dependency (`@dnd-kit`, D1), and a one-line change to how the Proof's `settingsKey` is composed (D5). `BookStructureView`, the import flow, and every other station are untouched.
+- **Accessibility contract held:** dnd-kit keyboard sensor + announcements; inline rename via the accessible `ui/Input`; the editor must keep the studio at its axe budget (baseline recapture is expected — an intentional desktop appearance change, the `UI_FOUNDATION` Commit-8 pattern).
+
+## 5. Functional / technical specifications (locked before implementation)
+
+- **Shared type (D7)** — `packages/shared-types/src/StructureMutation.ts`, re-exported from `index.ts`; identical shape to today's backend union: `{ type:'reorderChapters'; fromIndex:number; toIndex:number } | { type:'rename'; id:string; title:string } | { type:'restoreVersion'; versionId:string }`. Backend `EditBookUseCase`/`ProjectsController` import it instead of declaring it.
+- **Client (`frontend/lib/api-client.ts`)** — `editStructure(id: string, mutation: StructureMutation): Promise<ProjectDTO>`; `POST /api/projects/:id/structure`, JSON body, `IMPORT_TIMEOUT_MS`, `apiErrorFrom` on non-2xx (so `INVALID_MUTATION` / `CONTENT_NOT_FOUND` / `VERSION_NOT_FOUND` reach the surface with codes). Mirrors `updateProjectSettings`.
+- **`StructureEditor` props** — `{ project: ProjectDTO; onEdited: (updated: ProjectDTO) => void }`. Renders the chapter list as a dnd-kit sortable list (handles), inline-renameable titles, an Undo affordance, and the ADR-0049 unstructured-finding banner (carried over from `BookStructureView`, since "0 chapters" is a fact about the structure this surface shows). `onEdited` sets workspace `project` state (D6) → Proof key advances (D5).
+- **Proof key (D5)** — `page.tsx`: `settingsKey = ` `${layoutName}/${themeName}/${project.versions.length}`.
+- **No new backend route or command in Phase 3** (D4 defers `editFrontMatter` to 3b unless the CTO folds it in).
+
+## 6. Risks (named, including deliberate scope-narrowing)
+
+1. **Non-technical-author confusion** — the core risk the CTO named. Mitigations: explicit drag handles (drag ≠ click), inline rename (no modal maze), live-region announcements, visible renumbering, an always-available Undo. Verified by real interaction tests, not just render tests.
+2. **Accessibility regression** from a drag interaction — mitigated by D1 (dnd-kit's keyboard/AT support is the reason it's chosen) and an axe assertion on the editor in the baseline.
+3. **Proof/edit desync** — if the Proof key did *not* advance on edits, the author would trust a stale PDF. D5 removes this by construction; an acceptance test asserts the re-ink.
+4. **Scope creep into front-matter editing** (D4) and **nested-section reorder** (D3) — both deliberately deferred with a stated reason (each needs a new backend command), not hidden.
+5. **Optimistic-UI complexity** (D6) — avoided in Phase 3 by choosing confirmed-apply; flagged as the place feel-tuning would go later.
+6. **dnd-kit stack-compat unknown** — retired by the pre-lock spike (D1) before any real component code.
+
+## 7. Commit plan (post-approval; one responsibility each, green gate between)
+
+0. **Spike (pre-lock, throwaway):** dnd-kit sortable + keyboard sensor + announcement in this React 19 / Next 16 install. Confirms or replaces D1. *(Not `src/`, not tested — the ADR-0019/0020 pattern.)*
+1. **`shared-types`: add `StructureMutation`** (D7); backend imports it (no behaviour change; backend suite stays green).
+2. **`editStructure` client function** + unit tests (mirror `updateProjectSettings.test`).
+3. **`StructureEditor` — read-only parity first:** renders the chapter/section list + the unstructured banner, no editing yet; wired at the `structure` station; **baseline recapture** (intentional desktop change).
+4. **Reorder** (dnd-kit, mouse + keyboard) → `editStructure({reorderChapters})` → server-authoritative update (D6); renumber reflected; announcement; component test incl. keyboard-only reorder.
+5. **Inline rename** (click-to-edit, Enter/Esc/empty-reject) → `editStructure({rename})`; component test for commit + cancel.
+6. **Undo** affordance → `editStructure({restoreVersion})`; test that undo restores the prior order/title.
+7. **Living Proof link** (D5): compose the Proof key with `versions.length`; test that an edit advances the key.
+8. **Real end-to-end verification + docs/ADR reconciliation:** reorder a real imported book in the running studio (Browser pane), switch to Proof, confirm the PDF shows the new order with no manual export; axe 0 nodes on the editor; undo restores. Reconcile `STRUCTURE_EDITING.md` (phase 3 done), `CURRENT_STATE`/`TODO`, and record any ADR (e.g., the dnd-kit dependency decision).
+
+*(Phase 3b, separate: `editFrontMatter` backend command + front-matter form — only if the CTO doesn't fold it into Phase 3 per D4.)*
+
+## 8. Acceptance criteria (concrete, inspectable)
+
+- A chapter can be moved from position 5 to position 1 **by keyboard alone**, with an audible-to-AT announcement; chapters renumber; the change persists across a reload.
+- A chapter/section can be renamed inline; Enter commits, Esc cancels, an empty title is refused.
+- After any edit, **switching to the Proof station shows the new structure already re-inked — no Generate, no manual re-export** (the D5 payoff, verified in the real browser).
+- **Undo** restores the immediately-prior state (order or title), and the History station shows the versions the edits created.
+- The editor holds the studio at **0 axe nodes**; the desktop baseline is recaptured intentionally, with attribution.
+- No backend rendering test changes value (no R2 impact); the backend suite stays green after D1/D7.
+
+## 9. Open questions for the CTO (round 1)
+
+1. **D4 — front-matter editing:** accept the Phase 3 = reorder/rename/undo, front matter = Phase 3b split? Or fold front-matter editing (new `editFrontMatter` backend command) into Phase 3?
+2. **D5 — Proof:** is "the Proof station is correct the moment you open it after editing" sufficient, or do you want a live inline mini-Proof beside the editor in Phase 3 despite the ~600ms cost?
+3. **D6 — feel:** confirmed-apply first (recommended), or optimistic reorder required in Phase 3?
+4. **D1 — dependency:** OK to add `@dnd-kit` (pending the spike), given `UI_FOUNDATION` Decision 1's "headless library only where accessibility is hard" rule?
+
+## Related
+`STRUCTURE_EDITING.md` (Level-1 parent; phases 1–2), `EXPLORER_PARITY.md` (the audit this closes), ADR-0052 (export/publish render the stored book — the reason an edit is even visible in output), ADR-0051 (R2 untouched), ADR-0027 (validation read-only after an edit), `UI_FOUNDATION.md` Decision 1 (build-in-house-except-accessibility, the D1 precedent), `PRODUCT_EXPERIENCE.md` §2.3/§4.5 (Explorer-as-navigator, living Proof), `PreviewPanel.tsx`/`Explorer.tsx`/`BookStructureView.tsx`/`app/projects/[id]/page.tsx` (the real code §2 measured), `FORMATTING_TOOLS_AUDIT.md` (the per-theme fine-tuning report queued *after* this closes).
