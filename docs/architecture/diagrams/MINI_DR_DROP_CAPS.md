@@ -39,6 +39,12 @@ model and violate Q2 directly.
 
 ## 3. How R2 is guaranteed — and tested
 
+**IN SCOPE, CTO-ruled: pricing `estimateBlockHeight` for a `dropCap` block is part of THIS
+capability's delivered work — not a separate debt.** (Distinguish it from
+`DROPCAP_PARAGRAPH_ATOMICITY`, which *is* accepted debt and is only made observable here.) The
+principle in §3.1 below — *the charged property must equal the real measurement against the
+renderer* — is a **directing principle, not an option**, per the CTO's verdict.
+
 **The premise the amended §4 row now carries: height impact is REAL and currently UNPRICED.**
 `estimateBlockHeight` never mentions `dropCap`, so the model charges a drop-cap paragraph as if its
 first character were body-sized while the renderer draws it at 2.5×. Today that costs nothing only
@@ -76,4 +82,4 @@ problem — would be **its own chantier with its own R2**, never a silent extens
 - **The pricing is wrong in either direction.** Under-charge → overflow and reconciliation pages; over-charge → under-full pages. Instrument: §3.1 plus parity. This is the single largest risk, and the reason §3.1 insists the added height be measured rather than computed from the scale factor.
 - **The trigger fires where it should not** (a chapter whose first block is not a paragraph, an empty chapter, a chapter opening on a split continuation). These are positional edge cases and belong in the resolver's own tests, enumerated before implementation rather than discovered by a real manuscript.
 - **Classic drifts visually** → guarded by `scope: 'none'` plus parity byte-stability.
-- **Open question for the CTO:** `Block.dropCap` becomes a field with a consumer and still no producer, now shadowed by a theme rule. Options: (a) leave it as a documented per-block override path for a future editing capability; (b) mark it deprecated in the model. **I recommend (a)** — structure editing is gated but real, and per-block overrides are exactly what it would need — **but this is a model-level decision, so I am not taking it.**
+- **`Block.dropCap` — RESOLVED by the CTO, against my recommendation.** I proposed keeping it alive as a per-block override path for future structure editing. **Overruled, and correctly:** BOOK_PRESENTATION §6 Q2 already locked *"block presentation lives in `Theme`, never per-block AST overrides"* when this chantier opened. Keeping the field as an override mechanism would contradict a locked decision even while nobody activates it — my recommendation had simply failed to check it against that lock. **Decision: deprecated, not removed** — removal touches `Book.ts` and several consumers and deserves its own review rather than being a side effect of this one. Recorded in `docs/DECISIONS.md` so a future session does not rediscover the field and hesitate between the two readings.
