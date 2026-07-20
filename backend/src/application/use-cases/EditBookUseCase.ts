@@ -2,16 +2,9 @@ import type { ProjectRepository } from '../../domain/ports/ProjectRepository';
 import type { ProjectService } from '../../domain/services/ProjectService';
 import type { BookEditingService } from '../../domain/services/BookEditingService';
 import type { Project } from '../../domain/models/Project';
-
-/**
- * A typed structure-mutation command (STRUCTURE_EDITING.md Q4: one generic command, not a route
- * per verb). Discriminated on `type` so the use case dispatches exhaustively and the route can
- * validate a single shape. When the frontend (phase 3) needs it, this moves to shared-types.
- */
-export type StructureMutation =
-  | { type: 'reorderChapters'; fromIndex: number; toIndex: number }
-  | { type: 'rename'; id: string; title: string }
-  | { type: 'restoreVersion'; versionId: string };
+// STRUCTURE_EDITING.md Q4's command, now shared (ADR-0033): Phase 3's frontend issues the same
+// union. Moved to shared-types as the Level-1 review pre-committed ("when the frontend needs it").
+import type { StructureMutation } from 'shared-types';
 
 /**
  * Applies a manual structure edit to a project's manuscript, durably (STRUCTURE_EDITING.md, Level-1
