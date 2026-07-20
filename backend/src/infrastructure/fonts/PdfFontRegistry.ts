@@ -92,6 +92,22 @@ export class PdfFontRegistry {
     }
   }
 
+  /**
+   * Every face `registerAll` registers, in registration order.
+   *
+   * Exists so the cap-height plausibility check (docs/DECISIONS.md - the PDFKit private-field
+   * dependency) can assert over EVERY face rather than a hand-copied list that would silently
+   * stop covering a family added later.
+   */
+  registeredFaceNames(): string[] {
+    return FAMILIES.flatMap((family) => [
+      family.name,
+      `${family.name}-Bold`,
+      `${family.name}-Italic`,
+      `${family.name}-BoldItalic`,
+    ]);
+  }
+
   /** Body text role - resolves from the theme's body font (e.g. paragraphs, quotes, lists, footnotes, tables). */
   resolveBody(theme: Theme, bold: boolean, italic: boolean): string {
     return this.variant(resolveFamily(theme.fonts.body).name, bold, italic);

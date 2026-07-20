@@ -94,6 +94,14 @@ not conflated.
 Both are **pure additions**. `measureHeight` and `lineHeight` are untouched, so no existing pricing
 path changes behaviour: non-drop-cap blocks are measured exactly as before.
 
+**Correction, found while executing this stage (2026-07-21):** "pure addition" was true of
+*behaviour* and misleading about *cost*. Adding a method to a port is a **breaking change for every
+implementer** — `tsc` failed on three `TextMeasurer` test doubles in `LayoutEngine.test.ts` that
+satisfy the interface structurally. Vitest could not see it; only the type-check did. Nothing about
+R2 changes (no runtime path moved), but the review should not have implied the extension is free:
+its real cost is *one production implementer plus every double, today and in future*. Recorded
+because the same surprise will meet the foreseen DOCX implementer.
+
 **Not asserted — staged to be proved.** The port extension lands and is verified **inert** before
 anything consumes it: full suite green and `PDFRenderer.parity.test.ts` byte-stable at **238 pages /
 2 reconciliations** with the new methods present and unused. Only then does the drop-cap pricing
