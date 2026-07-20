@@ -16,6 +16,12 @@ None currently.
 
 - **`LIST_SPLITTING_ACROSS_PAGES`** — accepted disclosed tech debt (CTO decision 2026-07-21, LIST_PAGINATION_DRIFT.md §5). Lists are atomic (LAYOUT_FIDELITY Decision 7): a list that does not fit the remaining page space overflows into a reconciliation page regardless of how precisely its height is charged. On the list-dense real fixture this produces 5 reconciliations (> the locked `unplannedPageBreaks ≤ 2`) — **fully observable, never silent (ADR-0051)**, a quality defect not an ADR-0050 fidelity violation. Fully resolving it needs a list-splitting capability (split a list across a page break at item boundaries, the list analogue of Phase B paragraph splitting) — **its own Design Review, not authorized now**. This is a candidate for that future review, not a hidden gap.
 
+- **`C1_QUOTE_PRESENTATION_UNBLOCK`** — CTO lock condition (2026-07-21). Phase 3 C1 (quote presentation as a declared theme value) is written, green and **frozen without a date** on `feature/book-presentation-p3`. It is NOT blocked by a defect: it is blocked because nothing real exercises it. **Measured** (`backend/spikes/quote-census-spike.ts`): all four corpus manuscripts import with **zero** `quote`/`scripture` blocks — including a real theology book whose prose cites scripture constantly — because `HtmlNormalizer` emits a quote only for an HTML `<blockquote>`, i.e. only when the author applied Word's "Quote" style. So the parity suite proves nothing about quote pagination, and the property test is the only instrument. **The CTO explicitly refuses to unblock this with a fabricated fixture** (`REAL_FIXTURE_POLICY.md`). **Exactly two conditions can unblock it:**
+  1. A **real** manuscript containing quotes styled with Word's "Quote" style enters the corpus (supplied by the CTO or found elsewhere) → C1 unblocks on that basis.
+  2. The **semantic-detection chantier** (backlogged below, scheduled after Phase 3) makes the `quote` path genuinely reachable from a real, unstyled DOCX → C1 becomes deeply testable then, not before.
+
+  **Do not reopen an investigation on C1 until one of the two has actually happened.** The question is settled and measured; re-deriving it would waste a session.
+
 ---
 
 ## 🟡 IN PROGRESS
