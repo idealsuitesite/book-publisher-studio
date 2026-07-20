@@ -1508,3 +1508,40 @@ lines, which adds height — the cost Word already demonstrates. It is the **fix
 height cost, not the drop cap; the original decision was correct for the behaviour as it stood.
 
 **Related:** `TODO.md` → `DROPCAP_TEXT_OVERLAP`, `MINI_DR_DROP_CAPS.md` §3, ADR-0051.
+
+---
+
+## Governance note — `PdfKitTextMeasurer.capHeight` depends on a PDFKit private field (2026-07-21)
+
+**Status:** ACCEPTED RISK, CTO-approved, recorded outside the code deliberately. Not a full ADR — a
+one-entry governance trace, so that someone debugging a broken export in six months finds it without
+reading the port line by line.
+
+**The dependency.** `TextMeasurer.capHeight()` returns a glyph's real ink height above the baseline.
+Its only implementation, `PdfKitTextMeasurer`, obtains it from **`doc._font.capHeight`** — a
+**private/internal PDFKit field**, normalised by PDFKit to a 1000-unit em. This is the **first
+private-API dependency** in a class otherwise built entirely on public PDFKit API (`font`,
+`fontSize`, `heightOfString`, `widthOfString`).
+
+**Why no public route exists.** PDFKit exposes no public font-metric accessor. The metric that *is*
+public — `measureHeight` of a single character — returns the **line box**, not the ink: measured
+34.91pt versus a real cap height of 19.05pt on Gelasio-Bold at 27.5pt, an ~83% over-report. **The
+reachable metric is the wrong one; the correct one is private.** Deriving it from a constant
+fraction of the font size was rejected: that is the reasoning that produced the list-prefix
+under-charge (`LIST_PAGINATION_DRIFT.md`).
+
+**The risk.** A future PDFKit version renames, removes, or rescales `_font.capHeight`. A *rescale* is
+the dangerous case: it would return a plausible-looking number that is quietly wrong, producing a
+wrong drop-cap indent that renders and prices without complaint.
+
+**The mitigation, in three layers** (`MINI_DR_TEXTMEASURER_PORT.md` §3, §5):
+1. **A plausibility guard in the implementation** — a cap height outside **0.6–0.8 em** for a Latin face is a measurement failure, not a font property, and the method **throws** rather than returning a number. It never invents a fallback: inventing one is the failure being guarded against.
+2. **A CI test over every registered face**, so a PDFKit upgrade that breaks the metric fails the suite before reaching an author. The condition is environment-wide (library version + embedded faces), never manuscript-dependent, so this test is decisive rather than best-effort.
+3. **Graceful degradation at runtime** — the port throws, the *caller* degrades: the affected paragraph renders as a normal paragraph with no drop cap, counted and surfaced in `RenderMetrics` (ADR-0051's logic applied to presentation: loud, never silent). **The book still exports.** Refusing the ornament is proportionate; refusing the book is not.
+
+**Precedent already earned:** this guard, in its spike form, caught a real conversion error — dividing
+by the inner font's `unitsPerEm` on top of PDFKit's per-mille value gave 0.34 em, i.e. "no lines to
+indent", i.e. "no bug". It was caught by a plausibility check, not by the toolchain.
+
+**Related:** `MINI_DR_TEXTMEASURER_PORT.md`, `MINI_DR_DROPCAP_OVERLAP.md`, ADR-0051,
+`TODO.md` → `DROPCAP_TEXT_OVERLAP`.

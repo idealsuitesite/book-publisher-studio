@@ -68,9 +68,14 @@ the failure mode is silent — a wrong indent count renders plausibly and prices
 
 **Mitigation, and it is not optional:** the plausibility guard already written and self-tested in
 `spikes/dropcap-ink-spike.ts` moves into the implementation — a cap height outside **0.6–0.8 em** for
-a Latin face is a measurement failure, not a font property, and must throw rather than return. That
-is what makes a future PDFKit upgrade which renames or rescales `_font.capHeight` fail **loudly**
-instead of silently producing a wrong indent. *(The guard already caught one real conversion error:
+a Latin face is a measurement failure, not a font property, and the method **throws rather than
+returning a number**. That is what makes a future PDFKit upgrade which renames or rescales
+`_font.capHeight` fail **loudly** instead of silently producing a wrong indent.
+
+**To be precise about the division of responsibility, because §5 depends on it: the PORT throws, the
+CALLER degrades.** `capHeight` never invents a fallback value — inventing one is the failure mode
+being guarded against. What happens to an author's export is the *caller's* decision, and §5 answers
+it: the drop cap is dropped, the book is not. *(The guard already caught one real conversion error:
 dividing by the inner font's `unitsPerEm` on top of PDFKit's per-mille value yielded 0.34 em — i.e.
 "no lines to indent", i.e. "no bug".)*
 
@@ -95,7 +100,40 @@ anything consumes it: full suite green and `PDFRenderer.parity.test.ts` byte-sta
 consume them, at which point parity is re-checked. **If the numbers move at the first stage, the
 pure-addition claim is false and the work stops.**
 
-## 5. Risks
+## 5. What happens when the guard fails IN PRODUCTION (CTO question, answered before code)
+
+**First, the nature of the failure, because it determines where to catch it.** The guard trips on a
+cap-height ratio outside 0.6-0.8 em. That depends on the PDFKit version and the embedded faces
+(Gelasio, Inter, JetBrains Mono) — both **fixed for a given deployment**. It does not depend on the
+author's manuscript. So the condition is either *always* true or *never* true for a build: it is a
+**deployment defect, not a document defect**. An answer that only handles it at export time would be
+catching it in the worst possible place.
+
+Three layers, in order:
+
+**1. CI catches it first — the primary defence.** A test asserts cap-height plausibility for *every
+registered face*, not just the one drop caps happen to use. A PDFKit upgrade that renames or
+rescales `_font.capHeight` fails the suite **before it can reach an author**. Because the condition
+is environment-wide, this is not best-effort: if the metric is broken, this test cannot pass.
+
+**2. At runtime, the drop cap degrades — the export never fails.** Answering the CTO's question
+directly: **no, it must not crash a real author's export.** If the guard trips at render or
+pagination time, the affected paragraph is rendered as a **normal paragraph with no drop cap**. The
+book still exports, complete and readable; it loses one ornament. Refusing the *ornament* is
+proportionate. Refusing the *book* is not.
+
+**3. The degradation is loud, never silent — ADR-0051's logic applied to presentation.** A silent
+fallback would reproduce exactly the defect this whole chantier closed: output quietly differing
+from what was declared. So a degraded drop cap is **counted and surfaced in `RenderMetrics`**,
+alongside `unplannedPageBreaks`, and logged with the measured ratio that tripped the guard. Someone
+debugging a book whose drop caps vanished finds the number and the reason, not a mystery.
+
+**Model and renderer cannot diverge under degradation** — the property that makes this safe. Both
+consult the same measurer over the same registered faces, so both reach the same verdict for the
+same block: either both price and draw a drop cap, or neither does. The degradation therefore never
+creates a charged-vs-consumed disagreement — it is not a new R2 hole opened to plug a metric hole.
+
+## 6. Risks
 
 - **`capHeight`'s private-field access breaks on a PDFKit upgrade.** Guarded (§3): loud failure, not a wrong number. Residual: a version removing the field entirely breaks the build — acceptable and visible, unlike a silent rescale.
 - **`measureWidth` is asked for text it cannot measure unwrapped** (a very long string). It answers honestly — an advance width, however large. Callers wanting a column must use `measureHeight`; the doc comment must say so.
