@@ -1,6 +1,14 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 21, 2026 (late) — `main` at **PR #21** (Import Fidelity, Render Drift, Book Presentation Phases 0-2 + per-chapter word counts, Table-Duplication A/B, list-height fix). Last tag `v0.9.0-alpha`. **THREE branches await a CTO decision, none merged:** (1) **PR #22** — Art-of-Captivating as 2nd corpus fixture + `LIST_SPLITTING_ACROSS_PAGES` tech-debt (open, ready to merge); (2) **`feature/book-presentation-p3`** — Phase 3 C1 (quote presentation as theme value), resume Phase 3 from here; (3) **`investigate/first-screen-error`** — `FIRST_SCREEN_ERROR.md` report (stale deep-link, not a resume bug), fix sketched not implemented. Calibration round 1 LOCKED; `RECALIBRATE_PAGE_RATIO_TOLERANCE` at 2 of 3 fixtures. Real-bug lineage at eleven. See `docs/CURRENT_STATE.md`'s executive brief + the 2026-07-21 (late) session entry for full context.
+**Last Updated:** July 21, 2026 (end of session) — `main` is at **PR #25**. Last tag `v0.9.0-alpha`.
+
+**Merged and live on `main`:** PR #21 (Import Fidelity, Render Drift, Book Presentation Phases 0-2, Table-Duplication A/B, list-height fix), **#22** (Art-of-Captivating as 2nd corpus fixture + `LIST_SPLITTING_ACROSS_PAGES`), **#24** (first-screen redirect on `PROJECT_NOT_FOUND` — implemented and verified live on a real stale deep link), **#25** (Phase 3 capability 1: `Theme.colors.accent` is really consumed, tri-format), plus two documentation commits (`Block.dropCap` deprecated; the C1 EPUB-inset traceability note).
+
+**TWO branches open, neither merged:**
+1. **`feature/book-presentation-p3`** — Phase 3 C1 (quote presentation as a theme value). Written, green, **frozen without a date** — see `C1_QUOTE_PRESENTATION_UNBLOCK` below for the only two conditions that unblock it. Do not reopen the investigation.
+2. **`feature/dropcaps`** — the drop-cap chantier's whole diagnostic phase, **no product code written**. Carries `MINI_DR_DROP_CAPS.md` (theme capability, frozen), `MINI_DR_DROPCAP_OVERLAP.md` (**the fix's Design Review, CTO-APPROVED, code green-lit but not started**), the `DROPCAP_TEXT_OVERLAP` and `DROPCAP_PARAGRAPH_ATOMICITY` entries below, six reproducible measurement spikes, and — **note: these live here, NOT on `main`** — the formal reversal of the drop-cap pricing removal in `DECISIONS.md`. **The next session resumes here: implementation only, nothing to re-derive.** Read `MINI_DR_DROPCAP_OVERLAP.md`, the reversal in `DECISIONS.md`, and the two debt entries below; the diagnostic work is finished.
+
+Calibration round 1 LOCKED; `RECALIBRATE_PAGE_RATIO_TOLERANCE` at 2 of 3 fixtures. Real-bug lineage at eleven — `DROPCAP_TEXT_OVERLAP` is deliberately **not** counted in it (found by targeted instrumentation on a synthetic fixture, not by a real manuscript; see its entry). See `docs/CURRENT_STATE.md` for the longer narrative, but **this header is the authoritative statement of what is merged and what is not.**
 
 ---
 
