@@ -149,14 +149,14 @@ describe('BookStructureView', () => {
           id: 'c-1',
           number: 1,
           title: 'Counted',
-          content: [{ type: 'paragraph' as const, id: 'p-1', text: 'one two three four five' }],
+          content: [{ type: 'paragraph' as const, id: 'p-1', text: 'one two three four five', inlines: [] }],
           sections: [
             {
               type: 'section' as const,
               id: 's-1',
               level: 2,
               title: 'Sub',
-              content: [{ type: 'paragraph' as const, id: 'p-2', text: 'six seven' }],
+              content: [{ type: 'paragraph' as const, id: 'p-2', text: 'six seven', inlines: [] }],
             },
           ],
         },
