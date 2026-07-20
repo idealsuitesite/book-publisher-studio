@@ -25,7 +25,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // not a placeholder string, so ImageRun/Mammoth/PDFKit all treat it as a genuine
 // embedded image rather than a text fallback.
 const TINY_PNG_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
 async function writeDocx(filename: string, doc: Document): Promise<void> {
   const buffer = await Packer.toBuffer(doc);

@@ -18,6 +18,8 @@ import {
   type IStylesOptions,
   type ParagraphChild,
 } from 'docx';
+import { probeImageDimensions } from '../../shared/utils/imageDimensions';
+import { renderedImageSize } from '../../domain/services/renderedImageSize';
 import type { Renderer, RenderContext, RenderResult } from '../../domain/ports/Renderer';
 import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
@@ -468,14 +470,26 @@ export class DOCXRenderer implements Renderer<Buffer> {
 
       case 'image':
         if (block.base64) {
+          const data = Buffer.from(block.base64, 'base64');
+          // Real format instead of the old hardcoded 'png' (a JPEG declared as PNG is
+          // format-lottery); real proportional size instead of 300x200 for every image.
+          // 468px ~ a 6.5in text column at 72dpi — Word rescales to its own margins anyway,
+          // what matters is the true aspect ratio reaching the document.
+          const probed = probeImageDimensions(data);
+          const size = renderedImageSize(
+            { width: block.width ?? probed?.width, height: block.height ?? probed?.height },
+            468
+          );
           return [
             new Paragraph({
               pageBreakBefore,
               children: [
                 new ImageRun({
-                  data: Buffer.from(block.base64, 'base64'),
-                  transformation: { width: block.width ?? 300, height: block.height ?? 200 },
-                  type: 'png',
+                  data,
+                  transformation: size
+                    ? { width: Math.round(size.width), height: Math.round(size.height) }
+                    : { width: block.width ?? 300, height: block.height ?? 200 },
+                  type: probed?.format === 'jpeg' ? 'jpg' : probed?.format === 'gif' ? 'gif' : 'png',
                 }),
               ],
             }),

@@ -61,11 +61,20 @@ export class HtmlNormalizer implements DocumentNormalizer {
             source: { originalIndex: nodes.length },
           });
         } else if (tag === 'img') {
+          // Mammoth inlines DOCX images as data URLs by default. Until Phase 2
+          // (BOOK_PRESENTATION.md §2.5) that base64 sat unparsed inside `url`, so
+          // `Block.base64` — which all three renderers already consume — was never
+          // populated and every embedded image fell to the text placeholder.
+          const src = $elem.attr('src') ?? '';
+          const dataUrl = /^data:image\/[a-z+.-]+;base64,(.+)$/is.exec(src);
           nodes.push({
             id: ids.node(),
             type: 'image',
             image: {
-              url: $elem.attr('src') ?? '',
+              // A parsed data URL leaves `url` empty on purpose: duplicating megabytes of
+              // base64 into a field every log/debug dump prints would be pure waste.
+              url: dataUrl ? '' : src,
+              base64: dataUrl?.[1],
               alt: $elem.attr('alt'),
               caption: $elem.attr('title'),
             },

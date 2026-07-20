@@ -1,4 +1,5 @@
 import * as epubModule from 'epub-gen-memory';
+import { probeImageDimensions } from '../../shared/utils/imageDimensions';
 import type { Chapter as EpubChapter, Options as EpubOptions } from 'epub-gen-memory';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -291,9 +292,12 @@ export class EPUBRenderer implements Renderer<Buffer> {
       return `<p><em>[Image: ${escapeHtml(block.caption ?? block.url)}]</em></p>`;
     }
 
-    // PNG assumed - same simplification DOCXRenderer already makes (Image has no mimeType field).
-    const filePath = join(tmpDir, `${block.id}.png`);
-    writeFileSync(filePath, Buffer.from(block.base64, 'base64'));
+    // Real extension from the bytes themselves (Phase 2) - the old PNG-assumed simplification
+    // handed JPEG bytes to readers under a .png name.
+    const data = Buffer.from(block.base64, 'base64');
+    const format = probeImageDimensions(data)?.format ?? 'png';
+    const filePath = join(tmpDir, `${block.id}.${format === 'jpeg' ? 'jpg' : format}`);
+    writeFileSync(filePath, data);
     const fileUrl = `file://${filePath.split('\\').join('/')}`;
     const altText = escapeHtml(block.alt ?? block.caption ?? 'image');
     return `<img src="${fileUrl}" alt="${altText}" />`;

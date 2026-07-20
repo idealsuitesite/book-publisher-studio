@@ -15,6 +15,7 @@ import type {
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
+import { renderedImageSize } from '../../domain/services/renderedImageSize';
 
 // Simple v1 drop-cap approximation: render the paragraph's first character at a larger
 // size inline, with no text wrap-around (a real drop cap needs line-aware layout, which
@@ -575,9 +576,26 @@ export class PDFRenderer implements Renderer<Buffer> {
 
       case 'image':
         if (block.base64) {
-          doc.image(Buffer.from(block.base64, 'base64'), {
-            fit: [doc.page.width - doc.page.margins.left - doc.page.margins.right, block.height ?? 300],
-          });
+          // R2: the fit box comes from renderedImageSize — the exact height the model priced.
+          // Without probed dimensions, the historical 300pt-fit fallback stands (and the model
+          // priced its own fallback constant; both sides degrade together, never apart).
+          const usableImageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+          const size = renderedImageSize(block, usableImageWidth);
+          try {
+            doc.image(Buffer.from(block.base64, 'base64'), {
+              fit: size ? [size.width, size.height] : [usableImageWidth, block.height ?? 300],
+            });
+          } catch (error) {
+            // One undecodable image must never kill a whole book's export (ADR-0050: the
+            // manuscript survives; ADR-0051 spirit: the degradation is OBSERVABLE, never
+            // silent). Found live: a malformed PNG that browsers tolerate but PDFKit's strict
+            // decoder rejects — before Phase 2 populated base64, nothing ever decoded, so the
+            // corruption hid inside the fixture for its whole life.
+            console.warn(
+              `[PDFRenderer] image ${block.id} could not be decoded (${error instanceof Error ? error.message : String(error)}) — rendered as placeholder`
+            );
+            doc.font(this.fonts.resolveBody(theme, false, true)).fontSize(fontSize).text(`[Image: ${block.caption ?? block.alt ?? 'undecodable'}]`);
+          }
         } else {
           // No embedded data - never fetch remote URLs at render time (no hidden network I/O
           // in a renderer, same rule DOCXRenderer follows). Falls back to a text placeholder.

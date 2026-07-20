@@ -29,6 +29,7 @@ import type {
   InlineNode,
 } from '../models/Normalized';
 import { createIdGenerator } from '../../shared/utils/idGenerator';
+import { probeImageDimensions } from '../../shared/utils/imageDimensions';
 
 interface SectionStackEntry {
   level: number;
@@ -219,6 +220,14 @@ export class ASTBuilder {
   }
 
   private convertImage(node: ImageNode, ids: ReturnType<ASTBuilder['createIdGenerators']>): Image {
+    // Real intrinsic dimensions, probed from the embedded bytes when the source declared none
+    // (Phase 2, BOOK_PRESENTATION.md R2): pagination prices images from these instead of a
+    // 200pt guess, and the renderers draw the same numbers. Probe failure leaves the fields
+    // undefined — the historical fallback stays, nothing invents a size.
+    const probed =
+      node.image.base64 && (node.image.width === undefined || node.image.height === undefined)
+        ? probeImageDimensions(Buffer.from(node.image.base64, 'base64'))
+        : undefined;
     return {
       type: 'image',
       id: ids.image(),
@@ -226,8 +235,8 @@ export class ASTBuilder {
       base64: node.image.base64,
       caption: node.image.caption,
       alt: node.image.alt,
-      width: node.image.width,
-      height: node.image.height,
+      width: node.image.width ?? probed?.width,
+      height: node.image.height ?? probed?.height,
     };
   }
 

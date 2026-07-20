@@ -2,6 +2,7 @@ import type { StyledBook } from '../models/Theme';
 import type { PageLayout } from '../models/PageLayout';
 import type { Page, PaginatedBook } from '../models/PaginatedBook';
 import type { Content, Block, TOCEntry } from '../models/Book';
+import { renderedImageSize } from './renderedImageSize';
 import { countWords } from '../../shared/utils/textMetrics';
 import type { TextMeasurer } from '../ports/TextMeasurer';
 
@@ -383,8 +384,12 @@ export class LayoutEngine {
           return (1 + block.rows.length) * line + spaceAfter;
         case 'footnote':
           return line + spaceAfter;
-        case 'image':
-          return (block.height ?? DEFAULT_IMAGE_HEIGHT) + spaceAfter;
+        case 'image': {
+          // R2 (BOOK_PRESENTATION.md): priced from REAL probed dimensions via the same
+          // formula the renderers draw with — never a guessed constant when truth exists.
+          const size = renderedImageSize(block, usableWidth);
+          return (size ? size.height : (block.height ?? DEFAULT_IMAGE_HEIGHT)) + spaceAfter;
+        }
         case 'page-break':
         case 'divider':
           return line;
@@ -411,8 +416,10 @@ export class LayoutEngine {
         return (1 + block.rows.length) * linePoints;
       case 'footnote':
         return linePoints;
-      case 'image':
-        return block.height ?? DEFAULT_IMAGE_HEIGHT;
+      case 'image': {
+        const size = renderedImageSize(block, usableWidth);
+        return size ? size.height : (block.height ?? DEFAULT_IMAGE_HEIGHT);
+      }
       case 'page-break':
       case 'divider':
         // Not yet produced by ASTBuilder (same scope decision already made for BlockMapper/BlockDTO
