@@ -77,18 +77,24 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
       .catch((error: unknown) => {
         if (error instanceof ApiError && error.code === 'PROJECT_NOT_FOUND') {
           // ADR-0049 §3 recovery: a link to a project that no longer exists must not keep
-          // resurrecting itself — drop its resume-where-left entry along with the message.
+          // resurrecting itself — drop its resume-where-left entry.
           try {
             localStorage.removeItem(viewStorageKey(id));
           } catch {
             /* storage unavailable */
           }
-          setLoadError('This project is no longer in your library.');
+          // FIRST_SCREEN_ERROR.md: `/projects/[id]` is a real reloadable URL, so a stale deep
+          // link (an old id, a reset db, a deleted project) restored on launch would land the
+          // author on a terminal error screen as their FIRST contact. The project is gone; the
+          // only useful place is the library — go there, don't dead-end. `replace` (not push)
+          // so Back doesn't bounce straight into the dead link again. Other errors (network,
+          // timeout, 500) are transient/retryable and keep the recoverable error screen below.
+          router.replace('/');
           return;
         }
         setLoadError(error instanceof Error ? error.message : 'Could not open this project.');
       });
-  }, [id]);
+  }, [id, router]);
 
   useEffect(() => {
     reload();
