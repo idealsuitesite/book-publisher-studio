@@ -13,6 +13,7 @@ import { ThemeEngine } from '../domain/services/ThemeEngine';
 import { TypographyResolver } from '../domain/services/TypographyResolver';
 import { LayoutEngine } from '../domain/services/LayoutEngine';
 import { PdfKitTextMeasurer } from '../infrastructure/fonts/PdfKitTextMeasurer';
+import { InMemoryPaginationCache } from '../infrastructure/cache/InMemoryPaginationCache';
 import { ManualLayoutSelector } from '../domain/services/ManualLayoutSelector';
 import { DOCXRenderer } from '../infrastructure/renderers/DOCXRenderer';
 import { PDFRenderer } from '../infrastructure/renderers/PDFRenderer';
@@ -63,6 +64,11 @@ export function createApp(): Express {
   // knowingly: Word repaginates on open and EPUB reflows, so PDF is the only format whose
   // pagination is load-bearing (ADR-0045).
   const layoutEngine = new LayoutEngine(new PdfKitTextMeasurer());
+
+  // One pagination cache for the whole export path (MINI_DR_PAGINATION_REUSE): a colour-only
+  // accent change reuses the stored geometry instead of re-paginating. A server singleton like
+  // the measurer above; the project export path alone consumes it (the raw-bytes route does not).
+  const paginationCache = new InMemoryPaginationCache();
 
   // New Application/Presentation pipeline (Book AST-based import)
   // Sprint 5: ValidationEngine (8 rules, docs/architecture/diagrams/
@@ -157,7 +163,8 @@ export function createApp(): Express {
       projectRepository,
       { docx: exportDocxUseCase, pdf: exportPdfUseCase, epub: exportEpubUseCase },
       new ManualLayoutSelector(),
-      projectService
+      projectService,
+      paginationCache
     ),
     new PublishProjectUseCase(projectRepository, projectService, publishUseCase, new ManualLayoutSelector()),
     new PublishingReportMapper(),
