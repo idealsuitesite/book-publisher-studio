@@ -67,7 +67,10 @@ async function run(label: string, book: Book) {
   console.log(`  model pages ${paginated.pages.length}, real pages ${result.metrics.pageCount}, unplanned ${result.metrics.unplannedPageBreaks}`);
   console.log(`  TOC entries: ${tocTitles.length} ${tocTitles.some((t) => t.startsWith('Part ')) ? '(includes Part openers)' : ''}`);
   console.log(`  opener block-ids present on model pages: ${openersInModel.length}; opener-ONLY pages: ${openerOwnPages.length}`);
-  if (warns.length) console.log(`  renderer warnings: ${warns.length} (first: ${warns[0]?.slice(0, 100)})`);
+  if (warns.length) {
+    console.log(`  renderer warnings: ${warns.length}`);
+    for (const w of warns) console.log(`    - ${w.slice(0, 140)}`);
+  }
   return { model: paginated.pages.length, real: result.metrics.pageCount ?? 0, unplanned: result.metrics.unplannedPageBreaks ?? 0, toc: tocTitles };
 }
 
