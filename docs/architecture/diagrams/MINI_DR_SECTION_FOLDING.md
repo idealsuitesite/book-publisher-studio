@@ -47,5 +47,9 @@ Each chapter's **sections** move behind a **per-chapter, collapsed-by-default di
 ## 7. What the CTO is asked to lock
 All four §2 points are pre-locked. No open questions — this is the durable design record; commits follow (feu vert given), reported at each green step.
 
+## Implementation note (as-built)
+
+Shipped as one frontend commit, exactly as scoped. Verified live on faith-alone (the number is the proof, per the scope report): the Structure panel dropped from **3898px (≈3.8× viewport) to 851px (≈0.83×)** collapsed by default (all disclosures closed), and the chapter list caps at **721px (70vh) with internal scroll** even with everything expanded (7526px of content) — D5 restored in both the default and worst-case regimes. jsdom asserts collapsed-by-default and that the header controls stay visible while sections fold. The block "split into chapters" view is untouched. Console showed only Next dev-server RSC-prefetch errors (artefacts of server restarts, not this change). Merged to `main` (`1a6cf8a`); frontend 179/179, tsc + eslint clean.
+
 ## Related
 `SECTION_FOLDING_SCOPE.md` (the measured scope — the 3898px regression, Option C chosen), `STRUCTURE_EDITING_PHASE3.md` D5 (the "never proportional to manuscript size" principle restored for the section list), the removed `BookStructureView.tsx` (git `5df2bc7^` — collapse-by-default + `max-h-64`, the behaviour regressed), `CREATE_CHAPTER.md` D5 (the block view that already folds/caps, untouched).
