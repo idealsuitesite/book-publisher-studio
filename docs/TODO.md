@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 21, 2026 (continued — structure editing CREATE half merged, `fb76960`; a docs-reconciliation commit follows). Last tag `v0.9.0-alpha`; all merged work since is deliberately untagged (the next tag is the CTO's call).
+**Last Updated:** July 21, 2026 (continued — subtitle spacing merged, `d3c0f53`, after the structure-editing CREATE half `fb76960`; a docs-reconciliation commit follows). Last tag `v0.9.0-alpha`; all merged work since is deliberately untagged (the next tag is the CTO's call).
 
 **Merged and live on `main` this session:** **verify-publication-quality** (chantier B — all ten DOCX §4 criteria have a verdict: 8 green on real fixtures, 2 disclosed gaps, none fabricated; `7cd3371`), the **`AIProvider` agnostic anchor port** (interface only, exit-condition-gated; `aab9af9`), the **second theme "Modern"** (`e5954e9` — the first real consumer of `colors.accent`; its own parity/calibration), **manual structure editing phase 1** (`BookEditingService` pure ops; `992688b`), and **manual structure editing phase 2 backend** (`7298df2` — see next paragraph). Plus governance: **Editorial AI SUSPENDED** until commercial revenue (`NO_PAID_AI_BEFORE_REVENUE`), Documentation & Learning Platform closed out-of-scope, the ADR re-verification non-negotiable, and the reports `GUTTER_SCOPE.md` (→ chantier D `GUTTER_VALIDATION_FIRST`) / `STRUCTURE_VS_THEME_SCOPE.md` / `FORMATTING_TOOLS_AUDIT.md`. Everything through PR #26 is also on `main` (Import Fidelity, Render Drift, Book Presentation 0-2, Table-Duplication A/B, drop-cap fix).
 
@@ -11,12 +11,13 @@
 
 `feature/structure-editing-phase2`, `feature/structure-editing-phase3`, and `feature/structure-editing-create` are now merged. Other unmerged branches hold nothing missing: `spike/editorial-structure-detection` (Editorial-AI spike A, **SUSPENDED** — not run, not deleted), `investigate/first-screen-error` (superseded by PR #24), `spike/dropcap-feasibility` / `spike/heuristic-structure` (content on `main`).
 
-Verified on `main`: **backend 650/650, frontend 148/148, tsc + eslint clean.**
+Verified on `main`: **backend 653/653, frontend 148/148, tsc + eslint clean.** (`main` now also carries subtitle spacing, merge `d3c0f53` — see NEXT's DONE note below.)
 
 **NEXT — confirmed order (CTO 2026-07-21), each gated on its own review, no code before approval:**
-1. **Subtitle spacing (PDF)** — small **mini Level-2 review** (feu vert given), scoped in `SUBTITLE_SPACING_SCOPE.md` §3: a theme-driven title spacing pair consumed by `renderTitle` + `titleHeightOf` in lock-step, with a deliberate loud parity re-lock. **The next step.**
-2. **The Proof as editorial control** — a **short scope report** (new idea, CTO 2026-07-21): does the living Proof surface whether editorial parts (preface / bibliography / annex) are present or not? Ahead of per-theme tuning.
-3. **Per-theme fine-tuning** scoping report, then **Living-Proof default visibility** — refinements to structure that already exists; end of queue.
+1. **The Proof as editorial control** — a **short scope report** (CTO 2026-07-21): does the living Proof surface whether editorial parts (preface / bibliography / annex) are present or not? Ahead of per-theme tuning. **The next step.**
+2. **Per-theme fine-tuning** scoping report, then **Living-Proof default visibility** — refinements to structure that already exists; end of queue.
+
+*(DONE 2026-07-21: **subtitle spacing (PDF)** — `MINI_DR_SUBTITLE_SPACING.md`, CTO-approved (5 points locked), merged `d3c0f53`. Flat `titleSpaceBefore`/`titleSpaceAfter` on `theme.spacing` (Classic 18/8, Modern 14/6, above > below) spent by `renderTitle` in lock-step with `titleHeightOf`; validated live on real pages. Building it **closed a latent ADR-0051 empty-title drift** — `renderTitle` spent title spacing for an untitled preamble Section the model charged at zero — dropping corpus reconciliations 2 → 1, recorded as its own drift-closure line in `DECISIONS.md`/`RENDER_DRIFT.md` (NOT counted in the eleven-bug lineage). Q4 tri-format convergence parked for per-theme fine-tuning.)*
 
 *(DONE this session: structure editing **CREATE half** — `CREATE_CHAPTER.md` (Level-2 approved, scope locked), merged `fb76960`, the founder's gap closed live; plus the `CREATE_CHAPTER_SCOPE.md` report, the `SUBTITLE_SPACING_SCOPE.md` report, and the 0-chapter manual validation that produced the create chantier.)* Calibration round 1 LOCKED; `RECALIBRATE_PAGE_RATIO_TOLERANCE` at 2 of 3 fixtures (Modern added a *theme* dimension, `PUBLICATION_QUALITY_BAR §10.4`). Real-bug lineage at eleven (`STRUCTURE_EDITS_NOT_EXPORTED` is a real defect found by inspection, deliberately NOT counted in that lineage — same rule as `DROPCAP_TEXT_OVERLAP`). **This header is the authoritative statement of what is merged and what is not** — the longer narrative is `docs/CURRENT_STATE.md`.
 
