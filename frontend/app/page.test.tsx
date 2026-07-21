@@ -40,6 +40,33 @@ describe('Home — conditional layout by library state', () => {
     expect(screen.queryByText(/Drop your DOCX here/)).toBeNull(); // the full drop form no longer competes
   });
 
+  // HOME_TIGHTEN_SCOPE Point B1: the last-worked-on project (projects[0] — the server already
+  // orders updated_at DESC) is the hero; the rest keep the compact grid under "All projects".
+  it('two+ projects: the first is the hero with the primary Continue; the rest sit under "All projects"', async () => {
+    // updatedAt = now, so the recency assertion holds whatever day the suite runs.
+    const latest = { ...summary('p1', 'Latest Book'), updatedAt: new Date().toISOString() } as ProjectSummaryDTO;
+    vi.mocked(listProjects).mockResolvedValue({ projects: [latest, summary('p2', 'Older Book')] });
+    render(<Home />);
+
+    expect(await screen.findByText('Latest Book')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Continue' })).toHaveTextContent('Latest Book');
+    expect(screen.getByText('Continue →')).toBeInTheDocument(); // the hero's primary action
+    expect(screen.getByText('Worked on today')).toBeInTheDocument(); // humanised recency, real updatedAt
+    const grid = screen.getByRole('region', { name: 'All projects' });
+    expect(grid).toHaveTextContent('Older Book');
+    expect(grid).not.toHaveTextContent('Latest Book'); // the hero project appears once, never twice
+  });
+
+  it('a single project: the hero IS the library — no "All projects" section, no duplicate card', async () => {
+    vi.mocked(listProjects).mockResolvedValue({ projects: [summary('p1', 'Only Book')] });
+    render(<Home />);
+
+    expect(await screen.findByText('Only Book')).toBeInTheDocument();
+    expect(screen.getByText('Continue →')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'All projects' })).toBeNull();
+    expect(screen.getAllByText('Only Book')).toHaveLength(1);
+  });
+
   // HOME_TIGHTEN_SCOPE Point A: the promise lives at first contact, the task on return — never
   // both on the same screen, so the pitch cannot become wallpaper for a returning author.
   it('the empty (first-contact) screen states the promise; the returning screen states the task', async () => {
