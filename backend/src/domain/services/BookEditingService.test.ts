@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { createBook, type Book, type Content, type Chapter, type Section } from '../models/Book';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createBook, type Book, type Content, type Chapter, type Section, type Block, type Paragraph } from '../models/Book';
 import { BookEditingService } from './BookEditingService';
 import { ContentNotFoundError } from '../../shared/errors/ContentNotFoundError';
+import { MammothParser } from '../../infrastructure/parsers/MammothParser';
+import { HtmlNormalizer } from '../../infrastructure/normalizers/HtmlNormalizer';
+import { ASTBuilder } from './ASTBuilder';
 
 const NOW = new Date('2026-07-21T12:00:00Z');
 const OLD = new Date('2020-01-01T00:00:00Z');
@@ -97,4 +102,144 @@ describe('BookEditingService — rename (property-style, exhaustive over every n
     expect(editedSection.updatedAt).toBe(NOW);
     expect((book.mainContent[0] as Chapter).sections![0].updatedAt).toBe(OLD); // original unmutated
   });
+});
+
+// ── CREATE_CHAPTER.md: promoteToChapter + mergeChapterIntoPrevious ───────────────────────────────
+const para = (id: string, text: string): Paragraph => ({ type: 'paragraph', id, text });
+/** A 0-chapter manuscript's shape: one untitled section holding blocks. */
+function unstructuredBook(blocks: Block[]): Book {
+  return createBook({ title: 'T', author: 'A', language: 'en' }, [
+    { type: 'section', id: 'sec', title: '', content: blocks, level: 1, createdAt: OLD, updatedAt: OLD },
+  ]);
+}
+/** Ids are irrelevant to structure; a deterministic generator keeps the created chapter findable. */
+const withIds = () => new BookEditingService((() => { let n = 0; return () => `gen-${++n}`; })());
+/** Structural projection: types + titles + block texts, ignoring ids/numbers/timestamps. */
+function projection(contents: Content[]): unknown {
+  return contents.map((c) => ({
+    type: c.type,
+    title: c.title,
+    blocks: c.content.map((b) => `${b.type}:${'text' in b ? b.text : ''}`),
+    children: projection(c.type === 'chapter' ? (c.sections ?? []) : (c.subsections ?? [])),
+  }));
+}
+
+describe('BookEditingService — promoteToChapter', () => {
+  it('splits an untitled section at a middle block: remainder kept, block becomes the chapter title', () => {
+    const book = unstructuredBook([para('b1', 'One'), para('b2', 'Two'), para('b3', 'Three')]);
+    const result = withIds().promoteToChapter(book, 'b2', NOW);
+
+    expect(result.mainContent).toHaveLength(2);
+    const [remainder, chapter] = result.mainContent;
+    expect(remainder.type).toBe('section');
+    expect(remainder.content.map((b) => (b as Paragraph).text)).toEqual(['One']);
+    expect(chapter.type).toBe('chapter');
+    expect(chapter.title).toBe('Two');
+    expect((chapter as Chapter).number).toBe(1);
+    expect(chapter.content.map((b) => (b as Paragraph).text)).toEqual(['Three']);
+    // original untouched
+    expect(book.mainContent).toHaveLength(1);
+  });
+
+  it('drops an untitled section left empty when its FIRST block is promoted (§9.3, no phantom section)', () => {
+    const book = unstructuredBook([para('b1', 'One'), para('b2', 'Two')]);
+    const result = withIds().promoteToChapter(book, 'b1', NOW);
+
+    expect(result.mainContent).toHaveLength(1);
+    expect(result.mainContent[0].type).toBe('chapter');
+    expect(result.mainContent[0].title).toBe('One');
+    expect(result.mainContent[0].content.map((b) => (b as Paragraph).text)).toEqual(['Two']);
+  });
+
+  it('keeps a TITLED container even when the split leaves it empty (it has a title worth preserving)', () => {
+    const book = createBook({ title: 'T', author: 'A', language: 'en' }, [
+      { type: 'chapter', id: 'c1', number: 1, title: 'Kept', content: [para('b1', 'Only')], createdAt: OLD, updatedAt: OLD },
+    ]);
+    const result = withIds().promoteToChapter(book, 'b1', NOW);
+    expect(result.mainContent.map((c) => c.title)).toEqual(['Kept', 'Only']);
+    expect(result.mainContent[0].content).toHaveLength(0); // titled chapter kept though empty
+  });
+
+  it('renumbers chapters after the insert', () => {
+    const book = createBook({ title: 'T', author: 'A', language: 'en' }, [
+      { type: 'chapter', id: 'c1', number: 1, title: 'A', content: [para('b1', 'x'), para('b2', 'Split here')], createdAt: OLD, updatedAt: OLD },
+      { type: 'chapter', id: 'c2', number: 2, title: 'B', content: [], createdAt: OLD, updatedAt: OLD },
+    ]);
+    const result = withIds().promoteToChapter(book, 'b2', NOW);
+    const numbers = result.mainContent.filter((c) => c.type === 'chapter').map((c) => (c as Chapter).number);
+    expect(numbers).toEqual([1, 2, 3]);
+  });
+
+  it('throws ContentNotFoundError for an unknown block, and for a non-text block', () => {
+    const book = unstructuredBook([para('b1', 'One'), { type: 'divider', id: 'd1' }]);
+    expect(() => withIds().promoteToChapter(book, 'nope', NOW)).toThrow(ContentNotFoundError);
+    expect(() => withIds().promoteToChapter(book, 'd1', NOW)).toThrow(ContentNotFoundError);
+  });
+});
+
+describe('BookEditingService — mergeChapterIntoPrevious', () => {
+  it('is the exact inverse of a non-first-block promote (round-trip identity, synthetic)', () => {
+    const book = unstructuredBook([para('b1', 'One'), para('b2', 'Two'), para('b3', 'Three')]);
+    const svc = withIds();
+    const promoted = svc.promoteToChapter(book, 'b2', NOW);
+    const newChapterId = promoted.mainContent[1].id;
+    const merged = svc.mergeChapterIntoPrevious(promoted, newChapterId, NOW);
+    expect(projection(merged.mainContent)).toEqual(projection(book.mainContent));
+  });
+
+  it('disallows merging the first chapter — §9.1 (throws; version-undo is the exit)', () => {
+    const book = createBook({ title: 'T', author: 'A', language: 'en' }, [
+      { type: 'chapter', id: 'c1', number: 1, title: 'A', content: [], createdAt: OLD, updatedAt: OLD },
+    ]);
+    expect(() => withIds().mergeChapterIntoPrevious(book, 'c1', NOW)).toThrow(ContentNotFoundError);
+  });
+
+  it('throws for an unknown chapter id', () => {
+    expect(() => withIds().mergeChapterIntoPrevious(sampleBook(), 'nope', NOW)).toThrow(ContentNotFoundError);
+  });
+});
+
+// Round-trip identity on REAL manuscripts (CTO: not only the degenerate 0-chapter case, but also
+// faith-alone — a book that already has chapters, a non-degenerate multi-container context).
+async function importCorpus(file: string): Promise<Book> {
+  const raw = await new MammothParser().parse(readFileSync(join(__dirname, '..', '..', '..', 'verification', 'corpus', file)));
+  const normalized = new HtmlNormalizer().normalize(raw.html, { fileName: file });
+  return new ASTBuilder().build(normalized);
+}
+/** First top-level container with a promotable text block that is NOT its first block (so the
+ * remainder is kept and the new chapter is not at index 0 — the round-trippable case). */
+function nonFirstPromotableBlockId(book: Book): string {
+  for (const c of book.mainContent) {
+    const idx = c.content.findIndex((b) => b.type === 'paragraph' || b.type === 'heading');
+    if (idx > 0) return c.content[idx].id;
+    if (idx === 0) {
+      const second = c.content.slice(1).find((b) => b.type === 'paragraph' || b.type === 'heading');
+      if (second) return second.id;
+    }
+  }
+  throw new Error('no non-first promotable block found');
+}
+
+describe('BookEditingService — promote→merge round-trip on real manuscripts (CTO)', () => {
+  it('0-chapter manuscript: promoting a paragraph then merging back restores the content', async () => {
+    const book = await importCorpus('generated-unstyled-3060w.docx');
+    const svc = withIds();
+    const blockId = nonFirstPromotableBlockId(book);
+    const promoted = svc.promoteToChapter(book, blockId, NOW);
+    const newChapter = promoted.mainContent.find((c) => c.type === 'chapter')!;
+    const merged = svc.mergeChapterIntoPrevious(promoted, newChapter.id, NOW);
+    expect(projection(merged.mainContent)).toEqual(projection(book.mainContent));
+  }, 30_000);
+
+  it('faith-alone (already chaptered): promote a paragraph in a chapter, merge back, structure restored', async () => {
+    const book = await importCorpus('faith-alone-styled.docx');
+    const svc = withIds();
+    const blockId = nonFirstPromotableBlockId(book);
+    const promoted = svc.promoteToChapter(book, blockId, NOW);
+    // the new chapter is the one whose id is not in the original set
+    const originalIds = new Set(book.mainContent.map((c) => c.id));
+    const newChapter = promoted.mainContent.find((c) => c.type === 'chapter' && !originalIds.has(c.id))!;
+    const merged = svc.mergeChapterIntoPrevious(promoted, newChapter.id, NOW);
+    expect(projection(merged.mainContent)).toEqual(projection(book.mainContent));
+  }, 30_000);
 });
