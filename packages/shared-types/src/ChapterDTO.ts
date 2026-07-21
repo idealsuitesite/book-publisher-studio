@@ -9,4 +9,6 @@ export interface ChapterDTO {
   subtitle?: string;
   content: BlockDTO[];
   sections?: SectionDTO[];
+  /** Editorial placement (MINI_DR_EDITORIAL_PLACEMENT): 'front'/'back' exports before/after the chapters. */
+  role?: 'front' | 'back';
 }

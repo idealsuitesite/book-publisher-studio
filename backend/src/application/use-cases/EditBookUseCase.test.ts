@@ -47,6 +47,16 @@ describe('EditBookUseCase — structure editing persists, snapshots, and undoes'
     expect((saved.versions[0].book.mainContent[1] as Chapter).title).toBe('Two');
   });
 
+  it('setPartRole: tags a part, persists, and snapshots before (undo point) — MINI_DR_EDITORIAL_PLACEMENT', async () => {
+    const ok = await useCase.execute(id, { type: 'setPartRole', id: 'c1', role: 'front' });
+    expect(ok).toBe(true);
+
+    const saved = (await repo.findById(id))!;
+    expect((saved.book.mainContent[0] as Chapter).role).toBe('front');
+    expect(saved.versions).toHaveLength(1);
+    expect((saved.versions[0].book.mainContent[0] as Chapter).role).toBeUndefined(); // pre-edit: untagged
+  });
+
   it('reorderChapters: applies, persists, renumbers, and snapshots before', async () => {
     await useCase.execute(id, { type: 'reorderChapters', fromIndex: 0, toIndex: 2 });
     const saved = (await repo.findById(id))!;

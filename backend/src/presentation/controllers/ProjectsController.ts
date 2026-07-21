@@ -31,6 +31,9 @@ function parseMutation(body: unknown): StructureMutation | null {
   if (m.type === 'mergeChapterIntoPrevious' && typeof m.chapterId === 'string' && m.chapterId) {
     return { type: 'mergeChapterIntoPrevious', chapterId: m.chapterId };
   }
+  if (m.type === 'setPartRole' && typeof m.id === 'string' && m.id && (m.role === 'front' || m.role === 'back' || m.role === 'main')) {
+    return { type: 'setPartRole', id: m.id, role: m.role };
+  }
   return null;
 }
 

@@ -21,6 +21,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Button, Card, cx } from '@/components/ui';
 import { countContentWords, unstructuredFinding } from '@/lib/bookFacts';
+import { classifyEditorialTitle } from '@/lib/editorialParts';
 import { editStructure, ApiError } from '@/lib/api-client';
 
 /**
@@ -153,6 +154,21 @@ export async function applyMerge(
   }
 }
 
+/** Tag a top-level part for export placement — front/back matter, or 'main' to revert to a chapter
+ * (MINI_DR_EDITORIAL_PLACEMENT). The author action; never auto-inferred. Extracted for jsdom testing. */
+export async function applySetPartRole(
+  projectId: string,
+  id: string,
+  role: 'front' | 'back' | 'main',
+  deps: { editStructure: typeof editStructure; onEdited: (updated: ProjectDTO) => void; onError: (message: string) => void }
+): Promise<void> {
+  try {
+    deps.onEdited(await deps.editStructure(projectId, { type: 'setPartRole', id, role }));
+  } catch (error) {
+    deps.onError(error instanceof ApiError ? 'That placement could not be saved.' : 'Could not reach the server.');
+  }
+}
+
 /**
  * Inline click-to-edit title (D3): a quiet button that becomes an input on click, commits on Enter
  * or blur, cancels on Esc, and refuses an empty title (reverts). No modal — the author keeps their
@@ -258,6 +274,60 @@ function BlockList({ blocks, disabled, onPromote }: { blocks: ContentBlocks; dis
   );
 }
 
+/**
+ * Editorial placement control (MINI_DR_EDITORIAL_PLACEMENT): tag a top-level part as front/back
+ * matter so it exports before/after the chapters, or revert to a chapter. When the part's title is
+ * canonical (Introduction, Bibliography, …) and it is not yet tagged, the classifier SUGGESTS a
+ * placement (ADR-0049 suggest-never-impose) — but the author always decides; nothing auto-relocates.
+ */
+function PlacementControl({
+  content,
+  disabled,
+  onSetRole,
+}: {
+  content: BookDTO['mainContent'][number];
+  disabled: boolean;
+  onSetRole: (id: string, role: 'front' | 'back' | 'main') => void;
+}) {
+  const btn =
+    'shrink-0 rounded px-1.5 py-0.5 text-xs text-app-text-muted hover:text-app-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent disabled:cursor-not-allowed';
+
+  if (content.role) {
+    return (
+      <span className="flex shrink-0 items-center gap-1.5">
+        <span className="rounded bg-app-surface-2 px-1.5 py-0.5 text-xs text-app-text-muted">
+          {content.role === 'front' ? 'Front matter' : 'Back matter'}
+        </span>
+        <button onClick={() => onSetRole(content.id, 'main')} disabled={disabled} className={btn}>
+          Make a chapter
+        </button>
+      </span>
+    );
+  }
+
+  const suggestion = classifyEditorialTitle(content.title);
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      <button
+        onClick={() => onSetRole(content.id, 'front')}
+        disabled={disabled}
+        className={cx(btn, suggestion?.placement === 'front' && 'text-app-accent')}
+        title={suggestion?.placement === 'front' ? `Looks like your ${suggestion.label}` : undefined}
+      >
+        → front
+      </button>
+      <button
+        onClick={() => onSetRole(content.id, 'back')}
+        disabled={disabled}
+        className={cx(btn, suggestion?.placement === 'back' && 'text-app-accent')}
+        title={suggestion?.placement === 'back' ? `Looks like your ${suggestion.label}` : undefined}
+      >
+        → back
+      </button>
+    </span>
+  );
+}
+
 function SortableChapterRow({
   content,
   index,
@@ -265,6 +335,7 @@ function SortableChapterRow({
   onRename,
   onPromote,
   onMerge,
+  onSetRole,
 }: {
   content: BookDTO['mainContent'][number];
   index: number;
@@ -272,6 +343,7 @@ function SortableChapterRow({
   onRename: (id: string, title: string) => void;
   onPromote: (blockId: string) => void;
   onMerge: (chapterId: string) => void;
+  onSetRole: (id: string, role: 'front' | 'back' | 'main') => void;
 }) {
   const isUnstructured = content.type === 'section' && !content.title.trim();
   const canMerge = content.type === 'chapter' && index > 0;
@@ -322,6 +394,7 @@ function SortableChapterRow({
             Merge back
           </button>
         )}
+        {!isUnstructured && <PlacementControl content={content} disabled={disabled} onSetRole={onSetRole} />}
       </div>
 
       {/* CREATE_CHAPTER.md D5: block rows expanded for the unstructured container (act here), on
@@ -428,6 +501,13 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
     setPending(false);
   }
 
+  async function onSetRole(id: string, role: 'front' | 'back' | 'main') {
+    setError(null);
+    setPending(true);
+    await applySetPartRole(project.id, id, role, { editStructure, onEdited: captureUndo, onError: setError });
+    setPending(false);
+  }
+
   async function onUndo() {
     if (!undoVersionId) return;
     setError(null);
@@ -489,6 +569,7 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
                 onRename={onRename}
                 onPromote={onPromote}
                 onMerge={onMerge}
+                onSetRole={onSetRole}
               />
             ))}
           </ul>

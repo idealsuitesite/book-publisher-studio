@@ -10,6 +10,7 @@ import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 import type { PageLayout } from '../../domain/models/PageLayout';
 import type { Book } from '../../domain/models/Book';
 import { resolveTheme } from '../../domain/themes/getTheme';
+import { orderByRole } from '../../domain/services/orderByRole';
 
 export interface ExportRequest {
   buffer: Buffer;
@@ -58,7 +59,10 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
     // resolveTheme applies the optional per-project accent over the named theme, in the ONE shared
     // seam (MINI_DR_PER_THEME_ACCENT). No override -> the named theme, unchanged.
     const theme = resolveTheme(themeName, accentOverride);
-    const styled = this.themeEngine.applyTheme(book, theme);
+    // Editorial-part placement (MINI_DR_EDITORIAL_PLACEMENT): front/back-tagged parts are ordered
+    // before/after the chapters here, in the shared tail, before pagination — so pagination, TOC and
+    // running heads all follow. A book with no tagged part is returned untouched (byte-identical).
+    const styled = this.themeEngine.applyTheme(orderByRole(book), theme);
     const typeset = this.typographyResolver.resolve(styled);
     const paginated = this.layoutEngine.paginate(typeset, pageLayout);
 

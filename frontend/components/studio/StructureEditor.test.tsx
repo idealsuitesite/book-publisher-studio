@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ProjectDTO } from 'shared-types';
-import { StructureEditor, applyReorder, applyRename, applyUndo, applyPromote, applyMerge } from './StructureEditor';
+import { StructureEditor, applyReorder, applyRename, applyUndo, applyPromote, applyMerge, applySetPartRole } from './StructureEditor';
 import { editStructure } from '@/lib/api-client';
 import type { editStructure as editStructureFn } from '@/lib/api-client';
 
@@ -77,6 +77,45 @@ describe('StructureEditor (read-only, phase 3 commit 3)', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('0 chapters detected — needs review');
     expect(screen.getByText(/No chapters were detected/)).toBeInTheDocument();
+  });
+});
+
+// MINI_DR_EDITORIAL_PLACEMENT: the author marks a part front/back matter (Option C). Handler in
+// isolation, then the placement control's UX (real clicks) — never auto-inferred, always an action.
+describe('applySetPartRole (placement handler)', () => {
+  it('posts the setPartRole mutation and applies the returned project', async () => {
+    const editStructure = vi.fn().mockResolvedValue({ id: 'p1' }) as unknown as typeof editStructureFn;
+    const onEdited = vi.fn();
+    const onError = vi.fn();
+    await applySetPartRole('p1', 'c2', 'front', { editStructure, onEdited, onError });
+    expect(editStructure).toHaveBeenCalledWith('p1', { type: 'setPartRole', id: 'c2', role: 'front' });
+    expect(onEdited).toHaveBeenCalled();
+  });
+});
+
+describe('placement control UX (MINI_DR_EDITORIAL_PLACEMENT)', () => {
+  it('marks a part as front matter from a real click', async () => {
+    const user = userEvent.setup();
+    vi.mocked(editStructure).mockResolvedValue(project());
+    render(<StructureEditor project={project()} onEdited={() => {}} />);
+
+    // "Method" (c2, index > 0) offers placement controls; move it to front matter.
+    const frontButtons = screen.getAllByRole('button', { name: '→ front' });
+    await user.click(frontButtons[frontButtons.length - 1]);
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'setPartRole', id: 'c2', role: 'front' });
+  });
+
+  it('shows a badge and a revert control for an already-tagged part', () => {
+    const tagged = project({
+      book: {
+        metadata: { title: 'A Book', author: 'Jean' },
+        mainContent: [{ id: 'c1', type: 'chapter', number: 1, title: 'Bibliography', content: [], sections: [], role: 'back' }],
+      },
+    } as unknown as Partial<ProjectDTO>);
+    render(<StructureEditor project={tagged} onEdited={() => {}} />);
+
+    expect(screen.getByText('Back matter')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Make a chapter' })).toBeInTheDocument();
   });
 });
 

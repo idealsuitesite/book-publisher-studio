@@ -89,18 +89,24 @@ export function computeBookFacts(book: BookDTO): BookFacts {
   };
 
   // Classification is TOP-LEVEL only (MINI_DR_EDITORIAL_PARTS): a canonical title nested inside a
-  // chapter is ordinary content, only a top-level part is an editorial part. A recognised part is
-  // recorded and excluded from the chapter/section count — the miscount fix — but its blocks still
-  // count. Everything else keeps the exact previous logic.
+  // chapter is ordinary content, only a top-level part is an editorial part. A part is editorial when
+  // it is EITHER role-tagged (authoritative — MINI_DR_EDITORIAL_PLACEMENT, the author's own decision)
+  // OR its title is canonical (the automatic suggestion this session established). Either way it is
+  // recorded and excluded from the chapter/section count — but its blocks still count.
   for (const content of book.mainContent) {
     const category = classifyEditorialTitle(content.title);
-    if (category) {
-      facts.editorialParts.push({
-        key: category.key,
-        label: category.label,
-        placement: category.placement,
-        detectedTitle: content.title,
-      });
+    const tagged = content.role; // 'front' | 'back' | undefined — set only by an author action
+    if (tagged || category) {
+      // The panel is category-based, so only a recognised title yields a panel row; the placement
+      // follows the author's tag when present, else the category's convention.
+      if (category) {
+        facts.editorialParts.push({
+          key: category.key,
+          label: category.label,
+          placement: tagged ?? category.placement,
+          detectedTitle: content.title,
+        });
+      }
       countBlocksDeep(content);
       continue;
     }

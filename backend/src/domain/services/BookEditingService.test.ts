@@ -243,3 +243,31 @@ describe('BookEditingService — promote→merge round-trip on real manuscripts 
     expect(projection(merged.mainContent)).toEqual(projection(book.mainContent));
   }, 30_000);
 });
+
+// ── MINI_DR_EDITORIAL_PLACEMENT: setPartRole ─────────────────────────────────────────────────────
+describe('BookEditingService — setPartRole', () => {
+  const roleOf = (book: Book, id: string) => book.mainContent.find((c) => c.id === id)?.role;
+
+  it('tags a top-level part front or back', () => {
+    expect(roleOf(service.setPartRole(sampleBook(), 'c1', 'front', NOW), 'c1')).toBe('front');
+    expect(roleOf(service.setPartRole(sampleBook(), 'c3', 'back', NOW), 'c3')).toBe('back');
+  });
+
+  it("clears the tag with 'main', leaving no role property", () => {
+    const tagged = service.setPartRole(sampleBook(), 'c1', 'front', NOW);
+    const cleared = service.setPartRole(tagged, 'c1', 'main', NOW);
+    expect(roleOf(cleared, 'c1')).toBeUndefined();
+    expect('role' in cleared.mainContent[0]).toBe(false); // property removed, not set to undefined
+  });
+
+  it('only tags TOP-LEVEL parts — a nested section id is not found', () => {
+    // 's1a' is a section inside c1, not a top-level part; roles live only on mainContent entries.
+    expect(() => service.setPartRole(sampleBook(), 's1a', 'front', NOW)).toThrow(ContentNotFoundError);
+  });
+
+  it('throws for an unknown id and never mutates the input', () => {
+    const book = sampleBook();
+    expect(() => service.setPartRole(book, 'nope', 'front', NOW)).toThrow(ContentNotFoundError);
+    expect(book.mainContent.every((c) => c.role === undefined)).toBe(true); // input untouched
+  });
+});

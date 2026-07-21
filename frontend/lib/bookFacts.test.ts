@@ -14,8 +14,8 @@ function project(overrides: Partial<ProjectDTO> = {}): ProjectDTO {
 function book(mainContent: unknown[]): BookDTO {
   return { id: 'b1', metadata: {}, mainContent } as unknown as BookDTO;
 }
-const ch = (title: string, content: unknown[] = [], sections: unknown[] = []) => ({
-  type: 'chapter', id: title, number: 1, title, content, sections,
+const ch = (title: string, content: unknown[] = [], sections: unknown[] = [], role?: 'front' | 'back') => ({
+  type: 'chapter', id: title, number: 1, title, content, sections, role,
 });
 const sec = (title: string, content: unknown[] = []) => ({ type: 'section', id: title, title, level: 1, content });
 
@@ -53,6 +53,19 @@ describe('computeBookFacts — editorial parts excluded from the chapter count (
     expect(facts.chapters).toBe(1);
     expect(facts.sections).toBe(1);
     expect(facts.editorialParts).toEqual([]);
+  });
+
+  it('excludes a ROLE-TAGGED part from the chapter count even with a non-canonical title (authoritative — MINI_DR_EDITORIAL_PLACEMENT)', () => {
+    // The author tagged a custom-titled part as front matter: it must not count as a chapter, even
+    // though its title is not canonical (the tag is authoritative, superseding the by-title rule).
+    const facts = computeBookFacts(book([ch('A Note From the Author', [], [], 'front'), ch('Chapter One: Start')]));
+    expect(facts.chapters).toBe(1);
+  });
+
+  it('a tagged canonical part reports the tagged placement, not the title default', () => {
+    // "Introduction" defaults to front, but if the author tagged it back, the panel follows the tag.
+    const facts = computeBookFacts(book([ch('Introduction', [], [], 'back')]));
+    expect(facts.editorialParts[0].placement).toBe('back');
   });
 });
 
