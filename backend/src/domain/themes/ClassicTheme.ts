@@ -30,6 +30,8 @@ export const ClassicTheme: Theme = {
     paragraphSpacing: 8,
     headingSpacing: 16,
     lineHeight: 1.4,
+    titleSpaceBefore: 18, // above > below (convention). Effective above ~= 8 (prev block's
+    titleSpaceAfter: 8, //   paragraphSpacing bleeds down) + 18 = ~26pt, vs 8pt below.
   },
   // Matches today's pre-Sprint-6 PDF running-head/footer defaults (top running head, "Page N
   // of TOTAL" footer, size-9 default font) minus the hardcoded 'Book Publisher Studio' literal

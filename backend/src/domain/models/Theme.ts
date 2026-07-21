@@ -42,6 +42,15 @@ export interface Theme {
     paragraphSpacing: number;
     headingSpacing: number;
     lineHeight: number;
+    // Chapter/Section TITLE spacing (MINI_DR_SUBTITLE_SPACING). Flat points, size-independent,
+    // and deliberately ASYMMETRIC (above > below) so a title binds to the text it introduces.
+    // Distinct from headingSpacing (which spaces heading *blocks* symmetrically): real DOCX
+    // imports produce Chapter/Section titles, not heading blocks (ADR-0031/0032), so before this
+    // the PDF spaced all titles with renderTitle's size-scaled moveDown() -- below-only, backwards.
+    // PDF-only for now (DOCXRenderer/EPUBRenderer do not read these; tri-format convergence is a
+    // named candidate for the per-theme fine-tuning chantier).
+    titleSpaceBefore: number;
+    titleSpaceAfter: number;
   };
   // Additive (ADR-0022/ADR-0027 pattern) - no existing Theme consumer breaks. undefined/show:false
   // means no running head at all, matching every theme's behavior before this sprint.
