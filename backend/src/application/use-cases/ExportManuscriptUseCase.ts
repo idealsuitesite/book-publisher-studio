@@ -9,7 +9,7 @@ import type { LayoutEngine } from '../../domain/services/LayoutEngine';
 import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 import type { PageLayout } from '../../domain/models/PageLayout';
 import type { Book } from '../../domain/models/Book';
-import { getTheme } from '../../domain/themes/getTheme';
+import { resolveTheme } from '../../domain/themes/getTheme';
 
 export interface ExportRequest {
   buffer: Buffer;
@@ -54,8 +54,10 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
    * silently discarded every stored edit — the Structure station and the export were two different
    * books (STRUCTURE_EDITING.md §5/§9; ADR-0052).
    */
-  async renderBook(book: Book, themeName: string, pageLayout: PageLayout): Promise<Buffer> {
-    const theme = getTheme(themeName);
+  async renderBook(book: Book, themeName: string, pageLayout: PageLayout, accentOverride?: string): Promise<Buffer> {
+    // resolveTheme applies the optional per-project accent over the named theme, in the ONE shared
+    // seam (MINI_DR_PER_THEME_ACCENT). No override -> the named theme, unchanged.
+    const theme = resolveTheme(themeName, accentOverride);
     const styled = this.themeEngine.applyTheme(book, theme);
     const typeset = this.typographyResolver.resolve(styled);
     const paginated = this.layoutEngine.paginate(typeset, pageLayout);

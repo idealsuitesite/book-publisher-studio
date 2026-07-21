@@ -42,7 +42,8 @@ export class PublishProjectUseCase {
     const report = await this.publisher.publishBook(
       this.projectService.currentBook(project),
       project.settings.themeName,
-      pageLayout
+      pageLayout,
+      project.settings.accentOverride
     );
 
     const recorded = this.projectService.recordPublication(withVersion, report, version.id);

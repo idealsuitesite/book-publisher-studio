@@ -29,6 +29,8 @@ export interface ProjectPublicationDTO {
 export interface ProjectSettingsDTO {
   layoutName: string;
   themeName: string;
+  /** Optional per-project accent colour (hex) overriding the theme's accent (MINI_DR_PER_THEME_ACCENT). */
+  accentOverride?: string;
 }
 
 export interface ProjectDTO {
@@ -52,4 +54,9 @@ export interface ProjectDTO {
 export interface UpdateProjectSettingsDTO {
   layoutName?: string;
   themeName?: string;
+  /**
+   * Set (a hex string) or CLEAR (null or '') the per-project accent override. Omitted leaves it
+   * unchanged (MINI_DR_PER_THEME_ACCENT).
+   */
+  accentOverride?: string | null;
 }

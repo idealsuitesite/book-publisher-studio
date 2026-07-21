@@ -13,8 +13,12 @@ interface FormatSelectorProps {
   options: ManuscriptOptionsDTO;
   selectedLayout: string;
   selectedTheme: string;
+  /** The per-project accent override (hex), or undefined for the theme's own accent. */
+  selectedAccent?: string;
   onLayoutChange: (name: string) => void;
   onThemeChange: (name: string) => void;
+  /** Set (hex) or clear (null) the accent override. */
+  onAccentChange: (hex: string | null) => void;
 }
 
 const CATEGORY_LABELS: Record<LayoutOptionDTO['category'], string> = {
@@ -86,7 +90,15 @@ function PresetCard({
   );
 }
 
-export function FormatSelector({ options, selectedLayout, selectedTheme, onLayoutChange, onThemeChange }: FormatSelectorProps) {
+export function FormatSelector({
+  options,
+  selectedLayout,
+  selectedTheme,
+  selectedAccent,
+  onLayoutChange,
+  onThemeChange,
+  onAccentChange,
+}: FormatSelectorProps) {
   const categories = Array.from(new Set(options.layouts.map((layout) => layout.category)));
 
   return (
@@ -144,6 +156,33 @@ export function FormatSelector({ options, selectedLayout, selectedTheme, onLayou
             <span className="text-sm text-app-text-muted">More themes are being set.</span>
             <span className="text-xs text-app-text-muted">Classic is the first resident.</span>
           </div>
+        </div>
+      </div>
+
+      {/* Accent (MINI_DR_PER_THEME_ACCENT): the one theme value an author can tune. Colour-only,
+          so the Proof re-inks with no page shift. */}
+      <div className="flex flex-col gap-3 px-8 py-6">
+        <h3 className="text-lg font-semibold text-app-text">Accent</h3>
+        <p className="text-xs text-app-text-muted">
+          Recolours headings and titles over your chosen theme. You&apos;ll see it in the Proof.
+        </p>
+        <div className="flex items-center gap-3">
+          <input
+            type="color"
+            aria-label="Accent colour"
+            value={selectedAccent ?? '#000000'}
+            onChange={(event) => onAccentChange(event.target.value)}
+            className="h-9 w-14 cursor-pointer rounded border border-app-border bg-transparent"
+          />
+          <span className="text-sm tabular-nums text-app-text-muted">{selectedAccent ?? 'Theme default'}</span>
+          {selectedAccent && (
+            <button
+              onClick={() => onAccentChange(null)}
+              className="text-sm text-app-text-muted underline hover:text-app-text"
+            >
+              Reset to theme default
+            </button>
+          )}
         </div>
       </div>
     </Card>
