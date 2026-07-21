@@ -407,8 +407,15 @@ export class PDFRenderer implements Renderer<Buffer> {
   ): void {
     for (const content of contents) {
       const firstBlockId = content.content[0]?.id;
-      const ownerPage = isTopLevel && content.type === 'chapter' && firstBlockId !== undefined ? pageStarts.get(firstBlockId) : undefined;
-      if (ownerPage && firstBlockId) pageStarts.delete(firstBlockId);
+      // A blockless titled top-level chapter (the Part-opener shape) owns its planned page under
+      // the CONTENT's own id — it has no block id the pageStarts protocol could key by
+      // (LayoutEngine's ownsBarePage branch, PART_LEVEL_STRUCTURE commit 1). startKey preserves
+      // the first-block path byte-for-byte when blocks exist; for an empty-with-sections chapter
+      // the model emitted no content-id page, so the lookup misses and behaviour is unchanged.
+      const startKey =
+        firstBlockId ?? (isTopLevel && content.type === 'chapter' && content.title ? content.id : undefined);
+      const ownerPage = isTopLevel && content.type === 'chapter' && startKey !== undefined ? pageStarts.get(startKey) : undefined;
+      if (ownerPage && startKey !== undefined) pageStarts.delete(startKey);
 
       // Blank pages (Chapter.openingPageStyle) are genuinely empty physical pages - each
       // addPage() here is immediately followed by another with nothing drawn in between,

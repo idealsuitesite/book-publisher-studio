@@ -53,7 +53,9 @@ describe('StructureEditor (read-only, phase 3 commit 3)', () => {
     expect(screen.getByText('Intro')).toBeInTheDocument();
     expect(screen.getByText('Method')).toBeInTheDocument();
     expect(screen.getByText('Background')).toBeInTheDocument();
-    expect(screen.getByText(/2 parts/)).toBeInTheDocument();
+    // Deliberate wording change (PART_LEVEL_STRUCTURE §6): "parts" now means Part dividers, so
+    // the summary counts entries by what they ARE — this fixture is 2 chapters, no dividers.
+    expect(screen.getByText(/2 chapters/)).toBeInTheDocument();
     // Chapter 1 = its paragraph (3) + the section (2) = 5; the section itself = 2.
     expect(screen.getByText('5 words')).toBeInTheDocument();
     expect(screen.getByText('2 words')).toBeInTheDocument();

@@ -250,6 +250,43 @@ export class LayoutEngine {
     // Chapters conventionally start on a new page; sections/subsections flow within their chapter's pages.
     const walkContent = (contents: Content[], isTopLevel: boolean): void => {
       for (const content of contents) {
+        // A titled, blockless, childless TOP-LEVEL CHAPTER owns a page of its own — the
+        // Part-opener shape (PART_LEVEL_STRUCTURE commit 1). Every renderer draws such a
+        // content's title unconditionally, but this walker only flushes pages per block, so the
+        // model charged NOTHING for the page the renderer emitted — the exact ADR-0051 drift
+        // measured in part-level-geometry-spike.ts (model +0, renderer +3 pages, unplanned
+        // 3→6). The page carries the CONTENT's own id — the only id it has — and PDFRenderer's
+        // planned-break protocol matches on it (renderContent's startKey). Measured on the whole
+        // corpus (empty-shape-probe.ts): no imported book produces this shape, so this branch is
+        // unreachable from any real import — byte-identity guarded by the parity locks. A chapter
+        // whose text lives under its sections (content: [] but sections present) is NOT this
+        // shape and flows exactly as before; a blockless titled top-level SECTION keeps today's
+        // in-flow title (the renderer plans no break for it — mirroring that is out of scope
+        // here, disclosed in PART_LEVEL_STRUCTURE.md).
+        const ownsBarePage =
+          isTopLevel &&
+          content.type === 'chapter' &&
+          Boolean(content.title) &&
+          content.content.length === 0 &&
+          (content.sections?.length ?? 0) === 0;
+        if (ownsBarePage && content.type === 'chapter') {
+          // Same protocol as a chapter's opening break below: flush attributing the closing page
+          // to the OLD currentTopLevelTitle, then blank-page parity, then the opener's own page.
+          flushPage();
+          if (content.startPageNumber !== undefined) pageNumber = content.startPageNumber;
+          const needed = blankPagesNeededFor(content.openingPageStyle, pageNumber);
+          pendingBlankPagesBefore = needed;
+          pageNumber += needed;
+          currentTopLevelTitle = content.title;
+          const titleHeight = titleHeightOf(content);
+          currentPageBlocks.push(content.id);
+          currentPageHeights.push(titleHeight);
+          currentHeight += titleHeight;
+          // The opener page holds ONLY its title: flush now so whatever follows starts a fresh
+          // planned page (renderBlock/renderContent honour it via pageStarts).
+          flushPage();
+          continue;
+        }
         const startsChapter = isTopLevel && content.type === 'chapter';
         let isFirstBlock = true;
         for (const block of content.content) {
@@ -344,7 +381,10 @@ export class LayoutEngine {
         // Section, ADR-0020 addendum, is skipped - an empty-title entry is never useful).
         if (content.title) {
           const level = content.type === 'chapter' ? 1 : content.level;
-          addEntry(level, content.title, content.id, content.content[0]?.id);
+          // A blockless titled chapter's page carries the content's own id (ownsBarePage), so the
+          // fallback resolves a Part opener's page number; for ordinary content the content id is
+          // never on a page and the fallback misses exactly as the old undefined did.
+          addEntry(level, content.title, content.id, content.content[0]?.id ?? content.id);
         }
         for (const block of content.content) {
           // The synthetic/future case: a literal Heading block genuinely present in content.

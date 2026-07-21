@@ -40,6 +40,9 @@ interface StructureEditorProps {
 }
 
 function chapterHeading(content: BookDTO['mainContent'][number]): string {
+  // A part divider (PART_LEVEL_STRUCTURE) is announced by its own title — it has no chapter
+  // number ("Part I: …" already names itself).
+  if (content.type === 'chapter' && content.partOpener) return content.title;
   if (content.type === 'chapter') return `Chapter ${content.number}: ${content.title}`;
   return content.title || 'Untitled section';
 }
@@ -151,6 +154,37 @@ export async function applyMerge(
     deps.onEdited(await deps.editStructure(projectId, { type: 'mergeChapterIntoPrevious', chapterId }));
   } catch (error) {
     deps.onError(error instanceof ApiError ? 'That chapter could not be merged back.' : 'Could not reach the server.');
+  }
+}
+
+/** Insert a "Part I / Part II" divider before the entry at `index` (PART_LEVEL_STRUCTURE): a
+ * titled page grouping the chapters that follow it, by position. Extracted for jsdom testing. */
+export async function applyInsertPartOpener(
+  projectId: string,
+  index: number,
+  title: string,
+  deps: { editStructure: typeof editStructure; onEdited: (updated: ProjectDTO) => void; onError: (message: string) => void }
+): Promise<void> {
+  const trimmed = title.trim();
+  if (!trimmed) return;
+  try {
+    deps.onEdited(await deps.editStructure(projectId, { type: 'insertPartOpener', index, title: trimmed }));
+  } catch (error) {
+    deps.onError(error instanceof ApiError ? 'That part divider could not be added.' : 'Could not reach the server.');
+  }
+}
+
+/** Remove a part divider (opener-only — a real chapter can never be deleted through this op; its
+ * chapters simply flow to the previous part). Extracted for jsdom testing. */
+export async function applyRemovePartOpener(
+  projectId: string,
+  id: string,
+  deps: { editStructure: typeof editStructure; onEdited: (updated: ProjectDTO) => void; onError: (message: string) => void }
+): Promise<void> {
+  try {
+    deps.onEdited(await deps.editStructure(projectId, { type: 'removePartOpener', id }));
+  } catch (error) {
+    deps.onError(error instanceof ApiError ? 'That part divider could not be removed.' : 'Could not reach the server.');
   }
 }
 
@@ -336,6 +370,8 @@ function SortableChapterRow({
   onPromote,
   onMerge,
   onSetRole,
+  onInsertPart,
+  onRemovePart,
 }: {
   content: BookDTO['mainContent'][number];
   index: number;
@@ -344,15 +380,57 @@ function SortableChapterRow({
   onPromote: (blockId: string) => void;
   onMerge: (chapterId: string) => void;
   onSetRole: (id: string, role: 'front' | 'back' | 'main') => void;
+  onInsertPart: (index: number) => void;
+  onRemovePart: (id: string) => void;
 }) {
+  const isPartOpener = content.type === 'chapter' && content.partOpener === true;
   const isUnstructured = content.type === 'section' && !content.title.trim();
-  const canMerge = content.type === 'chapter' && index > 0;
+  const canMerge = content.type === 'chapter' && !isPartOpener && index > 0;
   const blocks = content.content;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: content.id,
     disabled,
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
+
+  // A part divider's row (PART_LEVEL_STRUCTURE round 1): its own badge, rename, remove — no word
+  // count (it carries none), no merge/placement/blocks/sections. It drags as a plain entry
+  // (§3.5: entries move individually; dragging a divider does NOT drag its chapters).
+  if (isPartOpener) {
+    return (
+      <li
+        ref={setNodeRef}
+        style={style}
+        className={cx(
+          'rounded-md border border-app-accent/40 bg-app-surface-2 px-2 py-2',
+          isDragging && 'opacity-60 shadow-[var(--shadow-sheet)]'
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <button
+            {...attributes}
+            {...listeners}
+            aria-label={`Reorder ${content.title}`}
+            disabled={disabled}
+            className="shrink-0 cursor-grab rounded px-1 text-app-text-muted hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent disabled:cursor-not-allowed"
+          >
+            ⠿
+          </button>
+          <span className="shrink-0 rounded bg-app-surface-1 px-1.5 py-0.5 text-xs font-medium text-app-accent">Part</span>
+          <span className="flex flex-1 items-center text-sm font-medium text-app-text">
+            <EditableTitle value={content.title} ariaLabel={content.title} disabled={disabled} onCommit={(t) => onRename(content.id, t)} />
+          </span>
+          <button
+            onClick={() => onRemovePart(content.id)}
+            disabled={disabled}
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs text-app-text-muted hover:text-app-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent disabled:cursor-not-allowed"
+          >
+            Remove divider
+          </button>
+        </div>
+      </li>
+    );
+  }
 
   return (
     <li
@@ -395,6 +473,15 @@ function SortableChapterRow({
           </button>
         )}
         {!isUnstructured && <PlacementControl content={content} disabled={disabled} onSetRole={onSetRole} />}
+        <button
+          onClick={() => onInsertPart(index)}
+          disabled={disabled}
+          title="Start a part here — inserts a Part divider above this entry"
+          aria-label={`Start a part before ${chapterHeading(content)}`}
+          className="shrink-0 rounded px-1.5 py-0.5 text-xs text-app-text-muted hover:text-app-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent disabled:cursor-not-allowed"
+        >
+          + Part
+        </button>
       </div>
 
       {/* CREATE_CHAPTER.md D5: block rows expanded for the unstructured container (act here), on
@@ -517,6 +604,22 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
     setPending(false);
   }
 
+  // Inserted with a default title, renamed inline right after — the promoteToChapter precedent
+  // (title first, refine with the existing EditableTitle; no modal interrupting the author).
+  async function onInsertPart(index: number) {
+    setError(null);
+    setPending(true);
+    await applyInsertPartOpener(project.id, index, 'New part', { editStructure, onEdited: captureUndo, onError: setError });
+    setPending(false);
+  }
+
+  async function onRemovePart(id: string) {
+    setError(null);
+    setPending(true);
+    await applyRemovePartOpener(project.id, id, { editStructure, onEdited: captureUndo, onError: setError });
+    setPending(false);
+  }
+
   async function onUndo() {
     if (!undoVersionId) return;
     setError(null);
@@ -531,8 +634,21 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
       <div className="flex items-baseline justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-app-text">Structure</h2>
+          {/* Wording pass (PART_LEVEL_STRUCTURE §6): "parts" used to mean list entries here, which
+              would collide head-on with Part dividers. The summary now counts what things ARE. */}
           <p className="mt-0.5 text-sm text-app-text-muted">
-            {book.mainContent.length} {book.mainContent.length === 1 ? 'part' : 'parts'} · drag to reorder, click a title to rename
+            {(() => {
+              const chapters = book.mainContent.filter((c) => c.type === 'chapter' && !c.partOpener).length;
+              const dividers = book.mainContent.filter((c) => c.type === 'chapter' && c.partOpener === true).length;
+              const others = book.mainContent.length - chapters - dividers;
+              const bits = [
+                dividers > 0 ? `${dividers} ${dividers === 1 ? 'part' : 'parts'}` : null,
+                `${chapters} ${chapters === 1 ? 'chapter' : 'chapters'}`,
+                others > 0 ? `${others} ${others === 1 ? 'other entry' : 'other entries'}` : null,
+              ].filter(Boolean);
+              return bits.join(' · ');
+            })()}{' '}
+            · drag to reorder, click a title to rename
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
@@ -582,6 +698,8 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
                 onPromote={onPromote}
                 onMerge={onMerge}
                 onSetRole={onSetRole}
+                onInsertPart={onInsertPart}
+                onRemovePart={onRemovePart}
               />
             ))}
           </ul>

@@ -34,6 +34,15 @@ function parseMutation(body: unknown): StructureMutation | null {
   if (m.type === 'setPartRole' && typeof m.id === 'string' && m.id && (m.role === 'front' || m.role === 'back' || m.role === 'main')) {
     return { type: 'setPartRole', id: m.id, role: m.role };
   }
+  // PART_LEVEL_STRUCTURE: whitelisted HERE, with route tests, at the same time as the dispatch —
+  // the untrusted-body boundary is where setPartRole shipped its live-found gap (a unit-tested
+  // handler behind an unwhitelisted route, MINI_DR_EDITORIAL_PLACEMENT); not repeated.
+  if (m.type === 'insertPartOpener' && typeof m.index === 'number' && Number.isInteger(m.index) && typeof m.title === 'string' && m.title.trim()) {
+    return { type: 'insertPartOpener', index: m.index, title: m.title };
+  }
+  if (m.type === 'removePartOpener' && typeof m.id === 'string' && m.id) {
+    return { type: 'removePartOpener', id: m.id };
+  }
   return null;
 }
 
