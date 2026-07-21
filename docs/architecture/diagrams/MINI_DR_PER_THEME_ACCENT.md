@@ -51,5 +51,15 @@ A per-project `accentOverride` colour, stored in settings, applied over the chos
 ## 7. What is already decided (no open questions)
 All four §2 points are CTO-locked; Option A is the scope. This review carries no unresolved questions — it exists as the durable design record and the commit plan. Code proceeds; report at each green commit.
 
+## Implementation note (added at build time — the design above is unchanged; this records what the build settled)
+
+- **All four points shipped as locked**, each with a test: override replaces accent for any theme (Classic + Modern); accent-only proven R2-free **both ways** (unit: only `colors.accent` changes; real output: same page count with/without); `proofRefreshKey` re-inks on the override with the same `updatedAt` (the D5 test); the contrast guard is deferred and **named `ACCENT_CONTRAST_UNGUARDED` in TODO.md** (the `ProjectsController` comment references it — no dangling pointer).
+- **Format guard only** (point 2): `PATCH /settings` accepts a valid hex, rejects otherwise with `400 INVALID_SETTINGS`; `null`/`''` clears. Verified live.
+- **The raw-bytes non-regression** is a real test: `resolveTheme(name) === getTheme(name)` with no override, so the override cannot leak to a path that should not apply it.
+- **Verified live on real faith-alone:** PATCH set/persist/reread; non-hex → 400; the Layout station's Accent picker reflects the persisted `#1D4E68` with its reset control; zero console errors.
+- **Environment note (not a code defect):** a stale backend process from before this chantier held port 5000 and answered PATCH with the old behaviour (non-hex accepted) — killed by PID and restarted, after which the new code responded correctly. Recorded so a future reader does not mistake an obsolete-server symptom for a regression.
+
+Merged to `main` (`f74db29`); backend 659/659, frontend 164/164, tsc + eslint clean.
+
 ## Related
 `PER_THEME_TUNING_SCOPE.md` (the measured scope — Option A), `FORMATTING_TOOLS_AUDIT.md` (the top gap), `MINI_DR_ACCENT_COLORS.md` (what `colors.accent` drives — headings + titles), ADR-0052 (the shared `renderBook`/`publishBook` tail — the seam the override enters), `MINI_DR_SUBTITLE_SPACING.md` (the geometry contrast — why accent, colour-only, needs no parity re-lock), `STRUCTURE_EDITING_PHASE3.md` D5 (the stale-Proof risk the refresh-key test closes), `GUTTER_SCOPE.md` (the named-not-hidden treatment for the §2.2 validation gap).
