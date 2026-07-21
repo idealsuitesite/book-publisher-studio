@@ -78,6 +78,22 @@ describe('StructureEditor (read-only, phase 3 commit 3)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('0 chapters detected — needs review');
     expect(screen.getByText(/No chapters were detected/)).toBeInTheDocument();
   });
+
+  // MINI_DR_SECTION_FOLDING (Option C): a chapter's sections fold behind a collapsed disclosure by
+  // default, so the panel's height is no longer proportional to the manuscript — the header stays.
+  it("folds a chapter's sections behind a collapsed disclosure by default", () => {
+    render(<StructureEditor project={project()} onEdited={() => {}} />);
+    expect(screen.getByText('1 section')).toBeInTheDocument(); // the summary (c1 has one section)
+    const details = screen.getByText('Background').closest('details');
+    expect(details).not.toBeNull();
+    expect(details).not.toHaveAttribute('open'); // collapsed by default (the regression fix)
+  });
+
+  it('keeps the chapter header controls visible while sections are folded', () => {
+    render(<StructureEditor project={project()} onEdited={() => {}} />);
+    // The chapter's own rename control is present even though its sections are collapsed.
+    expect(screen.getByRole('button', { name: 'Rename Chapter 1: Intro' })).toBeInTheDocument();
+  });
 });
 
 // MINI_DR_EDITORIAL_PLACEMENT: the author marks a part front/back matter (Option C). Handler in
