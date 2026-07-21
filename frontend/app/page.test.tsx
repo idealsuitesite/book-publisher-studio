@@ -39,4 +39,18 @@ describe('Home — conditional layout by library state', () => {
     expect(screen.getByText('Import a manuscript')).toBeInTheDocument(); // import stays evident (a real button)
     expect(screen.queryByText(/Drop your DOCX here/)).toBeNull(); // the full drop form no longer competes
   });
+
+  // HOME_TIGHTEN_SCOPE Point A: the promise lives at first contact, the task on return — never
+  // both on the same screen, so the pitch cannot become wallpaper for a returning author.
+  it('the empty (first-contact) screen states the promise; the returning screen states the task', async () => {
+    vi.mocked(listProjects).mockResolvedValue({ projects: [] });
+    const { unmount } = render(<Home />);
+    expect(await screen.findByText(/Import your manuscript — leave with a professional, publish-ready book/)).toBeInTheDocument();
+    unmount();
+
+    vi.mocked(listProjects).mockResolvedValue({ projects: [summary('p1', 'My Book')] });
+    render(<Home />);
+    expect(await screen.findByText(/Pick up your book where you left it/)).toBeInTheDocument();
+    expect(screen.queryByText(/publish-ready book/)).toBeNull(); // no pitch on the returning screen
+  });
 });

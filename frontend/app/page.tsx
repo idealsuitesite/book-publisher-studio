@@ -63,7 +63,12 @@ export default function Home() {
         <section aria-label="Start" className="flex flex-col gap-6">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight text-app-text">Your studio</h1>
-            <p className="mt-1 text-sm text-app-text-muted">Bring in a manuscript to start your first project.</p>
+            {/* First contact carries the PROMISE (HOME_TIGHTEN_SCOPE Point A): what the product
+                does, plainly — the returning screen carries the task instead, so the pitch never
+                becomes wallpaper. */}
+            <p className="mt-1 text-sm text-app-text-muted">
+              Import your manuscript — leave with a professional, publish-ready book.
+            </p>
           </div>
           <UploadDropzone />
           {/* The honest empty state (ADR-0046/0047) — also the post-restart state; a fake-persistent
@@ -81,7 +86,8 @@ export default function Home() {
       <section aria-label="Start" className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-app-text">Your studio</h1>
-          <p className="mt-1 text-sm text-app-text-muted">Continue where you left off, or import a new manuscript.</p>
+          {/* The returning author reads their TASK, not the pitch (Point A's split). */}
+          <p className="mt-1 text-sm text-app-text-muted">Pick up your book where you left it, or import a new manuscript.</p>
         </div>
         <UploadDropzone variant="button" />
       </section>
