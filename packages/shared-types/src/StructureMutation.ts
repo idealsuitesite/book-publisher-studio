@@ -15,4 +15,7 @@ export type StructureMutation =
   // CREATE_CHAPTER.md (scope LOCKED to these two create ops): carve a chapter out of unstructured
   // content by promoting a paragraph, and its exact inverse.
   | { type: 'promoteToChapter'; blockId: string }
-  | { type: 'mergeChapterIntoPrevious'; chapterId: string };
+  | { type: 'mergeChapterIntoPrevious'; chapterId: string }
+  // MINI_DR_EDITORIAL_PLACEMENT (§2b): tag a top-level part for export placement — 'front' before the
+  // chapters, 'back' after, 'main' clears it. The author action; never auto-inferred (Option C).
+  | { type: 'setPartRole'; id: string; role: 'front' | 'back' | 'main' };

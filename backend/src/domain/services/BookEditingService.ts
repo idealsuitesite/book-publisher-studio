@@ -66,6 +66,30 @@ export class BookEditingService {
   }
 
   /**
+   * Set (or clear) the editorial placement role of a TOP-LEVEL part (MINI_DR_EDITORIAL_PLACEMENT §2b):
+   * 'front' exports it before the chapters, 'back' after them, 'main' clears the tag (ordinary
+   * content). Only top-level parts carry a role — a nested section is ordinary content, so the id must
+   * name a `mainContent` entry. Returns a new Book; the original is untouched. Throws
+   * `ContentNotFoundError` if no top-level part has the id. This is the Option-C author action — the
+   * ONLY way a role is ever set; nothing infers it into the export.
+   */
+  setPartRole(book: Book, id: string, role: 'front' | 'back' | 'main', now: Date = new Date()): Book {
+    let found = false;
+    const mainContent = book.mainContent.map((content): Content => {
+      if (content.id !== id) return content;
+      found = true;
+      const updated: Content = { ...content, updatedAt: now };
+      if (role === 'main') delete updated.role;
+      else updated.role = role;
+      return updated;
+    });
+    if (!found) {
+      throw new ContentNotFoundError(`setPartRole: no top-level part with id "${id}"`);
+    }
+    return { ...book, mainContent };
+  }
+
+  /**
    * Promote a paragraph/heading block (in a TOP-LEVEL container) to a new chapter, splitting that
    * container at the block: blocks before stay, the block's text becomes the new chapter's title,
    * blocks after become its content. Chapters renumber. The one op that lets an author carve
