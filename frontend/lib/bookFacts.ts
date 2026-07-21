@@ -1,4 +1,5 @@
 import type { BookDTO, BlockDTO, ContentDTO, ImportReportDTO, ValidationIssueDTO, ProjectDTO } from 'shared-types';
+import { classifyEditorialTitle, type DetectedEditorialPart } from './editorialParts';
 
 /**
  * The key that drives the living Proof's re-ink (PreviewPanel). It must change whenever the
@@ -24,6 +25,13 @@ export interface BookFacts {
   citations: number;
   footnotes: number;
   tables: number;
+  /**
+   * Top-level parts recognised as editorial (preface/introduction/bibliography/…) by canonical
+   * title (MINI_DR_EDITORIAL_PARTS). These are EXCLUDED from `chapters` above — that is the
+   * miscount fix: faith-alone reports 15 chapters + 2 editorial parts, not "17 ch". Presentation
+   * only; the Book is unchanged, the export is unchanged (§6).
+   */
+  editorialParts: DetectedEditorialPart[];
 }
 
 /**
@@ -58,7 +66,7 @@ export function countContentWords(content: ContentDTO): number {
 }
 
 export function computeBookFacts(book: BookDTO): BookFacts {
-  const facts: BookFacts = { chapters: 0, sections: 0, images: 0, citations: 0, footnotes: 0, tables: 0 };
+  const facts: BookFacts = { chapters: 0, sections: 0, images: 0, citations: 0, footnotes: 0, tables: 0, editorialParts: [] };
 
   const countBlocks = (blocks: BlockDTO[] | undefined): void => {
     for (const block of blocks ?? []) {
@@ -69,25 +77,45 @@ export function computeBookFacts(book: BookDTO): BookFacts {
     }
   };
 
-  const walk = (contents: ContentDTO[]): void => {
-    for (const content of contents) {
-      if (content.type === 'chapter') {
-        facts.chapters += 1;
-        countBlocks(content.content);
-        for (const section of content.sections ?? []) {
-          facts.sections += 1;
-          countBlocks(section.content);
-          for (const sub of section.subsections ?? []) {
-            facts.sections += 1;
-            countBlocks(sub.content);
-          }
-        }
-      } else {
-        facts.sections += 1;
-        countBlocks(content.content);
-      }
-    }
+  // An editorial part's own images/citations/footnotes/tables are still real content facts, so its
+  // blocks are counted deep — only its identity as a chapter/section is withheld.
+  const countBlocksDeep = (content: ContentDTO): void => {
+    countBlocks(content.content);
+    const children = content.type === 'chapter' ? content.sections : content.subsections;
+    for (const child of children ?? []) countBlocksDeep(child as ContentDTO);
   };
-  walk(book.mainContent);
+
+  // Classification is TOP-LEVEL only (MINI_DR_EDITORIAL_PARTS): a canonical title nested inside a
+  // chapter is ordinary content, only a top-level part is an editorial part. A recognised part is
+  // recorded and excluded from the chapter/section count — the miscount fix — but its blocks still
+  // count. Everything else keeps the exact previous logic.
+  for (const content of book.mainContent) {
+    const category = classifyEditorialTitle(content.title);
+    if (category) {
+      facts.editorialParts.push({
+        key: category.key,
+        label: category.label,
+        placement: category.placement,
+        detectedTitle: content.title,
+      });
+      countBlocksDeep(content);
+      continue;
+    }
+    if (content.type === 'chapter') {
+      facts.chapters += 1;
+      countBlocks(content.content);
+      for (const section of content.sections ?? []) {
+        facts.sections += 1;
+        countBlocks(section.content);
+        for (const sub of section.subsections ?? []) {
+          facts.sections += 1;
+          countBlocks(sub.content);
+        }
+      }
+    } else {
+      facts.sections += 1;
+      countBlocks(content.content);
+    }
+  }
   return facts;
 }
