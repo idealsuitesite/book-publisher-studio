@@ -11,6 +11,7 @@ import {
   exportProject,
 } from '@/lib/api-client';
 import { computeBookFacts, unstructuredFinding, proofRefreshKey } from '@/lib/bookFacts';
+import { shouldNudgeToProof, isBookRenderable, proofNudgeKey } from '@/lib/proofNudge';
 import { useStudio } from '@/components/studio/StudioContext';
 import { Explorer, buildExplorer, type StudioView } from '@/components/studio/Explorer';
 import { Inspector, inspectorRows } from '@/components/studio/Inspector';
@@ -59,6 +60,9 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
   const [measuredPages, setMeasuredPages] = useState<number | undefined>(undefined);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  // First-open Proof nudge (MINI_DR_LIVING_PROOF_NUDGE): resolved ONCE per mount, below. State (not a
+  // ref) so it can be adjusted during render — the blessed "adjust state while rendering" pattern.
+  const [nudgeResolved, setNudgeResolved] = useState(false);
 
   const setView = useCallback(
     (next: StudioView) => {
@@ -81,6 +85,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
           // resurrecting itself — drop its resume-where-left entry.
           try {
             localStorage.removeItem(viewStorageKey(id));
+            localStorage.removeItem(proofNudgeKey(id)); // tidy: a gone project keeps no nudge flag
           } catch {
             /* storage unavailable */
           }
@@ -173,6 +178,28 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
         <p className="animate-pulse text-sm text-app-text-muted">Opening project…</p>
       </div>
     );
+  }
+
+  // First-open Proof nudge (MINI_DR_LIVING_PROOF_NUDGE, Option B): resolved HERE — after the project
+  // has loaded (so its health is known) but still inside the "Opening project…" gate, before any
+  // station paints. Setting `view` during render makes React discard the would-be in-progress render
+  // and re-render with the Proof, so the FIRST station painted is already the Proof — never a
+  // dashboard-then-proof flash. Fires once per mount (the ref), at most once per project (the flag),
+  // never over a saved view, and never on an unhealthy book (which DEFERS, flag left unset). It sets
+  // `view` in memory only (not the resume-where-left key), so a second open resumes the author's own
+  // last navigation, not the Proof again.
+  if (!nudgeResolved) {
+    setNudgeResolved(true);
+    try {
+      const savedView = localStorage.getItem(viewStorageKey(id));
+      const alreadyNudged = Boolean(localStorage.getItem(proofNudgeKey(id)));
+      if (shouldNudgeToProof({ savedView, alreadyNudged, unstructured: !isBookRenderable(project) })) {
+        localStorage.setItem(proofNudgeKey(id), '1');
+        setViewState('proof');
+      }
+    } catch {
+      /* storage unavailable - the nudge is a comfort, not a contract */
+    }
   }
 
   const layoutLabel =
