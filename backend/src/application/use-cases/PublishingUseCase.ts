@@ -12,6 +12,7 @@ import type { Book } from '../../domain/models/Book';
 import type { PublishingReport } from '../../domain/models/PublishingReport';
 import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 import { resolveTheme } from '../../domain/themes/getTheme';
+import { orderByRole } from '../../domain/services/orderByRole';
 
 export interface PublishRequest {
   buffer: Buffer;
@@ -64,7 +65,9 @@ export class PublishingUseCase implements UseCase<PublishRequest, PublishingRepo
     // The publish tail applies the same per-project accent override as the export tail, through the
     // one shared resolveTheme seam (MINI_DR_PER_THEME_ACCENT) — publish and export stay identical.
     const theme = resolveTheme(themeName, accentOverride);
-    const styled = this.themeEngine.applyTheme(book, theme);
+    // Editorial-part placement (MINI_DR_EDITORIAL_PLACEMENT): same ordering as the export tail, so
+    // publish and export place front/back matter identically (ADR-0052).
+    const styled = this.themeEngine.applyTheme(orderByRole(book), theme);
     const typeset = this.typographyResolver.resolve(styled);
     const paginated = this.layoutEngine.paginate(typeset, pageLayout);
 

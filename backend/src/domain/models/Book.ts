@@ -105,6 +105,16 @@ export interface CopyrightPage {
 
 export type Content = Chapter | Section;
 
+/**
+ * Editorial placement of a top-level part (MINI_DR_EDITORIAL_PLACEMENT, §2b). A part tagged 'front'
+ * exports before chapter 1, 'back' after the last chapter; absent means ordinary main content.
+ * The tag is set only by an author action (Option C — never auto-inferred into the export). It is
+ * consumed at render time by `orderByRole` in the shared tail; the STORED order is unchanged.
+ * Positional only — a tagged part still renders as its own `Block[]`, never as structured
+ * bibliography/glossary/index entries (that boundary is out of scope, MINI_DR_EDITORIAL_PLACEMENT §2).
+ */
+export type PartRole = 'front' | 'back';
+
 export interface Chapter {
   type: 'chapter';
   id: string;
@@ -113,6 +123,7 @@ export interface Chapter {
   subtitle?: string;
   content: Block[];
   sections?: Section[];
+  role?: PartRole;
 
   // Print formatting
   openingPageStyle?: 'right' | 'left' | 'any';
@@ -129,6 +140,7 @@ export interface Section {
   title: string;
   content: Block[];
   subsections?: Section[];
+  role?: PartRole;
 
   // Hierarchy
   level: number; // 1-6 for h1-h6
