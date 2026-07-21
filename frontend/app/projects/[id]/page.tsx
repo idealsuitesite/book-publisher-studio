@@ -20,6 +20,7 @@ import { CommandPalette, type PaletteCommand } from '@/components/studio/Command
 import { StructureEditor } from '@/components/studio/StructureEditor';
 import { FormatSelector } from '@/components/FormatSelector';
 import { PreviewPanel } from '@/components/PreviewPanel';
+import { EditorialPartsPanel } from '@/components/EditorialPartsPanel';
 import { PublishDesk } from '@/components/studio/PublishDesk';
 import { Timeline } from '@/components/studio/Timeline';
 
@@ -250,18 +251,21 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
           />
         )}
         {view === 'proof' && (
-          <PreviewPanel
-            exporter={async () => {
-              const started = performance.now();
-              const blob = await exportProject(id, 'pdf');
-              setStudioFacts({ lastRenderMs: Math.round(performance.now() - started) });
-              return blob;
-            }}
-            settingsKey={settingsKey}
-            layoutLabel={layoutLabel}
-            themeLabel={themeLabel}
-            onPageCount={(pages) => setMeasuredPages(pages ?? undefined)}
-          />
+          <div className="flex flex-col gap-6">
+            <PreviewPanel
+              exporter={async () => {
+                const started = performance.now();
+                const blob = await exportProject(id, 'pdf');
+                setStudioFacts({ lastRenderMs: Math.round(performance.now() - started) });
+                return blob;
+              }}
+              settingsKey={settingsKey}
+              layoutLabel={layoutLabel}
+              themeLabel={themeLabel}
+              onPageCount={(pages) => setMeasuredPages(pages ?? undefined)}
+            />
+            <EditorialPartsPanel editorialParts={facts.editorialParts} />
+          </div>
         )}
         {view === 'editions' && (
           <PublishDesk
