@@ -94,6 +94,11 @@ export function computeBookFacts(book: BookDTO): BookFacts {
   // OR its title is canonical (the automatic suggestion this session established). Either way it is
   // recorded and excluded from the chapter/section count — but its blocks still count.
   for (const content of book.mainContent) {
+    // A part divider (PART_LEVEL_STRUCTURE) is never a chapter and never an editorial part — it
+    // groups the chapters that follow it. Excluded from every count BY TAG (authoritative), the
+    // same lesson as the editorial-parts miscount: "17 ch" must not come back as "Part I counted
+    // as a chapter". It carries no blocks, so skipping it deep-counts nothing either.
+    if (content.type === 'chapter' && content.partOpener) continue;
     const category = classifyEditorialTitle(content.title);
     const tagged = content.role; // 'front' | 'back' | undefined — set only by an author action
     if (tagged || category) {

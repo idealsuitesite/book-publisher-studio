@@ -12,6 +12,7 @@ import { PdfKitTextMeasurer } from '../../infrastructure/fonts/PdfKitTextMeasure
 import { InMemoryPaginationCache } from '../../infrastructure/cache/InMemoryPaginationCache';
 import { ManualLayoutSelector } from '../../domain/services/ManualLayoutSelector';
 import { ProjectService } from '../../domain/services/ProjectService';
+import { BookEditingService } from '../../domain/services/BookEditingService';
 import { buildTestDocxBuffer } from '../../test-utils/buildTestDocx';
 import type { Renderer, RenderResult, RenderContext } from '../../domain/ports/Renderer';
 import type { PaginatedBook } from '../../domain/models/PaginatedBook';
@@ -85,5 +86,27 @@ describe('ExportProjectUseCase pagination cache invalidation', () => {
     project = svc.updateSettings(project, { accentOverride: '#00AA00' }); // accent again on the settled state
     await useCase.execute(project.id, 'pdf'); // HIT
     expect(paginate).toHaveBeenCalledTimes(4);
+
+    // PART_LEVEL_STRUCTURE §3.6 (the CTO's named property): inserting/removing a part divider is
+    // a book edit -> a new content hash -> a MISS by construction; serving the part-less geometry
+    // after an insert would be exactly the silent-drift class the key-completeness rule guards.
+    const editing = new BookEditingService();
+    project = svc.replaceBook(project, editing.insertPartOpener(svc.currentBook(project), 0, 'Part I'));
+    await useCase.execute(project.id, 'pdf'); // MISS -> paginate #5
+    expect(paginate).toHaveBeenCalledTimes(5);
+
+    project = svc.updateSettings(project, { accentOverride: '#111111' }); // accent over the part-bearing book
+    await useCase.execute(project.id, 'pdf'); // HIT (openers cached like any geometry)
+    expect(paginate).toHaveBeenCalledTimes(5);
+
+    const openerId = svc.currentBook(project).mainContent[0].id;
+    project = svc.replaceBook(project, editing.removePartOpener(svc.currentBook(project), openerId));
+    await useCase.execute(project.id, 'pdf');
+    // A LEGITIMATE HIT, and the deeper §3.6 property: removing the opener restores the book to
+    // byte-identical pre-insert content, whose geometry is already cached — and serving it is
+    // CORRECT (same content -> same geometry). The content-hash key cannot confuse the two
+    // states because they ARE the same state; "invalidation" means never serving the WRONG
+    // geometry, which the insert-side miss above proves for the state that was genuinely new.
+    expect(paginate).toHaveBeenCalledTimes(5);
   });
 });
