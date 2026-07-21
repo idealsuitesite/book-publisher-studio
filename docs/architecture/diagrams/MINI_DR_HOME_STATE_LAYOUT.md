@@ -57,5 +57,9 @@ Either keeps import a first-class, visible action; the difference is whether dra
 
 **No code until these are locked.**
 
+## Implementation note (as-built)
+
+Shipped as one frontend commit, exactly as scoped (both sub-decisions locked: threshold 0 vs ≥1; import = a primary button → file picker, §2.2a). `UploadDropzone` gained a `variant="button"` reusing its file input + import→redirect; `app/page.tsx` branches on state (error/loading neutral first; empty → full dropzone; non-empty → library-first + the import button). Verified live on a 3-project library: the library grid leads, the import affordance is a real `<label>` wrapping the `.docx` file input (opens the picker directly, confirmed by JS, not just a visual capture), and the full dropzone is absent; the empty state is covered by jsdom (dropzone + "No projects yet", no import button). No new routes; Decision 1 held. Console showed only Next dev-server RSC-prefetch errors (server-restart artefacts, not this change). Merged to `main` (`0093bb5`); frontend 181/181, tsc + eslint clean.
+
 ## Related
 `HOME_SCREEN_SCOPE.md` (the measured scope — Option D chosen, no new routes), `HOME_WORKSPACE.md` Decision 1 (the deliberate Home-is-the-library decision Option D respects rather than reverses), `app/page.tsx` (the four sections re-weighted), `UploadDropzone.tsx` (the import→redirect logic reused behind the new affordance), `FIRST_SCREEN_ERROR.md` (a separate, already-closed first-screen concern — not this layout question).
