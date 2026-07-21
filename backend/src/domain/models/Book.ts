@@ -125,6 +125,19 @@ export interface Chapter {
   sections?: Section[];
   role?: PartRole;
 
+  /**
+   * Marks this chapter as a PART OPENER — a "Part I / Part II" divider page
+   * (PART_LEVEL_STRUCTURE, Shape B): a titled, blockless top-level entry grouping the chapters
+   * that FOLLOW it, by position — no `Part` node in the `Content` union (the `role?`/flat-TOC
+   * precedents; a walker that had to handle a third union case would recreate Shape A's cost by
+   * the back door). An opener never consumes a chapter number (`renumberChapters` skips it) and
+   * never counts as a chapter on any surface (`bookFacts`). Its page is charged by the
+   * `ownsBarePage` branch (LayoutEngine) and consumed as a planned break (PDFRenderer's
+   * startKey). Set only by an author action in the studio — nothing in a DOCX marks a Part, so
+   * there is no import detection (`HEURISTIC_STRUCTURE_DETECTION`'s closure).
+   */
+  partOpener?: true;
+
   // Print formatting
   openingPageStyle?: 'right' | 'left' | 'any';
   startPageNumber?: number;

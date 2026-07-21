@@ -155,6 +155,14 @@ export class BookEditingService {
     }
     const chapter = book.mainContent[index] as Chapter;
     const prev = book.mainContent[index - 1];
+    // A part opener is not a merge target (PART_LEVEL_STRUCTURE): pouring blocks into a divider
+    // would silently un-divider it (ownsBarePage requires blocklessness). Reachable only by
+    // reordering a chapter to sit directly after an opener; the author removes the opener first.
+    if (prev.type === 'chapter' && prev.partOpener) {
+      throw new ContentNotFoundError(
+        `mergeChapterIntoPrevious: chapter "${chapterId}" follows a part divider; remove the divider first`
+      );
+    }
     const titleBlock: Paragraph = { type: 'paragraph', id: this.idGenerator(), text: chapter.title };
 
     const mergedPrev: Content = {
@@ -171,12 +179,56 @@ export class BookEditingService {
     return { ...book, mainContent: this.renumberChapters(rebuilt, now) };
   }
 
+  /**
+   * Insert a PART OPENER (Part I / Part II divider, PART_LEVEL_STRUCTURE §3.4) at `index` in
+   * `mainContent` (0..length). A titled, blockless chapter flagged `partOpener: true` — its page
+   * is the divider; the chapters "in" the part are those that follow it, by position. Continuous
+   * numbering is untouched by construction (`renumberChapters` skips openers — the CTO-locked
+   * rule). Returns a new Book; throws on an empty title or an out-of-range index.
+   */
+  insertPartOpener(book: Book, index: number, title: string, now: Date = new Date()): Book {
+    const trimmed = title.trim();
+    if (!trimmed) throw new Error('Part title cannot be empty');
+    if (index < 0 || index > book.mainContent.length) {
+      throw new ContentNotFoundError(`insertPartOpener: index out of range (index=${index}, length=${book.mainContent.length})`);
+    }
+    const opener: Chapter = {
+      type: 'chapter',
+      id: this.idGenerator(),
+      number: 0, // openers never consume a chapter number; 0 is inert (never displayed, never renumbered)
+      title: trimmed,
+      content: [],
+      partOpener: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const rebuilt: Content[] = [...book.mainContent.slice(0, index), opener, ...book.mainContent.slice(index)];
+    return { ...book, mainContent: this.renumberChapters(rebuilt, now) };
+  }
+
+  /**
+   * Remove a part opener by id. Only an entry flagged `partOpener` may be removed this way — a
+   * real chapter is never deletable through this op (its content would vanish; openers carry
+   * none). The chapters that followed simply flow to the previous part — positional grouping
+   * makes removal non-destructive. Undo (version restore) covers regret, as everywhere else.
+   */
+  removePartOpener(book: Book, id: string, now: Date = new Date()): Book {
+    const index = book.mainContent.findIndex((c) => c.type === 'chapter' && c.partOpener === true && c.id === id);
+    if (index === -1) {
+      throw new ContentNotFoundError(`removePartOpener: no part opener with id "${id}"`);
+    }
+    const rebuilt: Content[] = [...book.mainContent.slice(0, index), ...book.mainContent.slice(index + 1)];
+    return { ...book, mainContent: this.renumberChapters(rebuilt, now) };
+  }
+
   /** Renumber top-level chapters 1..N in reading order; a chapter whose number changed advances its
-   * updatedAt. Sections carry through untouched. Shared by every op that changes chapter order/count. */
+   * updatedAt. Sections carry through untouched, and so do PART OPENERS (PART_LEVEL_STRUCTURE:
+   * a divider consumes no chapter number — "Chapter 5" stays "Chapter 5" whatever part it is in).
+   * Shared by every op that changes chapter order/count. */
   private renumberChapters(contents: Content[], now: Date): Content[] {
     let chapterNumber = 0;
     return contents.map((content): Content => {
-      if (content.type !== 'chapter') return content;
+      if (content.type !== 'chapter' || content.partOpener) return content;
       chapterNumber += 1;
       if (content.number === chapterNumber) return content;
       return { ...content, number: chapterNumber, updatedAt: now };
