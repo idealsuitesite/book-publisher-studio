@@ -413,22 +413,31 @@ function SortableChapterRow({
         </details>
       ) : null}
 
+      {/* SECTION_FOLDING (MINI_DR_SECTION_FOLDING, Option C): a chapter's sections fold behind a
+          per-chapter disclosure, COLLAPSED by default — the header (title + word count + controls)
+          stays visible, only the sub-section detail folds. Restores the pre-Phase-3 behaviour a
+          refactor dropped, so the panel's height is no longer proportional to the manuscript. */}
       {content.type === 'chapter' && content.sections && content.sections.length > 0 && (
-        <ul className="ml-6 mt-1.5 flex flex-col gap-1 border-l border-app-border pl-3">
-          {content.sections.map((section) => (
-            <li key={section.id} className="flex items-center justify-between gap-3 text-app-text-muted">
-              <EditableTitle
-                value={section.title || ''}
-                ariaLabel={section.title || 'Untitled section'}
-                disabled={disabled}
-                onCommit={(title) => onRename(section.id, title)}
-              />
-              <span className="shrink-0 text-xs tabular-nums text-app-text-muted">
-                {countContentWords(section).toLocaleString('en-US')} words
-              </span>
-            </li>
-          ))}
-        </ul>
+        <details className="ml-6 mt-1.5 border-l border-app-border pl-3">
+          <summary className="cursor-pointer select-none text-xs text-app-text-muted">
+            {content.sections.length} {content.sections.length === 1 ? 'section' : 'sections'}
+          </summary>
+          <ul className="mt-1 flex flex-col gap-1">
+            {content.sections.map((section) => (
+              <li key={section.id} className="flex items-center justify-between gap-3 text-app-text-muted">
+                <EditableTitle
+                  value={section.title || ''}
+                  ariaLabel={section.title || 'Untitled section'}
+                  disabled={disabled}
+                  onCommit={(title) => onRename(section.id, title)}
+                />
+                <span className="shrink-0 text-xs tabular-nums text-app-text-muted">
+                  {countContentWords(section).toLocaleString('en-US')} words
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </li>
   );
@@ -559,7 +568,10 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
         onDragEnd={onDragEnd}
       >
         <SortableContext items={items} strategy={verticalListSortingStrategy}>
-          <ul className="flex flex-col gap-1.5">
+          {/* Height-cap backstop (MINI_DR_SECTION_FOLDING §4): per-chapter collapse already bounds
+              the default height, but a section-dense book with many chapters expanded must still
+              never grow without bound — the D5 principle. dnd-kit auto-scrolls this container. */}
+          <ul className="flex max-h-[70vh] flex-col gap-1.5 overflow-y-auto pr-1">
             {book.mainContent.map((content, index) => (
               <SortableChapterRow
                 key={content.id}
