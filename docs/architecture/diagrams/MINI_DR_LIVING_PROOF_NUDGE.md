@@ -52,5 +52,15 @@ The guard's job is "will the Proof show a real book, not an empty/error page?". 
 
 **No code until these are locked.**
 
+## Implementation note (added at build time — the design above is unchanged; this records what the build settled)
+
+- **Extracted decision, exhaustively tested (`proofNudge.ts`):** `shouldNudgeToProof` is pure, so the two properties the CTO watches are unit-tested directly — a saved view always returns false (a second open resumes, never the Proof again), and an unhealthy first open returns false without the caller consuming the flag (defer). `isBookRenderable = !unstructuredFinding` (a missing ISBN, a WARNING, does NOT suppress the nudge).
+- **A lint rule forced a better implementation, not just conformance:** the first wiring read a `ref.current` during render (`react-hooks`: "Cannot access refs during render"). Converted to `useState` + `setNudgeResolved(true)` during render — the blessed *adjust-state-while-rendering* pattern — which is the *correct* form for a synchronous pre-paint decision, and makes the no-flash guarantee sturdier, not weaker. The unused `useRef` import was removed.
+- **No-flash — what is and is not proven (honest bound):** proven — the mechanism is React's documented adjust-state-while-rendering (the in-progress dashboard render is discarded before commit), and live the healthy first open landed **directly** on the Proof station. Not proven — a one-frame flash is not assertable at the pixel via browser automation; the no-flash rests on the mechanism + the landed station, stated as reasoning where it is reasoning.
+- **Verified live** on real fixtures: healthy first open → Proof; real 0-chapter `generated-unstyled-3060w.docx` → Overview with its actionable banner (defer), never an empty Proof; second open of the healthy project (no navigation) → Overview, **not** the Proof again; zero console errors.
+- **Tidiness in passing:** `FIRST_SCREEN_ERROR` recovery now clears `bps.proofNudged.<id>` alongside the view key for a gone project — behaviour-neutral, no scope widening.
+
+Merged to `main` (`20ca8ad`); frontend 172/172, backend 659/659, tsc + eslint clean.
+
 ## Related
 `LIVING_PROOF_VISIBILITY_SCOPE.md` (the measured scope — Option B), `FORMATTING_TOOLS_AUDIT.md` (the gap), ADR-0041 (the ~600ms render cost accepted in point 2), ADR-0049 / `CREATE_CHAPTER.md` (the `UNSTRUCTURED_MANUSCRIPT` state the health guard honours — the actionable banner the nudge must not replace), `STRUCTURE_EDITING_PHASE3.md` D5 (the persisted-bit discipline §6 mirrors), `bookFacts.ts` (`unstructuredFinding`, the health signal), `PreviewPanel.tsx` (the Proof the nudge lands on; its own RENDER_FAILED degradation).
