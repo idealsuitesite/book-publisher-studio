@@ -191,4 +191,39 @@ describe('POST /api/projects/:id/structure — manual structure editing (STRUCTU
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('CONTENT_NOT_FOUND');
   });
+
+  // CREATE_CHAPTER.md — the generic route carries the new create mutations end to end.
+  it('promoteToChapter: turns a paragraph into a new chapter, 200 + snapshot', async () => {
+    const app = createApp();
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Alpha.', 'Beta.', 'Gamma.'] });
+    const imported = await request(app)
+      .post('/api/manuscripts/import')
+      .attach('file', buffer, { filename: 'b.docx', contentType: DOCX_MIME });
+    const id = imported.body.projectId as string;
+
+    const got = await request(app).get(`/api/projects/${id}`);
+    // The 2nd block in the chapter's own content — promoting it splits the chapter.
+    const blockId = got.body.book.mainContent[0].content[1].id as string;
+
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'promoteToChapter', blockId });
+
+    expect(res.status).toBe(200);
+    const chapters = res.body.book.mainContent.filter((c: { type: string }) => c.type === 'chapter');
+    expect(chapters.length).toBe(2); // the original chapter + the promoted one
+    expect(res.body.versions).toHaveLength(1); // snapshot-before-edit
+  });
+
+  it('400 INVALID_MUTATION on a promoteToChapter with no blockId', async () => {
+    const { app, id } = await seedProject();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'promoteToChapter' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_MUTATION');
+  });
+
+  it('400 CONTENT_NOT_FOUND on promoteToChapter with an unknown blockId', async () => {
+    const { app, id } = await seedProject();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'promoteToChapter', blockId: 'ghost' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('CONTENT_NOT_FOUND');
+  });
 });

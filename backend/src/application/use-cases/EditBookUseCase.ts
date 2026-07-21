@@ -51,6 +51,16 @@ export class EditBookUseCase {
         const book = this.editingService.rename(this.projectService.currentBook(project), mutation.id, mutation.title);
         return this.projectService.replaceBook(snapped, book);
       }
+      case 'promoteToChapter': {
+        const snapped = this.projectService.snapshot(project, 'before promote to chapter');
+        const book = this.editingService.promoteToChapter(this.projectService.currentBook(project), mutation.blockId);
+        return this.projectService.replaceBook(snapped, book);
+      }
+      case 'mergeChapterIntoPrevious': {
+        const snapped = this.projectService.snapshot(project, 'before merge chapter');
+        const book = this.editingService.mergeChapterIntoPrevious(this.projectService.currentBook(project), mutation.chapterId);
+        return this.projectService.replaceBook(snapped, book);
+      }
       case 'restoreVersion':
         // Undo: no new snapshot — restoreVersion sets book+settings from the version and keeps the
         // whole log (nothing after it is deleted). ProjectService owns that invariant.

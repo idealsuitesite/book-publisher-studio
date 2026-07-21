@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ProjectDTO } from 'shared-types';
-import { StructureEditor, applyReorder, applyRename, applyUndo } from './StructureEditor';
+import { StructureEditor, applyReorder, applyRename, applyUndo, applyPromote, applyMerge } from './StructureEditor';
 import { editStructure } from '@/lib/api-client';
 import type { editStructure as editStructureFn } from '@/lib/api-client';
 
@@ -218,5 +218,88 @@ describe('undo UX (Phase 3 commit 6)', () => {
     await user.click(undo);
 
     expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'restoreVersion', versionId: 'v9' });
+  });
+});
+
+// ── CREATE_CHAPTER.md commit 3: the block-aware view ─────────────────────────────────────────────
+function unstructuredProject(): ProjectDTO {
+  return {
+    id: 'p1',
+    name: 'Blob',
+    book: {
+      metadata: { title: 'Blob', author: 'A' },
+      mainContent: [
+        {
+          id: 'sec',
+          type: 'section',
+          title: '',
+          level: 1,
+          content: [
+            { type: 'paragraph', id: 'p1blk', text: 'The first paragraph of an unstructured manuscript.' },
+            { type: 'paragraph', id: 'p2blk', text: 'The second paragraph, a natural chapter start.' },
+          ],
+        },
+      ],
+    },
+    report: { issues: [{ code: 'UNSTRUCTURED_MANUSCRIPT', severity: 'ERROR', message: 'No chapters', suggestion: 'Apply Heading 1' }] },
+    versions: [],
+    publications: [],
+    settings: { layoutName: 'letter', themeName: 'classic' },
+    updatedAt: '2026-07-21T00:00:00.000Z',
+  } as unknown as ProjectDTO;
+}
+
+describe('applyPromote / applyMerge (create handlers — commit 3)', () => {
+  it('applyPromote calls promoteToChapter and applies the result', async () => {
+    const editStructure = vi.fn().mockResolvedValue({ id: 'p1' }) as unknown as typeof editStructureFn;
+    const onEdited = vi.fn();
+    const onError = vi.fn();
+    await applyPromote('p1', 'p2blk', { editStructure, onEdited, onError });
+    expect(editStructure).toHaveBeenCalledWith('p1', { type: 'promoteToChapter', blockId: 'p2blk' });
+    expect(onEdited).toHaveBeenCalledWith({ id: 'p1' });
+  });
+
+  it('applyMerge calls mergeChapterIntoPrevious; surfaces an error without applying on failure', async () => {
+    const ok = vi.fn().mockResolvedValue({ id: 'p1' }) as unknown as typeof editStructureFn;
+    const onEdited = vi.fn();
+    await applyMerge('p1', 'c2', { editStructure: ok, onEdited, onError: vi.fn() });
+    expect(ok).toHaveBeenCalledWith('p1', { type: 'mergeChapterIntoPrevious', chapterId: 'c2' });
+
+    const bad = vi.fn().mockRejectedValue(new Error('down')) as unknown as typeof editStructureFn;
+    const onErr = vi.fn();
+    const onEd = vi.fn();
+    await applyMerge('p1', 'c2', { editStructure: bad, onEdited: onEd, onError: onErr });
+    expect(onErr).toHaveBeenCalledTimes(1);
+    expect(onEd).not.toHaveBeenCalled();
+  });
+});
+
+describe('block-aware UX — the founder\'s gap (commit 3)', () => {
+  it('an unstructured container shows its paragraphs with "Make this a chapter"; clicking promotes', async () => {
+    const user = userEvent.setup();
+    vi.mocked(editStructure).mockResolvedValue(unstructuredProject());
+    render(<StructureEditor project={unstructuredProject()} onEdited={() => {}} />);
+
+    // The paragraphs are visible (truncated previews) — the author can act without going to Word.
+    expect(screen.getByText(/The second paragraph/)).toBeInTheDocument();
+    const promoteButtons = screen.getAllByRole('button', { name: 'Make this a chapter' });
+    expect(promoteButtons).toHaveLength(2);
+
+    await user.click(promoteButtons[1]); // promote the 2nd paragraph
+
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'promoteToChapter', blockId: 'p2blk' });
+  });
+
+  it('a non-first chapter offers "Merge back"; clicking merges it', async () => {
+    const user = userEvent.setup();
+    vi.mocked(editStructure).mockResolvedValue(project());
+    render(<StructureEditor project={project()} onEdited={() => {}} />);
+
+    const mergeButtons = screen.getAllByRole('button', { name: 'Merge back' });
+    // Only the 2nd chapter (index 1) can merge; the first cannot (§9.1).
+    expect(mergeButtons).toHaveLength(1);
+
+    await user.click(mergeButtons[0]);
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'mergeChapterIntoPrevious', chapterId: 'c2' });
   });
 });
