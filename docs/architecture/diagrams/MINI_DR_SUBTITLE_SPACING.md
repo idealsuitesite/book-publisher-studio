@@ -113,5 +113,17 @@ Changing every title's height moves page counts on the corpus. This is expected 
 
 **No code until these are locked.**
 
+## Implementation note (added at build time — the design above is unchanged; this records what the build discovered)
+
+Two facts the paper design did not predict, both measured and now on record:
+
+1. **An empty-title guard was required, and it fixed a latent drift.** `titleHeightOf` already returns 0 for an empty title (`if (!content.title) return 0`), but `renderTitle` did not guard it — the old `moveDown()` (and, unfixed, the new flat pair) spent title spacing for an **untitled preamble Section** that the model charged at zero. This pre-existing asymmetry was widened by the flat pair (10pt → 26pt), so `renderTitle` gained `if (!content.title) return;` to match the model. `faith-alone` contains exactly one such untitled section, and that uncharged spacing was itself **producing one of the "2 disclosed reconciliations."** Closing it removed that reconciliation.
+
+2. **The parity re-lock is 2 → 1, not "stays 2."** §5 predicted the contract number would hold at 2 and forbade it *rising*; measured, it **improved to 1** on Classic (kdp-5x8) and on Modern (letter), because of finding 1. It never rose. Final locked numbers:
+   - **Classic kdp-5x8:** pageCount 238 (unchanged vs pre-chantier), model pages 235, **unplannedPageBreaks 2 → 1**. (The title-spacing change alone gave 239/235/2; the empty-title guard then took rendered 239 → 238 and reconciliations 2 → 1.)
+   - **Modern letter:** 90 → 88, reconciliations **2 → 1**. **Modern kdp-6x9:** 158 (unchanged), reconciliations **stay 2** (there the untitled section's spacing did not straddle a page break).
+
+Everything else in the design held: flat lock-step spend/charge, near-neutral page shift, PDF-only, one pair for all levels, the chapter-opening sink applied uniformly.
+
 ## Related
 `SUBTITLE_SPACING_SCOPE.md` (the measured scope this implements) · `RENDER_DRIFT.md` / ADR-0051 (the charged==consumed contract; the `moveDown → flat` fix titles never received) · ADR-0052 (*R2 verifies charged equals consumed, not that consumed is correct* — the lineage) · ADR-0031/0032 (why real imports produce titles, not heading blocks) · `MINI_DR_DROPCAP_OVERLAP.md` (the analogous PDFRenderer+LayoutEngine lock-step fix with a deliberate parity re-lock; the cross-format-convergence-deferral precedent) · `ThemeEngine.resolveBlockStyle` (the symmetric `headingSpacing` titles don't get).

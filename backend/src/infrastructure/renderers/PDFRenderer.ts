@@ -518,6 +518,11 @@ export class PDFRenderer implements Renderer<Buffer> {
   }
 
   private renderTitle(doc: PDFKit.PDFDocument, content: Chapter | Section, theme: Theme): void {
+    // An empty title (e.g. an untitled preamble Section, ADR-0020 addendum) draws nothing and,
+    // crucially, spends NO spacing -- matching LayoutEngine.titleHeightOf's `if (!title) return 0`,
+    // so charged == consumed holds for empty titles too (MINI_DR_SUBTITLE_SPACING). Without this,
+    // the flat title spacing below would be consumed while the model charged zero -> drift.
+    if (!content.title) return;
     (doc as unknown as { __currentBlockId?: string }).__currentBlockId = `title "${content.title.slice(0, 40)}"`;
     const level = content.type === 'chapter' ? 1 : content.level;
     const size = content.type === 'chapter' ? 24 : Math.max(12, 22 - content.level * 2);
@@ -530,8 +535,16 @@ export class PDFRenderer implements Renderer<Buffer> {
     // DOCX already resolved it through buildHeadingStyles, EPUB inherits it from CSS. The other
     // hardcoded colours here (running heads, title page, copyright) are front matter and chrome,
     // a different surface, deliberately untouched — see MINI_DR_ACCENT_COLORS.md §1.
+    // Title spacing is a theme value, spent flat in lock-step with LayoutEngine.titleHeightOf
+    // (MINI_DR_SUBTITLE_SPACING). Was: no space before + a size-scaled doc.moveDown() after --
+    // below-only and backwards from convention. Now: titleSpaceBefore above, titleSpaceAfter below
+    // (above > below), so the title binds to the text it introduces. Both terms are flat points
+    // (theme-owned, size-independent) and both are charged by titleHeightOf, so charged == consumed
+    // (ADR-0051) holds by construction. The preceding block's paragraphSpacing still bleeds down,
+    // so the visible gap above is (paragraphSpacing + titleSpaceBefore); values account for it.
+    this.spendSpaceAfter(doc, theme.spacing.titleSpaceBefore);
     doc.font(this.fonts.resolveHeading(level, theme, true, false)).fontSize(size).fillColor(theme.colors.accent).text(content.title);
-    doc.moveDown();
+    this.spendSpaceAfter(doc, theme.spacing.titleSpaceAfter);
   }
 
   private renderBlock(

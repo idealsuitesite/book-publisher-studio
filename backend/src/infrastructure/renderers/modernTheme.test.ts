@@ -51,9 +51,15 @@ describe('Modern theme — parity lock + tri-format accent/fonts (real corpus)',
   });
 
   it('R2 parity — Modern on faith-alone holds its own charged==consumed numbers', async () => {
+    // Re-locked CONSCIOUSLY for MINI_DR_SUBTITLE_SPACING: renderTitle now spends flat
+    // titleSpaceBefore/titleSpaceAfter (Modern 14/6) in lock-step with titleHeightOf, and skips
+    // spacing for empty titles. On Modern the corpus counts shift (letter 90 -> 88); reconciliations
+    // drop letter 2 -> 1 (the empty-title guard closed a latent drift whose reconciliation happened
+    // to fall on a letter page boundary) but stay 2 on kdp-6x9 (there the untitled section's spacing
+    // did not straddle a page break, so no reconciliation was riding on it). Both remain <= 2.
     const letter = await new PDFRenderer().render(paginate('modern', LetterPageLayout), { language: 'en' });
-    expect(letter.metrics.pageCount).toBe(90);
-    expect(letter.metrics.unplannedPageBreaks).toBe(2); // bounded, exactly like Classic
+    expect(letter.metrics.pageCount).toBe(88);
+    expect(letter.metrics.unplannedPageBreaks).toBe(1);
 
     const kdp = await new PDFRenderer().render(paginate('modern', KDP6x9PageLayout), { language: 'en' });
     expect(kdp.metrics.pageCount).toBe(158); // Modern's own number (Classic is 159 — tighter heading spacing)
