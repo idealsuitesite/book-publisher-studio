@@ -1,6 +1,6 @@
 # Create / Split a Chapter — Level-2 Design Review (round 1, OPENED)
 
-**Status:** 🟡 ROUND 1 — OPENED, awaiting CTO review. **No code, no branch** (two-gate discipline; this document is the deliverable). Opened on the CTO's feu vert after the `CREATE_CHAPTER_SCOPE.md` report, with the scope constraint below **already locked by the CTO** — this review answers *how*, never *whether*.
+**Status:** ✅ APPROVED (CTO 2026-07-21, round 1 — all three §9 questions resolved, full feu vert for the §7 commit plan). **Implementation authorized**; scope locked (below). Locked answers: **§9.1** merge at `mainContent[0]` is **disallowed** (throws; version-undo is the clean exit — no extra model path for a rare case); **§9.2** block rows appear **only in the unstructured container, expand-on-demand elsewhere** (stays strictly on the measured 0-chapter case); **§9.3** an empty leading remainder after promoting a first block is **dropped** (no phantom untitled section for the author to manage). **CTO addition (verify at commit 2):** the promote→merge **round-trip identity test must run on `faith-alone` too**, not only the 0-chapter fixtures — proving merge stays correct in a book that already has chapters (a non-degenerate, multi-container context), before an author with a partially-structured book relies on it. Report at each green commit; **commit 5 (live 0-chapter verification in the studio) is the load-bearing proof** — that the founder can rebuild a book without Word.
 **Date:** 2026-07-21, grounded in real code on `main` (`3dd6b8f`) and the live 0-chapter measurement in `CREATE_CHAPTER_SCOPE.md`.
 **Parent:** `STRUCTURE_EDITING.md` (Level-1). This is the *create* half its §1 named; Phase 3 (`STRUCTURE_EDITING_PHASE3.md`) shipped the *organize* half. Extends Phase 3's `StructureEditor`, `EditBookUseCase`, `StructureMutation`, `POST /:id/structure` — does not rebuild them.
 
@@ -53,7 +53,7 @@ Let a non-technical author **carve chapters, by hand, out of a manuscript the im
 ## 7. Commit plan (post-approval; one responsibility each, green gate between)
 
 1. **`shared-types`**: the two `StructureMutation` variants; backend imports them (no behaviour change).
-2. **Domain `promoteToChapter` + `mergeChapterIntoPrevious`** — pure ops, property-tested on the real 0-chapter fixtures incl. the promote→merge round-trip identity. No routes/UI.
+2. **Domain `promoteToChapter` + `mergeChapterIntoPrevious`** — pure ops, property-tested on the real 0-chapter fixtures **and on `faith-alone`** (CTO: the promote→merge round-trip identity must hold in an already-chaptered, multi-container book, not only the degenerate single-container case). No routes/UI.
 3. **`EditBookUseCase` dispatch + route validation** — snapshot/undo free; route integration tests (200 + snapshot, 400 on bad id).
 4. **`StructureEditor` block-aware view (D5)** — block rows in the unstructured container, truncated + height-capped, "Make this a chapter" + "Merge back"; handler unit-tested; the button interaction UX tested with **real user events in jsdom** (no drag → no Playwright needed for the gesture, unlike Phase 3).
 5. **Real-fixture verification + docs/ADR reconciliation** — in the running studio: import a 0-chapter manuscript, promote several paragraphs into chapters, confirm the structure rebuilds, the ADR-0049 banner clears, export reflects the new chapters, and merge/undo restores. Reconcile `STRUCTURE_EDITING.md` / `CREATE_CHAPTER_SCOPE.md` / `CURRENT_STATE` / `TODO`; ADR if warranted.
@@ -62,16 +62,18 @@ Let a non-technical author **carve chapters, by hand, out of a manuscript the im
 
 - Importing a real 0-chapter manuscript then promoting three paragraphs yields **three real chapters** (numbered 1–3) with the intervening content as their bodies; the leading remainder stays an untitled section (or is dropped if empty).
 - The **ADR-0049 "0 chapters — needs review" banner disappears** once a chapter exists (validation recomputes read-only).
-- **"Merge back" is the exact inverse** — promote then merge returns the original book (property test) — and version-undo also restores.
+- **"Merge back" is the exact inverse** — promote then merge returns the original book (property test **on the 0-chapter fixtures AND on `faith-alone`**) — and version-undo also restores.
 - Re-export reflects the new chapters; the page count re-derives through the unchanged pipeline (no parity change).
 - The editor holds the studio at **0 axe nodes**; the block list never makes the panel's height proportional to manuscript size (D5).
 - No backend rendering test changes value (no R2 impact); backend + frontend suites stay green.
 
-## 9. Open questions for the CTO (round 1)
+## 9. Open questions — RESOLVED (CTO 2026-07-21)
 
-1. **D2** — merge at `mainContent[0]` (no previous container): disallow (recommended) or convert to an untitled section?
-2. **D5** — is "block rows only in the unstructured container, expand-on-demand elsewhere" the right default, or should promote be available inside every chapter from the start (heavier UX)?
-3. **Risk 3** — promoting a container's first block may leave an empty leading remainder: drop it (recommended) or keep an empty untitled section?
+1. **D2** — merge at `mainContent[0]`: ✅ **disallow** (throws; version-undo is the clean exit — no extra model path for a rare case).
+2. **D5** — ✅ **block rows only in the unstructured container, expand-on-demand elsewhere** (stays on the measured 0-chapter case; making promote available everywhere would widen the surface past the locked scope).
+3. **Risk 3** — empty leading remainder: ✅ **drop it** (no phantom untitled section; consistent with "editing must be obvious").
+
+**Plus (CTO): the round-trip identity test runs on `faith-alone` too**, not only the 0-chapter fixtures — see §7 commit 2 and §8.
 
 ## Related
 `CREATE_CHAPTER_SCOPE.md` (the scope report + the locked constraint), `STRUCTURE_EDITING.md` (Level-1 parent — the create half), `STRUCTURE_EDITING_PHASE3.md` (the organize half; the `StructureEditor`/`EditBookUseCase`/`StructureMutation` this extends; D6 server-authoritative), ADR-0049 (the UNSTRUCTURED_MANUSCRIPT finding this lets the author resolve), ADR-0001 (immutable `Book`), ADR-0051 (the R2 contract this leaves untouched), `EXPLORER_PARITY.md`/`IMPORT_FIDELITY.md` ("manual structure correction post-import" demandeur).
