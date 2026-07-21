@@ -125,9 +125,23 @@ export class ProjectsController {
         return;
       }
       const body = req.body as UpdateProjectSettingsDTO;
-      const patch: Partial<{ layoutName: string; themeName: string }> = {};
+      const patch: Partial<{ layoutName: string; themeName: string; accentOverride: string | undefined }> = {};
       if (typeof body.layoutName === 'string' && body.layoutName) patch.layoutName = body.layoutName;
       if (typeof body.themeName === 'string' && body.themeName) patch.themeName = body.themeName;
+      // Accent override (MINI_DR_PER_THEME_ACCENT): a hex string SETS it, null/'' CLEARS it, omitted
+      // leaves it. Only a FORMAT guard here (a valid hex) — the printability/contrast guard is a
+      // deliberately deferred, named gap (TODO.md `ACCENT_CONTRAST_UNGUARDED`), since the author sees
+      // the shade live in the Proof and fixes a too-light choice themselves.
+      if (body.accentOverride !== undefined) {
+        if (body.accentOverride === null || body.accentOverride === '') {
+          patch.accentOverride = undefined;
+        } else if (typeof body.accentOverride === 'string' && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(body.accentOverride)) {
+          patch.accentOverride = body.accentOverride;
+        } else {
+          res.status(400).json({ error: 'accentOverride must be a hex colour like #1D4E68', code: 'INVALID_SETTINGS' });
+          return;
+        }
+      }
 
       const updated = this.projectService.updateSettings(project, patch);
       await this.repository.save(updated);

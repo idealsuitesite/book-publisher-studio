@@ -92,6 +92,33 @@ describe('GET /api/projects', () => {
     expect(reread.body.settings.layoutName).toBe('kdp-6x9');
   });
 
+  it('sets, persists and clears a per-project accent override; rejects a non-hex (MINI_DR_PER_THEME_ACCENT)', async () => {
+    const app = createApp();
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });
+    const imported = await request(app)
+      .post('/api/manuscripts/import')
+      .attach('file', buffer, { filename: 'g.docx', contentType: DOCX_MIME });
+    const id = imported.body.projectId;
+
+    // Set: a valid hex is stored and returned.
+    const set = await request(app).patch(`/api/projects/${id}/settings`).send({ accentOverride: '#1D4E68' });
+    expect(set.status).toBe(200);
+    expect(set.body.settings.accentOverride).toBe('#1D4E68');
+    expect((await request(app).get(`/api/projects/${id}`)).body.settings.accentOverride).toBe('#1D4E68');
+
+    // Reject: a non-hex value is a 400 and does not change the stored override.
+    const bad = await request(app).patch(`/api/projects/${id}/settings`).send({ accentOverride: 'blue' });
+    expect(bad.status).toBe(400);
+    expect(bad.body.code).toBe('INVALID_SETTINGS');
+    expect((await request(app).get(`/api/projects/${id}`)).body.settings.accentOverride).toBe('#1D4E68');
+
+    // Clear: null removes it.
+    const cleared = await request(app).patch(`/api/projects/${id}/settings`).send({ accentOverride: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.settings.accentOverride).toBeUndefined();
+    expect((await request(app).get(`/api/projects/${id}`)).body.settings.accentOverride).toBeUndefined();
+  });
+
   it('exports from the STORED source - no re-upload, the whole point of Decision 6', async () => {
     const app = createApp();
     const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });

@@ -5,7 +5,7 @@ import { ThemeEngine } from '../../domain/services/ThemeEngine';
 import { TypographyResolver } from '../../domain/services/TypographyResolver';
 import { LayoutEngine } from '../../domain/services/LayoutEngine';
 import { PdfKitTextMeasurer } from '../fonts/PdfKitTextMeasurer';
-import { getTheme } from '../../domain/themes/getTheme';
+import { getTheme, resolveTheme } from '../../domain/themes/getTheme';
 import { LetterPageLayout } from '../../domain/layouts/LetterPageLayout';
 import { PDFRenderer } from './PDFRenderer';
 import { DOCXRenderer } from './DOCXRenderer';
@@ -137,5 +137,18 @@ describe('accent colours — tri-format (Phase 3 capability 1, ADR-0050)', () =>
   it('Classic stays visually stable: its accent IS its text colour', () => {
     const classic = getTheme('classic');
     expect(classic.colors.accent).toBe(classic.colors.text);
+  });
+
+  // MINI_DR_PER_THEME_ACCENT: the real override function, on real output. Classic's own accent is
+  // invisible black, so a visible override reaching the PDF proves the whole chain works, and the
+  // page count staying put proves the override is colour-only (R2-free), not geometry.
+  it('a per-project accent override (resolveTheme) recolours Classic and moves no pages (R2-free)', async () => {
+    const overridden = resolveTheme('classic', ACCENT);
+    expect(paginateWith(overridden).pages.length).toBe(paginateWith(getTheme('classic')).pages.length);
+
+    const pdf = inflateContentStreams((await new PDFRenderer().render(paginateWith(overridden), { language: 'en' })).output);
+    const expected = [0x1d / 255, 0x4e / 255, 0x68 / 255];
+    const operators = [...pdf.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) (?:rg|sc|scn)\b/g)].map((m) => [m[1], m[2], m[3]].map(Number));
+    expect(operators.some((rgb) => rgb.every((v, i) => Math.abs(v - expected[i]) < 0.002))).toBe(true);
   });
 });

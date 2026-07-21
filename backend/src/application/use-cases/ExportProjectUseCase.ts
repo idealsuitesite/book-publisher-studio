@@ -46,7 +46,8 @@ export class ExportProjectUseCase {
     return this.exporters[format].renderBook(
       this.projectService.currentBook(project),
       project.settings.themeName,
-      pageLayout
+      pageLayout,
+      project.settings.accentOverride
     );
   }
 }

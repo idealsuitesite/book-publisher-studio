@@ -96,6 +96,13 @@ export interface ProjectSettings {
    * renamed or corrected preset reaches existing projects rather than freezing at import time. */
   layoutName: string;
   themeName: string;
+  /**
+   * Optional per-project accent colour (hex) that overrides the chosen theme's `colors.accent`
+   * (MINI_DR_PER_THEME_ACCENT). Colour-only — it re-colours headings/titles and moves no geometry,
+   * so it is R2-free. Absent means "use the theme's own accent"; present replaces it for ANY theme,
+   * including Classic (an explicit author choice, not an error to prevent).
+   */
+  accentOverride?: string;
 }
 
 /**
