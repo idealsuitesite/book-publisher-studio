@@ -13,6 +13,7 @@ export class SectionMapper {
       level: section.level,
       content: section.content.map((block) => this.blockMapper.map(block)),
       subsections: section.subsections?.map((subsection) => this.map(subsection)),
+      role: section.role,
     };
   }
 }

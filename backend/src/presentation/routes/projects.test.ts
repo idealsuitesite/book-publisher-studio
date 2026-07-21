@@ -253,4 +253,25 @@ describe('POST /api/projects/:id/structure — manual structure editing (STRUCTU
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('CONTENT_NOT_FOUND');
   });
+
+  // MINI_DR_EDITORIAL_PLACEMENT — the generic route must carry setPartRole through parseMutation
+  // (the untrusted-body boundary). This closes the gap that shipped a 400 in live testing: the
+  // dispatch was wired but the route validator did not whitelist the new variant.
+  it('setPartRole: tags a top-level part front, 200 + role persisted + snapshot', async () => {
+    const { app, id } = await seedProject();
+    const got = await request(app).get(`/api/projects/${id}`);
+    const partId = got.body.book.mainContent[0].id as string;
+
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'setPartRole', id: partId, role: 'front' });
+    expect(res.status).toBe(200);
+    expect(res.body.book.mainContent[0].role).toBe('front');
+    expect(res.body.versions).toHaveLength(1); // snapshot-before-edit
+  });
+
+  it('400 INVALID_MUTATION on a setPartRole with an unrecognised role', async () => {
+    const { app, id } = await seedProject();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'setPartRole', id: 'c1', role: 'sideways' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_MUTATION');
+  });
 });
