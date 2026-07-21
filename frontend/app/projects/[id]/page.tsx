@@ -193,7 +193,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
     { id: 'home', label: 'Back to the studio', run: () => router.push('/') },
   ];
 
-  async function changeSettings(patch: { layoutName?: string; themeName?: string }) {
+  async function changeSettings(patch: { layoutName?: string; themeName?: string; accentOverride?: string | null }) {
     try {
       setSettingsError(null);
       await updateProjectSettings(id, patch);
@@ -246,8 +246,10 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
             options={options}
             selectedLayout={project.settings.layoutName}
             selectedTheme={project.settings.themeName}
+            selectedAccent={project.settings.accentOverride}
             onLayoutChange={(layoutName) => void changeSettings({ layoutName })}
             onThemeChange={(themeName) => void changeSettings({ themeName })}
+            onAccentChange={(accentOverride) => void changeSettings({ accentOverride })}
           />
         )}
         {view === 'proof' && (

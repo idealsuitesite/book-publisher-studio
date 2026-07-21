@@ -75,4 +75,14 @@ describe('proofRefreshKey — what makes the living Proof re-ink (Phase 3 D5)', 
     const after = proofRefreshKey(project({ updatedAt: '2026-07-21T10:05:00.000Z' }));
     expect(after).not.toBe(before);
   });
+
+  it('changes when the accent override changes — even with the SAME updatedAt (MINI_DR_PER_THEME_ACCENT, D5)', () => {
+    // The key must re-ink on the accent's OWN signal, not rely on updatedAt as a proxy — else a
+    // shade change could leave the Proof silently stale, the exact D5 risk.
+    const plain = proofRefreshKey(project({ settings: { layoutName: 'letter', themeName: 'classic' } }));
+    const accented = proofRefreshKey(
+      project({ settings: { layoutName: 'letter', themeName: 'classic', accentOverride: '#1D4E68' } })
+    );
+    expect(accented).not.toBe(plain);
+  });
 });

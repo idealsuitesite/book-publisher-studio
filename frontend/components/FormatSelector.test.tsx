@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ManuscriptOptionsDTO } from 'shared-types';
 import { FormatSelector } from './FormatSelector';
@@ -20,6 +20,7 @@ function setup(overrides: Partial<React.ComponentProps<typeof FormatSelector>> =
     selectedTheme: 'classic',
     onLayoutChange: vi.fn(),
     onThemeChange: vi.fn(),
+    onAccentChange: vi.fn(),
     ...overrides,
   };
   render(<FormatSelector {...props} />);
@@ -84,5 +85,25 @@ describe('FormatSelector', () => {
   it('survives an options payload with no layouts without crashing', () => {
     setup({ options: { themes: options.themes, layouts: [] } });
     expect(screen.getByText('Classic')).toBeInTheDocument();
+  });
+
+  // MINI_DR_PER_THEME_ACCENT: the accent picker reports the chosen colour to the parent (PATCH),
+  // never holds state itself — same discipline as the layout/theme controls above.
+  it('reports an accent change to the parent', () => {
+    const { onAccentChange } = setup();
+    fireEvent.change(screen.getByLabelText('Accent colour'), { target: { value: '#1d4e68' } });
+    expect(onAccentChange).toHaveBeenCalledWith('#1d4e68');
+  });
+
+  it('shows no reset control when there is no override (nothing to clear)', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: /reset to theme default/i })).toBeNull();
+  });
+
+  it('clears the override via the reset control, reporting null', async () => {
+    const user = userEvent.setup();
+    const { onAccentChange } = setup({ selectedAccent: '#1D4E68' });
+    await user.click(screen.getByRole('button', { name: /reset to theme default/i }));
+    expect(onAccentChange).toHaveBeenCalledWith(null);
   });
 });
