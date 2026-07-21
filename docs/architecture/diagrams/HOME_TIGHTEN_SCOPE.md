@@ -44,6 +44,17 @@ The backend already provides everything Point B needs (§0.1); both points are f
 
 ---
 
+## Implementation note (added at build time — A + B1 as CTO-approved; this records what the build settled)
+
+Built on `feature/home-tighten`, two commits, frontend-only, gate green at each (frontend 188 → **196**, tsc + eslint clean; backend untouched).
+
+- **Commit 1 (`d30dd0a`) — Point A.** The two subtitles as proposed, split intact (promise at first contact, task on return); jsdom asserts both states **and that the pitch is absent on the returning screen** (the anti-wallpaper property, tested not hoped).
+- **Commit 2 (`e840c7e`) — Point B1.** The hero card (recency line via `lib/recency.ts` — "Worked on…" wording matching the §0.2 honesty; name; book · author; versions; **Continue → in the import button's own visual language** so the screen has one consistent primary grammar); the rest of the library under "All projects" in the unchanged compact grid; **the single-project case renders no grid and no duplicate** (jsdom-pinned). `recencyLabel` unit-tested incl. the calendar-boundary "yesterday" (a date boundary, not a 24h window) and the unparseable-stamp guard.
+- **Verified LIVE across the full arc on a real library (post-cleanup, no fixtures):** empty state shows the promise + dropzone-as-screen; **1 real book** (faith-alone) → the hero IS the library, no "All projects", no duplicate; **3 real books** (+ art-of-captivating, pm-notes) → hero = last imported, the other two in the grid, stats "3 books"; **then an edit on the *oldest* project (a rename in faith-alone) flipped the hero to it on reload** — "last worked on" proven end to end, not assumed from the sort order; zero console errors; screenshot captured.
+- The three imported corpus manuscripts are **left in place deliberately** as a realistic 3-book demo library (they are real manuscripts, not harness fixtures) — the CTO may keep or clear them.
+
+**Status: complete on `feature/home-tighten`, all green, awaiting the CTO's merge decision** (GR-1). Docs reconcile after merge.
+
 ## Appendix — fixture cleanup (point 2 of the same directive, executed, environment-only)
 
 18 projects deleted from `backend/data/studio.db` (direct SQL, dev-environment cleanup, no production code): 2× the `verify-real-export` harness quartet (images/large-book/tables/typography-test, runs of 21:44 and 23:29), 4× the `verify-real-import` corpus imports (faith-alone, pm-notes, generated-unstyled, art-of-captivating, 23:29), 5× faith-alone live-check duplicates (incl. the v3 Part-level verification project), 1× generated-unstyled (13:46). All created 2026-07-21 by this session's harnesses/verifications; none a real author book (CTO's own qualification). `versions` (6) and `blobs` (18) rows removed with them; `VACUUM` shrank the DB **36.7 MB → 32 KB**. The library is now genuinely empty — the Option-D first-run screen is what a capture shows next. **Note for future sessions: every `verify-real-export`/`verify-real-import` run repopulates four-to-eight fixture projects** — this pollution is structural to the harnesses (they import through the real route); if it becomes a recurring nuisance, a `DATABASE_PATH=:memory:`-style harness isolation is its own tiny report, not done here.
