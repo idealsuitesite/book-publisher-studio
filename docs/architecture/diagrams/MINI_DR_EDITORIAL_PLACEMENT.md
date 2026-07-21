@@ -59,5 +59,16 @@ The two headline decisions (C; §2b) and the §1 boundary are already locked. Re
 
 **No code until these are locked.**
 
+## Implementation note (added at build time — the design above is unchanged; this records what the build settled)
+
+- **Shipped exactly as scoped (C + §2b), 3 commits:** `orderByRole` in the shared tail (render side); the `setPartRole` mutation (author marking, reusing the built infra); the role crossing to the studio (DTO + mappers) + the `StructureEditor` placement control (suggest-assisted) + the by-tag count exclusion.
+- **A route-validation gap found LIVE, not by the unit tests, then closed by tests.** Marking a part in the studio returned **400**: `parseMutation` (the untrusted-body validator at the route boundary) did not whitelist `setPartRole`, though the dispatch and handler were wired and unit-tested. Fixed, and guarded by two new route tests (`setPartRole` 200 + role persisted; a bad role → 400). The lesson: a new mutation must be added in **two** places — the dispatch AND the route validator — and only a route/live test crosses that boundary.
+- **The two guards the CTO watched, both green:** `orderByRole` returns the **same reference** when nothing is tagged (byte-identical no-op, no regression for books that never use the feature); the **positional-only boundary** holds (a "Bibliography" renders as its `Block[]` paragraphs; `backMatter.bibliography` is never populated).
+- **Verified live on the real manuscript:** marking faith-alone's INTRODUCTION front + Conclusion back → the exported DOCX renders INTRODUCTION **first** (before "Chapter One") and Conclusion **last**. In the studio: the placement controls render with the classifier suggestion highlighted; marking tags the part (badge + revert + a version snapshotted for undo); the revert click clears it; no console errors.
+- **Renumbering out of scope by measurement** (`Chapter.number` is never a visible label) — no numbering gap from placement.
+- **Environment note (not a code defect):** `pkill -f "tsx"` does not kill the `node` child, so backend restarts kept failing to bind port 5000 and answered with stale code (misleading 400s at first); resolved by killing `node` via PowerShell.
+
+Merged to `main` (`397bc2c`); backend 674/674, frontend 177/177, tsc + eslint clean.
+
 ## Related
 `EDITORIAL_PLACEMENT_SCOPE.md` (the measured scope — C + §2b chosen), `PROOF_EDITORIAL_CONTROL_SCOPE.md` §6 (the reporting half this completes), `MINI_DR_EDITORIAL_PARTS.md` (the `editorialParts.ts` classifier the suggest-assist reuses; the by-title count exclusion this makes by-tag), `CREATE_CHAPTER.md` / `STRUCTURE_EDITING.md` (the `StructureMutation`/`BookEditingService`/`EditBookUseCase`/undo infrastructure extended), ADR-0049 (suggest-never-assert — how the assist stays honest), ADR-0052 (the shared render tail `orderByRole` lives in), `Book.ts` `FrontMatter`/`BackMatter` (the §2 structured shapes deliberately left untouched).
