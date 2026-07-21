@@ -1,5 +1,6 @@
 import type { ProjectRepository } from '../../domain/ports/ProjectRepository';
 import type { LayoutSelector } from '../../domain/ports/LayoutSelector';
+import type { PaginationCache } from '../../domain/ports/PaginationCache';
 import type { ProjectService } from '../../domain/services/ProjectService';
 import type { ExportManuscriptUseCase } from './ExportManuscriptUseCase';
 
@@ -35,7 +36,10 @@ export class ExportProjectUseCase {
     private repository: ProjectRepository,
     private exporters: ExportUseCasesByFormat,
     private layoutSelector: LayoutSelector,
-    private projectService: ProjectService
+    private projectService: ProjectService,
+    // The pagination cache is the project path's alone (MINI_DR_PAGINATION_REUSE §2.4): the
+    // raw-bytes /export route is one-shot and never cached. Optional so tests can omit it.
+    private paginationCache?: PaginationCache
   ) {}
 
   async execute(projectId: string, format: ProjectExportFormat): Promise<Buffer | undefined> {
@@ -47,7 +51,8 @@ export class ExportProjectUseCase {
       this.projectService.currentBook(project),
       project.settings.themeName,
       pageLayout,
-      project.settings.accentOverride
+      project.settings.accentOverride,
+      this.paginationCache
     );
   }
 }
