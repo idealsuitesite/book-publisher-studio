@@ -19,7 +19,13 @@ type State =
 const CARD_CLASSES =
   'flex w-full max-w-xl flex-col items-center justify-center gap-3 rounded-2xl border-2 px-10 py-20 text-center transition-colors';
 
-export function UploadDropzone() {
+/**
+ * `full` — the drag-and-drop card (the empty-library / first-run screen, where import is the point).
+ * `button` — a compact primary "Import a manuscript" action that opens the file picker directly
+ * (MINI_DR_HOME_STATE_LAYOUT §2.2a): used on a NON-empty library, where import is a quick one-off, not
+ * a full form competing with the book list. Both share the same file input + import→redirect logic.
+ */
+export function UploadDropzone({ variant = 'full' }: { variant?: 'full' | 'button' }) {
   const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const [state, setState] = useState<State>({ status: 'idle' });
@@ -48,6 +54,38 @@ export function UploadDropzone() {
         message: error instanceof Error ? error.message : 'Something went wrong.',
       });
     }
+  }
+
+  // Button variant (non-empty library): a compact primary action, not the full drop card.
+  if (variant === 'button') {
+    const input = (
+      <input
+        type="file"
+        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        className="sr-only"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void handleFile(file);
+          event.target.value = '';
+        }}
+      />
+    );
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border-2 border-app-accent bg-app-surface-2 px-5 py-2.5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-3 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-app-accent">
+          {input}
+          <span>{state.status === 'uploading' ? 'Uploading…' : 'Import a manuscript'}</span>
+        </label>
+        {state.status === 'error' && (
+          <p className="text-xs text-app-error">
+            {state.message}{' '}
+            <Button variant="link" className="text-xs" onClick={() => setState({ status: 'idle' })}>
+              Try again
+            </Button>
+          </p>
+        )}
+      </div>
+    );
   }
 
   if (state.status === 'uploading') {
