@@ -19,6 +19,7 @@ export class ChapterMapper {
       content: chapter.content.map((block) => this.blockMapper.map(block)),
       sections: chapter.sections?.map((section) => this.sectionMapper.map(section)),
       role: chapter.role,
+      partOpener: chapter.partOpener,
     };
   }
 }

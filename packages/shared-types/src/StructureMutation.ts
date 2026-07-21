@@ -18,4 +18,8 @@ export type StructureMutation =
   | { type: 'mergeChapterIntoPrevious'; chapterId: string }
   // MINI_DR_EDITORIAL_PLACEMENT (§2b): tag a top-level part for export placement — 'front' before the
   // chapters, 'back' after, 'main' clears it. The author action; never auto-inferred (Option C).
-  | { type: 'setPartRole'; id: string; role: 'front' | 'back' | 'main' };
+  | { type: 'setPartRole'; id: string; role: 'front' | 'back' | 'main' }
+  // PART_LEVEL_STRUCTURE (§3.4): insert a "Part I" divider at a mainContent index, and remove one
+  // by id (opener-only — a real chapter can never be deleted through this op).
+  | { type: 'insertPartOpener'; index: number; title: string }
+  | { type: 'removePartOpener'; id: string };

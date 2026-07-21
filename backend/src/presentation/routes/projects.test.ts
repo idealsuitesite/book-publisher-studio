@@ -274,4 +274,64 @@ describe('POST /api/projects/:id/structure — manual structure editing (STRUCTU
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('INVALID_MUTATION');
   });
+
+  // PART_LEVEL_STRUCTURE — the untrusted-body boundary tested WITH the dispatch, not after it
+  // (the setPartRole lesson above: a unit-tested handler behind an unwhitelisted route is a 400).
+  it('insertPartOpener: inserts a flagged divider, 200 + snapshot + numbering untouched', async () => {
+    const { app, id } = await seedProject();
+
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'insertPartOpener', index: 0, title: 'Part I: Beginnings' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.book.mainContent[0].partOpener).toBe(true);
+    expect(res.body.book.mainContent[0].title).toBe('Part I: Beginnings');
+    expect(res.body.book.mainContent[0].content).toEqual([]);
+    // Continuous numbering: the real chapter after the divider is still Chapter 1.
+    expect(res.body.book.mainContent[1].number).toBe(1);
+    expect(res.body.versions).toHaveLength(1); // snapshot-before-edit
+  });
+
+  it('removePartOpener: removes the divider, the chapters flow back, undoable via versions', async () => {
+    const { app, id } = await seedProject();
+    const inserted = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'insertPartOpener', index: 0, title: 'Part I' });
+    const openerId = inserted.body.book.mainContent[0].id as string;
+
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'removePartOpener', id: openerId });
+
+    expect(res.status).toBe(200);
+    expect(res.body.book.mainContent).toHaveLength(1);
+    expect(res.body.book.mainContent[0].partOpener).toBeUndefined();
+    expect(res.body.versions).toHaveLength(2); // one snapshot per edit
+  });
+
+  it('400 CONTENT_NOT_FOUND when removePartOpener targets a REAL chapter (never deletable this way)', async () => {
+    const { app, id } = await seedProject();
+    const got = await request(app).get(`/api/projects/${id}`);
+    const chapterId = got.body.book.mainContent[0].id as string;
+
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'removePartOpener', id: chapterId });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('CONTENT_NOT_FOUND');
+  });
+
+  it('400 INVALID_MUTATION on malformed part-opener bodies (missing title, non-integer index, missing id)', async () => {
+    const { app, id } = await seedProject();
+    for (const body of [
+      { type: 'insertPartOpener', index: 0 },
+      { type: 'insertPartOpener', index: 0, title: '   ' },
+      { type: 'insertPartOpener', index: 1.5, title: 'Part I' },
+      { type: 'removePartOpener' },
+    ]) {
+      const res = await request(app).post(`/api/projects/${id}/structure`).send(body);
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('INVALID_MUTATION');
+    }
+  });
+
+  it('400 CONTENT_NOT_FOUND on insertPartOpener with an out-of-range index', async () => {
+    const { app, id } = await seedProject();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'insertPartOpener', index: 99, title: 'Part I' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('CONTENT_NOT_FOUND');
+  });
 });
