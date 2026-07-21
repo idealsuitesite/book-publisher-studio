@@ -551,23 +551,23 @@ describe('LayoutEngine - measured pagination (Decision 6)', () => {
   });
 
   it('fills a page by measured height, not by the word-count estimate', () => {
-    // usable height 648pt. Measured block = 60pt + spaceAfter 8 = 68pt -> 9 fit (612), 10th overflows.
-    // The estimator would have charged these one line each (16.5pt) and packed ~39 - the
-    // divergence is the whole point.
+    // usable height ~643pt (648 raw minus the PAGE_SAFETY half-line reserve). Measured block =
+    // 56pt + spaceAfter 8 = 64pt. The estimator would have charged these one line each and packed
+    // dozens - measuring instead fits ~9, the divergence that is the whole point. (Block measure is
+    // 56, not the old 60, only so the taller title below still leaves room for the split this test
+    // demonstrates - the title now costs titleSpaceBefore+measure+titleSpaceAfter, MINI_DR_SUBTITLE_SPACING.)
     const blocks = Array.from({ length: 12 }, (_, i) => paragraph(`p-${i}`, 'short text'));
     const styled = styledBookFrom([chapter(blocks)]);
-    const engine = new LayoutEngine(measurerOf(60));
+    const engine = new LayoutEngine(measurerOf(56));
 
     const result = engine.paginate(styled, LETTER_LAYOUT);
 
-    // Title (60 measured + 10 moveDown = 70) + 8 blocks of 68 = 614. Pre-Phase-B the 9th block
-    // (682 > 648) moved whole; now its first 3 lines fill the remainder (34pt -> 3 lines of 10,
-    // block has 6, both sides keep >=2) and the rest continues - the "essai de coupure" the
-    // CTO's investigation found missing.
+    // Title (18 before + 56 measured + 8 after = 82) + 8 blocks of 64 = 594; remaining ~49 -> the
+    // 9th block's first 4 lines fill it (block has 6 lines, both sides keep >=2) and the rest
+    // continues - the "essai de coupure" the CTO's investigation found missing.
     expect(result.pages[0].blocks).toHaveLength(9);
-    // 2, not 3, since the PAGE_SAFETY_PT reserve (RENDER_DRIFT follow-up): the measured page
-    // budget keeps half a line back so renderer-side noise cannot overflow silently.
-    expect(result.pages[0].splitAfterLines).toBe(2);
+    // 4 lines fit the ~49pt remainder after the half-line PAGE_SAFETY reserve.
+    expect(result.pages[0].splitAfterLines).toBe(4);
     expect(result.pages[1].startsWithContinuation).toBe(true);
     expect(result.pages).toHaveLength(2);
   });
@@ -636,18 +636,21 @@ describe('LayoutEngine - paragraph splitting (Phase B)', () => {
 
     const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
 
-    // Title (1 word + moveDown = 20) + p-1 (300+8) = 328; remaining 320 -> 32 lines of p-2 stay.
+    // Title (18 before + 1 word×10 + 8 after = 36) + p-1 (300+8) = 344; remaining ~299 -> 29 lines
+    // of p-2 stay (was 31 before the taller title, MINI_DR_SUBTITLE_SPACING).
     expect(result.pages).toHaveLength(2);
     expect(result.pages[0].blocks).toEqual(['p-1', 'p-2']);
-    // 31, not 32 — the PAGE_SAFETY_PT reserve costs the page half a line (see above).
-    expect(result.pages[0].splitAfterLines).toBe(31);
+    // 29, after the PAGE_SAFETY_PT half-line reserve.
+    expect(result.pages[0].splitAfterLines).toBe(29);
     expect(result.pages[1].blocks[0]).toBe('p-2');
     expect(result.pages[1].startsWithContinuation).toBe(true);
   });
 
   it('never strands a single line at the bottom - fewer than 2 lines fitting means no split', () => {
-    // Title 20 + p-1 (610+8) = 638; remaining 10 -> 1 line would fit p-2: orphan, so p-2 moves whole.
-    const styled = styledBookFrom([chapter([paragraph('p-1', words(61)), paragraph('p-2', words(20))])]);
+    // Title 36 + p-1 (580+8=588) = 624; remaining ~19 -> 1 line would fit p-2: orphan (<2), so p-2
+    // moves whole and p-1 itself never splits (MINI_DR_SUBTITLE_SPACING: p-1 shortened 61->58 words
+    // so the taller title still leaves it fully on page 1, preserving the orphan scenario).
+    const styled = styledBookFrom([chapter([paragraph('p-1', words(58)), paragraph('p-2', words(20))])]);
 
     const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
 
@@ -659,13 +662,14 @@ describe('LayoutEngine - paragraph splitting (Phase B)', () => {
   });
 
   it('never strands a single line at the top - the cut moves up to leave 2 for the next page', () => {
-    // Title 20 + p-1 (300+8) = 328; remaining 320 -> 32 lines fit, but p-2 has 33: a 32-line cut
-    // would leave a 1-line widow. The cut retreats to 31, leaving 2.
-    const styled = styledBookFrom([chapter([paragraph('p-1', words(30)), paragraph('p-2', words(33))])]);
+    // Title 36 + p-1 (300+8) = 344; remaining ~299 -> 29 lines fit, but p-2 has 30: a 29-line cut
+    // would leave a 1-line widow. The cut retreats to 28, leaving 2 (MINI_DR_SUBTITLE_SPACING: p-2
+    // is 30 words, one more than fits, so the leave-2 rule - not the space - governs the cut).
+    const styled = styledBookFrom([chapter([paragraph('p-1', words(30)), paragraph('p-2', words(30))])]);
 
     const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
 
-    expect(result.pages[0].splitAfterLines).toBe(31);
+    expect(result.pages[0].splitAfterLines).toBe(28);
     expect(result.pages[1].blocks).toEqual(['p-2']);
   });
 
@@ -684,8 +688,11 @@ describe('LayoutEngine - paragraph splitting (Phase B)', () => {
   });
 
   it('does not split quotes - their continuation indent semantics differ', () => {
+    // Title 36 + p-1 (550+8=558) = 594 (whole, no split); remaining ~49 < the quote's 200pt, so the
+    // quote is the only split candidate - and quotes are atomic, so it moves whole instead
+    // (MINI_DR_SUBTITLE_SPACING: p-1 shortened 60->55 words so the taller title keeps it unsplit).
     const styled = styledBookFrom([
-      chapter([paragraph('p-1', words(60)), { type: 'quote', id: 'q-1', text: words(20) } as Block]),
+      chapter([paragraph('p-1', words(55)), { type: 'quote', id: 'q-1', text: words(20) } as Block]),
     ]);
 
     const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);

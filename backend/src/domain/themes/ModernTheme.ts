@@ -39,6 +39,8 @@ export const ModernTheme: Theme = {
     paragraphSpacing: 8,
     headingSpacing: 12, // slightly tighter than Classic's 16 -- the "Modern" rhythm
     lineHeight: 1.4,
+    titleSpaceBefore: 14, // tighter than Classic (18/8), matching Modern's rhythm
+    titleSpaceAfter: 6,
   },
   runningHead: {
     show: true,

@@ -125,13 +125,20 @@ export class LayoutEngine {
     const titleHeightOf = (content: Content): number => {
       if (!this.measurer || !content.title) return 0;
       const size = content.type === 'chapter' ? 24 : Math.max(12, 22 - content.level * 2);
+      const { titleSpaceBefore, titleSpaceAfter } = styled.theme.spacing;
       return (
+        // Lock-step with PDFRenderer.renderTitle (MINI_DR_SUBTITLE_SPACING): flat titleSpaceBefore
+        // above + the measured title height + flat titleSpaceAfter below. Replaces the former
+        // `+ lineHeight(size)` term, which charged renderTitle's old size-scaled moveDown(). The
+        // two must move together, else charged != consumed and pagination drifts (ADR-0051).
+        titleSpaceBefore +
         this.measurer.measureHeight(content.title, {
           fontSize: size,
           width: usableWidth,
           heading: true,
           theme: styled.theme,
-        }) + this.measurer.lineHeight(size, { theme: styled.theme, heading: true }) // renderTitle's moveDown(), in the face it really uses
+        }) +
+        titleSpaceAfter
       );
     };
 

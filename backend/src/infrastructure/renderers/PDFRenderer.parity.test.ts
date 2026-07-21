@@ -48,10 +48,24 @@ describe('PDFRenderer — drift parity on the real corpus (ADR-0051)', () => {
     // (`currentHeight += f()` read the left operand before f()'s flush zeroed it): ghost
     // near-full pages at section boundaries are gone, one of the three reconciliations
     // was downstream of one, and the counts dropped accordingly.
-    expect(result.metrics.unplannedPageBreaks).toBe(2);
+    //
+    // Re-locked again CONSCIOUSLY for MINI_DR_SUBTITLE_SPACING (subtitle-spacing convention fix),
+    // in two measured steps:
+    //  1. titleHeightOf now charges flat titleSpaceBefore + measure + titleSpaceAfter instead of
+    //     measure + moveDown(size). This moved the MODEL count +1 (234 -> 235) and, in lock-step,
+    //     the rendered count +1 (238 -> 239) with reconciliations still 2 -- charged == consumed held.
+    //  2. renderTitle then gained a guard skipping spacing for an EMPTY title (untitled preamble
+    //     Section), matching titleHeightOf's `if (!title) return 0`. faith-alone has one such
+    //     section, and the OLD code spent title spacing there that the model never charged -- a
+    //     latent ADR-0051 drift that was itself producing one of the "2 disclosed reconciliations".
+    //     Closing it removed that reconciliation and its rendered page: rendered 239 -> 238,
+    //     unplannedPageBreaks 2 -> 1. The model count is renderer-independent, so it stays 235.
+    // Net vs the pre-chantier baseline (238 / 234 / 2): the CONTRACT number IMPROVED to 1 (never
+    // rose -- a shrinkage this file's header demands be updated consciously, which is what this is).
+    expect(result.metrics.unplannedPageBreaks).toBe(1);
     expect(result.metrics.pageCount).toBe(238);
     // The model's own count stays the anchor the renderer answers to.
-    expect(paginated.pages.length).toBe(234);
+    expect(paginated.pages.length).toBe(235);
   }, 120_000);
 
   // TABLE_DUPLICATION.md Défaut B, the class-closing assertion (CTO-required): the drawn
