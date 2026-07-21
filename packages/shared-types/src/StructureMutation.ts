@@ -11,4 +11,8 @@
 export type StructureMutation =
   | { type: 'reorderChapters'; fromIndex: number; toIndex: number }
   | { type: 'rename'; id: string; title: string }
-  | { type: 'restoreVersion'; versionId: string };
+  | { type: 'restoreVersion'; versionId: string }
+  // CREATE_CHAPTER.md (scope LOCKED to these two create ops): carve a chapter out of unstructured
+  // content by promoting a paragraph, and its exact inverse.
+  | { type: 'promoteToChapter'; blockId: string }
+  | { type: 'mergeChapterIntoPrevious'; chapterId: string };

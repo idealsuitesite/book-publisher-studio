@@ -25,6 +25,12 @@ function parseMutation(body: unknown): StructureMutation | null {
   if (m.type === 'restoreVersion' && typeof m.versionId === 'string' && m.versionId) {
     return { type: 'restoreVersion', versionId: m.versionId };
   }
+  if (m.type === 'promoteToChapter' && typeof m.blockId === 'string' && m.blockId) {
+    return { type: 'promoteToChapter', blockId: m.blockId };
+  }
+  if (m.type === 'mergeChapterIntoPrevious' && typeof m.chapterId === 'string' && m.chapterId) {
+    return { type: 'mergeChapterIntoPrevious', chapterId: m.chapterId };
+  }
   return null;
 }
 

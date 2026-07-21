@@ -73,3 +73,62 @@ describe('EditBookUseCase — structure editing persists, snapshots, and undoes'
     expect((saved.book.mainContent[0] as Chapter).title).toBe('One');
   });
 });
+
+describe('EditBookUseCase — create ops dispatch (CREATE_CHAPTER.md)', () => {
+  let repo: InMemoryProjectRepository;
+  let projectService: ProjectService;
+  let useCase: EditBookUseCase;
+  let id: string;
+
+  // A 0-chapter manuscript's shape: one untitled section of paragraph blocks.
+  function unstructured(): Book {
+    return createBook({ title: 'T', author: 'A', language: 'en' }, [
+      {
+        type: 'section',
+        id: 'sec',
+        title: '',
+        content: [
+          { type: 'paragraph', id: 'b1', text: 'One' },
+          { type: 'paragraph', id: 'b2', text: 'Two' },
+          { type: 'paragraph', id: 'b3', text: 'Three' },
+        ],
+        level: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+  }
+
+  beforeEach(async () => {
+    repo = new InMemoryProjectRepository();
+    projectService = new ProjectService();
+    useCase = new EditBookUseCase(repo, projectService, new BookEditingService());
+    const project = projectService.create(unstructured(), { layoutName: 'letter', themeName: 'classic' });
+    id = project.id;
+    await repo.save(project);
+  });
+
+  it('promoteToChapter: persists a new chapter and snapshots the pre-edit book', async () => {
+    const ok = await useCase.execute(id, { type: 'promoteToChapter', blockId: 'b2' });
+    expect(ok).toBe(true);
+
+    const saved = (await repo.findById(id))!;
+    expect(saved.versions).toHaveLength(1); // pre-edit snapshot (undo point)
+    expect(saved.versions[0].book.mainContent).toHaveLength(1); // the snapshot is the unstructured book
+    const chapters = saved.book.mainContent.filter((c) => c.type === 'chapter');
+    expect(chapters.map((c) => c.title)).toEqual(['Two']);
+  });
+
+  it('mergeChapterIntoPrevious: dispatches and reaches the domain op (round-trips the promote)', async () => {
+    await useCase.execute(id, { type: 'promoteToChapter', blockId: 'b2' });
+    const afterPromote = (await repo.findById(id))!;
+    const newChapterId = afterPromote.book.mainContent.find((c) => c.type === 'chapter')!.id;
+
+    const ok = await useCase.execute(id, { type: 'mergeChapterIntoPrevious', chapterId: newChapterId });
+    expect(ok).toBe(true);
+
+    const saved = (await repo.findById(id))!;
+    expect(saved.book.mainContent.filter((c) => c.type === 'chapter')).toHaveLength(0); // merged back
+    expect(saved.versions).toHaveLength(2); // one snapshot per edit
+  });
+});
