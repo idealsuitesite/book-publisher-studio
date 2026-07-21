@@ -114,5 +114,15 @@ ADR-0049: *suggest, never silently assert.* The count changes from 17 to 15+2, w
 
 **No code until these are locked.**
 
+## Implementation note (added at build time — the design above is unchanged; this records what the build settled)
+
+Three as-built facts, all CTO-acknowledged:
+
+1. **A bare hyphen is NOT a subtitle separator.** The design listed `-` among the separators; building it showed a bare `-` lives inside canonical names ("Avant-propos", the FR foreword), so splitting on it would silently break that match. The separators are `:`, `—`, `–`, and a **spaced** ` - ` only. Caught while constructing, not in production.
+2. **Enumerated parts are a disclosed false NEGATIVE, frozen as a tested property.** Under the CTO-locked exact-segment rule, "Appendix A" / "Annexe 1" have a leading segment ("Appendix A") that is not the bare canonical name, so they read as **chapters** — safe (a false negative, never a false positive), visible, and asserted as *intended* behaviour in `editorialParts.test.ts`. The CTO's ruling: keep the safe false negative; extending the rule to `canonical + short enumerator` is a real rule change to reopen only if a real author with numbered appendices actually hits it — its own small report, not now.
+3. **Verified live on faith-alone (the load-bearing proof):** 15 chapters across the Explorer, dashboard and status bar (was 17); the Proof panel shows Introduction present ("INTRODUCTION"), Conclusion present ("Conclusion: Nothing but Faith"), Bibliography **absent**; zero console errors. Screenshot capture hangs on the embedded-PDF Proof (known env issue) — verified via the accessibility tree instead. The §6 boundary held: model and export untouched.
+
+Merged to `main` (`1806809`); frontend 160/160, backend 653/653, tsc + eslint clean.
+
 ## Related
 `PROOF_EDITORIAL_CONTROL_SCOPE.md` (the measured scope this implements — Option A), ADR-0050 (fidelity is the product — the miscount is its defect; A makes reporting faithful), ADR-0049 (suggest-never-silently-assert — the panel is what keeps the count-correction honest), `HEURISTIC_STRUCTURE_DETECTION` (why canonical top-level titles are a lookup, not the closed 0% inference), `CREATE_CHAPTER.md` / `STRUCTURE_EDITING.md` (author-controlled marking — the Option C this defers to), `bookFacts.ts` (the single count source A corrects), `MINI_DR_SUBTITLE_SPACING.md` (the untitled preamble in §4 is the section whose drift it closed).

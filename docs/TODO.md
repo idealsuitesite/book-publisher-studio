@@ -1,6 +1,6 @@
 # TODO - Book Publisher Studio
 
-**Last Updated:** July 21, 2026 (continued — subtitle spacing merged, `d3c0f53`, after the structure-editing CREATE half `fb76960`; a docs-reconciliation commit follows). Last tag `v0.9.0-alpha`; all merged work since is deliberately untagged (the next tag is the CTO's call).
+**Last Updated:** July 21, 2026 (continued — editorial-parts merged, `1806809`, after subtitle spacing `d3c0f53` and the structure-editing CREATE half `fb76960`; a docs-reconciliation commit follows). Last tag `v0.9.0-alpha`; all merged work since is deliberately untagged (the next tag is the CTO's call).
 
 **Merged and live on `main` this session:** **verify-publication-quality** (chantier B — all ten DOCX §4 criteria have a verdict: 8 green on real fixtures, 2 disclosed gaps, none fabricated; `7cd3371`), the **`AIProvider` agnostic anchor port** (interface only, exit-condition-gated; `aab9af9`), the **second theme "Modern"** (`e5954e9` — the first real consumer of `colors.accent`; its own parity/calibration), **manual structure editing phase 1** (`BookEditingService` pure ops; `992688b`), and **manual structure editing phase 2 backend** (`7298df2` — see next paragraph). Plus governance: **Editorial AI SUSPENDED** until commercial revenue (`NO_PAID_AI_BEFORE_REVENUE`), Documentation & Learning Platform closed out-of-scope, the ADR re-verification non-negotiable, and the reports `GUTTER_SCOPE.md` (→ chantier D `GUTTER_VALIDATION_FIRST`) / `STRUCTURE_VS_THEME_SCOPE.md` / `FORMATTING_TOOLS_AUDIT.md`. Everything through PR #26 is also on `main` (Import Fidelity, Render Drift, Book Presentation 0-2, Table-Duplication A/B, drop-cap fix).
 
@@ -11,11 +11,12 @@
 
 `feature/structure-editing-phase2`, `feature/structure-editing-phase3`, and `feature/structure-editing-create` are now merged. Other unmerged branches hold nothing missing: `spike/editorial-structure-detection` (Editorial-AI spike A, **SUSPENDED** — not run, not deleted), `investigate/first-screen-error` (superseded by PR #24), `spike/dropcap-feasibility` / `spike/heuristic-structure` (content on `main`).
 
-Verified on `main`: **backend 653/653, frontend 148/148, tsc + eslint clean.** (`main` now also carries subtitle spacing, merge `d3c0f53` — see NEXT's DONE note below.)
+Verified on `main`: **backend 653/653, frontend 160/160, tsc + eslint clean.** (`main` now also carries subtitle spacing `d3c0f53` and the editorial-parts fix `1806809` — see NEXT's DONE notes below.)
 
 **NEXT — confirmed order (CTO 2026-07-21), each gated on its own review, no code before approval:**
-1. **The Proof as editorial control** — a **short scope report** (CTO 2026-07-21): does the living Proof surface whether editorial parts (preface / bibliography / annex) are present or not? Ahead of per-theme tuning. **The next step.**
-2. **Per-theme fine-tuning** scoping report, then **Living-Proof default visibility** — refinements to structure that already exists; end of queue.
+1. **Per-theme fine-tuning** scoping report, then **Living-Proof default visibility** — refinements to structure that already exists; end of queue. **The next step.**
+
+*(DONE 2026-07-21: **the Proof as editorial control** — `PROOF_EDITORIAL_CONTROL_SCOPE.md` (measured; the miscount reframed by the CTO as an ADR-0050 reporting-fidelity defect) → Option A `MINI_DR_EDITORIAL_PARTS.md` (CTO-approved, 5 points locked), merged `1806809`. Canonical-title classifier (EN/FR, exact leading segment) excludes editorial parts from the chapter count + a Proof presence/absence panel; verified live on faith-alone (17 → 15 ch, Introduction/Conclusion present with real titles, Bibliography absent). Presentation-only; export placement is B/C (own report). Enumerated appendices a disclosed safe false-negative, frozen as a tested property.)*
 
 *(DONE 2026-07-21: **subtitle spacing (PDF)** — `MINI_DR_SUBTITLE_SPACING.md`, CTO-approved (5 points locked), merged `d3c0f53`. Flat `titleSpaceBefore`/`titleSpaceAfter` on `theme.spacing` (Classic 18/8, Modern 14/6, above > below) spent by `renderTitle` in lock-step with `titleHeightOf`; validated live on real pages. Building it **closed a latent ADR-0051 empty-title drift** — `renderTitle` spent title spacing for an untitled preamble Section the model charged at zero — dropping corpus reconciliations 2 → 1, recorded as its own drift-closure line in `DECISIONS.md`/`RENDER_DRIFT.md` (NOT counted in the eleven-bug lineage). Q4 tri-format convergence parked for per-theme fine-tuning.)*
 
