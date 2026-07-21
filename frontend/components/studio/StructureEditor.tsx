@@ -126,6 +126,33 @@ export async function applyUndo(
   }
 }
 
+/** Promote a paragraph to a chapter (CREATE_CHAPTER.md) — carve structure out of a manuscript the
+ * importer could not (the founder's gap). Extracted for isolated jsdom testing, like the others. */
+export async function applyPromote(
+  projectId: string,
+  blockId: string,
+  deps: { editStructure: typeof editStructure; onEdited: (updated: ProjectDTO) => void; onError: (message: string) => void }
+): Promise<void> {
+  try {
+    deps.onEdited(await deps.editStructure(projectId, { type: 'promoteToChapter', blockId }));
+  } catch (error) {
+    deps.onError(error instanceof ApiError ? 'That block could not be made a chapter.' : 'Could not reach the server.');
+  }
+}
+
+/** Merge a chapter back into the previous container — the inverse of promote. */
+export async function applyMerge(
+  projectId: string,
+  chapterId: string,
+  deps: { editStructure: typeof editStructure; onEdited: (updated: ProjectDTO) => void; onError: (message: string) => void }
+): Promise<void> {
+  try {
+    deps.onEdited(await deps.editStructure(projectId, { type: 'mergeChapterIntoPrevious', chapterId }));
+  } catch (error) {
+    deps.onError(error instanceof ApiError ? 'That chapter could not be merged back.' : 'Could not reach the server.');
+  }
+}
+
 /**
  * Inline click-to-edit title (D3): a quiet button that becomes an input on click, commits on Enter
  * or blur, cancels on Esc, and refuses an empty title (reverts). No modal — the author keeps their
@@ -194,15 +221,61 @@ function EditableTitle({
   );
 }
 
+type ContentBlocks = BookDTO['mainContent'][number]['content'];
+
+function blockPreview(block: ContentBlocks[number]): string {
+  if ('text' in block && typeof block.text === 'string') {
+    const t = block.text.trim();
+    return t.length > 80 ? `${t.slice(0, 80)}…` : t || '(empty paragraph)';
+  }
+  return `[${block.type}]`;
+}
+
+/**
+ * The block-aware view (CREATE_CHAPTER.md D5): a height-capped, truncated list of a container's own
+ * paragraphs, each offering "Make this a chapter". Shown expanded for an unstructured (untitled)
+ * container — where the author must act — and on demand for a chapter. Height-capped on purpose:
+ * the panel must never grow with the manuscript (the old BookStructureView `<details>` lesson).
+ */
+function BlockList({ blocks, disabled, onPromote }: { blocks: ContentBlocks; disabled: boolean; onPromote: (blockId: string) => void }) {
+  return (
+    <ul className="mt-1.5 flex max-h-56 flex-col gap-0.5 overflow-y-auto border-l border-app-border pl-3">
+      {blocks.map((block) => (
+        <li key={block.id} className="flex items-center justify-between gap-2 py-0.5 text-sm">
+          <span className="min-w-0 flex-1 truncate text-app-text-muted">{blockPreview(block)}</span>
+          {(block.type === 'paragraph' || block.type === 'heading') && (
+            <button
+              onClick={() => onPromote(block.id)}
+              disabled={disabled}
+              className="shrink-0 rounded px-1.5 py-0.5 text-xs text-app-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent disabled:cursor-not-allowed disabled:text-app-text-muted disabled:no-underline"
+            >
+              Make this a chapter
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function SortableChapterRow({
   content,
+  index,
   disabled,
   onRename,
+  onPromote,
+  onMerge,
 }: {
   content: BookDTO['mainContent'][number];
+  index: number;
   disabled: boolean;
   onRename: (id: string, title: string) => void;
+  onPromote: (blockId: string) => void;
+  onMerge: (chapterId: string) => void;
 }) {
+  const isUnstructured = content.type === 'section' && !content.title.trim();
+  const canMerge = content.type === 'chapter' && index > 0;
+  const blocks = content.content;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: content.id,
     disabled,
@@ -240,7 +313,33 @@ function SortableChapterRow({
         <span className="shrink-0 text-xs tabular-nums text-app-text-muted">
           {countContentWords(content).toLocaleString('en-US')} words
         </span>
+        {canMerge && (
+          <button
+            onClick={() => onMerge(content.id)}
+            disabled={disabled}
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs text-app-text-muted hover:text-app-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent disabled:cursor-not-allowed"
+          >
+            Merge back
+          </button>
+        )}
       </div>
+
+      {/* CREATE_CHAPTER.md D5: block rows expanded for the unstructured container (act here), on
+          demand for a chapter. Only text blocks (paragraph/heading) can become a chapter. */}
+      {isUnstructured ? (
+        <div className="mt-1">
+          <p className="text-xs text-app-text-muted">Turn a paragraph into a chapter to build your structure:</p>
+          <BlockList blocks={blocks} disabled={disabled} onPromote={onPromote} />
+        </div>
+      ) : blocks.length > 0 ? (
+        <details className="mt-1.5">
+          <summary className="cursor-pointer select-none text-xs text-app-text-muted">
+            {blocks.length} {blocks.length === 1 ? 'block' : 'blocks'} — split into chapters
+          </summary>
+          <BlockList blocks={blocks} disabled={disabled} onPromote={onPromote} />
+        </details>
+      ) : null}
+
       {content.type === 'chapter' && content.sections && content.sections.length > 0 && (
         <ul className="ml-6 mt-1.5 flex flex-col gap-1 border-l border-app-border pl-3">
           {content.sections.map((section) => (
@@ -315,6 +414,20 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
     setPending(false);
   }
 
+  async function onPromote(blockId: string) {
+    setError(null);
+    setPending(true);
+    await applyPromote(project.id, blockId, { editStructure, onEdited: captureUndo, onError: setError });
+    setPending(false);
+  }
+
+  async function onMerge(chapterId: string) {
+    setError(null);
+    setPending(true);
+    await applyMerge(project.id, chapterId, { editStructure, onEdited: captureUndo, onError: setError });
+    setPending(false);
+  }
+
   async function onUndo() {
     if (!undoVersionId) return;
     setError(null);
@@ -367,8 +480,16 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
       >
         <SortableContext items={items} strategy={verticalListSortingStrategy}>
           <ul className="flex flex-col gap-1.5">
-            {book.mainContent.map((content) => (
-              <SortableChapterRow key={content.id} content={content} disabled={pending} onRename={onRename} />
+            {book.mainContent.map((content, index) => (
+              <SortableChapterRow
+                key={content.id}
+                content={content}
+                index={index}
+                disabled={pending}
+                onRename={onRename}
+                onPromote={onPromote}
+                onMerge={onMerge}
+              />
             ))}
           </ul>
         </SortableContext>
