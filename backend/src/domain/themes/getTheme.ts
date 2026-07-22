@@ -2,6 +2,7 @@ import type { Theme } from '../models/Theme';
 import type { TypographyOverride } from '../models/Project';
 import { ClassicTheme } from './ClassicTheme';
 import { ModernTheme } from './ModernTheme';
+import { NovelTheme } from './NovelTheme';
 import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
 
 /**
@@ -32,6 +33,7 @@ const FONT_ROLE_NAME: Record<'serif' | 'sans', string> = {
 const THEMES: Record<string, Theme> = {
   classic: ClassicTheme,
   modern: ModernTheme,
+  novel: NovelTheme,
 };
 
 export function getTheme(name: string): Theme {
