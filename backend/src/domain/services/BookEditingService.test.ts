@@ -299,42 +299,42 @@ describe('BookEditingService — setCallout (MINI_DR_CALLOUTS commit 1)', () => 
   };
 
   it('marks a paragraph at ANY depth — chapter-direct, section, subsection', () => {
-    expect(flagOf(service.setCallout(calloutBook(), 'p-top', true, NOW), 'top')).toBe(true);
-    expect(flagOf(service.setCallout(calloutBook(), 'p-sec', true, NOW), 'sec')).toBe(true);
-    expect(flagOf(service.setCallout(calloutBook(), 'p-sub', true, NOW), 'sub')).toBe(true);
+    expect(flagOf(service.setCallout(calloutBook(), 'p-top', true), 'top')).toBe(true);
+    expect(flagOf(service.setCallout(calloutBook(), 'p-sec', true), 'sec')).toBe(true);
+    expect(flagOf(service.setCallout(calloutBook(), 'p-sub', true), 'sub')).toBe(true);
   });
 
   it('unmarking removes the property entirely — round-trip is EXACT identity (no timestamp on Paragraph)', () => {
     const original = calloutBook();
-    const marked = service.setCallout(original, 'p-sec', true, NOW);
-    const back = service.setCallout(marked, 'p-sec', false, NOW);
+    const marked = service.setCallout(original, 'p-sec', true);
+    const back = service.setCallout(marked, 'p-sec', false);
     expect('callout' in ((back.mainContent[0] as Chapter).sections![0].content[0] as Paragraph)).toBe(false);
     // The strongest identity this model allows: strict deep equality of the whole content tree.
     expect(back.mainContent).toEqual(original.mainContent);
   });
 
   it('rejects a no-op toggle as malformed — marking the already-marked, unmarking the unmarked', () => {
-    const marked = service.setCallout(calloutBook(), 'p-top', true, NOW);
-    expect(() => service.setCallout(marked, 'p-top', true, NOW)).toThrow(ContentNotFoundError);
-    expect(() => service.setCallout(calloutBook(), 'p-top', false, NOW)).toThrow(ContentNotFoundError);
+    const marked = service.setCallout(calloutBook(), 'p-top', true);
+    expect(() => service.setCallout(marked, 'p-top', true)).toThrow(ContentNotFoundError);
+    expect(() => service.setCallout(calloutBook(), 'p-top', false)).toThrow(ContentNotFoundError);
   });
 
   it('only paragraphs can be callouts — a heading id is not a valid target (quotes/lists stay out, v1 boundary)', () => {
-    expect(() => service.setCallout(calloutBook(), 'h1', true, NOW)).toThrow(ContentNotFoundError);
+    expect(() => service.setCallout(calloutBook(), 'h1', true)).toThrow(ContentNotFoundError);
   });
 
   it('throws for an unknown id and never mutates the input', () => {
     const book = calloutBook();
-    expect(() => service.setCallout(book, 'ghost', true, NOW)).toThrow(ContentNotFoundError);
+    expect(() => service.setCallout(book, 'ghost', true)).toThrow(ContentNotFoundError);
     expect(flagOf(book, 'top')).toBeUndefined();
   });
 
   it('real-fixture round-trip (faith-alone): mark then unmark is byte-equal on the whole tree', async () => {
     const book = await importCorpus('faith-alone-styled.docx');
     const target = book.mainContent.flatMap((c) => c.content).find((b) => b.type === 'paragraph')!;
-    const marked = service.setCallout(book, target.id, true, NOW);
+    const marked = service.setCallout(book, target.id, true);
     expect(marked).not.toEqual(book); // the mark is a real change (a genuine cache MISS later)
-    const back = service.setCallout(marked, target.id, false, NOW);
+    const back = service.setCallout(marked, target.id, false);
     expect(back.mainContent).toEqual(book.mainContent);
   }, 30_000);
 });

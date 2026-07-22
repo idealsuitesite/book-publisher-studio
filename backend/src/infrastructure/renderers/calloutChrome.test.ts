@@ -7,7 +7,7 @@ import { PdfKitTextMeasurer } from '../fonts/PdfKitTextMeasurer';
 import { PDFRenderer } from './PDFRenderer';
 import { DOCXRenderer } from './DOCXRenderer';
 import { EPUBRenderer } from './EPUBRenderer';
-import { getTheme } from '../../domain/themes/getTheme';
+import { getTheme, resolveTheme } from '../../domain/themes/getTheme';
 import { KDP5x8PageLayout } from '../../domain/layouts/KDP5x8PageLayout';
 import { createBook } from '../../domain/models/Book';
 import {
@@ -19,6 +19,7 @@ import {
 } from '../../domain/services/calloutMetrics';
 import type { Chapter, Paragraph } from '../../domain/models/Book';
 import type { PaginatedBook } from '../../domain/models/PaginatedBook';
+import type { Theme } from '../../domain/models/Theme';
 
 /**
  * MINI_DR_CALLOUTS §6 commit 2 — the chrome, priced in lock-step.
@@ -126,6 +127,36 @@ describe('callout chrome (MINI_DR_CALLOUTS §6 commit 2)', () => {
     expect(docxXml).not.toContain('w:pBdr');
     const epub = await epubText(paginateUnder('modern', blocks));
     expect(epub).not.toContain('class="callout"');
+  });
+
+  it('the chrome re-inks under an accentOverride — colour only, geometry untouched (D3 end to end)', async () => {
+    // The pagination-reuse trap's guard, extended to the callout (MINI_DR_PAGINATION_REUSE §3):
+    // an accent change over a marked book is a cache HIT, so the cached GEOMETRY must be
+    // accent-invariant while the INK follows the resolved accent — including an author's
+    // accentOverride, the D3 "one knob" promise end to end.
+    const base = resolveTheme('modern');
+    const overridden = resolveTheme('modern', '#7A1F1F');
+    const blocks = [paragraphAt(0, { callout: true }), paragraphAt(1)];
+    const book = createBook({ title: 'Callout', author: 'T', language: 'en' }, [chapterOf(blocks)]);
+
+    const paginateWith = (theme: Theme) =>
+      new LayoutEngine(new PdfKitTextMeasurer()).paginate(new TypographyResolver().resolve(new ThemeEngine().applyTheme(book, theme)), KDP5x8PageLayout);
+    const basePaginated = paginateWith(base);
+    const overriddenPaginated = paginateWith(overridden);
+
+    // Geometry accent-invariant: the planned pages are identical under both inks.
+    expect(overriddenPaginated.pages).toEqual(basePaginated.pages);
+
+    // Ink follows the override: different PDF bytes from the same geometry (re-inked, not stale)…
+    const basePdf = (await new PDFRenderer({ compress: false }).render(basePaginated, { language: 'en' })).output;
+    const overriddenPdf = (await new PDFRenderer({ compress: false }).render(overriddenPaginated, { language: 'en' })).output;
+    expect(overriddenPdf.equals(basePdf)).toBe(false);
+
+    // …and the EPUB stylesheet carries the OVERRIDDEN rule colour and its derived tint.
+    const epub = await epubText(overriddenPaginated);
+    expect(epub).toContain(`border-left: ${CALLOUT_RULE_PT}pt solid #7A1F1F`);
+    expect(epub).toContain(`background-color: ${calloutTintOf(overridden)}`);
+    expect(calloutTintOf(overridden)).not.toBe(calloutTintOf(base)); // the tint really derives from the override
   });
 
   it('a callout paragraph never takes the chapterOpening drop cap — one rule, decided in the resolver, followed everywhere', () => {

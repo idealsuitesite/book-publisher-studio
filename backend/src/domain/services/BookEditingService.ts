@@ -109,7 +109,12 @@ export class BookEditingService {
    * a mutation that changes nothing is a malformed request, not a version event (the
    * front-matter lesson). Returns a new Book; the original is untouched.
    */
-  setCallout(book: Book, blockId: string, on: boolean, now: Date = new Date()): Book {
+  // No `now` parameter and no book-level updatedAt bump ON PURPOSE, matching every other op
+  // here (rename/setPartRole/…): paragraphs carry no timestamp, the project's own updatedAt
+  // moves at save time, and bumping the BOOK would break the legitimate-HIT property — an
+  // unmark must restore byte-identical pre-mark content (the §3.6 honesty; caught by the
+  // pagination-cache instrument the moment the first draft bumped it).
+  setCallout(book: Book, blockId: string, on: boolean): Book {
     let found = false;
 
     const applyIn = (blocks: Block[]): Block[] =>
@@ -145,7 +150,7 @@ export class BookEditingService {
     if (!found) {
       throw new ContentNotFoundError(`setCallout: no paragraph with id "${blockId}"`);
     }
-    return { ...book, mainContent, updatedAt: now };
+    return { ...book, mainContent };
   }
 
   /**
