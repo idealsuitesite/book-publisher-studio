@@ -1,8 +1,9 @@
 # Third Theme — Scope Report (queue item 7)
 
-**Status:** 🟡 MEASURED — **STOPPED AT THE TASTE DECISION (§5, the aesthetic direction), as the
-queue directive requires.** No production code opened; every claim below re-verified in code
-today (non-negotiable #7).
+**Status:** ✅ CLOSED — the §5 taste stop was ANSWERED by the CTO the same day (**direction A
+"Novel"**, three ranked reasons + six sub-decisions) and the chantier DELIVERED via
+`THIRD_THEME_NOVEL.md`, merged to `main` 2026-07-22 (`1cc5a2b`). The vocabulary measurement
+below remains the ground of record — including the honest exclusion of Bible/Theology (C1).
 **Date:** 2026-07-22
 **The CTO's framing, which this report serves:** *the cadrage must first establish what the
 pipeline can really express today, because THAT defines the space of aesthetic directions to
