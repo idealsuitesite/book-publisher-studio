@@ -191,14 +191,28 @@ the API: the HTTP round trip, the ~230 KB PDF over the wire, and — the likely 
 what makes this visible; a short book would not feel slow. Locus = the frontend proof rendering,
 not the pagination engine (which S13 already measured and left load-bearing).
 
-**Honest limit of this measurement:** I measured the backend precisely and reasoned the frontend
-term from the payload size and page count; I did not instrument the browser PDF render (doing so
-on the founder's project would mutate it — forbidden). Recommend the verdict authorise a
-frontend-side measurement on a throwaway/demo project to confirm the 114-page render is the cost.
+**Frontend measurement DONE (CTO-authorised, on a throwaway 114-page project; the founder's
+project untouched; throwaway deleted after).** The perceived theme-switch cost, decomposed and
+measured:
+- **A fixed 500 ms debounce** before a settings change even starts the refresh
+  (`PreviewPanel.tsx` `REFRESH_DEBOUNCE_MS`) — deliberate (absorbs a click-flurry), but it is
+  500 ms every author pays on a single deliberate change.
+- **~730 ms export round trip**, measured from the real browser (`fetch` timed in-page: 724 / 735 /
+  784 ms; cold ~1259 ms) — the backend render (~300 ms) plus serialisation and the 229 KB PDF over
+  the wire.
+- **The `<embed type="application/pdf">` native PDF viewer reloads all 114 pages** from the new
+  blob URL on every re-ink (the Proof swaps `blobUrl`, discarding the rendered state) — on top of
+  the two above.
 
-**Verdict-ready summary.** Locus: frontend proof rendering (backend is ~300 ms, fine). This is a
-perceived-performance question — Lot 3 (`AUTHOR_EXPERIENCE`) territory (progressive/first-page
-proof, or not re-rendering all pages on a re-ink). No backend correctif indicated.
+Sum ≈ 500 ms + ~730 ms + a full 114-page native-PDF reload ≈ the "several seconds" the founder
+felt. **The backend is ~300 ms of it; the rest is frontend.** Confirmed, not reasoned.
+
+**Verdict-ready summary.** Locus: frontend (the 500 ms debounce + the full `<embed>` PDF reload),
+NOT the backend. This is a perceived-performance question — Lot 3 (`AUTHOR_EXPERIENCE`): candidates
+are a shorter/adaptive debounce, a progressive or first-page-first proof, or a PDF viewer that
+does not re-render every page on a re-ink. **No backend correctif indicated; no fix now (CTO).**
+Instrument: `backend/spikes/founder-defect6-throwaway.ts` (creates a disposable 114-page project,
+times the export round trip, cleans up).
 
 ---
 
