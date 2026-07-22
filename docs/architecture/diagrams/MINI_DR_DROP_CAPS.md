@@ -1,10 +1,13 @@
 # Mini Design Review — Drop Caps (BOOK_PRESENTATION §4 row 4, as amended)
 
-**Status:** AWAITING CTO REVIEW — **no code written.** Builds on the CTO-approved amendment to
-`BOOK_PRESENTATION.md` §4 row 4 (scope now includes the trigger; the "already priced" claim
-withdrawn as measured-false). No line touches `TypographyResolver` or any renderer until this is
-approved.
-**Date:** 2026-07-21
+**Status:** REOPENED FOR IMPLEMENTATION (2026-07-22, queue item 5) — **DRAFT awaiting CTO approval
+of the reopened review; no code before it.** The §4bis question is **SETTLED as item 1** (Option A
+— converge up, CTO 2026-07-22) on a POSITIVE real-Word spike whose visual proof was seen **before**
+validation, as the CTO conditioned (`spikes/output/dropcap-frame-sized.png` — four real wrapped
+drop caps rendered by Word 16.0 itself from our sized, cleaned markup). §4 is reframed
+accordingly; the item-1 plan and the verification-instrument rules (including one explicit
+exclusion) are below.
+**Date:** 2026-07-21, reopened 2026-07-22
 
 ---
 
@@ -70,12 +73,20 @@ Three instruments, each asserting the property that would be violated:
 **Tri-format proof (ADR-0050),** with a test theme declaring `scope: 'chapterOpening'`: PDF first
 glyph rendered at the declared scale · EPUB `::first-letter` CSS · DOCX enlarged first run.
 
-## 4. What this capability is NOT — recorded, per CTO
+## 4. What this capability themes — REFRAMED (2026-07-22, superseding the "v1 approximation" text)
 
-It themes a **known v1 approximation**: an enlarged first character with **no text wrap-around**, in
-all three renderers. The theme may vary scale and form *within* that approximation, **not beyond it**.
-This is accepted for this scope, explicitly, not overlooked. Real wrap-around — a line-aware layout
-problem — would be **its own chantier with its own R2**, never a silent extension of this one.
+*(The original §4 called this "a known v1 approximation: an enlarged first character with no text
+wrap-around, in all three renderers" — kept here as history, now measured-false on two of three
+formats and closed on the third by Option A.)*
+
+**The capability themes a REAL drop cap, tri-format:** a glyph spanning `lines` body lines with
+text beside it — PDF via the shipped indent-band (PR #26), EPUB via `float`, **DOCX via Word's own
+native drop-cap frame** (the §4bis Option-A convergence, spike-proven). One declared theme value,
+one visual meaning in all three formats, and — deeper than visual — **one sizing arithmetic**: the
+DOCX letter size becomes another consumer of the shared `dropCapMetrics` cap-height-spans-N-lines
+computation (spike Finding B: Word auto-sizes its native letters by exactly that arithmetic —
+129 half-points for `lines=3` over an 11pt body). Real per-line wrap-shaping beyond the band
+(e.g. contoured wrap) stays out — its own chantier if ever wanted.
 
 ## 4bis. OPEN — three renderers, three strategies (**THE FIRST POINT to settle when this review reopens**)
 
@@ -178,6 +189,67 @@ scenario the CTO's condition anticipated). Instruments: `docx-dropcap-frame-spik
 **Next (per the CTO's sequencing): report, then reopen this review with §4bis settled as item 1,
 §4 reframed (a real tri-format drop cap, no longer a v1 approximation), and the standing §3
 instruments (measured pricing, observable atomicity, Classic `scope:'none'` byte-stability).**
+
+### §4bis PRE-VALIDATION VISUAL PROOF (2026-07-22 — the CTO's condition, met BEFORE this review's approval)
+
+The CTO's question, answered precisely: **the original spike file did NOT carry Finding B's
+sizing** (its letter was 27.5pt = 2.5× body — current-strategy scale; Finding B was *discovered*
+by diffing against native, not applied). Nobody had seen a properly-sized tri-format drop cap in
+Word. So the check was done first: the spike now generates `dropcap-frame-sized.docx` (letter at
+Word's own 129 half-points for `lines=3`, framePr stripped to the native shape), Word 16.0
+rendered it to PDF (OM read-back: `Position=1`, `LinesToDrop=3`), and the page was rasterised
+via WinRT `Windows.Data.Pdf` — **`spikes/output/dropcap-frame-sized.png`: four drop caps, the
+glyph spanning its line band, text genuinely wrapped beside it, full width resumed below.** The
+XML identity now has its visual counterpart; the convergence is not built on markup equality
+alone.
+
+---
+
+## 6. ITEM 1 SETTLED + the reopened commit plan (2026-07-22)
+
+**Item 1 (the §4bis convergence) — SETTLED: Option A** (CTO 2026-07-22, three reasons recorded in
+the session log: the cost objection died by re-measurement; Word is the format authors open most;
+the founding instinct against one-value-three-behaviours). Findings A/B and the visual proof are
+integrated below; if implementation uncovers frame quirks beyond them, it stops and reports (the
+standing mid-item rule).
+
+Commit plan (one responsibility each; gate green before the next):
+
+1. **DOCX convergence (Finding A + B).** A custom `XmlComponent` emitting the native attribute-free
+   `framePr` (never the post-generation patch the spike used); the letter sized via the shared
+   `dropCapMetrics` cap-height arithmetic (Finding B — the third consumer of the one module);
+   `DOCXRenderer.buildRunsWithDropCap` replaced by the letter-paragraph + body-paragraph structure
+   native Word uses. Verified against real Word (OM read-back + a rendered-page raster in the
+   build's screenshot loop).
+2. **The theme value + the positional trigger.** `Theme.presentation.dropCap`
+   (`scope: 'none' | 'chapterOpening'`, `scale`/`lines`), applied by `TypographyResolver` with the
+   positional context it currently lacks (§1); the §5 positional edge cases (first block not a
+   paragraph, empty chapter, split continuation) enumerated in the resolver's tests **before**
+   implementation. Classic ships `scope: 'none'`.
+3. **The §3 instruments.** The pricing test (measured against the renderer, never derived from
+   scale arithmetic); **the owed `DROPCAP_PARAGRAPH_ATOMICITY` observable-overflow test** (a
+   drop-cap paragraph too long for the page remainder yields a measured reconciliation — the
+   TODO.md debt this chantier makes loud); parity byte-stability (Classic `scope:'none'` → the
+   locked corpus numbers unmoved).
+4. **Tri-format proof + live verification.** A test theme with `scope:'chapterOpening'`: PDF glyph
+   at scale with indented band, EPUB `::first-letter`/float CSS, DOCX native frame (OM-verified);
+   live in the studio on a real manuscript; docs reconciliation.
+
+## 7. Verification instruments — what is TRUSTED, and one EXPLICIT EXCLUSION (CTO-required)
+
+**Trusted:**
+- the emitted-XML identity against Word's own native drop-cap markup (ground truth produced by
+  `DropCap.Enable()` via COM, never our reading of the spec);
+- Word's object-model read-back (`Paragraph.DropCap.Position` / `.LinesToDrop`) on OUR files;
+- a human-visible rendered page (Word → PDF → WinRT raster) in the build's screenshot loop;
+- the §3 pricing/atomicity/parity instruments for the PDF side.
+
+**EXCLUDED — `Word Range.Information` positional geometry (wdVertical/HorizontalPositionRelativeToPage), with the reason on the record:** it reports paragraph
+anchors, not laid-out line positions. Measured 2026-07-22: it returned the SAME "not wrapped"
+signature on Word's own native drop cap — which wraps by definition — as on our file; trusted
+naively it would have killed Option A on a false measurement (the instrument-liar class: the
+drop-cap height invariance, the styleMap "ACCEPTED", the singleton measurer). **No future session
+may use it to judge wrap behaviour.**
 
 ## 5. Risks, and one open question
 

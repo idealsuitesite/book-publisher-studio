@@ -66,11 +66,49 @@ function frameDoc(): Document {
   return new Document({ sections: [{ children: paragraphs }] });
 }
 
+/**
+ * Finding B APPLIED (the CTO's pre-validation visual condition): the letter sized as Word sizes
+ * its own — 129 half-points (64.5pt) for lines=3 over an 11pt body, read from the native file —
+ * and the framePr stripped of the type-forced zero attrs to match the native shape exactly.
+ * Word 16.0 rendered this file to PDF; rasterised (WinRT Windows.Data.Pdf), the page shows REAL
+ * wrapped drop caps — the human-visible proof (`output/dropcap-frame-sized.png`).
+ */
+function sizedFrameDoc(): Document {
+  const paragraphs = Array.from({ length: 4 }, () => [
+    new Paragraph({
+      frame: {
+        type: 'absolute',
+        position: { x: 0, y: 0 },
+        width: 0,
+        height: 0,
+        anchor: { horizontal: FrameAnchorType.TEXT, vertical: FrameAnchorType.TEXT },
+        dropCap: DropCapType.DROP,
+        lines: 3,
+        wrap: FrameWrap.AROUND,
+      },
+      children: [new TextRun({ text: 'E', size: 129, bold: true })], // native Word's own auto-size
+    }),
+    new Paragraph({ children: [new TextRun({ text: Array.from({ length: 60 }, () => 'word').join(' '), size: BODY_PT * 2 })] }),
+  ]).flat();
+  return new Document({ sections: [{ children: paragraphs }] });
+}
+
+async function stripFrameAttrs(buffer: Buffer): Promise<Buffer> {
+  const zip = await JSZip.loadAsync(buffer);
+  let xml = await zip.file('word/document.xml')!.async('string');
+  // The library's types FORCE width/height/position; native Word drop caps omit them. Strip to
+  // the native shape (the production path will be a custom XmlComponent, not this patch).
+  xml = xml.replace(/<w:framePr([^>]*)\/>/g, (_m, attrs: string) => `<w:framePr${attrs.replace(/ w:(w|h|x|y)="0"/g, '')}/>`);
+  zip.file('word/document.xml', xml);
+  return zip.generateAsync({ type: 'nodebuffer' });
+}
+
 async function main() {
   const inline = await Packer.toBuffer(inlineDoc());
   const framed = await Packer.toBuffer(frameDoc());
   writeFileSync(join(OUT, 'dropcap-inline.docx'), inline);
   writeFileSync(join(OUT, 'dropcap-frame.docx'), framed);
+  writeFileSync(join(OUT, 'dropcap-frame-sized.docx'), await stripFrameAttrs(await Packer.toBuffer(sizedFrameDoc())));
 
   // The library's half of the proof: the XML really carries Word's drop-cap frame markup.
   const zip = await JSZip.loadAsync(framed);
