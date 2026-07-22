@@ -71,13 +71,16 @@ describe('Novel theme — parity lock (drop caps lit) + tri-format (real corpus)
     // MOVED out of the unlucky straddle by the re-flow, not cured (Modern's kdp anchor still
     // carries its own, same class, still counted). The ornament stays live on all 17 openings,
     // degraded 0 on both anchors.
+    // Re-locked CONSCIOUSLY for FOUNDER_TRAVERSAL defect 2: faith-alone has no author, so the
+    // synthesised "© Unknown" copyright page is gone — one planned front-matter page fewer in the
+    // rendered count (letter 89 -> 88, kdp 160 -> 159). The ornament and reconciliations unchanged.
     const letter = await new PDFRenderer().render(paginate('novel', LetterPageLayout), { language: 'en' });
-    expect(letter.metrics.pageCount).toBe(89);
+    expect(letter.metrics.pageCount).toBe(88);
     expect(letter.metrics.unplannedPageBreaks).toBe(0);
     expect(letter.metrics.degradedDropCaps).toBe(0);
 
     const kdp = await new PDFRenderer().render(paginate('novel', KDP6x9PageLayout), { language: 'en' });
-    expect(kdp.metrics.pageCount).toBe(160);
+    expect(kdp.metrics.pageCount).toBe(159);
     expect(kdp.metrics.unplannedPageBreaks).toBe(0);
     expect(kdp.metrics.degradedDropCaps).toBe(0);
   }, 60_000); // renders the 40k-word corpus twice under full-suite parallel load

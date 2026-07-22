@@ -80,14 +80,18 @@ describe('Part-opener parity on real faith-alone (kdp-6x9, classic, auto-TOC)', 
     // single planned page (attributed "front matter" in the warnings) — pre-existing,
     // observable per ADR-0051. The model count is renderer-independent and stays 155: the
     // ~36pt charge absorbs into existing page slack without adding a model page.
+    // Re-locked again for FOUNDER_TRAVERSAL defect 2: faith-alone has no author, so its "© Unknown"
+    // copyright page is gone — one planned front-matter page fewer (base 160 -> 159, openers
+    // 164 -> 163). Model counts (155 / 158) and unplanned (2 / 3) unchanged; the ledger's planned
+    // front-matter constant drops 3 -> 2 (title + TOC-first; the copyright page no longer exists).
     expect(baseRun.paginated.pages.length).toBe(155);
-    expect(baseRun.metrics.pageCount).toBe(160);
+    expect(baseRun.metrics.pageCount).toBe(159);
     expect(baseRun.metrics.unplannedPageBreaks).toBe(2);
 
     // charged == consumed on the opener shape: the model now charges the 3 opener pages
     // (155→158) — pre-fix it charged +0 while the renderer drew +3 as unplanned breaks.
     expect(openerRun.paginated.pages.length).toBe(158);
-    expect(openerRun.metrics.pageCount).toBe(164);
+    expect(openerRun.metrics.pageCount).toBe(163);
     // 3, not 5: the 3 opener drifts are GONE (planned pages now, PART_LEVEL), and the
     // paragraph-136 residual this comment used to carry vanished when MINI_DR_BLOCKLESS_TITLES
     // charged the §3 title and re-flowed its page context (moved by the re-flow, not cured —
@@ -97,10 +101,10 @@ describe('Part-opener parity on real faith-alone (kdp-6x9, classic, auto-TOC)', 
     expect(openerRun.metrics.unplannedPageBreaks).toBe(3);
 
     // The ADR-0051 ledger balances in BOTH runs: every real page is a planned model page, one of
-    // the 3 planned front-matter pages (title, copyright, the TOC's first), or a counted
-    // unplanned break. Nothing silent.
+    // the 2 planned front-matter pages (title + the TOC's first; the "© Unknown" copyright page is
+    // gone, FOUNDER_TRAVERSAL defect 2), or a counted unplanned break. Nothing silent.
     for (const run of [baseRun, openerRun]) {
-      expect(run.metrics.pageCount).toBe(run.paginated.pages.length + 3 + (run.metrics.unplannedPageBreaks ?? 0));
+      expect(run.metrics.pageCount).toBe(run.paginated.pages.length + 2 + (run.metrics.unplannedPageBreaks ?? 0));
     }
 
     // Each opener owns exactly one model page carrying its own id.

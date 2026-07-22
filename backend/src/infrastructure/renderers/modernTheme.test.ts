@@ -59,12 +59,15 @@ describe('Modern theme — parity lock + tri-format accent/fonts (real corpus)',
     // 158/2 -> 157/1, the remaining 1 being paragraph-123's ±1-line bold-run residual — the
     // disclosed class surviving exactly where it genuinely fires. Letter drops 88/1 -> 87/0:
     // its reconciliation was riding the same uncharged title.
+    // Re-locked CONSCIOUSLY for FOUNDER_TRAVERSAL defect 2: faith-alone has no author, so the
+    // synthesised "© Unknown" copyright page is gone — one planned front-matter page fewer in the
+    // rendered count (letter 87 -> 86, kdp 157 -> 156). Reconciliations unaffected.
     const letter = await new PDFRenderer().render(paginate('modern', LetterPageLayout), { language: 'en' });
-    expect(letter.metrics.pageCount).toBe(87);
+    expect(letter.metrics.pageCount).toBe(86);
     expect(letter.metrics.unplannedPageBreaks).toBe(0);
 
     const kdp = await new PDFRenderer().render(paginate('modern', KDP6x9PageLayout), { language: 'en' });
-    expect(kdp.metrics.pageCount).toBe(157); // Modern's own number, never Classic's
+    expect(kdp.metrics.pageCount).toBe(156); // Modern's own number, never Classic's
     expect(kdp.metrics.unplannedPageBreaks).toBe(1); // paragraph-123, the ±1-line residual class
   }, 30_000); // renders the 40k-word corpus twice — needs headroom under full-suite parallel load
 

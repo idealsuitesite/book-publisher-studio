@@ -39,14 +39,16 @@ export class FrontMatterBuilder {
   private buildTitlePage(book: Book): TitlePage | undefined {
     const { title, subtitle, author } = book.metadata;
 
-    // A title page with neither a title nor an author is a blank sheet. Emitting one would add
-    // an empty leaf to every export.
-    if (!title?.trim() && !author?.trim()) return undefined;
+    // A title page needs a real title (FOUNDER_TRAVERSAL defect 2). The two former fallbacks —
+    // 'Untitled' and 'Unknown author' — are removed together in the same change: neutralising
+    // only the ASTBuilder default would just move the invention down one floor to here. `title`
+    // is the filename stand-in and is present in practice; `author` prints only when it exists.
+    if (!title?.trim()) return undefined;
 
     return {
-      title: title?.trim() || 'Untitled',
+      title: title.trim(),
       subtitle: subtitle?.trim() || undefined,
-      author: author?.trim() || 'Unknown author',
+      author: author?.trim() || undefined,
     };
   }
 

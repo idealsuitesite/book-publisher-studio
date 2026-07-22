@@ -363,7 +363,7 @@ export class BookEditingService {
         delete frontMatter.titlePage;
       } else {
         const title = patch.titlePage.title.trim();
-        const author = patch.titlePage.author.trim();
+        const author = patch.titlePage.author?.trim();
         if (!title || !author) throw new Error('Title page requires a title and an author');
         frontMatter.titlePage = {
           title,

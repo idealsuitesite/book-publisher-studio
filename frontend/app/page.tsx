@@ -104,7 +104,7 @@ export default function Home() {
           <p className="text-xs text-app-text-muted">{recencyLabel(latest.updatedAt)}</p>
           <p className="text-xl font-semibold text-app-text">{latest.name}</p>
           <p className="text-sm text-app-text-muted">
-            {latest.bookTitle} · {latest.author}
+            {latest.bookTitle}{latest.author ? ` · ${latest.author}` : ''}
           </p>
           <p className="text-xs text-app-text-muted">
             {latest.versionCount} version{latest.versionCount === 1 ? '' : 's'}
@@ -128,7 +128,7 @@ export default function Home() {
                 <Card className="flex h-full flex-col gap-2 px-6 py-5">
                   <p className="text-base font-semibold text-app-text">{project.name}</p>
                   <p className="text-sm text-app-text-muted">
-                    {project.bookTitle} · {project.author}
+                    {project.bookTitle}{project.author ? ` · ${project.author}` : ''}
                   </p>
                   <p className="text-xs text-app-text-muted">
                     {project.versionCount} version{project.versionCount === 1 ? '' : 's'}

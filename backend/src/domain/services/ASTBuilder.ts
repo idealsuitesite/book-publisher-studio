@@ -319,7 +319,11 @@ export class ASTBuilder {
   private buildMetadata(doc: NormalizedDocument): BookMetadata {
     return {
       title: doc.metadata.title ?? titleFromFileName(doc.metadata.fileName) ?? '',
-      author: doc.metadata.author ?? 'Unknown',
+      // FOUNDER_TRAVERSAL defect 2 (ADR-0050 applied to metadata): a missing author is ABSENT, not
+      // the placeholder 'Unknown' — which the FrontMatterBuilder's own guards (correctly) treat as
+      // real content and print as "Unknown" / "© 2026 Unknown". The validation report still names
+      // the gap (BookValidator / ComplianceRule flag a missing author). Empty/whitespace → absent.
+      author: doc.metadata.author?.trim() || undefined,
       language: 'fr',
     };
   }

@@ -15,7 +15,28 @@ import { DOCXRenderer } from './DOCXRenderer';
 import { EPUBRenderer } from './EPUBRenderer';
 import { LetterPageLayout } from '../../domain/layouts/LetterPageLayout';
 import { extractPdfRuns } from '../../test-utils/extractPdfText';
+import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
+import { ClassicTheme } from '../../domain/themes/ClassicTheme';
+import { createBook } from '../../domain/models/Book';
+import type { Chapter } from '../../domain/models/Book';
+import type { PaginatedBook } from '../../domain/models/PaginatedBook';
 import type { Renderer } from '../../domain/ports/Renderer';
+
+// A book that genuinely HAS an author, built through the real pipeline — so the copyright-page
+// RENDER path (renderCopyrightPage) stays covered after FOUNDER_TRAVERSAL defect 2 removed the
+// 'Unknown' placeholder that used to give the authorless fixtures a copyright page by accident.
+function authoredPaginatedBook(): PaginatedBook {
+  const now = new Date();
+  const chapter: Chapter = {
+    type: 'chapter', id: 'c-1', number: 1, title: 'Chapter 1',
+    content: [{ type: 'paragraph', id: 'p-1', text: 'Body text.' }], createdAt: now, updatedAt: now,
+  };
+  const book = createBook({ title: 'Le Guide de Jean', author: 'Jean Dupont', language: 'en' }, [chapter]);
+  const withFront = { ...book, frontMatter: new FrontMatterBuilder().build(book) };
+  const styled = new ThemeEngine().applyTheme(withFront, ClassicTheme);
+  const typeset = new TypographyResolver().resolve(styled);
+  return new LayoutEngine().paginate(typeset, LetterPageLayout);
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = readFileSync(join(__dirname, '..', '..', '..', 'verification', 'large-book.docx'));
@@ -77,13 +98,21 @@ describe('Front matter — PDF', () => {
     expect(text).not.toContain('Ã');
   });
 
-  it('renders a copyright page', async () => {
-    const pdf = await useCaseWith(new PDFRenderer({ compress: false })).execute(request);
-    const text = extractPdfRuns(pdf)
-      .map((run) => run.text)
-      .join(' ');
+  it('renders a copyright page when the book HAS an author', async () => {
+    const { output } = await new PDFRenderer({ compress: false }).render(authoredPaginatedBook(), { language: 'en' });
+    const text = extractPdfRuns(output).map((run) => run.text).join(' ');
 
     expect(text).toMatch(/©/);
+    expect(text).toContain('Jean Dupont');
+  });
+
+  it('never invents a copyright page for an authorless book — no "©", no "Unknown" (FOUNDER_TRAVERSAL defect 2)', async () => {
+    // large-book.docx carries no author; the honest output has no copyright page at all.
+    const pdf = await useCaseWith(new PDFRenderer({ compress: false })).execute(request);
+    const text = extractPdfRuns(pdf).map((run) => run.text).join(' ');
+
+    expect(text).not.toMatch(/©/);
+    expect(text).not.toContain('Unknown');
   });
 
   it('strips the source extension — a title page never reads ".docx"', async () => {
@@ -109,17 +138,27 @@ describe('Front matter — DOCX', () => {
     expect(xml).toContain('Édition Spéciale');
   });
 
-  it('renders a copyright page', async () => {
-    const xml = await documentXml(await useCaseWith(new DOCXRenderer()).execute(request));
+  it('renders a copyright page when the book HAS an author', async () => {
+    const zip = await JSZip.loadAsync((await new DOCXRenderer().render(authoredPaginatedBook(), { language: 'en' })).output);
+    const xml = await zip.file('word/document.xml')!.async('string');
 
     expect(xml).toMatch(/©/);
+    expect(xml).toContain('Jean Dupont');
   });
 
-  it('separates title page, copyright page and body with real page breaks', async () => {
-    const xml = await documentXml(await useCaseWith(new DOCXRenderer()).execute(request));
+  it('separates title page, copyright page and body with real page breaks (author present)', async () => {
+    const zip = await JSZip.loadAsync((await new DOCXRenderer().render(authoredPaginatedBook(), { language: 'en' })).output);
+    const xml = await zip.file('word/document.xml')!.async('string');
 
     // One after the title page, one after the copyright page.
     expect((xml.match(/<w:br w:type="page"\/>/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('never invents a copyright page for an authorless book (FOUNDER_TRAVERSAL defect 2)', async () => {
+    const xml = await documentXml(await useCaseWith(new DOCXRenderer()).execute(request));
+
+    expect(xml).not.toMatch(/©/);
+    expect(xml).not.toContain('Unknown');
   });
 });
 
@@ -142,13 +181,23 @@ describe('Front matter — EPUB', () => {
     expect(titleIndex).toBeLessThan(chapterIndex);
   });
 
-  it('renders a copyright section', async () => {
-    const files = await sections(await useCaseWith(new EPUBRenderer()).execute(request));
+  async function sectionsOf(buffer: Buffer): Promise<string> {
+    const zip = await JSZip.loadAsync(buffer);
+    const names = Object.keys(zip.files).filter((name) => name.endsWith('.xhtml'));
+    return (await Promise.all(names.map((name) => zip.file(name)!.async('string')))).join('\n');
+  }
 
+  it('renders a copyright section when the book HAS an author', async () => {
     // epub-gen-memory serialises © as the numeric entity &#xA9; — valid XHTML, and the reason
     // a naive search for the literal character reports a false negative.
-    const all = files.map((f) => f.content).join('\n');
+    const all = await sectionsOf((await new EPUBRenderer().render(authoredPaginatedBook(), { language: 'en' })).output);
     expect(all).toMatch(/©|&#xA9;/);
+  });
+
+  it('never invents a copyright section for an authorless book (FOUNDER_TRAVERSAL defect 2)', async () => {
+    const all = await sectionsOf(await useCaseWith(new EPUBRenderer()).execute(request));
+    expect(all).not.toMatch(/©|&#xA9;/);
+    expect(all).not.toContain('Unknown');
   });
 
   it('preserves accents without mojibake', async () => {

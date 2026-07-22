@@ -494,11 +494,15 @@ export class PDFRenderer implements Renderer<Buffer> {
       doc.text(page.tagline, doc.page.margins.left, doc.y, { width: usableWidth, align: 'center' });
     }
 
-    doc.font(this.fonts.resolveBody(theme, false, false)).fontSize(14).fillColor('#000');
-    doc.text(page.author, doc.page.margins.left, doc.page.height - doc.page.margins.bottom - 80, {
-      width: usableWidth,
-      align: 'center',
-    });
+    // A title page with no real author prints no author line (FOUNDER_TRAVERSAL defect 2) —
+    // never 'Unknown author'. FrontMatterBuilder only sets this when a real author exists.
+    if (page.author) {
+      doc.font(this.fonts.resolveBody(theme, false, false)).fontSize(14).fillColor('#000');
+      doc.text(page.author, doc.page.margins.left, doc.page.height - doc.page.margins.bottom - 80, {
+        width: usableWidth,
+        align: 'center',
+      });
+    }
   }
 
   /**

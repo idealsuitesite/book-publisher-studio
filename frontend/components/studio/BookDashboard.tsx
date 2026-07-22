@@ -56,7 +56,7 @@ export function BookDashboard({ project, facts, layoutLabel, themeLabel, measure
           {meta.title}
         </h2>
         <p className="mt-1 text-sm text-app-text-muted">
-          {meta.author} · {meta.language.toUpperCase()} · {themeLabel} · {layoutLabel}
+          {meta.author ? `${meta.author} · ` : ''}{meta.language.toUpperCase()} · {themeLabel} · {layoutLabel}
         </p>
       </div>
 

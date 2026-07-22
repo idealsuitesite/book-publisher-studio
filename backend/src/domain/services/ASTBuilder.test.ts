@@ -381,6 +381,14 @@ describe('ASTBuilder', () => {
       expect(l.items).toEqual(['One', 'Two']);
     });
 
+    it('leaves author ABSENT when the document supplies none — never the placeholder "Unknown" (FOUNDER_TRAVERSAL defect 2)', () => {
+      const book = new ASTBuilder().build(buildDocument([heading(1, 'Chapter One')]));
+
+      expect(book.metadata.author).toBeUndefined();
+      // The title still stands in from the filename (a legitimate substitution, not an invention).
+      expect(book.metadata.title).toBe('manuscript');
+    });
+
     it('converts a footnote node with a sequential number', () => {
       const doc = buildDocument([heading(1, 'Chapter One'), footnote('See appendix A.')]);
       const book = new ASTBuilder().build(doc);

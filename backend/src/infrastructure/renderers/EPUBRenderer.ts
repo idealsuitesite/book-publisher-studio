@@ -178,7 +178,7 @@ export class EPUBRenderer implements Renderer<Buffer> {
         `<h1 style="font-size:2em">${escapeHtml(title)}</h1>`,
         subtitle ? `<p style="font-size:1.3em;font-style:italic">${escapeHtml(subtitle)}</p>` : '',
         tagline ? `<p style="font-style:italic">${escapeHtml(tagline)}</p>` : '',
-        `<p style="margin-top:4em;font-size:1.1em">${escapeHtml(author)}</p>`,
+        author ? `<p style="margin-top:4em;font-size:1.1em">${escapeHtml(author)}</p>` : '',
         `</div>`,
       ].filter(Boolean);
       chapters.push({ title, content: parts.join('\n'), excludeFromToc: true });

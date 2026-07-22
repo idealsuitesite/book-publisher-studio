@@ -9,7 +9,11 @@
 export interface TitlePageDTO {
   title: string;
   subtitle?: string;
-  author: string;
+  // Optional (FOUNDER_TRAVERSAL defect 2): a synthesized title page with no real author carries
+  // no author. The WRITE path (editFrontMatter) still requires a non-empty author to SAVE a
+  // manually-authored page — that product rule lives in the controller guard, not in this
+  // transport type, which must faithfully carry an authorless page to the reader.
+  author?: string;
   tagline?: string;
 }
 
