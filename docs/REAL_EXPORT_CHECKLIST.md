@@ -63,7 +63,7 @@ Export method: POST /api/manuscripts/export via the running dev server (NOT call
 - [ ] Footnotes render correctly
 - [ ] Page breaks land where expected (PDF/DOCX)
 - [ ] Page numbers correct (PDF)
-- [ ] Drop caps applied where marked (once implemented)
+- [ ] Drop caps applied where the theme declares them (`Theme.presentation.dropCap`, 2026-07-22 — shipped themes declare `scope: 'none'`, so on Classic/Modern the correct observation is NO drop cap anywhere)
 - [ ] Correct font family visible (not a silent fallback)
 - [ ] No missing paragraphs
 - [ ] No duplicated paragraphs
