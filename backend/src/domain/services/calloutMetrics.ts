@@ -21,10 +21,13 @@ export const CALLOUT_PAD_V_PT = 6;
 
 /**
  * How far the tint is mixed from the accent toward paper white (0 = raw accent, 1 = white).
- * THE SHADE KNOB — its value locks only after the CTO's look at real rendered pages
- * (MINI_DR_CALLOUTS §7, the Modern-accent screenshot precedent).
+ * THE SHADE KNOB — CTO-tuned on real rendered pages (MINI_DR_CALLOUTS §7, the Modern-accent
+ * screenshot precedent): 0.92 read as a documentation box that competed with the chapter title;
+ * 0.96 is the CTO's call — "une teinte qui se devine plutôt qu'elle ne s'annonce", the rule
+ * carries the distinction, the tint only confirms it. Do not lower this to make the tint more
+ * visible; visibility is not the goal, a breathing page is.
  */
-export const CALLOUT_TINT_TOWARD_PAPER = 0.92;
+export const CALLOUT_TINT_TOWARD_PAPER = 0.96;
 
 /** Horizontal space the chrome reserves before the text column starts. */
 export function calloutTextIndentPt(): number {
