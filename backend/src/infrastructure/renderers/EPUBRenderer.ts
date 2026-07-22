@@ -121,16 +121,22 @@ export class EPUBRenderer implements Renderer<Buffer> {
         ...domainBook.mainContent.map((content) => this.buildChapter(content, blockTypography, tmpDir)),
       ];
 
-      // FOUNDER_TRAVERSAL defect 3: EPUB requires a language, but WE no longer invent one. We set
-      // `lang` ONLY when it is genuinely known; when absent, the key is OMITTED (not set to
-      // undefined, which epub-gen rejects with a 500) so the library applies its own format-
-      // required default — that fallback is the library's, never our assertion of a language the
-      // manuscript never declared (which is how English books shipped labelled 'fr').
-      const language = context.metadata?.language ?? domainBook.metadata.language;
+      // FOUNDER_TRAVERSAL defect 3 (+ CTO EPUB-500 review): the MODEL stays language-unknown when
+      // the author declared none — `book.metadata.language` is undefined and never gets a 'en'
+      // default there (that would be the same false assertion as the old hardcoded 'fr'). But the
+      // EPUB FORMAT requires a `dc:language`, so THIS ADAPTER supplies the format-required fallback
+      // explicitly — owned and documented here, never re-injected into the Book. Measured
+      // (epub-lang-behavior-probe.ts): passing `lang: undefined` throws inside epub-gen
+      // ("...reading 'replace'"), and omitting the key lets epub-gen fall back to 'en' — but
+      // depending on that undocumented internal default is fragile (an upgrade could turn the
+      // omit-path into the throw-path), so a book must NEVER fail to export because an optional
+      // field is empty. 'en' is the disclosed default until a real language is known
+      // (LANGUAGE_DETECTION). A declared language always wins.
+      const language = context.metadata?.language ?? domainBook.metadata.language ?? 'en';
       const options: EpubOptions = {
         title: context.metadata?.title ?? domainBook.metadata.title,
         author: context.metadata?.author ?? domainBook.metadata.author,
-        ...(language ? { lang: language } : {}),
+        lang: language,
         version: 3,
         // We render every title ourselves (chapter and nested section headings) for parity with
         // DOCXRenderer/PDFRenderer, rather than relying on the library's own default behavior.

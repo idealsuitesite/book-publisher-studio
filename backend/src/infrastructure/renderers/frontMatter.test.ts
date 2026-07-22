@@ -181,6 +181,22 @@ describe('Front matter — EPUB', () => {
     expect(titleIndex).toBeLessThan(chapterIndex);
   });
 
+  it('Author B (no declared language) still exports a valid EPUB — never a 500, always a dc:language (FOUNDER_TRAVERSAL defect 3, EPUB-500 review)', async () => {
+    // large-book.docx carries no language (post defect-3 import): book.metadata.language is
+    // undefined. The EPUB format REQUIRES dc:language, so the adapter supplies its own explicit
+    // fallback here — the export must SUCCEED (a book never fails to export because an optional
+    // field is empty) and the EPUB must declare a valid, non-empty language. The model stays
+    // language-unknown; only the artifact carries the format-required value.
+    const buffer = await useCaseWith(new EPUBRenderer()).execute(request); // must not throw
+    const zip = await JSZip.loadAsync(buffer);
+    const opfName = Object.keys(zip.files).find((n) => n.endsWith('.opf'))!;
+    const opf = await zip.file(opfName)!.async('string');
+    const lang = opf.match(/<dc:language[^>]*>([^<]+)<\/dc:language>/)?.[1];
+
+    expect(lang).toBeTruthy();
+    expect(lang).toBe('en'); // the disclosed adapter fallback until LANGUAGE_DETECTION exists
+  });
+
   async function sectionsOf(buffer: Buffer): Promise<string> {
     const zip = await JSZip.loadAsync(buffer);
     const names = Object.keys(zip.files).filter((name) => name.endsWith('.xhtml'));
