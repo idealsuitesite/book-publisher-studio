@@ -27,7 +27,7 @@ import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTy
 import type { Content, Block, Chapter, Section, TOCEntry, FrontMatter } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
-import { DROP_CAP_SCALE, dropCapLetterSizePt } from '../../domain/services/dropCapMetrics';
+import { dropCapLetterSizePt, dropCapScaleOf } from '../../domain/services/dropCapMetrics';
 import type { TextMeasurer } from '../../domain/ports/TextMeasurer';
 import { withNativeDropCapFrame } from './docxDropCapFrame';
 
@@ -114,14 +114,16 @@ function buildRunsWithPrefix(
   return [new TextRun({ text: prefix, font, size, color }), ...buildRuns(runs, font, size, color)];
 }
 
-// Drop-cap v1 approximation (see DROP_CAP_SCALE above): splits the first character off
-// the paragraph's very first run and renders it as its own larger, bold TextRun before
-// the rest of the paragraph's runs render normally.
+// Drop-cap inline approximation (the documented measurer-less degradation): splits the first
+// character off the paragraph's very first run and renders it as its own larger, bold TextRun
+// before the rest of the paragraph's runs render normally. `scale` is the theme-declared value
+// (dropCapScaleOf — §6 commit 2), so even the degraded letter honours the theme's knob.
 function buildRunsWithDropCap(
   runs: TypeRun[],
   font: string | undefined,
   size: number | undefined,
-  color: string | undefined
+  color: string | undefined,
+  scale: number
 ): ParagraphChild[] {
   const [firstRun, ...restRuns] = runs;
   if (!firstRun || firstRun.text.length === 0) return buildRuns(runs, font, size, color);
@@ -133,7 +135,7 @@ function buildRunsWithDropCap(
   const dropCapRun = new TextRun({
     text: dropCapChar,
     font,
-    size: size ? Math.round(size * DROP_CAP_SCALE) : undefined,
+    size: size ? Math.round(size * scale) : undefined,
     bold: true,
     italics: firstRun.italic,
   });
@@ -401,7 +403,7 @@ export class DOCXRenderer implements Renderer<Buffer> {
    * following paragraph — Word wraps the body beside the framed letter with its own engine.
    *
    * Sizing is the SHARED arithmetic (`dropCapMetrics`), from MEASURED inputs, never constants:
-   * the band is what the PDF charges for the same paragraph (cap ink at `DROP_CAP_SCALE` over
+   * the band is what the PDF charges for the same paragraph (cap ink at the theme-declared scale over
    * measured body lines), and the letter is sized so its ink fills that band — exactly how Word
    * auto-sizes its own drop caps (spike Finding B: 129 half-points for lines=3 over an 11pt
    * body). One module, three formats, no divergent calculations.
@@ -429,7 +431,8 @@ export class DOCXRenderer implements Renderer<Buffer> {
     const bodyLinePt = measurer.lineHeight(bodyPt, { theme });
     const capHeightEm = measurer.capHeight(100, { theme }) / 100;
     // The same band the PDF prices for this paragraph: the scaled glyph's ink over body lines.
-    const bandLines = Math.max(1, Math.ceil((capHeightEm * DROP_CAP_SCALE * bodyPt) / bodyLinePt));
+    // The scale is the theme's declared knob (§6 commit 2) — the ONE value all formats derive from.
+    const bandLines = Math.max(1, Math.ceil((capHeightEm * dropCapScaleOf(theme) * bodyPt) / bodyLinePt));
     const letterPt = dropCapLetterSizePt({ lines: bandLines, bodyLinePt, capHeightEm });
 
     const letterChar = firstRun.text[0];
@@ -499,7 +502,7 @@ export class DOCXRenderer implements Renderer<Buffer> {
             pageBreakBefore,
             spacing,
             alignment,
-            children: dropCap ? buildRunsWithDropCap(runs, font, size, color) : buildRuns(runs, font, size, color),
+            children: dropCap ? buildRunsWithDropCap(runs, font, size, color, dropCapScaleOf(theme)) : buildRuns(runs, font, size, color),
           }),
         ];
       }

@@ -1,5 +1,5 @@
 import type { StyledBook } from '../models/Theme';
-import { DROP_CAP_SCALE, dropCapGeometry } from './dropCapMetrics';
+import { dropCapGeometry, dropCapScaleOf } from './dropCapMetrics';
 import type { PageLayout } from '../models/PageLayout';
 import type { Page, PaginatedBook } from '../models/PaginatedBook';
 import type { Content, Block, TOCEntry } from '../models/Book';
@@ -425,7 +425,9 @@ export class LayoutEngine {
     const plain = (t: string, width: number): number =>
       measurer.measureHeight(t, { fontSize, width, theme }) + spaceAfter;
 
-    const dropSize = fontSize * DROP_CAP_SCALE;
+    // Theme-declared scale, same helper the renderers read (§6 commit 2) — the model prices at
+    // the value the renderer will really draw with, whatever the theme declares.
+    const dropSize = fontSize * dropCapScaleOf(theme);
     let geometry;
     try {
       geometry = dropCapGeometry({

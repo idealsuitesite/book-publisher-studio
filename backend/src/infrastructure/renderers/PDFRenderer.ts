@@ -16,7 +16,7 @@ import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
 import { renderedImageSize } from '../../domain/services/renderedImageSize';
-import { DROP_CAP_SCALE, dropCapGeometry, type DropCapGeometry } from '../../domain/services/dropCapMetrics';
+import { dropCapGeometry, dropCapScaleOf, type DropCapGeometry } from '../../domain/services/dropCapMetrics';
 import { assertPlausibleCapHeight } from '../fonts/PdfKitTextMeasurer';
 
 // The drop-cap scale now lives in the Domain (dropCapMetrics), because the pagination model
@@ -604,7 +604,7 @@ export class PDFRenderer implements Renderer<Buffer> {
           return;
         }
         if (dropCap) {
-          this.renderRunsWithDropCap(doc, runs, resolveBody, fontSize, color, options);
+          this.renderRunsWithDropCap(doc, runs, resolveBody, fontSize, color, options, dropCapScaleOf(theme));
         } else {
           this.renderRuns(doc, runs, resolveBody, fontSize, color, options);
         }
@@ -744,9 +744,6 @@ export class PDFRenderer implements Renderer<Buffer> {
     });
   }
 
-  // Drop-cap v1 approximation (see DROP_CAP_SCALE above): splits the first character off
-  // the paragraph's very first run and renders it at a larger size, inline, before the
-  // rest of the paragraph's runs render normally via renderRuns().
   /**
    * Renders a paragraph the LayoutEngine split across pages (Phase B, LAYOUT_FIDELITY.md
    * Decision 7): each non-final segment renders its allotted lines, then a real page break,
@@ -829,7 +826,8 @@ export class PDFRenderer implements Renderer<Buffer> {
     resolveFont: FontResolver,
     fontSize: number,
     color: string,
-    paragraphOptions: PDFKit.Mixins.TextOptions
+    paragraphOptions: PDFKit.Mixins.TextOptions,
+    dropCapScale: number
   ): void {
     const [firstRun, ...restRuns] = runs;
     if (!firstRun || firstRun.text.length === 0) {
@@ -841,7 +839,7 @@ export class PDFRenderer implements Renderer<Buffer> {
     const remainderOfFirstRun = firstRun.text.slice(1);
     const remainingRuns: TypeRun[] = remainderOfFirstRun ? [{ ...firstRun, text: remainderOfFirstRun }, ...restRuns] : restRuns;
 
-    const dropSize = fontSize * DROP_CAP_SCALE;
+    const dropSize = fontSize * dropCapScale;
     const dropFont = resolveFont(true, firstRun.italic);
 
     // Metrics first, because they can refuse. Measured on THIS document, in the very faces this

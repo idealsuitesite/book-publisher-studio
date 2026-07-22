@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { TypographyResolver } from './TypographyResolver';
 import { ThemeEngine } from './ThemeEngine';
+import { BookEditingService } from './BookEditingService';
 import { ClassicTheme } from '../themes/ClassicTheme';
 import { createBook } from '../models/Book';
+import type { Theme } from '../models/Theme';
 import type {
   Chapter,
   Section,
+  Content,
   Heading,
   Paragraph,
   Quote,
@@ -320,5 +323,176 @@ describe('TypographyResolver', () => {
     expect(result).not.toBe(styled);
     expect(result.book).toBe(styled.book);
     expect(result.blockStyles).toBe(styled.blockStyles);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Theme-declared chapterOpening drop caps (MINI_DR_DROP_CAPS §6 commit 2).
+// The §5 positional edge cases are enumerated HERE, before the implementation,
+// as the review requires. The rule under test is strictly positional (§2/Q1 —
+// "positional, never inferential"): a drop cap fires iff the theme declares
+// scope 'chapterOpening' AND the block is a chapter's FIRST block AND that
+// block is a paragraph with real text. Every case below is that rule's direct
+// consequence, decided by position alone — never by guessing what the text is.
+// ---------------------------------------------------------------------------
+
+function withDropCapRule(scope: 'none' | 'chapterOpening', scale = 2.5): Theme {
+  return { ...ClassicTheme, name: 'dropcap-rule-test', presentation: { dropCap: { scope, scale } } };
+}
+
+function styledWith(theme: Theme, contents: Content[]) {
+  const book = createBook({ title: 'T', author: 'A', language: 'en' }, contents);
+  return new ThemeEngine().applyTheme(book, theme);
+}
+
+function sectionOf(id: string, title: string, content: Block[], level = 2): Section {
+  const now = new Date();
+  return { type: 'section', id, title, content, level, createdAt: now, updatedAt: now };
+}
+
+describe('TypographyResolver — theme-declared chapterOpening drop caps (MINI_DR_DROP_CAPS §6 commit 2)', () => {
+  const resolver = new TypographyResolver();
+  const trigger = withDropCapRule('chapterOpening');
+
+  it('fires on the first paragraph of every chapter, and on no other paragraph', () => {
+    const styled = styledWith(trigger, [
+      chapter([paragraph('c1-p1', 'Opening one.'), paragraph('c1-p2', 'Second.')], { id: 'c-1', number: 1 }),
+      chapter([paragraph('c2-p1', 'Opening two.'), paragraph('c2-p2', 'Second.')], { id: 'c-2', number: 2 }),
+    ]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['c1-p1']?.dropCap).toBe(true);
+    expect(result.blockTypography?.['c1-p2']?.dropCap).toBe(false);
+    expect(result.blockTypography?.['c2-p1']?.dropCap).toBe(true);
+    expect(result.blockTypography?.['c2-p2']?.dropCap).toBe(false);
+  });
+
+  it('does not fire under scope none — the scope Classic and Modern ship', () => {
+    const styled = styledWith(withDropCapRule('none'), [chapter([paragraph('p-1', 'Opening.')])]);
+
+    expect(resolver.resolve(styled).blockTypography?.['p-1']?.dropCap).toBe(false);
+    // The SHIPPED themes must declare 'none' (§3 instrument 3: parity byte-stability rests on it).
+    expect(ClassicTheme.presentation?.dropCap?.scope).toBe('none');
+  });
+
+  it('does not fire when the theme declares no presentation at all (every pre-capability theme shape)', () => {
+    const bare: Theme = { ...ClassicTheme, presentation: undefined };
+    const styled = styledWith(bare, [chapter([paragraph('p-1', 'Opening.')])]);
+
+    expect(resolver.resolve(styled).blockTypography?.['p-1']?.dropCap).toBe(false);
+  });
+
+  // §5 edge case 1: first block not a paragraph.
+  it('§5: a chapter whose FIRST block is not a paragraph gets no drop cap — not even on a later paragraph', () => {
+    // The ornament marks the chapter's opening TEXT. If a heading, a quote or an image opens the
+    // chapter, there is no opening paragraph to ornament — a drop cap further down would sit
+    // mid-flow, exactly the misfire §5 names.
+    const styled = styledWith(trigger, [
+      chapter([heading('h-1', 'A heading first'), paragraph('after-h', 'Then prose.')], { id: 'c-1', number: 1 }),
+      chapter([quote('q-1', 'An epigraph first.'), paragraph('after-q', 'Then prose.')], { id: 'c-2', number: 2 }),
+      chapter([image('img-1'), paragraph('after-img', 'Then prose.')], { id: 'c-3', number: 3 }),
+    ]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['after-h']?.dropCap).toBe(false);
+    expect(result.blockTypography?.['after-q']?.dropCap).toBe(false);
+    expect(result.blockTypography?.['after-img']?.dropCap).toBe(false);
+  });
+
+  // §5 edge case 2: empty chapter.
+  it('§5: an empty chapter — including the blockless part-opener divider — fires nowhere and does not crash', () => {
+    const styled = styledWith(trigger, [
+      chapter([], { id: 'empty-ch', number: 1, title: 'Empty' }),
+      chapter([], { id: 'part-1', number: 0, title: 'Part I', partOpener: true }),
+      chapter([paragraph('c2-p1', 'Real opening.')], { id: 'c-2', number: 2 }),
+    ]);
+
+    const result = resolver.resolve(styled);
+
+    const fired = Object.entries(result.blockTypography ?? {}).filter(([, t]) => t.dropCap);
+    expect(fired.map(([id]) => id)).toEqual(['c2-p1']);
+  });
+
+  it('§5: a chapter whose text lives under its sections gets no drop cap — the rule never descends', () => {
+    // A paragraph under a section title is a SECTION opening, not the chapter's own opening; the
+    // chapter's first block is the positional fact, and here there is none. This also covers the
+    // untitled-section shape a structure-editing split can leave behind.
+    const styled = styledWith(trigger, [
+      chapter([], { id: 'c-1', number: 1, sections: [sectionOf('sec-1', 'First Section', [paragraph('sec-p1', 'Section prose.')])] }),
+      chapter([paragraph('c2-p1', 'Direct opening.')], {
+        id: 'c-2',
+        number: 2,
+        sections: [sectionOf('sec-2', '', [paragraph('sec-p2', 'Untitled-section prose.')])],
+      }),
+    ]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['sec-p1']?.dropCap).toBe(false);
+    expect(result.blockTypography?.['sec-p2']?.dropCap).toBe(false);
+    expect(result.blockTypography?.['c2-p1']?.dropCap).toBe(true); // the direct opening still fires
+  });
+
+  it('a top-level SECTION is not a chapter: its first paragraph never fires (the preamble shape)', () => {
+    const styled = styledWith(trigger, [
+      sectionOf('preamble', '', [paragraph('pre-p1', 'Preamble prose before any chapter.')]) as Content,
+      chapter([paragraph('c1-p1', 'Chapter opening.')], { id: 'c-1', number: 1 }),
+    ]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['pre-p1']?.dropCap).toBe(false);
+    expect(result.blockTypography?.['c1-p1']?.dropCap).toBe(true);
+  });
+
+  // §5 edge case 3: a chapter opening on a split continuation.
+  it('§5: a chapter carved out mid-flow by promoteToChapter DOES fire — positional truth, pinned deliberately', () => {
+    // The new chapter's first paragraph is the continuation of the flow the split cut. The
+    // resolver cannot tell — and must not guess (§2: positional, never inferential): the author
+    // made this a chapter, so it opens like one. The correction path is the author's own
+    // undo/merge, never an inference here. This test PINS that decision.
+    const source = createBook({ title: 'T', author: 'A', language: 'en' }, [
+      chapter(
+        [paragraph('p1', 'The flow begins.'), paragraph('p2', 'The New Chapter Title'), paragraph('p3', 'and continues mid-thought after the cut.')],
+        { id: 'c-1', number: 1 }
+      ),
+    ]);
+    const split = new BookEditingService(() => 'promoted-ch').promoteToChapter(source, 'p2');
+    const styled = new ThemeEngine().applyTheme(split, trigger);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['p3']?.dropCap).toBe(true); // the promoted chapter opens on the continuation — and fires
+    expect(result.blockTypography?.['p1']?.dropCap).toBe(true); // the remainder chapter still opens on p1
+  });
+
+  it('an empty-text first paragraph is not an opening — there is no letter to ornament', () => {
+    const styled = styledWith(trigger, [chapter([paragraph('p-empty', '   '), paragraph('p-2', 'Real prose.')], { id: 'c-1' })]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['p-empty']?.dropCap).toBe(false);
+    expect(result.blockTypography?.['p-2']?.dropCap).toBe(false); // and the rule does NOT slide to the next paragraph
+  });
+
+  it('the dropCaps:false option suppresses the theme trigger, same as the per-block path', () => {
+    const styled = styledWith(trigger, [chapter([paragraph('p-1', 'Opening.')])]);
+
+    expect(resolver.resolve(styled, { dropCaps: false }).blockTypography?.['p-1']?.dropCap).toBe(false);
+  });
+
+  it('the deprecated per-block path and the theme trigger union rather than exclude each other', () => {
+    // Block.dropCap is deprecated-not-removed (§5 resolution in DECISIONS.md); while it exists,
+    // a block that carries it keeps rendering — the trigger adds openings, it never subtracts.
+    const styled = styledWith(trigger, [
+      chapter([paragraph('c1-p1', 'Opening.'), dropCapParagraph('c1-p2', 'Explicitly marked mid-chapter.', true)], { id: 'c-1' }),
+    ]);
+
+    const result = resolver.resolve(styled);
+
+    expect(result.blockTypography?.['c1-p1']?.dropCap).toBe(true);
+    expect(result.blockTypography?.['c1-p2']?.dropCap).toBe(true);
   });
 });

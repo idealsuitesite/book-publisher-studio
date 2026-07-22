@@ -23,13 +23,17 @@ function bookWithDropCapParagraph(): { book: Book; blockTypography: Record<strin
   const chapter: Chapter = { type: 'chapter', id: 'c1', number: 1, title: 'One', content: [para], createdAt: now, updatedAt: now };
   const book = createBook({ title: 'T', author: 'A', language: 'en' }, [chapter]);
   const blockTypography: Record<string, ResolvedTypography> = {
-    p1: { runs: [{ text: para.text, bold: false, italic: false, superscript: false, subscript: false, smallCaps: false }], dropCap: true },
+    p1: {
+      runs: [{ text: para.text, bold: false, italic: false, underline: false, strikethrough: false, superscript: false, subscript: false, smallCaps: false }],
+      dropCap: true,
+      staysWithNext: false,
+    },
   };
   return { book, blockTypography };
 }
 
-function paginatedFor(book: Book, blockTypography: Record<string, ResolvedTypography>): PaginatedBook {
-  const styled = new ThemeEngine().applyTheme(book, ClassicTheme);
+function paginatedFor(book: Book, blockTypography: Record<string, ResolvedTypography>, theme = ClassicTheme): PaginatedBook {
+  const styled = new ThemeEngine().applyTheme(book, theme);
   return {
     styledBook: { ...styled, blockTypography },
     pages: [{ number: 1, blocks: ['p1'] }],
@@ -101,6 +105,40 @@ describe('DOCX native drop cap (MINI_DR_DROP_CAPS §6 commit 1)', () => {
     expect(xml).not.toContain('w:framePr');
     // The inline strategy's enlarged letter is still there (degraded, lossless).
     expect(xml).toContain(`w:val="${Math.round(ClassicTheme.fontSizes.body * 2 * DROP_CAP_SCALE)}"`);
+  });
+
+  it('a theme-declared scale drives BOTH strategies — the band on the native path, the letter on the fallback (§6 commit 2)', async () => {
+    // Scale 5 chosen so the derived band DIFFERS from the constant-derived one: if either path
+    // still read DROP_CAP_SCALE instead of the theme, the assertion below could not pass.
+    const declaredScale = 5;
+    const scaledTheme = {
+      ...ClassicTheme,
+      name: 'dropcap-scale-test',
+      presentation: { dropCap: { scope: 'chapterOpening' as const, scale: declaredScale } },
+    };
+    const { book, blockTypography } = bookWithDropCapParagraph();
+
+    // Native path: the band is derived from the DECLARED scale through the shared arithmetic.
+    const measurer = new PdfKitTextMeasurer();
+    const bodyPt = scaledTheme.fontSizes.body;
+    const bodyLinePt = measurer.lineHeight(bodyPt, { theme: scaledTheme });
+    const capHeightEm = measurer.capHeight(100, { theme: scaledTheme }) / 100;
+    const declaredBand = Math.max(1, Math.ceil((capHeightEm * declaredScale * bodyPt) / bodyLinePt));
+    const constantBand = Math.max(1, Math.ceil((capHeightEm * DROP_CAP_SCALE * bodyPt) / bodyLinePt));
+    expect(declaredBand).not.toBe(constantBand); // the test's own strength: the two values must be distinguishable
+
+    const nativeXml = await documentXml(
+      (await new DOCXRenderer({ measurer }).render(paginatedFor(book, blockTypography, scaledTheme), { language: 'en' })).output
+    );
+    expect(nativeXml).toContain(`w:lines="${declaredBand}"`);
+    const expectedLetterHalfPoints = Math.round(dropCapLetterSizePt({ lines: declaredBand, bodyLinePt, capHeightEm }) * 2);
+    expect(nativeXml).toContain(`<w:sz w:val="${expectedLetterHalfPoints}"/>`);
+
+    // Fallback path (no measurer): the inline letter is sized by the DECLARED scale.
+    const fallbackXml = await documentXml(
+      (await new DOCXRenderer().render(paginatedFor(book, blockTypography, scaledTheme), { language: 'en' })).output
+    );
+    expect(fallbackXml).toContain(`w:val="${Math.round(bodyPt * 2 * declaredScale)}"`);
   });
 
   it('a book with NO drop caps emits no frame at all — the capability cannot leak (parity guard)', async () => {

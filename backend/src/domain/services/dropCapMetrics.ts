@@ -13,15 +13,27 @@
  * the reasoning that produced the list-prefix under-charge.
  */
 
+import type { Theme } from '../models/Theme';
+
 /**
- * The v1 approximation's scale: an enlarged first character, no true wrap-around ornament
- * (BOOK_PRESENTATION.md §4 row 4 as amended). Previously duplicated as a private constant in
- * both PDFRenderer and DOCXRenderer; it lives here so the model can price what they draw.
+ * The default drop-cap scale. Previously duplicated as a private constant in both PDFRenderer
+ * and DOCXRenderer; it lives here so the model can price what they draw.
  *
- * NOT theme-declared yet: making scale a theme value belongs to the drop-cap capability, which
- * stays frozen until this defect is fixed (`MINI_DR_DROP_CAPS.md`).
+ * Since MINI_DR_DROP_CAPS §6 commit 2 the scale IS theme-declared (`Theme.presentation.dropCap`)
+ * — this constant is the fallback for a theme that declares nothing, keeping every
+ * pre-capability rendering byte-identical. Read it through `dropCapScaleOf`, never directly.
  */
 export const DROP_CAP_SCALE = 2.5;
+
+/**
+ * The scale a render (or the pricing model) should use: the theme's declared drop-cap scale,
+ * else the fallback constant. ONE helper so no consumer hand-rolls the fallback rule — the
+ * model and all three renderers stay on the same value by construction (the charged==consumed
+ * discipline applied to the knob itself).
+ */
+export function dropCapScaleOf(theme: Theme): number {
+  return theme.presentation?.dropCap?.scale ?? DROP_CAP_SCALE;
+}
 
 /** Breathing room between the glyph and the text beside it, in em of the BODY size. Mirrors the EPUB stylesheet's `padding-right: 0.08em`, so the three formats space the ornament alike. */
 export const DROP_CAP_GUTTER_EM = 0.08;

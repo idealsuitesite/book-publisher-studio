@@ -18,6 +18,29 @@ export interface RunningHead {
   size?: number;
 }
 
+/**
+ * The theme-declared drop-cap rule (MINI_DR_DROP_CAPS §6 commit 2).
+ *
+ * `scope` is the POSITIONAL trigger (§2/Q1: positional, never inferential):
+ * 'chapterOpening' puts a drop cap on a chapter's first block iff that block is a paragraph
+ * with real text — a chapter opening with a heading/quote/image has no opening paragraph to
+ * ornament, text under sections is a section opening (the rule never descends), and an empty
+ * chapter (including the blockless part-opener divider) fires nothing. 'none' grows no drop
+ * caps; the deprecated per-block `Block.dropCap` path (DECISIONS.md) still renders if set.
+ *
+ * `scale` is the ONE declared geometry knob: the glyph is drawn at scale × body size, and the
+ * band it spans — Word's `w:lines`, the PDF's indented lines — is DERIVED from measured font
+ * metrics through the shared `dropCapMetrics` arithmetic. The band (`lines`) is deliberately
+ * NOT a second declared field: two independent knobs could disagree, and the one declared
+ * value would then mean different geometry in different formats — the exact §4bis divergence
+ * class this capability exists to close. (Commit 1's proof is the model: Word read back
+ * LinesToDrop=2 == the PDF's Gelasio band — DERIVED equality, never declared twice.)
+ */
+export interface DropCapPresentation {
+  scope: 'none' | 'chapterOpening';
+  scale: number;
+}
+
 export interface Theme {
   name: string;
   fonts: {
@@ -55,6 +78,12 @@ export interface Theme {
   // Additive (ADR-0022/ADR-0027 pattern) - no existing Theme consumer breaks. undefined/show:false
   // means no running head at all, matching every theme's behavior before this sprint.
   runningHead?: RunningHead;
+  // Block-presentation rules the theme declares (BOOK_PRESENTATION §6 Q2: presentation lives in
+  // Theme, never as per-block AST overrides). Additive and optional — a theme without it
+  // presents exactly as before the capability existed.
+  presentation?: {
+    dropCap?: DropCapPresentation;
+  };
 }
 
 export interface ResolvedBlockStyle {
