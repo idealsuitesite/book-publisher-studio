@@ -28,7 +28,7 @@ import type { Book } from '../../domain/models/Book';
 import type { PageLayout } from '../../domain/models/PageLayout';
 
 const CORPUS = join(__dirname, '..', '..', '..', 'verification', 'corpus', 'faith-alone-styled.docx');
-const ACCENT = '6E3B2F'; // the screenshot-loop STARTING POINT — re-lock consciously if the CTO tunes it
+const ACCENT = '6E3B2F'; // CTO-VALIDATED on the real page (2026-07-22 screenshot loop): "chaud et sobre", B&W-safe — LOCKED
 
 describe('Novel theme — parity lock (drop caps lit) + tri-format (real corpus)', () => {
   let faith: Book;

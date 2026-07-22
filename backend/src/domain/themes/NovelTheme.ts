@@ -9,10 +9,13 @@ import type { Theme } from '../models/Theme';
 // The three-theme fan this completes (CTO reasoning, ranked): Classic = sober, B&W-safe;
 // Modern = contemporary, visible accent, tinted callouts; Novel = literary, ornamented, warm.
 //
-// The accent shade is a SCREENSHOT-LOOP decision (the #1D4E68 and callout-0.96 precedents):
-// #6E3B2F is the warm russet STARTING POINT, judged on real pages before it locks. lineHeight
-// stays 1.4 on purpose — spacing.lineHeight is not a real PDF knob today (typography scope,
-// measured), so a "larger leading" identity would lie in the format that matters most.
+// The accent shade went through the screenshot loop (the #1D4E68 and callout-0.96 precedents)
+// and is CTO-LOCKED at #6E3B2F (2026-07-22, judged on real faith-alone pages): "chaud et
+// sobre" — it distinguishes the title without shouting, sits with Gelasio's warmth, and
+// flattens to a clean mid-grey in B&W print, not a muddy tint. Neither deeper nor redder.
+// lineHeight stays 1.4 on purpose — spacing.lineHeight is not a real PDF knob today
+// (typography scope, measured), so a "larger leading" identity would lie in the format that
+// matters most.
 export const NovelTheme: Theme = {
   name: 'novel',
   fonts: {
@@ -31,7 +34,7 @@ export const NovelTheme: Theme = {
   },
   colors: {
     text: '#000000',
-    accent: '#6E3B2F', // warm and sober (CTO sub-decision 6) — the exact shade is the screenshot loop's
+    accent: '#6E3B2F', // warm and sober (CTO sub-decision 6) — LOCKED on the real page, 2026-07-22
   },
   spacing: {
     paragraphSpacing: 8,

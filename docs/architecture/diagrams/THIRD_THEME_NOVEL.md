@@ -1,13 +1,14 @@
 # Third Theme — "Novel" — Level-2 Design Review (short, the SECOND_THEME shape)
 
-**Status:** ✅ Direction + six sub-decisions **CTO-LOCKED (2026-07-22)** — A "Novel" chosen over
-Academic/Minimal for three ranked reasons (showcases the drop-cap capability where it
-typographically belongs; the product's widest audience; completes a coherent three-theme fan:
-Classic sober/B&W-safe, Modern contemporary/tinted, Novel literary/warm). Mechanism =
-SECOND_THEME's, re-verified in `THIRD_THEME_SCOPE.md` §0. Build authorized: data + locks, then
-**STOP at the screenshot loop** (the accent shade and any rhythm value refine on real pages —
-the `#1D4E68` and 0.96 precedents).
-**Date:** 2026-07-22
+**Status:** ✅ DELIVERED — direction + six sub-decisions CTO-locked, built in 3 commits on
+`feature/third-theme-novel` (`170cac4` data+registry · `3e9eb7d` own parity lock, born with the
+17 drop-cap openings priced in · `c3103b8` gallery label + loop artifacts), **the screenshot
+loop PASSED (§6): accent LOCKED `#6E3B2F`, one known limitation consigned with its exit door.**
+A "Novel" was chosen over Academic/Minimal for three ranked reasons (showcases the drop-cap
+capability where it typographically belongs; the product's widest audience; completes a
+coherent three-theme fan: Classic sober/B&W-safe, Modern contemporary/tinted, Novel
+literary/warm). Mechanism = SECOND_THEME's, re-verified in `THIRD_THEME_SCOPE.md` §0.
+**Date:** 2026-07-22, delivered 2026-07-22
 
 ---
 
@@ -69,6 +70,32 @@ by itself (count-agnostic, re-verified); cache = new `themeName` key space, noth
 3. **⛔ the screenshot loop** — real faith-alone pages under Novel (chapter opening with the
    lit drop cap, the running head, the warm accent) rastered for the CTO; the live gallery
    check (third card, Proof re-inks). Values lock only after the CTO's look.
+
+## 6. Screenshot-loop observations (2026-07-22 — the loop's verdicts, on the record)
+
+1. **The accent is LOCKED at `#6E3B2F`** (CTO, on real faith-alone pages): warm and sober,
+   sits with Gelasio, flattens to a clean mid-grey in B&W — neither deeper nor redder. The
+   parity test's hex comment flipped from "starting point" to locked.
+2. **KNOWN LIMITATION, consigned with its exact cause (CTO ruling): the drop cap lands on the
+   first paragraph BLOCK whatever its semantic role — a subtitle stored as a paragraph
+   receives it.** Seen on faith-alone: INTRODUCTION opens with "The Crisis of Confidence — And
+   the Recovery of the Gospel", semantically a subtitle but living in the model as an ordinary
+   first paragraph, so the ornament lands there instead of on the first prose paragraph —
+   positionally correct by construction, typographically against the convention (no printed
+   book drop-caps a subtitle line). **This is not a trigger bug: the data is not what it
+   claims to be.** The trigger does exactly what §2/Q1 locked (positional, never inferential)
+   over a structure that cannot distinguish subtitle from prose.
+   - **What is deliberately NOT done:** a "this paragraph looks like a subtitle, skip it"
+     heuristic — that is the inference §2/Q1 forbids, the door closed three times
+     (HEURISTIC_STRUCTURE_DETECTION, the callout census, editorial-part detection).
+   - **The author's correction paths exist today:** promote the block, move it, or accept the
+     effect.
+   - **The named exit door, for the future session that reopens this:** `Chapter.subtitle` is
+     ALREADY TYPED in the model (and crosses the DTO via `ChapterMapper`) — **nothing populates
+     it from import** (verified 2026-07-22: `ASTBuilder` never writes it; the
+     FrontMatter-fields-before-Q3 pattern). The future chantier is populating/authoring that
+     field (import mapping and/or a structure-editing gesture); once a subtitle is structural,
+     the trigger can skip it POSITIONALLY, no inference anywhere. Candidate, not opened.
 
 ## Related
 `THIRD_THEME_SCOPE.md` (the measured vocabulary) · `SECOND_THEME.md` (the procedure) ·
