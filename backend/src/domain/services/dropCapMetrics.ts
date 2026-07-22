@@ -38,6 +38,21 @@ export interface DropCapGeometry {
 }
 
 /**
+ * The letter SIZE (in points) whose cap-height ink spans exactly `lines` body lines — the
+ * arithmetic Word itself applies to its native drop caps (spike Finding B: Word auto-sized the
+ * letter to 64.5pt for lines=3 over an 11pt body — this same computation from ITS font metrics).
+ * The DOCX renderer is this function's consumer (MINI_DR_DROP_CAPS §6 commit 1), making the
+ * letter sizing SHARED across formats rather than three divergent calculations: PDF sizes by
+ * scale and derives the band; DOCX sizes by band (lines) and derives the letter — both through
+ * this one module, both from MEASURED inputs (capHeightEm from TextMeasurer.capHeight, never a
+ * constant; the §-top rule).
+ */
+export function dropCapLetterSizePt(params: { lines: number; bodyLinePt: number; capHeightEm: number }): number {
+  const { lines, bodyLinePt, capHeightEm } = params;
+  return (lines * bodyLinePt) / capHeightEm;
+}
+
+/**
  * @param glyphWidth MEASURED advance width of the drop-cap character at its enlarged size.
  * @param capPt      MEASURED cap height (real ink) at that enlarged size — never the line box,
  *                   which over-reports by ~83% (34.91pt vs 19.05pt on Gelasio-Bold at 27.5pt).

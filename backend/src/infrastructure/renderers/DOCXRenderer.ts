@@ -27,7 +27,9 @@ import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTy
 import type { Content, Block, Chapter, Section, TOCEntry, FrontMatter } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
-import { DROP_CAP_SCALE } from '../../domain/services/dropCapMetrics';
+import { DROP_CAP_SCALE, dropCapLetterSizePt } from '../../domain/services/dropCapMetrics';
+import type { TextMeasurer } from '../../domain/ports/TextMeasurer';
+import { withNativeDropCapFrame } from './docxDropCapFrame';
 
 const HEADING_LEVEL_BY_NUMBER: Record<number, (typeof HeadingLevel)[keyof typeof HeadingLevel]> = {
   1: HeadingLevel.HEADING_1,
@@ -263,6 +265,15 @@ function buildTableOfContentsParagraphs(entries: TOCEntry[], theme: Theme): Para
 }
 
 export class DOCXRenderer implements Renderer<Buffer> {
+  /**
+   * With a `TextMeasurer`, drop caps render as Word's NATIVE frame (MINI_DR_DROP_CAPS §6 commit
+   * 1): the letter sized so its ink spans the band (the shared `dropCapMetrics` arithmetic —
+   * measured inputs, Gelasio being metrically compatible with the Georgia Word renders). Without
+   * one, drop caps fall back to the inline enlarged-letter approximation — the documented
+   * no-instrument degradation, the same philosophy as LayoutEngine's fallback estimator.
+   */
+  constructor(private readonly options: { measurer?: TextMeasurer } = {}) {}
+
   async render(book: PaginatedBook, _context: RenderContext): Promise<RenderResult<Buffer>> {
     const pageStarts = new Map<string, Page>();
     for (const page of book.pages.slice(1)) {
@@ -285,6 +296,7 @@ export class DOCXRenderer implements Renderer<Buffer> {
       book.styledBook.blockStyles,
       book.styledBook.blockTypography,
       pageStarts,
+      book.styledBook.theme,
       true,
       children,
       tocEntries.length > 0
@@ -331,6 +343,7 @@ export class DOCXRenderer implements Renderer<Buffer> {
     blockStyles: Record<string, ResolvedBlockStyle>,
     blockTypography: Record<string, ResolvedTypography> | undefined,
     pageStarts: Map<string, Page>,
+    theme: Theme,
     isTopLevel: boolean,
     out: (Paragraph | Table)[],
     forceBreakOnFirst = false
@@ -356,13 +369,13 @@ export class DOCXRenderer implements Renderer<Buffer> {
       isFirstContent = false;
 
       for (const block of content.content) {
-        out.push(...this.renderBlock(block, blockStyles[block.id], blockTypography, pageStarts));
+        out.push(...this.renderBlock(block, blockStyles[block.id], blockTypography, pageStarts, theme));
       }
 
       if (content.type === 'chapter' && content.sections) {
-        this.renderContent(content.sections, blockStyles, blockTypography, pageStarts, false, out);
+        this.renderContent(content.sections, blockStyles, blockTypography, pageStarts, theme, false, out);
       } else if (content.type === 'section' && content.subsections) {
-        this.renderContent(content.subsections, blockStyles, blockTypography, pageStarts, false, out);
+        this.renderContent(content.subsections, blockStyles, blockTypography, pageStarts, theme, false, out);
       }
     }
   }
@@ -382,11 +395,70 @@ export class DOCXRenderer implements Renderer<Buffer> {
     });
   }
 
+  /**
+   * The Word-native drop cap (§4bis Option A, spike-proven): the first character split into its
+   * own paragraph carrying the attribute-free `framePr` Word itself writes, the remainder as the
+   * following paragraph — Word wraps the body beside the framed letter with its own engine.
+   *
+   * Sizing is the SHARED arithmetic (`dropCapMetrics`), from MEASURED inputs, never constants:
+   * the band is what the PDF charges for the same paragraph (cap ink at `DROP_CAP_SCALE` over
+   * measured body lines), and the letter is sized so its ink fills that band — exactly how Word
+   * auto-sizes its own drop caps (spike Finding B: 129 half-points for lines=3 over an 11pt
+   * body). One module, three formats, no divergent calculations.
+   *
+   * Returns undefined when the paragraph has no leading text to split — the caller falls back.
+   */
+  private buildNativeDropCapParagraphs(
+    runs: TypeRun[],
+    p: {
+      font: string | undefined;
+      size: number | undefined;
+      color: string | undefined;
+      spacing: { before: number; after: number } | undefined;
+      alignment: 'both' | 'left' | 'center' | 'right' | undefined;
+      pageBreakBefore: boolean;
+    },
+    style: ResolvedBlockStyle | undefined,
+    theme: Theme
+  ): (Paragraph | Table)[] | undefined {
+    const [firstRun, ...restRuns] = runs;
+    if (!firstRun || firstRun.text.length === 0) return undefined;
+    const measurer = this.options.measurer!;
+
+    const bodyPt = style?.fontSize ?? theme.fontSizes.body;
+    const bodyLinePt = measurer.lineHeight(bodyPt, { theme });
+    const capHeightEm = measurer.capHeight(100, { theme }) / 100;
+    // The same band the PDF prices for this paragraph: the scaled glyph's ink over body lines.
+    const bandLines = Math.max(1, Math.ceil((capHeightEm * DROP_CAP_SCALE * bodyPt) / bodyLinePt));
+    const letterPt = dropCapLetterSizePt({ lines: bandLines, bodyLinePt, capHeightEm });
+
+    const letterChar = firstRun.text[0];
+    const remainderOfFirstRun = firstRun.text.slice(1);
+    const remainingRuns: TypeRun[] = remainderOfFirstRun ? [{ ...firstRun, text: remainderOfFirstRun }, ...restRuns] : restRuns;
+
+    const letterParagraph = withNativeDropCapFrame(
+      new Paragraph({
+        pageBreakBefore: p.pageBreakBefore,
+        children: [
+          new TextRun({ text: letterChar, font: p.font, size: Math.round(letterPt * 2), bold: true, italics: firstRun.italic, color: p.color }),
+        ],
+      }),
+      bandLines
+    );
+    const bodyParagraph = new Paragraph({
+      spacing: p.spacing,
+      alignment: p.alignment,
+      children: buildRuns(remainingRuns, p.font, p.size, p.color),
+    });
+    return [letterParagraph, bodyParagraph];
+  }
+
   private renderBlock(
     block: Block,
     style: ResolvedBlockStyle | undefined,
     blockTypography: Record<string, ResolvedTypography> | undefined,
-    pageStarts: Map<string, Page>
+    pageStarts: Map<string, Page>,
+    theme: Theme
   ): (Paragraph | Table)[] {
     const pageBreakBefore = pageStarts.has(block.id);
     const font = style?.fontFamily;
@@ -414,6 +486,14 @@ export class DOCXRenderer implements Renderer<Buffer> {
         const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
         const dropCap = blockTypography?.[block.id]?.dropCap ?? false;
         const alignment = block.align === 'justify' ? 'both' : block.align;
+        // Word-NATIVE drop cap (MINI_DR_DROP_CAPS §6 commit 1, §4bis Option A): the letter in its
+        // own framePr paragraph — the structure Word's DropCap.Enable() itself produces — sized by
+        // the shared dropCapMetrics arithmetic. Needs a measurer; without one, the inline
+        // enlarged-letter approximation below stays the documented degradation.
+        if (dropCap && this.options.measurer) {
+          const native = this.buildNativeDropCapParagraphs(runs, { font, size, color, spacing, alignment, pageBreakBefore }, style, theme);
+          if (native) return native;
+        }
         return [
           new Paragraph({
             pageBreakBefore,

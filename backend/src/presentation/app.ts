@@ -63,7 +63,8 @@ export function createApp(): Express {
   // ThemeEngine/TypographyResolver already are. DOCX and EPUB reuse the PDF-metric pagination
   // knowingly: Word repaginates on open and EPUB reflows, so PDF is the only format whose
   // pagination is load-bearing (ADR-0045).
-  const layoutEngine = new LayoutEngine(new PdfKitTextMeasurer());
+  const measurer = new PdfKitTextMeasurer();
+  const layoutEngine = new LayoutEngine(measurer);
 
   // One pagination cache for the whole export path (MINI_DR_PAGINATION_REUSE): a colour-only
   // accent change reuses the stored geometry instead of re-paginating. A server singleton like
@@ -102,7 +103,10 @@ export function createApp(): Express {
     new ThemeEngine(),
     new TypographyResolver(),
     layoutEngine,
-    new DOCXRenderer()
+    // The shared measurer lets DOCX drop caps render as Word's NATIVE frame with the shared
+    // sizing arithmetic (MINI_DR_DROP_CAPS §6 commit 1); without it they degrade to the inline
+    // approximation — the same measured/fallback split LayoutEngine already lives by.
+    new DOCXRenderer({ measurer })
   );
   const exportPdfUseCase = new ExportManuscriptUseCase(
     new MammothParser(),
