@@ -1,7 +1,12 @@
 # Chapter.subtitle — Scope Report (the door named at THIRD_THEME_NOVEL §6)
 
-**Status:** 🟡 MEASURED — **STOPPED AT THE DECISIONS (§6), as always.** No production code
-opened; the census spike is the only artifact.
+**Status:** ✅ CLOSED — the §6 decisions were ANSWERED by the CTO (authoring-first only + the
+`SUBTITLE_IMPORT_MAPPING_UNBLOCK` C1-form unblock with the A1 guard; italic ~60% ratified then
+LOCKED at 0.6 on the real page; clear-reinserts; the wording approved) and the chantier
+DELIVERED via `MINI_DR_SUBTITLE_FIELD.md`, merged to `main` 2026-07-22 (`be2b7a9`). One §5
+claim was corrected by that review's §3, flagged not slipped: clear is a conservative cache
+MISS (fresh block id), not the legitimate-HIT fourth application — UNDO is the legitimate HIT.
+The census (validated by its positive control) remains the ground of record.
 **Date:** 2026-07-22
 **Why now (CTO):** the limitation is visible in a theme DELIVERED today — Novel drop-caps the
 subtitle line of any manuscript whose chapter opens on a subtitle-stored-as-paragraph; closing
