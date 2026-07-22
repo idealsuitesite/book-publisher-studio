@@ -145,6 +145,21 @@ export async function applyPromote(
   }
 }
 
+/** Mark or unmark a paragraph as a callout (MINI_DR_CALLOUTS commit 4) — the author's gesture
+ * that makes the theme's chrome reachable from a real manuscript; extracted like the others. */
+export async function applySetCallout(
+  projectId: string,
+  blockId: string,
+  on: boolean,
+  deps: { editStructure: typeof editStructure; onEdited: (updated: ProjectDTO) => void; onError: (message: string) => void }
+): Promise<void> {
+  try {
+    deps.onEdited(await deps.editStructure(projectId, { type: 'setCallout', blockId, on }));
+  } catch (error) {
+    deps.onError(error instanceof ApiError ? 'That callout change could not be saved.' : 'Could not reach the server.');
+  }
+}
+
 /** Merge a chapter back into the previous container — the inverse of promote. */
 export async function applyMerge(
   projectId: string,
@@ -302,18 +317,52 @@ function blockPreview(block: ContentBlocks[number]): string {
  * container — where the author must act — and on demand for a chapter. Height-capped on purpose:
  * the panel must never grow with the manuscript (the old BookStructureView `<details>` lesson).
  */
-function BlockList({ blocks, disabled, onPromote }: { blocks: ContentBlocks; disabled: boolean; onPromote: (blockId: string) => void }) {
+function BlockList({
+  blocks,
+  disabled,
+  onPromote,
+  onSetCallout,
+}: {
+  blocks: ContentBlocks;
+  disabled: boolean;
+  onPromote: (blockId: string) => void;
+  onSetCallout: (blockId: string, on: boolean) => void;
+}) {
+  const actionBtn =
+    'shrink-0 rounded px-1.5 py-0.5 text-xs text-app-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent disabled:cursor-not-allowed disabled:text-app-text-muted disabled:no-underline';
   return (
     <ul className="mt-1.5 flex max-h-56 flex-col gap-0.5 overflow-y-auto border-l border-app-border pl-3">
       {blocks.map((block) => (
         <li key={block.id} className="flex items-center justify-between gap-2 py-0.5 text-sm">
           <span className="min-w-0 flex-1 truncate text-app-text-muted">{blockPreview(block)}</span>
+          {/* MINI_DR_CALLOUTS commit 4: the marking gesture, on the row already rendered (D5 —
+              no new rows, the folded panel's height budget untouched). Generic per D2: the badge
+              names the mechanism, never a taxonomy. */}
+          {block.type === 'paragraph' &&
+            (block.callout === true ? (
+              <span className="flex shrink-0 items-center gap-1.5">
+                <span className="rounded bg-app-surface-2 px-1.5 py-0.5 text-xs text-app-text-muted">Callout</span>
+                <button
+                  onClick={() => onSetCallout(block.id, false)}
+                  disabled={disabled}
+                  title="Return this passage to ordinary body text"
+                  className={actionBtn}
+                >
+                  Remove callout
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => onSetCallout(block.id, true)}
+                disabled={disabled}
+                title="Distinguish this passage with a callout rule in the exported book"
+                className={actionBtn}
+              >
+                Set off as callout
+              </button>
+            ))}
           {(block.type === 'paragraph' || block.type === 'heading') && (
-            <button
-              onClick={() => onPromote(block.id)}
-              disabled={disabled}
-              className="shrink-0 rounded px-1.5 py-0.5 text-xs text-app-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent disabled:cursor-not-allowed disabled:text-app-text-muted disabled:no-underline"
-            >
+            <button onClick={() => onPromote(block.id)} disabled={disabled} className={actionBtn}>
               Make this a chapter
             </button>
           )}
@@ -387,6 +436,7 @@ function SortableChapterRow({
   onSetRole,
   onInsertPart,
   onRemovePart,
+  onSetCallout,
 }: {
   content: BookDTO['mainContent'][number];
   index: number;
@@ -397,6 +447,7 @@ function SortableChapterRow({
   onSetRole: (id: string, role: 'front' | 'back' | 'main') => void;
   onInsertPart: (index: number) => void;
   onRemovePart: (id: string) => void;
+  onSetCallout: (blockId: string, on: boolean) => void;
 }) {
   const isPartOpener = content.type === 'chapter' && content.partOpener === true;
   const isUnstructured = content.type === 'section' && !content.title.trim();
@@ -504,14 +555,14 @@ function SortableChapterRow({
       {isUnstructured ? (
         <div className="mt-1">
           <p className="text-xs text-app-text-muted">Turn a paragraph into a chapter to build your structure:</p>
-          <BlockList blocks={blocks} disabled={disabled} onPromote={onPromote} />
+          <BlockList blocks={blocks} disabled={disabled} onPromote={onPromote} onSetCallout={onSetCallout} />
         </div>
       ) : blocks.length > 0 ? (
         <details className="mt-1.5">
           <summary className="cursor-pointer select-none text-xs text-app-text-muted">
             {blocks.length} {blocks.length === 1 ? 'block' : 'blocks'} — split into chapters
           </summary>
-          <BlockList blocks={blocks} disabled={disabled} onPromote={onPromote} />
+          <BlockList blocks={blocks} disabled={disabled} onPromote={onPromote} onSetCallout={onSetCallout} />
         </details>
       ) : null}
 
@@ -635,6 +686,13 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
     setPending(false);
   }
 
+  async function onSetCallout(blockId: string, on: boolean) {
+    setError(null);
+    setPending(true);
+    await applySetCallout(project.id, blockId, on, { editStructure, onEdited: captureUndo, onError: setError });
+    setPending(false);
+  }
+
   async function onEditFrontMatter(
     patch: Pick<Extract<StructureMutation, { type: 'editFrontMatter' }>, 'titlePage' | 'copyrightPage'>
   ) {
@@ -724,6 +782,7 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
                 onSetRole={onSetRole}
                 onInsertPart={onInsertPart}
                 onRemovePart={onRemovePart}
+                onSetCallout={onSetCallout}
               />
             ))}
           </ul>
