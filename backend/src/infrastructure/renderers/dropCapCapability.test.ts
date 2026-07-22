@@ -122,9 +122,12 @@ describe('drop-cap capability instruments (MINI_DR_DROP_CAPS §3, commit 3)', ()
     expect(renderedSplittable.metrics.unplannedPageBreaks).toBe(0);
   });
 
-  it('§3.3 leak guard: the SHIPPED themes resolve zero drop caps on an ordinary book', () => {
+  it("§3.3 leak guard: the 'none'-scope residents (Classic, Modern) resolve zero drop caps on an ordinary book", () => {
     // The corpus parity numbers are locked by PDFRenderer.parity.test.ts; this closes the same
-    // loop at the resolver level — Classic and Modern, as shipped, grow no drop caps anywhere.
+    // loop at the resolver level for the themes that declare scope 'none'. Novel is DELIBERATELY
+    // absent from this list: it lights the capability by CTO decision (THIRD_THEME_NOVEL) and
+    // carries its own lock (novelTheme.test.ts) with the ornament priced in — a lit theme here
+    // would be a false failure, not a leak.
     for (const name of ['classic', 'modern']) {
       const book = createBook({ title: 'T', author: 'A', language: 'en' }, [chapterOf(paragraphs(3))]);
       const typeset = new TypographyResolver().resolve(new ThemeEngine().applyTheme(book, getTheme(name)));
