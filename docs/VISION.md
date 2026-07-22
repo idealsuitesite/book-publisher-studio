@@ -6,6 +6,18 @@ This document describes what Book Publisher Studio should become, not what exist
 
 Professional publishing software — import, analyze, structure, format, and export books — for authors, publishers, educators, universities, and independent creators. Global, not tied to any single audience, language, or region. Competes with Atticus on UX and AI-powered workflow.
 
+## Who the product is built for — Author B first (founder strategic direction, 2026-07-22)
+
+The mission above names a broad audience. This section fixes the **priority within it**, and it is the founder's explicit strategic direction — every design choice is checked against it.
+
+**The product is built for Author B.** Author B arrives with an **unprepared manuscript** and makes **no formatting effort** — no Word heading styles, no structure work, no typographic craft. Author B's whole expectation is simple and total: **open the exported PDF/EPUB and be satisfied.** The software does the preparation Author B did not.
+
+**Author A is served incidentally (par surcroît).** Author A is the prepared, technically-fluent author — the one who already applied heading styles, understands structure, would meet the tool halfway. A product that delights Author B serves Author A for free; the reverse is not true. So when a choice trades Author A's control for Author B's effortlessness, Author B wins.
+
+**The success criterion is a real file, not a green pipeline.** Success is: **Author B opens their exported PDF/EPUB and is fulfilled** — judged on the *real file* an author actually receives, never on "the pipeline ran" or "the tests pass". A book that exports cleanly but opens to a document Author B would not be proud of is a failure by this criterion. This is the `REAL_FIXTURE_POLICY` and ADR-0050 (Fidelity Is the Product) read from the author's side of the screen: the artifact is the verdict.
+
+**Why this is engraved here and not only in a sprint doc:** it reorders priorities across every chantier. `STRUCTURE_ASSIST` exists because Author B typed `CHAPTER 1` as text and the pipeline threw it away (`STRUCTURE_ASSIST_DR.md`). `AUTHOR_EXPERIENCE` exists because Author B must not have to understand three "title" fields or wait seconds for a proof (`AUTHOR_EXPERIENCE.md`). The metadata-honesty fixes (FOUNDER_TRAVERSAL Lot 1) exist because Author B, who gave no author name, must not open a book stamped "© 2026 Unknown". Each is Author B's effortlessness made concrete.
+
 ## Target Architecture (end state)
 
 The Clean Architecture / Hexagonal / DDD foundation already in place (Domain → Application → Infrastructure/Presentation, ports and adapters, `UseCase<TRequest,TResponse>` everywhere) does not change as the product grows — new capability is added as new Domain services, new ports, new Infrastructure adapters, and new plugins, never by bending the existing layers. Concretely, the target Domain layer includes:

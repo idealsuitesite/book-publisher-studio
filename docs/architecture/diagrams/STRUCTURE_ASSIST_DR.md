@@ -11,6 +11,17 @@ introduces a new capability (structure suggestion) governed by a doctrinal invar
 imported a ~114-page book that arrived with **zero** detected chapters and hand-built its
 structure across 10 versions — exactly the labour the product exists to remove.
 
+This is **Author B** made concrete (`VISION.md` — the unprepared manuscript, no formatting effort,
+satisfied on opening the exported file). STRUCTURE_ASSIST is the capability that lets Author B skip
+the structure work entirely; the success criterion is the real exported file, not a green pipeline.
+
+**In-progress inputs (founder's second traversal, "The Secret Of Spiritual Protection", live):**
+the founder is measuring further symptoms on a fresh manuscript — a `ProtectionFOREWORD`-style
+title concatenation, chapters reporting 0 words, an introduction/text offset, and a confirmed-good
+body composition. These feed this DR before it is built (the engraved sequence's measurement step
+between Lot 1 and this review); they are to be measured read-only, never by mutating the founder's
+live project.
+
 ## §2 The problem, measured (from the scope report, re-stated as the DR's premise)
 
 - **Typographic detection is closed and stays closed** (re-verified on the founder's file:
