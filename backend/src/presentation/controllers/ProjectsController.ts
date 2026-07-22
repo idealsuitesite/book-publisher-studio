@@ -49,6 +49,15 @@ function parseMutation(body: unknown): StructureMutation | null {
   if (m.type === 'setCallout' && typeof m.blockId === 'string' && m.blockId && typeof m.on === 'boolean') {
     return { type: 'setCallout', blockId: m.blockId, on: m.on };
   }
+  // MINI_DR_SUBTITLE_FIELD commit 1: whitelisted here, with route tests, in the same commit as
+  // the dispatch (the standing lesson, applied d'office). A3: the ops' refusals surface as the
+  // named CONTENT_NOT_FOUND at this boundary — typed at both levels, never a 500 path.
+  if (m.type === 'markAsSubtitle' && typeof m.blockId === 'string' && m.blockId) {
+    return { type: 'markAsSubtitle', blockId: m.blockId };
+  }
+  if (m.type === 'clearSubtitle' && typeof m.chapterId === 'string' && m.chapterId) {
+    return { type: 'clearSubtitle', chapterId: m.chapterId };
+  }
   // MINI_DR_EDIT_FRONT_MATTER (Phase 3b): whitelisted with route tests in the same commit (the
   // standing setPartRole lesson). The route enforces the SHAPE and the non-emptiness the pure op
   // also requires — so the op's own throw stays defense-in-depth, never a 500 path.

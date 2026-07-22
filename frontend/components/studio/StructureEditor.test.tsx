@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ProjectDTO } from 'shared-types';
-import { StructureEditor, applyReorder, applyRename, applyUndo, applyPromote, applyMerge, applySetPartRole, applySetCallout } from './StructureEditor';
+import { StructureEditor, applyReorder, applyRename, applyUndo, applyPromote, applyMerge, applySetPartRole, applySetCallout, applyMarkAsSubtitle, applyClearSubtitle } from './StructureEditor';
 import { editStructure } from '@/lib/api-client';
 import type { editStructure as editStructureFn } from '@/lib/api-client';
 
@@ -359,6 +359,61 @@ describe('callout marking UX (MINI_DR_CALLOUTS commit 4)', () => {
     await user.click(remove);
 
     expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'setCallout', blockId: 'p1blk', on: false });
+  });
+});
+
+// ── MINI_DR_SUBTITLE_FIELD commit 3: the subtitle gestures in the studio ────────────────────────
+describe('applyMarkAsSubtitle / applyClearSubtitle (the subtitle gesture handlers)', () => {
+  it('sends the mutations and applies the results; errors surface without applying', async () => {
+    const ok = vi.fn().mockResolvedValue({ id: 'p1' }) as unknown as typeof editStructureFn;
+    const onEdited = vi.fn();
+    await applyMarkAsSubtitle('p1', 'blk1', { editStructure: ok, onEdited, onError: vi.fn() });
+    expect(ok).toHaveBeenCalledWith('p1', { type: 'markAsSubtitle', blockId: 'blk1' });
+    await applyClearSubtitle('p1', 'ch1', { editStructure: ok, onEdited, onError: vi.fn() });
+    expect(ok).toHaveBeenCalledWith('p1', { type: 'clearSubtitle', chapterId: 'ch1' });
+    expect(onEdited).toHaveBeenCalledTimes(2);
+
+    const bad = vi.fn().mockRejectedValue(new Error('down')) as unknown as typeof editStructureFn;
+    const onErr = vi.fn();
+    const onEd = vi.fn();
+    await applyMarkAsSubtitle('p1', 'blk1', { editStructure: bad, onEdited: onEd, onError: onErr });
+    expect(onErr).toHaveBeenCalledTimes(1);
+    expect(onEd).not.toHaveBeenCalled();
+  });
+});
+
+describe('subtitle gesture UX (MINI_DR_SUBTITLE_FIELD commit 3)', () => {
+  function chapteredProject(overrides: { subtitle?: string } = {}): ProjectDTO {
+    const p = project(); // one chapter 'c1' titled 'Intro' with paragraph blocks
+    const ch = p.book.mainContent[0] as unknown as { subtitle?: string };
+    if (overrides.subtitle) ch.subtitle = overrides.subtitle;
+    return p;
+  }
+
+  it('offers "Make this the chapter subtitle" on the FIRST paragraph row only (A2: disclosed v1 boundary)', async () => {
+    const user = userEvent.setup();
+    vi.mocked(editStructure).mockResolvedValue(project());
+    render(<StructureEditor project={chapteredProject()} onEdited={() => {}} />);
+
+    const marks = screen.getAllByRole('button', { name: 'Make this the chapter subtitle' });
+    expect(marks).toHaveLength(1); // first paragraph row only — never every row
+
+    await user.click(marks[0]);
+    const firstBlockId = (project().book.mainContent[0].content[0] as { id: string }).id;
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'markAsSubtitle', blockId: firstBlockId });
+  });
+
+  it('a populated chapter hides the mark affordance (decision 5) and shows the subtitle with "Remove subtitle"', async () => {
+    const user = userEvent.setup();
+    vi.mocked(editStructure).mockResolvedValue(project());
+    render(<StructureEditor project={chapteredProject({ subtitle: 'The Crisis of Confidence' })} onEdited={() => {}} />);
+
+    expect(screen.queryByRole('button', { name: 'Make this the chapter subtitle' })).toBeNull();
+    expect(screen.getByText('The Crisis of Confidence')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Remove subtitle' }));
+    const chapterId = (project().book.mainContent[0] as { id: string }).id;
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'clearSubtitle', chapterId });
   });
 });
 

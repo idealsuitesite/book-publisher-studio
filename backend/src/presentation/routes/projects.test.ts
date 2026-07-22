@@ -341,6 +341,64 @@ describe('POST /api/projects/:id/structure — manual structure editing (STRUCTU
     expect(res.body.code).toBe('CONTENT_NOT_FOUND');
   });
 
+  // MINI_DR_SUBTITLE_FIELD commit 1 — whitelisted WITH route tests in the same commit (the
+  // standing lesson, applied d'office). A3: the refusals surface a NAMED ApiErrorCode in BOTH
+  // directions — a screen may only show an error it can name, defense-in-depth included.
+  it('markAsSubtitle: moves the paragraph into chapter.subtitle, 200 + snapshot; clearSubtitle restores it first', async () => {
+    const { app, id } = await seedProject();
+    const got = await request(app).get(`/api/projects/${id}`);
+    const chapterId = got.body.book.mainContent[0].id as string;
+    const paragraphId = got.body.book.mainContent[0].content[0].id as string;
+    const paragraphText = got.body.book.mainContent[0].content[0].text as string;
+
+    const marked = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'markAsSubtitle', blockId: paragraphId });
+    expect(marked.status).toBe(200);
+    expect(marked.body.book.mainContent[0].subtitle).toBe(paragraphText);
+    expect(marked.body.book.mainContent[0].content.some((b: { id: string }) => b.id === paragraphId)).toBe(false);
+    expect(marked.body.versions).toHaveLength(1); // snapshot-before-edit
+
+    const cleared = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'clearSubtitle', chapterId });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.book.mainContent[0].subtitle).toBeUndefined();
+    expect(cleared.body.book.mainContent[0].content[0].text).toBe(paragraphText);
+  });
+
+  it('A3 both directions: mark-on-populated and clear-on-empty each surface the named code, never a 500', async () => {
+    // Own two-paragraph seed: the mark-on-populated direction needs a second target paragraph.
+    const app = createApp();
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['A subtitle-looking line.', 'Real prose follows.'] });
+    const imported = await request(app)
+      .post('/api/manuscripts/import')
+      .attach('file', buffer, { filename: 'b.docx', contentType: DOCX_MIME });
+    const id = imported.body.projectId as string;
+    const got = await request(app).get(`/api/projects/${id}`);
+    const chapterId = got.body.book.mainContent[0].id as string;
+    const paragraphId = got.body.book.mainContent[0].content[0].id as string;
+
+    // clear on empty — refused, named
+    const clearEmpty = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'clearSubtitle', chapterId });
+    expect(clearEmpty.status).toBe(400);
+    expect(clearEmpty.body.code).toBe('CONTENT_NOT_FOUND');
+
+    // mark on populated — refused, named
+    await request(app).post(`/api/projects/${id}/structure`).send({ type: 'markAsSubtitle', blockId: paragraphId });
+    const fresh = await request(app).get(`/api/projects/${id}`);
+    const remainingParagraphId = fresh.body.book.mainContent[0].content[0].id as string;
+    const markPopulated = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'markAsSubtitle', blockId: remainingParagraphId });
+    expect(markPopulated.status).toBe(400);
+    expect(markPopulated.body.code).toBe('CONTENT_NOT_FOUND');
+  });
+
+  it('400 INVALID_MUTATION on malformed subtitle mutations (missing ids)', async () => {
+    const { app, id } = await seedProject();
+    const noBlock = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'markAsSubtitle' });
+    expect(noBlock.status).toBe(400);
+    expect(noBlock.body.code).toBe('INVALID_MUTATION');
+    const noChapter = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'clearSubtitle' });
+    expect(noChapter.status).toBe(400);
+    expect(noChapter.body.code).toBe('INVALID_MUTATION');
+  });
+
   // PART_LEVEL_STRUCTURE — the untrusted-body boundary tested WITH the dispatch, not after it
   // (the setPartRole lesson above: a unit-tested handler behind an unwhitelisted route is a 400).
   it('insertPartOpener: inserts a flagged divider, 200 + snapshot + numbering untouched', async () => {

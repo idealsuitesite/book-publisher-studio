@@ -36,6 +36,17 @@ Day-to-day operational rules for working in this repository — distinct from `d
 - [ ] Commit with a clear, Conventional-Commit-style message
 - [ ] Push (to a feature branch, or to `main` only for the governance-doc exception above)
 
+## Live verification leaves no trace (CTO rule, 2026-07-22)
+
+A live verification that MUTATES the permanent demo library (a rename, a mark, a part insert —
+any gesture through the real routes) **undoes itself in the same session**: the harness-cleanup
+rule extended to manual gestures. The precedent that made this a rule: a phase-3 live rename
+left `"INTRODUCTION (edited)"` stored in the demo book for days — it printed faithfully in
+every export (the pipeline was honest; the data was polluted) and silently shifted the editorial
+chapter count by breaking canonical-title recognition. Version-log growth from the
+snapshot-per-gesture machinery is the accepted cost of live verification; a mutated FINAL STATE
+is not. Verify the final state matches the found state before closing the session.
+
 ## Server verification (never assume the port)
 
 Before any real export/import verification against a running server:

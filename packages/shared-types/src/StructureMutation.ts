@@ -28,6 +28,11 @@ export type StructureMutation =
   // MINI_DR_CALLOUTS commit 1: mark/unmark a paragraph as a generic callout (Shape B — the flag
   // lives on the paragraph; the chrome lives in the theme). The author action; never inferred.
   | { type: 'setCallout'; blockId: string; on: boolean }
+  // MINI_DR_SUBTITLE_FIELD commit 1: move a paragraph's text into its top-level chapter's
+  // subtitle field, and the inverse (reinsert as first paragraph). The author action; the
+  // import writes nothing (SUBTITLE_IMPORT_MAPPING_UNBLOCK gates the styleMap path).
+  | { type: 'markAsSubtitle'; blockId: string }
+  | { type: 'clearSubtitle'; chapterId: string }
   // MINI_DR_EDIT_FRONT_MATTER (Phase 3b): edit the RENDERED front-matter sections. undefined =
   // untouched, null = cleared (a book with no copyright page is a legitimate author choice),
   // object = replaced whole.

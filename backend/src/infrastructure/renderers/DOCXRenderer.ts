@@ -31,6 +31,7 @@ import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { dropCapLetterSizePt, dropCapScaleOf } from '../../domain/services/dropCapMetrics';
 import { CALLOUT_GAP_PT, CALLOUT_RULE_PT, calloutRuleColorOf, calloutTintOf } from '../../domain/services/calloutMetrics';
+import { CHAPTER_SUBTITLE_RATIO } from '../../domain/services/titleMetrics';
 import type { TextMeasurer } from '../../domain/ports/TextMeasurer';
 import { withNativeDropCapFrame } from './docxDropCapFrame';
 
@@ -76,6 +77,27 @@ function buildHeadingStyles(theme: Theme): IStylesOptions['default'] {
     heading5: styleFor('h5'),
     heading6: styleFor('h6'),
   };
+}
+
+// The REAL Word `Subtitle` paragraph style (MINI_DR_SUBTITLE_FIELD §4): italic, the shared
+// ratio of the theme's h1, the accent — declared in styles.xml so gestured chapters carry
+// Word's own convention. One universal treatment; the ratio comes from the ONE domain module
+// the pagination model also reads (titleMetrics).
+function buildSubtitleStyle(theme: Theme): NonNullable<IStylesOptions['paragraphStyles']> {
+  return [
+    {
+      id: 'Subtitle',
+      name: 'Subtitle',
+      basedOn: 'Normal',
+      next: 'Normal',
+      run: {
+        font: theme.fonts.heading,
+        size: Math.round(theme.fontSizes.h1 * CHAPTER_SUBTITLE_RATIO * 2),
+        italics: true,
+        color: theme.colors.accent.replace(/^#/, ''),
+      },
+    },
+  ];
 }
 
 // Renders a resolved TypeRun[] into docx ParagraphChild[] (TextRun, or ExternalHyperlink
@@ -333,7 +355,10 @@ export class DOCXRenderer implements Renderer<Buffer> {
       children,
     };
     const doc = new Document({
-      styles: { default: buildHeadingStyles(book.styledBook.theme) },
+      styles: {
+        default: buildHeadingStyles(book.styledBook.theme),
+        paragraphStyles: buildSubtitleStyle(book.styledBook.theme),
+      },
       sections: [section],
     });
 
@@ -370,7 +395,7 @@ export class DOCXRenderer implements Renderer<Buffer> {
       // top-level content needs its own forced break to separate it from the TOC, even though
       // it's normally the one case that never breaks (it's the document's own first content).
       const breaksPage = ownerPage !== undefined || (isTopLevel && isFirstContent && forceBreakOnFirst);
-      out.push(this.renderTitle(content, breaksPage));
+      out.push(...this.renderTitle(content, breaksPage));
       isFirstContent = false;
 
       for (const block of content.content) {
@@ -385,19 +410,29 @@ export class DOCXRenderer implements Renderer<Buffer> {
     }
   }
 
-  private renderTitle(content: Chapter | Section, pageBreakBefore: boolean): Paragraph {
+  private renderTitle(content: Chapter | Section, pageBreakBefore: boolean): Paragraph[] {
     if (content.type === 'chapter') {
-      return new Paragraph({
+      const title = new Paragraph({
         text: content.title,
         heading: HeadingLevel.HEADING_1,
         pageBreakBefore,
       });
+      // A chapter's subtitle (MINI_DR_SUBTITLE_FIELD §4): a REAL `Subtitle`-styled paragraph —
+      // Word's own convention (declared in styles.xml, buildSubtitleStyle) — so Word users see
+      // and edit it as what it is. Deliberate bonus, GUARDED (TODO A1): this output never
+      // counts as the unblocking manuscript for SUBTITLE_IMPORT_MAPPING_UNBLOCK.
+      if (content.subtitle) {
+        return [title, new Paragraph({ text: content.subtitle, style: 'Subtitle' })];
+      }
+      return [title];
     }
-    return new Paragraph({
-      text: content.title,
-      heading: HEADING_LEVEL_BY_NUMBER[content.level] ?? HeadingLevel.HEADING_6,
-      pageBreakBefore,
-    });
+    return [
+      new Paragraph({
+        text: content.title,
+        heading: HEADING_LEVEL_BY_NUMBER[content.level] ?? HeadingLevel.HEADING_6,
+        pageBreakBefore,
+      }),
+    ];
   }
 
   /**

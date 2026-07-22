@@ -18,6 +18,7 @@ import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
 import { renderedImageSize } from '../../domain/services/renderedImageSize';
 import { dropCapGeometry, dropCapScaleOf, type DropCapGeometry } from '../../domain/services/dropCapMetrics';
 import { CALLOUT_PAD_V_PT, CALLOUT_RULE_PT, calloutRuleColorOf, calloutTextIndentPt, calloutTintOf } from '../../domain/services/calloutMetrics';
+import { CHAPTER_SUBTITLE_RATIO } from '../../domain/services/titleMetrics';
 import { assertPlausibleCapHeight } from '../fonts/PdfKitTextMeasurer';
 
 // The drop-cap scale now lives in the Domain (dropCapMetrics), because the pagination model
@@ -552,6 +553,16 @@ export class PDFRenderer implements Renderer<Buffer> {
     // so the visible gap above is (paragraphSpacing + titleSpaceBefore); values account for it.
     this.spendSpaceAfter(doc, theme.spacing.titleSpaceBefore);
     doc.font(this.fonts.resolveHeading(level, theme, true, false)).fontSize(size).fillColor(theme.colors.accent).text(content.title);
+    // A chapter's subtitle (MINI_DR_SUBTITLE_FIELD §4): italic, the shared ratio of the title
+    // size, same accent, directly under the title INSIDE the title block — drawn here and
+    // charged by titleHeightOf in the same expression (lock-step, never a parallel calculation).
+    if (content.type === 'chapter' && content.subtitle) {
+      doc
+        .font(this.fonts.resolveHeading(level, theme, false, true))
+        .fontSize(size * CHAPTER_SUBTITLE_RATIO)
+        .fillColor(theme.colors.accent)
+        .text(content.subtitle);
+    }
     this.spendSpaceAfter(doc, theme.spacing.titleSpaceAfter);
   }
 

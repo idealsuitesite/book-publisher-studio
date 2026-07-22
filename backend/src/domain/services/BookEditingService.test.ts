@@ -338,3 +338,87 @@ describe('BookEditingService — setCallout (MINI_DR_CALLOUTS commit 1)', () => 
     expect(back.mainContent).toEqual(book.mainContent);
   }, 30_000);
 });
+
+// ── MINI_DR_SUBTITLE_FIELD commit 1: markAsSubtitle / clearSubtitle ─────────────────────────────
+// The gesture that makes a subtitle-stored-as-paragraph become what it claims to be — retiring
+// Novel's consigned limitation by position alone (the drop-cap trigger is untouched: once the
+// line leaves content[0], the first block IS the prose). Fifth use of the gesture machinery.
+
+function subtitleBook(): Book {
+  const now = new Date();
+  const ch1: Chapter = {
+    type: 'chapter', id: 'ch1', number: 1, title: 'One', createdAt: now, updatedAt: now,
+    content: [calloutPara('sub-line', 'The Crisis of Confidence — a subtitle stored as prose'), calloutPara('prose-1', 'All around the world, real prose begins.')],
+    sections: [{ type: 'section', id: 'sec1', title: 'Sec', level: 2, createdAt: now, updatedAt: now, content: [calloutPara('sec-p', 'Section prose.')] }],
+  };
+  const preamble: Section = { type: 'section', id: 'pre', title: '', content: [calloutPara('pre-p', 'Preamble prose.')], level: 1, createdAt: now, updatedAt: now };
+  return createBook({ title: 'T', author: 'A', language: 'en' }, [preamble, ch1]);
+}
+
+describe('BookEditingService — markAsSubtitle / clearSubtitle (MINI_DR_SUBTITLE_FIELD commit 1)', () => {
+  const svc = withIds();
+  const ch = (book: Book) => book.mainContent.find((c) => c.id === 'ch1') as Chapter;
+
+  it('mark moves the paragraph text into chapter.subtitle and removes the block', () => {
+    const marked = svc.markAsSubtitle(subtitleBook(), 'sub-line');
+    expect(ch(marked).subtitle).toBe('The Crisis of Confidence — a subtitle stored as prose');
+    expect(ch(marked).content.map((b) => b.id)).toEqual(['prose-1']); // the prose is now content[0] — position retires the drop-cap case
+  });
+
+  it('mark rejects when the chapter already has a subtitle — the author clears first, explicitly (decision 5)', () => {
+    const marked = svc.markAsSubtitle(subtitleBook(), 'sub-line');
+    expect(() => svc.markAsSubtitle(marked, 'prose-1')).toThrow(ContentNotFoundError);
+  });
+
+  it('mark rejects paragraphs outside a top-level chapter (v1 boundary): section-nested and preamble paragraphs', () => {
+    expect(() => svc.markAsSubtitle(subtitleBook(), 'sec-p')).toThrow(ContentNotFoundError);
+    expect(() => svc.markAsSubtitle(subtitleBook(), 'pre-p')).toThrow(ContentNotFoundError);
+  });
+
+  it('mark rejects an empty-text paragraph and an unknown id; never mutates the input', () => {
+    const withEmpty = subtitleBook();
+    (withEmpty.mainContent.find((c) => c.id === 'ch1') as Chapter).content.unshift(calloutPara('empty-p', '   '));
+    expect(() => svc.markAsSubtitle(withEmpty, 'empty-p')).toThrow(ContentNotFoundError);
+    const book = subtitleBook();
+    expect(() => svc.markAsSubtitle(book, 'ghost')).toThrow(ContentNotFoundError);
+    expect(ch(book).subtitle).toBeUndefined();
+    expect(ch(book).content).toHaveLength(2);
+  });
+
+  it('clear reinserts the subtitle as the FIRST paragraph (fresh id) and removes the property', () => {
+    const marked = svc.markAsSubtitle(subtitleBook(), 'sub-line');
+    const cleared = svc.clearSubtitle(marked, 'ch1');
+    expect('subtitle' in ch(cleared)).toBe(false); // property removed, not set to undefined
+    const first = ch(cleared).content[0];
+    expect(first.type).toBe('paragraph');
+    expect((first as Paragraph).text).toBe('The Crisis of Confidence — a subtitle stored as prose');
+    expect(first.id).not.toBe('sub-line'); // a freshly minted id — the §3 conservative-MISS reason
+  });
+
+  it('clear rejects a chapter with no subtitle and an unknown chapter id', () => {
+    expect(() => svc.clearSubtitle(subtitleBook(), 'ch1')).toThrow(ContentNotFoundError);
+    expect(() => svc.clearSubtitle(subtitleBook(), 'ghost')).toThrow(ContentNotFoundError);
+  });
+
+  it('round trip is PLAIN-TEXT identity — texts and order restored, ids legitimately fresh (disclosure 1)', () => {
+    const original = subtitleBook();
+    const back = svc.clearSubtitle(svc.markAsSubtitle(original, 'sub-line'), 'ch1');
+    expect(ch(back).content.map((b) => (b as Paragraph).text)).toEqual(ch(original).content.map((b) => (b as Paragraph).text));
+  });
+
+  it('real-fixture (faith-alone): mark the opening subtitle-line of a real chapter, the prose becomes first; clear restores the text', async () => {
+    const book = await importCorpus('faith-alone-styled.docx');
+    const chapter = book.mainContent.find((c) => c.type === 'chapter' && c.content[0]?.type === 'paragraph')! as Chapter;
+    const openerText = (chapter.content[0] as Paragraph).text;
+    const secondText = (chapter.content[1] as Paragraph).text;
+
+    const marked = svc.markAsSubtitle(book, chapter.content[0].id);
+    const markedCh = marked.mainContent.find((c) => c.id === chapter.id) as Chapter;
+    expect(markedCh.subtitle).toBe(openerText);
+    expect((markedCh.content[0] as Paragraph).text).toBe(secondText); // the drop cap would now land HERE
+
+    const cleared = svc.clearSubtitle(marked, chapter.id);
+    const clearedCh = cleared.mainContent.find((c) => c.id === chapter.id) as Chapter;
+    expect((clearedCh.content[0] as Paragraph).text).toBe(openerText);
+  }, 30_000);
+});

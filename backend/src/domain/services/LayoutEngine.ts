@@ -1,6 +1,7 @@
 import type { StyledBook } from '../models/Theme';
 import { dropCapGeometry, dropCapScaleOf } from './dropCapMetrics';
 import { CALLOUT_PAD_V_PT, calloutTextIndentPt } from './calloutMetrics';
+import { CHAPTER_SUBTITLE_RATIO } from './titleMetrics';
 import type { PageLayout } from '../models/PageLayout';
 import type { Page, PaginatedBook } from '../models/PaginatedBook';
 import type { Content, Block, TOCEntry } from '../models/Book';
@@ -127,7 +128,21 @@ export class LayoutEngine {
       if (!this.measurer || !content.title) return 0;
       const size = content.type === 'chapter' ? 24 : Math.max(12, 22 - content.level * 2);
       const { titleSpaceBefore, titleSpaceAfter } = styled.theme.spacing;
+      // A chapter's subtitle (MINI_DR_SUBTITLE_FIELD §4) is charged INSIDE the same expression
+      // renderTitle spends — italic at the shared ratio of the title size, measured with the
+      // heading face (the italic wrap-width delta is the standing ±1-line residual class,
+      // disclosed). Sections carry no subtitle field.
+      const subtitleHeight =
+        content.type === 'chapter' && content.subtitle
+          ? this.measurer.measureHeight(content.subtitle, {
+              fontSize: size * CHAPTER_SUBTITLE_RATIO,
+              width: usableWidth,
+              heading: true,
+              theme: styled.theme,
+            })
+          : 0;
       return (
+        subtitleHeight +
         // Lock-step with PDFRenderer.renderTitle (MINI_DR_SUBTITLE_SPACING): flat titleSpaceBefore
         // above + the measured title height + flat titleSpaceAfter below. Replaces the former
         // `+ lineHeight(size)` term, which charged renderTitle's old size-scaled moveDown(). The
