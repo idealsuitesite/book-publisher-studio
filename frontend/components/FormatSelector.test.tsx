@@ -21,6 +21,7 @@ function setup(overrides: Partial<React.ComponentProps<typeof FormatSelector>> =
     onLayoutChange: vi.fn(),
     onThemeChange: vi.fn(),
     onAccentChange: vi.fn(),
+    onTypographyChange: vi.fn(),
     ...overrides,
   };
   render(<FormatSelector {...props} />);
@@ -37,7 +38,10 @@ describe('FormatSelector', () => {
 
   it('groups layouts by category rather than listing them flat', () => {
     setup();
-    expect(screen.getByText('Standard')).toBeInTheDocument();
+    // Scoped to the category label element: "Standard" is ALSO a text-size preset button since
+    // MINI_DR_TYPOGRAPHY_TUNING (a conscious wording collision, resolved by selector not rename —
+    // both words are correct in their own sections).
+    expect(screen.getByText('Standard', { selector: 'p' })).toBeInTheDocument();
     expect(screen.getByText('Amazon KDP')).toBeInTheDocument();
   });
 
@@ -46,7 +50,10 @@ describe('FormatSelector', () => {
     const pressed = screen
       .getAllByRole('button')
       .filter((b) => b.getAttribute('aria-pressed') === 'true');
-    expect(pressed).toHaveLength(2); // one layout + one theme
+    // one layout + one theme + the Standard text-size preset (active by default since
+    // MINI_DR_TYPOGRAPHY_TUNING — "standard" IS the theme default, honestly shown as chosen).
+    expect(pressed).toHaveLength(3);
+    expect(pressed.map((b) => b.textContent)).toContain('Standard');
   });
 
   it('reports a layout change to the parent rather than holding state itself', async () => {
@@ -98,6 +105,42 @@ describe('FormatSelector', () => {
   it('shows no reset control when there is no override (nothing to clear)', () => {
     setup();
     expect(screen.queryByRole('button', { name: /reset to theme default/i })).toBeNull();
+  });
+
+  // MINI_DR_TYPOGRAPHY_TUNING: the four named presets + the pairing selects, parent-reported
+  // (PATCH), never local state — the accent discipline extended to the geometry knobs.
+  it('renders the four CTO-locked presets with Standard active when nothing is overridden', () => {
+    setup();
+    for (const label of ['Compact', 'Standard', 'Comfort', 'Large print']) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
+    }
+    expect(screen.getByRole('button', { name: 'Standard' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('picking a preset reports the merged override to the parent', async () => {
+    const user = userEvent.setup();
+    const { onTypographyChange } = setup({ selectedTypography: { bodyFont: 'sans' } });
+    await user.click(screen.getByRole('button', { name: 'Large print' }));
+    expect(onTypographyChange).toHaveBeenCalledWith({ preset: 'large', bodyFont: 'sans' });
+  });
+
+  it('picking a font role reports it; putting every field back to default degrades to a CLEAR (null)', async () => {
+    const user = userEvent.setup();
+    const { onTypographyChange } = setup({ selectedTypography: { bodyFont: 'sans' } });
+    await user.selectOptions(screen.getByLabelText('Heading font'), 'serif');
+    expect(onTypographyChange).toHaveBeenCalledWith({ bodyFont: 'sans', headingFont: 'serif' });
+
+    // Body font back to "Theme default" with nothing else set -> null, never an empty object
+    // (the backend rightly rejects an override that touches nothing).
+    await user.selectOptions(screen.getByLabelText('Body font'), '');
+    expect(onTypographyChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it('typography reset reports null (its own control, scoped)', async () => {
+    const user = userEvent.setup();
+    const { onTypographyChange } = setup({ selectedTypography: { preset: 'comfort' } });
+    await user.click(screen.getByRole('button', { name: /reset to theme default/i }));
+    expect(onTypographyChange).toHaveBeenCalledWith(null);
   });
 
   it('clears the override via the reset control, reporting null', async () => {

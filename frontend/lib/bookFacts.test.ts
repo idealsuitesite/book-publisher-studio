@@ -82,6 +82,15 @@ describe('proofRefreshKey — what makes the living Proof re-ink (Phase 3 D5)', 
     );
   });
 
+  it('changes when the typography override changes, same updatedAt (MINI_DR_TYPOGRAPHY_TUNING §2.6)', () => {
+    // Geometry moves with the override — a stale Proof here would misstate the book's LENGTH.
+    expect(proofRefreshKey(project())).not.toBe(
+      proofRefreshKey(
+        project({ settings: { layoutName: 'letter', themeName: 'classic', typographyOverride: { preset: 'large' } } })
+      )
+    );
+  });
+
   it('changes when a structure edit advances updatedAt — even with identical settings', () => {
     const before = proofRefreshKey(project());
     // A reorder/rename/undo bumps updatedAt (ProjectService); settings are untouched.
