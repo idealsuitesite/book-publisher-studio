@@ -305,6 +305,42 @@ describe('POST /api/projects/:id/structure — manual structure editing (STRUCTU
     expect(res.body.code).toBe('INVALID_MUTATION');
   });
 
+  // MINI_DR_CALLOUTS commit 1 — whitelisted WITH route tests in the same commit (the standing
+  // setPartRole lesson): the untrusted-body boundary is where the live gap shipped last time.
+  it('setCallout: marks a paragraph, 200 + flag persisted + snapshot; unmark removes it', async () => {
+    const { app, id } = await seedProject();
+    const got = await request(app).get(`/api/projects/${id}`);
+    const paragraphId = got.body.book.mainContent[0].content[0].id as string;
+
+    const marked = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'setCallout', blockId: paragraphId, on: true });
+    expect(marked.status).toBe(200);
+    expect(marked.body.book.mainContent[0].content[0].callout).toBe(true);
+    expect(marked.body.versions).toHaveLength(1); // snapshot-before-edit
+
+    const unmarked = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'setCallout', blockId: paragraphId, on: false });
+    expect(unmarked.status).toBe(200);
+    expect(unmarked.body.book.mainContent[0].content[0].callout).toBeUndefined();
+  });
+
+  it('400 INVALID_MUTATION on a setCallout missing blockId or with a non-boolean on', async () => {
+    const { app, id } = await seedProject();
+    const noId = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'setCallout', on: true });
+    expect(noId.status).toBe(400);
+    expect(noId.body.code).toBe('INVALID_MUTATION');
+    const badOn = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'setCallout', blockId: 'p1', on: 'yes' });
+    expect(badOn.status).toBe(400);
+    expect(badOn.body.code).toBe('INVALID_MUTATION');
+  });
+
+  it('400 CONTENT_NOT_FOUND on a setCallout no-op toggle (marking the already-unmarked off)', async () => {
+    const { app, id } = await seedProject();
+    const got = await request(app).get(`/api/projects/${id}`);
+    const paragraphId = got.body.book.mainContent[0].content[0].id as string;
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'setCallout', blockId: paragraphId, on: false });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('CONTENT_NOT_FOUND');
+  });
+
   // PART_LEVEL_STRUCTURE — the untrusted-body boundary tested WITH the dispatch, not after it
   // (the setPartRole lesson above: a unit-tested handler behind an unwhitelisted route is a 400).
   it('insertPartOpener: inserts a flagged divider, 200 + snapshot + numbering untouched', async () => {

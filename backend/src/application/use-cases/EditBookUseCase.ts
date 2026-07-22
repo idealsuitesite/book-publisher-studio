@@ -76,6 +76,11 @@ export class EditBookUseCase {
         const book = this.editingService.removePartOpener(this.projectService.currentBook(project), mutation.id);
         return this.projectService.replaceBook(snapped, book);
       }
+      case 'setCallout': {
+        const snapped = this.projectService.snapshot(project, mutation.on ? 'before callout mark' : 'before callout unmark');
+        const book = this.editingService.setCallout(this.projectService.currentBook(project), mutation.blockId, mutation.on);
+        return this.projectService.replaceBook(snapped, book);
+      }
       case 'editFrontMatter': {
         const snapped = this.projectService.snapshot(project, 'before front matter edit');
         const book = this.editingService.editFrontMatter(this.projectService.currentBook(project), {

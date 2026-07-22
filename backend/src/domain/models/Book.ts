@@ -191,6 +191,18 @@ export interface Paragraph {
   dropCap?: boolean;
   align?: 'left' | 'center' | 'right' | 'justify';
 
+  /**
+   * Marks this paragraph as a CALLOUT — a passage the author set off (MINI_DR_CALLOUTS, Shape B:
+   * an additive field, no Block-union extension — the `partOpener`/`role` precedent, third use).
+   * GENERIC by CTO decision D2: no note/tip/warning taxonomy, no rendered label — the chrome
+   * (left rule + optional theme-declared tint, `Theme.presentation.callout`) distinguishes the
+   * passage, it never names it. Set ONLY by an author action (`BookEditingService.setCallout`
+   * via the mutation route); nothing in the import path writes it — the corpus census measured
+   * zero callout-shaped content to map (CALLOUTS_SCOPE.md §1), and a false callout is worse
+   * than none (BOOK_PRESENTATION §6 Q1).
+   */
+  callout?: true;
+
   // Spacing (in points)
   spaceBefore?: number;
   spaceAfter?: number;

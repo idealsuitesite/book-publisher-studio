@@ -13,6 +13,9 @@ export class BlockMapper {
           id: block.id,
           text: block.text,
           inlines: this.mapInlines(block.inlines),
+          // Additive callout crossing (MINI_DR_CALLOUTS): absent stays absent — the DTO mirrors
+          // the model's exact-identity round-trip rather than materialising `undefined`.
+          ...(block.callout === true ? { callout: true as const } : {}),
         };
       case 'quote':
         return {

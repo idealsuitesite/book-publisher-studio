@@ -41,6 +41,19 @@ export interface DropCapPresentation {
   scale: number;
 }
 
+/**
+ * The theme-declared callout chrome policy (MINI_DR_CALLOUTS §1). ONE mechanism everywhere —
+ * a left rule in the resolved accent plus an optional very light background tint — with the
+ * tint as the single per-theme value (the D1/D4 reconciliation, CTO-confirmed): 'none' keeps
+ * the chrome B&W-print safe (Classic), 'accent' mixes the resolved accent toward paper
+ * (Modern; `calloutMetrics.calloutTintOf` — one computed hex, three formats). A theme that
+ * declares nothing renders the rule alone: a marked callout ALWAYS shows chrome, else the
+ * author's gesture would be a lie.
+ */
+export interface CalloutPresentation {
+  tint: 'none' | 'accent';
+}
+
 export interface Theme {
   name: string;
   fonts: {
@@ -83,6 +96,7 @@ export interface Theme {
   // presents exactly as before the capability existed.
   presentation?: {
     dropCap?: DropCapPresentation;
+    callout?: CalloutPresentation;
   };
 }
 

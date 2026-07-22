@@ -12,6 +12,8 @@ export interface ParagraphDTO {
   id: string;
   text: string;
   inlines: InlineDTO[];
+  // MINI_DR_CALLOUTS: the author-set generic callout flag, additive (absent = ordinary paragraph).
+  callout?: true;
 }
 
 export interface QuoteDTO {

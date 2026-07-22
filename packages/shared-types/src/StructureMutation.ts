@@ -25,6 +25,9 @@ export type StructureMutation =
   // by id (opener-only — a real chapter can never be deleted through this op).
   | { type: 'insertPartOpener'; index: number; title: string }
   | { type: 'removePartOpener'; id: string }
+  // MINI_DR_CALLOUTS commit 1: mark/unmark a paragraph as a generic callout (Shape B — the flag
+  // lives on the paragraph; the chrome lives in the theme). The author action; never inferred.
+  | { type: 'setCallout'; blockId: string; on: boolean }
   // MINI_DR_EDIT_FRONT_MATTER (Phase 3b): edit the RENDERED front-matter sections. undefined =
   // untouched, null = cleared (a book with no copyright page is a legitimate author choice),
   // object = replaced whole.

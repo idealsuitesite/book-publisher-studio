@@ -1,7 +1,21 @@
 # Mini Design Review — Callouts (queue item 6, CALLOUTS_SCOPE.md → Option A)
 
-**Status:** 🟡 DRAFT — awaiting CTO approval. **No code before it** (the standing gate).
-**Date:** 2026-07-22
+**Status:** ✅ DELIVERED on `feature/callouts` — CTO-approved (2026-07-22, the §1 D1/D4
+reconciliation explicitly confirmed), all four §6 commits built and gated (1 `d264ce1`,
+2 `02834f0` + the shade tuning `0181d3f`, 3 `493cb44`, 4 = this commit), **AWAITING MERGE on the
+CTO's accord.** The shade knob is LOCKED at **0.96** on the CTO's real-page look (0.92 read as a
+documentation box; at 0.96 the tint suggests itself — and the CTO kept the tint for Modern over
+a rule-only reduction: two themes, two assumed identities). Verified live on faith-alone in the
+studio: mark → Callout badge + the chrome in the real exported PDF (black Classic rule, the
+author's own bold preserved) → unmark → **Undo restores the badge** → final unmark; zero console
+errors; 90 pages held. **Two instruments bit during the build, both on their birth day:** the
+legitimate-HIT cache property caught the first draft of `setCallout` bumping `book.updatedAt`
+(no other op does — the convention IS the property; fixed, reason recorded in the op), and the
+tests-first red run caught everything else before it existed. The callout/drop-cap interaction
+is decided ONCE in the resolver (a callout never takes the chapterOpening ornament), pinned by
+test. §5's real-gesture verification replaced the unsatisfiable corpus-fixture premise exactly
+as amended.
+**Date:** 2026-07-22, delivered 2026-07-22
 **Inputs:** `CALLOUTS_SCOPE.md` (measured: census 0/0/0/0 on the whole corpus; union extension =
 9 exhaustive sites; the C1-trap exit via authoring-first) · the CTO's **four §7 answers, locked
 2026-07-22** · the drop-cap chantier as the structural template (`MINI_DR_DROP_CAPS.md`).

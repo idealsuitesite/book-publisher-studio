@@ -1,4 +1,4 @@
-import type { Book, Content, Section, Chapter, Paragraph, TitlePage, CopyrightPage } from '../models/Book';
+import type { Book, Content, Section, Chapter, Paragraph, Block, TitlePage, CopyrightPage } from '../models/Book';
 import { ContentNotFoundError } from '../../shared/errors/ContentNotFoundError';
 
 /**
@@ -96,6 +96,59 @@ export class BookEditingService {
     });
     if (!found) {
       throw new ContentNotFoundError(`setPartRole: no top-level part with id "${id}"`);
+    }
+    return { ...book, mainContent };
+  }
+
+  /**
+   * Mark (or unmark) a paragraph as a callout — the author's gesture, the producer that ships
+   * WITH the callout capability (MINI_DR_CALLOUTS commit 1; the C1-trap exit, CALLOUTS_SCOPE §3).
+   * By id, at ANY depth (the `rename` walk); paragraphs only — the v1 boundary (quotes/lists/
+   * headings excluded by design, and quote presentation stays behind C1's freeze). A no-op
+   * toggle (marking the marked, unmarking the unmarked) is rejected rather than snapshotted —
+   * a mutation that changes nothing is a malformed request, not a version event (the
+   * front-matter lesson). Returns a new Book; the original is untouched.
+   */
+  // No `now` parameter and no book-level updatedAt bump ON PURPOSE, matching every other op
+  // here (rename/setPartRole/…): paragraphs carry no timestamp, the project's own updatedAt
+  // moves at save time, and bumping the BOOK would break the legitimate-HIT property — an
+  // unmark must restore byte-identical pre-mark content (the §3.6 honesty; caught by the
+  // pagination-cache instrument the moment the first draft bumped it).
+  setCallout(book: Book, blockId: string, on: boolean): Book {
+    let found = false;
+
+    const applyIn = (blocks: Block[]): Block[] =>
+      blocks.map((block): Block => {
+        if (block.id !== blockId || block.type !== 'paragraph') return block;
+        found = true;
+        if (on === (block.callout === true)) {
+          throw new ContentNotFoundError(
+            `setCallout: paragraph "${blockId}" is already ${on ? 'marked' : 'unmarked'} — nothing to change`
+          );
+        }
+        if (!on) {
+          const cleared = { ...block };
+          delete cleared.callout; // property removed, not set to undefined — round-trip stays exact identity
+          return cleared;
+        }
+        return { ...block, callout: true };
+      });
+
+    const walk = (contents: Content[]): Content[] =>
+      contents.map((content): Content => {
+        const withBlocks = { ...content, content: applyIn(content.content) };
+        if (withBlocks.type === 'chapter' && withBlocks.sections) {
+          return { ...withBlocks, sections: walk(withBlocks.sections) as Section[] };
+        }
+        if (withBlocks.type === 'section' && withBlocks.subsections) {
+          return { ...withBlocks, subsections: walk(withBlocks.subsections) as Section[] };
+        }
+        return withBlocks;
+      });
+
+    const mainContent = walk(book.mainContent);
+    if (!found) {
+      throw new ContentNotFoundError(`setCallout: no paragraph with id "${blockId}"`);
     }
     return { ...book, mainContent };
   }

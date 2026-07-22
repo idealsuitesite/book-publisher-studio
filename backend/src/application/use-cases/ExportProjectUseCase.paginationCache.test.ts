@@ -134,5 +134,28 @@ describe('ExportProjectUseCase pagination cache invalidation', () => {
     project = svc.updateSettings(project, { typographyOverride: undefined });
     await useCase.execute(project.id, 'pdf'); // HIT (the pre-override geometry for this exact book)
     expect(paginate).toHaveBeenCalledTimes(7);
+
+    // MINI_DR_CALLOUTS §5: marking a callout is a BOOK edit — its chrome moves real geometry
+    // (vertical padding + a narrowed text column) — so a new content hash and a MISS by
+    // construction; serving the unmarked geometry after a mark would be the silent-drift class.
+    const calloutTargetId = svc.currentBook(project).mainContent
+      .flatMap((c) => c.content)
+      .find((b) => b.type === 'paragraph')!.id;
+    project = svc.replaceBook(project, editing.setCallout(svc.currentBook(project), calloutTargetId, true));
+    await useCase.execute(project.id, 'pdf'); // MISS -> paginate #8
+    expect(paginate).toHaveBeenCalledTimes(8);
+
+    // An accent change OVER the marked book stays colour-only: the callout's rule and tint are
+    // ink derived from the resolved accent (D3), never geometry — the §3 trap's guard extended.
+    project = svc.updateSettings(project, { accentOverride: '#0044AA' });
+    await useCase.execute(project.id, 'pdf'); // HIT
+    expect(paginate).toHaveBeenCalledTimes(8);
+
+    // Unmarking restores byte-identical pre-mark content — the cached geometry is CORRECT for
+    // it (the §3.6 legitimate-HIT honesty: a content-hash key cannot confuse two states that
+    // ARE the same state).
+    project = svc.replaceBook(project, editing.setCallout(svc.currentBook(project), calloutTargetId, false));
+    await useCase.execute(project.id, 'pdf'); // legitimate HIT
+    expect(paginate).toHaveBeenCalledTimes(8);
   });
 });

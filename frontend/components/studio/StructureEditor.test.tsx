@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ProjectDTO } from 'shared-types';
-import { StructureEditor, applyReorder, applyRename, applyUndo, applyPromote, applyMerge, applySetPartRole } from './StructureEditor';
+import { StructureEditor, applyReorder, applyRename, applyUndo, applyPromote, applyMerge, applySetPartRole, applySetCallout } from './StructureEditor';
 import { editStructure } from '@/lib/api-client';
 import type { editStructure as editStructureFn } from '@/lib/api-client';
 
@@ -305,6 +305,62 @@ function unstructuredProject(): ProjectDTO {
     updatedAt: '2026-07-21T00:00:00.000Z',
   } as unknown as ProjectDTO;
 }
+
+// ── MINI_DR_CALLOUTS commit 4: the marking gesture in the studio ────────────────────────────────
+describe('applySetCallout (the callout gesture handler)', () => {
+  it('sends the setCallout mutation and applies the result', async () => {
+    const editStructure = vi.fn().mockResolvedValue({ id: 'p1' }) as unknown as typeof editStructureFn;
+    const onEdited = vi.fn();
+    await applySetCallout('p1', 'p2blk', true, { editStructure, onEdited, onError: vi.fn() });
+    expect(editStructure).toHaveBeenCalledWith('p1', { type: 'setCallout', blockId: 'p2blk', on: true });
+    expect(onEdited).toHaveBeenCalledWith({ id: 'p1' });
+  });
+
+  it('surfaces an error without applying on failure', async () => {
+    const editStructure = vi.fn().mockRejectedValue(new Error('down')) as unknown as typeof editStructureFn;
+    const onEdited = vi.fn();
+    const onError = vi.fn();
+    await applySetCallout('p1', 'p2blk', false, { editStructure, onEdited, onError });
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onEdited).not.toHaveBeenCalled();
+  });
+});
+
+describe('callout marking UX (MINI_DR_CALLOUTS commit 4)', () => {
+  function withMarkedFirstParagraph(): ProjectDTO {
+    const p = unstructuredProject();
+    (p.book.mainContent[0].content[0] as { callout?: true }).callout = true;
+    return p;
+  }
+
+  it('every paragraph row offers "Set off as callout"; clicking marks it', async () => {
+    const user = userEvent.setup();
+    vi.mocked(editStructure).mockResolvedValue(unstructuredProject());
+    render(<StructureEditor project={unstructuredProject()} onEdited={() => {}} />);
+
+    const toggles = screen.getAllByRole('button', { name: 'Set off as callout' });
+    expect(toggles).toHaveLength(2);
+
+    await user.click(toggles[1]);
+
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'setCallout', blockId: 'p2blk', on: true });
+  });
+
+  it('a marked paragraph shows the Callout badge and "Remove callout"; clicking unmarks it', async () => {
+    const user = userEvent.setup();
+    vi.mocked(editStructure).mockResolvedValue(unstructuredProject());
+    render(<StructureEditor project={withMarkedFirstParagraph()} onEdited={() => {}} />);
+
+    expect(screen.getByText('Callout')).toBeInTheDocument();
+    const remove = screen.getByRole('button', { name: 'Remove callout' });
+    // The marked row swaps its affordance; the other paragraph keeps the mark affordance.
+    expect(screen.getAllByRole('button', { name: 'Set off as callout' })).toHaveLength(1);
+
+    await user.click(remove);
+
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'setCallout', blockId: 'p1blk', on: false });
+  });
+});
 
 describe('applyPromote / applyMerge (create handlers — commit 3)', () => {
   it('applyPromote calls promoteToChapter and applies the result', async () => {

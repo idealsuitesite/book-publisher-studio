@@ -156,7 +156,10 @@ export class TypographyResolver {
             runs: resolveRuns(block.text, block.inlines, smartQuotes),
             // Union, not exclusion: the deprecated per-block path (Block.dropCap, DECISIONS.md)
             // keeps rendering while it exists; the theme trigger adds openings, never subtracts.
-            dropCap: dropCaps && (block.dropCap === true || isChapterOpening),
+            // EXCEPT a callout paragraph (MINI_DR_CALLOUTS commit 2): a set-off aside is not the
+            // chapter-opening ornament context. Decided HERE, once — the model's pricing and all
+            // three renderers read the resolved flag, so they cannot each rule differently.
+            dropCap: dropCaps && block.callout !== true && (block.dropCap === true || isChapterOpening),
             staysWithNext: false,
           },
         };
