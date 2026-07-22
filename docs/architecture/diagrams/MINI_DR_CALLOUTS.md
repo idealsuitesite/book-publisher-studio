@@ -2,8 +2,8 @@
 
 **Status:** ✅ DELIVERED on `feature/callouts` — CTO-approved (2026-07-22, the §1 D1/D4
 reconciliation explicitly confirmed), all four §6 commits built and gated (1 `d264ce1`,
-2 `02834f0` + the shade tuning `0181d3f`, 3 `493cb44`, 4 = this commit), **AWAITING MERGE on the
-CTO's accord.** The shade knob is LOCKED at **0.96** on the CTO's real-page look (0.92 read as a
+2 `02834f0` + the shade tuning `0181d3f`, 3 `493cb44`, 4 `3afca80`), **MERGED to `main`
+2026-07-22 (`9f66930`), branch deleted.** The shade knob is LOCKED at **0.96** on the CTO's real-page look (0.92 read as a
 documentation box; at 0.96 the tint suggests itself — and the CTO kept the tint for Modern over
 a rule-only reduction: two themes, two assumed identities). Verified live on faith-alone in the
 studio: mark → Callout badge + the chrome in the real exported PDF (black Classic rule, the

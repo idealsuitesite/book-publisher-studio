@@ -7,7 +7,7 @@ commit), **the screenshot stop PASSED: `CHAPTER_SUBTITLE_RATIO = 0.6` and the it
 the gestured faith-alone page in Novel: subtitle subordinate-not-timid inside the title block,
 the drop cap on the PROSE — the THIRD_THEME_NOVEL §6 limitation retired on the page that
 exposed it, with zero trigger code).** A future ratio change requires a new screenshot loop.
-**AWAITING MERGE on the CTO's accord — granted 2026-07-22; the closure sequence runs.**
+**MERGED to `main` 2026-07-22 (`be2b7a9`), branch deleted; the full gate re-verified POST-merge (backend 795/795, frontend 213/213, harnesses green, corpus parity locks unmoved).**
 The loop's secondary verdicts, §9 below. Originally:
 CTO-APPROVED (2026-07-22) **with three amendments, integrated below before any
 code:** **A1** — the unblock guard written into the TODO entry itself (our own Subtitle-styled
