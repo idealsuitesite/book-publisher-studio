@@ -53,7 +53,7 @@ Built on `feature/home-tighten`, two commits, frontend-only, gate green at each 
 - **Verified LIVE across the full arc on a real library (post-cleanup, no fixtures):** empty state shows the promise + dropzone-as-screen; **1 real book** (faith-alone) → the hero IS the library, no "All projects", no duplicate; **3 real books** (+ art-of-captivating, pm-notes) → hero = last imported, the other two in the grid, stats "3 books"; **then an edit on the *oldest* project (a rename in faith-alone) flipped the hero to it on reload** — "last worked on" proven end to end, not assumed from the sort order; zero console errors; screenshot captured.
 - The three imported corpus manuscripts are **left in place deliberately** as a realistic 3-book demo library (they are real manuscripts, not harness fixtures) — the CTO may keep or clear them.
 
-**Status: complete on `feature/home-tighten`, all green, awaiting the CTO's merge decision** (GR-1). Docs reconcile after merge.
+**Status: MERGED to `main` (`a60eb02`, no-ff, 2026-07-22).** Gate re-verified post-merge — and that re-run earned its keep: it caught a **real test defect** the pre-merge run had masked (`0a0332d`): the recency fixtures used Z-suffixed ISO strings while `recencyLabel` computes in *local* calendar days, so on this UTC+1 host the "yesterday" input crossed the midnight boundary into "today". Fixtures rebuilt from local components — deterministic in every timezone, matching what the function actually computes; no production code changed. Final: backend 709/709, frontend **196/196**, tsc + eslint clean. The CTO kept the 3-manuscript demo library (real manuscripts, not harness fixtures).
 
 ## Appendix — fixture cleanup (point 2 of the same directive, executed, environment-only)
 
