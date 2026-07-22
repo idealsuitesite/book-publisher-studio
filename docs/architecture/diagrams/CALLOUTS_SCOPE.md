@@ -1,7 +1,10 @@
 # Callouts — Scope Report (queue item 6)
 
-**Status:** 🟡 MEASURED — **STOPPED AT THE TASTE DECISION (§7, the visual direction), as the queue
-directive requires.** No production code opened; the census spike is the only artifact.
+**Status:** ✅ CLOSED — the §7 taste stop was ANSWERED by the CTO the same day (the four
+decisions: rule+light tint, one generic callout with silent chrome, accent-derived tint,
+Classic tint-free/Modern tinted) and the chantier DELIVERED via `MINI_DR_CALLOUTS.md`
+(Option A as recommended, Shape B as recommended), merged to `main` 2026-07-22 (`9f66930`).
+The census and the C1-trap analysis below remain the measured ground of record.
 **Date:** 2026-07-22
 **Format precedent:** `TYPOGRAPHY_TUNING_SCOPE.md` / `GUTTER_SCOPE.md` — measure, lay the options,
 stop where the founder decides.

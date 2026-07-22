@@ -34,6 +34,17 @@ Two rules make the boundary load-bearing rather than decorative:
 
 ## 4. Capabilities — each with its tri-format verification path (ADR-0050)
 
+> **Delivery annotations (2026-07-22, added at the callouts merge so this frozen review cannot
+> mislead):** row 3 (callouts) is **DELIVERED** via `MINI_DR_CALLOUTS.md` — with two premises
+> re-measured and amended there: Shape B (an additive `Paragraph.callout` field) replaced the
+> row's "NEW `Block` type" (the union cost measured at 9 exhaustive sites), and the "corpus
+> fixture must contain one" clause was found unsatisfiable without fabrication (census: zero
+> callout-shaped corpus content) — replaced by the real-manuscript + real-author-gesture proof.
+> Row 4 (drop caps) is **DELIVERED** via `MINI_DR_DROP_CAPS.md` (merged `aa5ac9b`), as reframed
+> by its own §4: a REAL tri-format drop cap, no longer the v1 approximation this table assumed.
+> Rows 1, 2*, 5, 6 statuses: 1 delivered (accent, Phase 3), 2 remains FROZEN behind
+> `C1_QUOTE_PRESENTATION_UNBLOCK`, 5 delivered (Phase 2, §4bis), 6 delivered (typography tuning).
+
 | # | Capability | Mechanism (sketch) | Height impact | Verified by (per format) |
 |---|---|---|---|---|
 | 1 | Text + accent colors | `Theme.colors` grows (headings, accents on titles/ornaments); ThemeEngine resolves per block; renderers consume only resolved values | none | PDF: color operators vs declared palette (PQB §5); DOCX: `styles.xml` color check (PQB §4); EPUB: CSS diff vs theme (PQB §6) |
