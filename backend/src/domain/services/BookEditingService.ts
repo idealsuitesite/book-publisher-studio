@@ -1,5 +1,16 @@
-import type { Book, Content, Section, Chapter, Paragraph } from '../models/Book';
+import type { Book, Content, Section, Chapter, Paragraph, TitlePage, CopyrightPage } from '../models/Book';
 import { ContentNotFoundError } from '../../shared/errors/ContentNotFoundError';
+
+/**
+ * A partial front-matter edit (MINI_DR_EDIT_FRONT_MATTER §2.2): `undefined` leaves a section
+ * untouched, `null` CLEARS it (the Q3-proven vanish stays author-expressible — a book with no
+ * copyright page is a legitimate choice), an object replaces it whole. Only the two sections
+ * every export actually renders are editable; the typed-but-unrendered fields are not offered.
+ */
+export interface FrontMatterPatch {
+  titlePage?: TitlePage | null;
+  copyrightPage?: CopyrightPage | null;
+}
 
 /**
  * Manual structure editing — the Domain write path (STRUCTURE_EDITING.md / STRUCTURE_EDITING_PHASE3.md
@@ -219,6 +230,52 @@ export class BookEditingService {
     }
     const rebuilt: Content[] = [...book.mainContent.slice(0, index), ...book.mainContent.slice(index + 1)];
     return { ...book, mainContent: this.renumberChapters(rebuilt, now) };
+  }
+
+  /**
+   * Edit the stored front matter — the Phase 3b slice (MINI_DR_EDIT_FRONT_MATTER). Q3 made front
+   * matter user content rendered from storage; this is the edit path it never had. Validation
+   * mirrors `FrontMatterBuilder`'s own "a blank sheet is worse than none" rule: a provided title
+   * page needs a title AND an author, a provided copyright page needs its text — throw, and the
+   * route maps it to 400 (the `rename` empty-title precedent). Optional fields are trimmed and
+   * normalised to undefined so a cleared input never ships as an authored-looking empty line.
+   */
+  editFrontMatter(book: Book, patch: FrontMatterPatch, now: Date = new Date()): Book {
+    const frontMatter = { ...book.frontMatter };
+
+    if (patch.titlePage !== undefined) {
+      if (patch.titlePage === null) {
+        delete frontMatter.titlePage;
+      } else {
+        const title = patch.titlePage.title.trim();
+        const author = patch.titlePage.author.trim();
+        if (!title || !author) throw new Error('Title page requires a title and an author');
+        frontMatter.titlePage = {
+          title,
+          author,
+          subtitle: patch.titlePage.subtitle?.trim() || undefined,
+          tagline: patch.titlePage.tagline?.trim() || undefined,
+        };
+      }
+    }
+
+    if (patch.copyrightPage !== undefined) {
+      if (patch.copyrightPage === null) {
+        delete frontMatter.copyrightPage;
+      } else {
+        const text = patch.copyrightPage.text.trim();
+        if (!text) throw new Error('Copyright page requires its copyright text');
+        frontMatter.copyrightPage = {
+          text,
+          isbn: patch.copyrightPage.isbn?.trim() || undefined,
+          copyrightText: patch.copyrightPage.copyrightText?.trim() || undefined,
+          legalNotice: patch.copyrightPage.legalNotice?.trim() || undefined,
+          printingInfo: patch.copyrightPage.printingInfo?.trim() || undefined,
+        };
+      }
+    }
+
+    return { ...book, frontMatter, updatedAt: now };
   }
 
   /** Renumber top-level chapters 1..N in reading order; a chapter whose number changed advances its
