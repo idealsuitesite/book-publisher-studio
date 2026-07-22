@@ -35,7 +35,7 @@ describe('FrontMatterBuilder — title page', () => {
     expect(front.titlePage?.author).toBe('曹雪芹');
   });
 
-  it('emits no title page at all when there is neither title nor author', () => {
+  it('emits no title page at all when there is no title', () => {
     const front = builder.build(bookWith({ title: '', author: '' }));
 
     expect(front.titlePage).toBeUndefined();
@@ -47,11 +47,11 @@ describe('FrontMatterBuilder — title page', () => {
     expect(front.titlePage).toBeUndefined();
   });
 
-  it('still emits a page when only one of title or author is present', () => {
-    const front = builder.build(bookWith({ title: 'Untitled Manuscript', author: '' }));
+  it('emits a title page with NO author line when the title exists but the author does not — never "Unknown author" (FOUNDER_TRAVERSAL defect 2)', () => {
+    const front = builder.build(bookWith({ title: 'A Real Title', author: '' }));
 
-    expect(front.titlePage?.title).toBe('Untitled Manuscript');
-    expect(front.titlePage?.author).toBe('Unknown author');
+    expect(front.titlePage?.title).toBe('A Real Title');
+    expect(front.titlePage?.author).toBeUndefined();
   });
 
   it('never overwrites a hand-authored title page', () => {

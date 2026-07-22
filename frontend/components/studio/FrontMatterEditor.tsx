@@ -40,7 +40,9 @@ export function FrontMatterEditor({ frontMatter, disabled, onApply }: FrontMatte
     printingInfo: frontMatter?.copyrightPage?.printingInfo ?? '',
   });
 
-  const canSaveTitle = title.title.trim() !== '' && title.author.trim() !== '';
+  // The WRITE path still requires an author to save a title page (FOUNDER_TRAVERSAL defect 2:
+  // the transport type allows an authorless page for reading, but manual authoring asks for one).
+  const canSaveTitle = title.title.trim() !== '' && (title.author ?? '').trim() !== '';
   const canSaveCopyright = copyright.text.trim() !== '';
 
   return (
@@ -64,7 +66,7 @@ export function FrontMatterEditor({ frontMatter, disabled, onApply }: FrontMatte
           </label>
           <label className={labelCls}>
             Author
-            <input className={inputCls} value={title.author} disabled={disabled} onChange={(e) => setTitle({ ...title, author: e.target.value })} />
+            <input className={inputCls} value={title.author ?? ''} disabled={disabled} onChange={(e) => setTitle({ ...title, author: e.target.value })} />
           </label>
           <label className={labelCls}>
             Tagline

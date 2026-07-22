@@ -184,7 +184,8 @@ export interface ProjectSummary {
   name: string;
   /** The book's own title, which may differ from the project name — see `Project.name`. */
   bookTitle: string;
-  author: string;
+  // Optional (FOUNDER_TRAVERSAL defect 2): mirrors Book.metadata.author — absent, never 'Unknown'.
+  author?: string;
   coverAssetId?: string;
   versionCount: number;
   /** Platforms with at least one successful publication. Derived, never stored. */

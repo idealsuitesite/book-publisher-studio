@@ -8,7 +8,9 @@ export interface ProjectSummaryDTO {
   /** What the author calls the project — may differ from the book's own title. */
   name: string;
   bookTitle: string;
-  author: string;
+  // Optional (FOUNDER_TRAVERSAL defect 2): absent when the book carries no author — the library
+  // card shows the title alone rather than "Title · Unknown".
+  author?: string;
   coverAssetId?: string;
   versionCount: number;
   /** Platforms with at least one successful publication. Derived server-side, never stored. */

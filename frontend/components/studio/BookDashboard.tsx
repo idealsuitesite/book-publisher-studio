@@ -56,7 +56,9 @@ export function BookDashboard({ project, facts, layoutLabel, themeLabel, measure
           {meta.title}
         </h2>
         <p className="mt-1 text-sm text-app-text-muted">
-          {meta.author} · {meta.language.toUpperCase()} · {themeLabel} · {layoutLabel}
+          {/* Absent metadata is simply skipped (FOUNDER_TRAVERSAL defects 2 & 3) — no "Unknown",
+              no hardcoded language code, no dangling separators. */}
+          {[meta.author, meta.language?.toUpperCase(), themeLabel, layoutLabel].filter(Boolean).join(' · ')}
         </p>
       </div>
 

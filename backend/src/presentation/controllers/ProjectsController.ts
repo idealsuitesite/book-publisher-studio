@@ -62,14 +62,14 @@ function parseMutation(body: unknown): StructureMutation | null {
   // standing setPartRole lesson). The route enforces the SHAPE and the non-emptiness the pure op
   // also requires — so the op's own throw stays defense-in-depth, never a 500 path.
   if (m.type === 'editFrontMatter') {
-    const isTitlePatch = (v: unknown): v is TitlePageDTO | null | undefined =>
-      v === undefined ||
-      v === null ||
-      (typeof v === 'object' &&
-        typeof (v as TitlePageDTO).title === 'string' &&
-        (v as TitlePageDTO).title.trim() !== '' &&
-        typeof (v as TitlePageDTO).author === 'string' &&
-        (v as TitlePageDTO).author.trim() !== '');
+    const isTitlePatch = (v: unknown): v is TitlePageDTO | null | undefined => {
+      if (v === undefined || v === null) return true;
+      if (typeof v !== 'object') return false;
+      // The WRITE path still requires a non-empty author (the product rule), even though the
+      // transport type now allows an authorless page for READING (FOUNDER_TRAVERSAL defect 2).
+      const { title, author } = v as TitlePageDTO;
+      return typeof title === 'string' && title.trim() !== '' && typeof author === 'string' && author.trim() !== '';
+    };
     const isCopyrightPatch = (v: unknown): v is CopyrightPageDTO | null | undefined =>
       v === undefined ||
       v === null ||

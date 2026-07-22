@@ -52,14 +52,21 @@ describe('ExportPanel', () => {
     await waitFor(() => expect(onDownloaded).toHaveBeenCalledTimes(1));
   });
 
-  it('disables the buttons while an export is in flight, so a slow export is not fired twice', async () => {
+  it('changes only the IN-FLIGHT button, leaving the others untouched (FOUNDER_TRAVERSAL defect 5)', async () => {
+    // The founder read the old "disable all three while one exports" as "PDF selected all three
+    // editions". Now only the clicked format shows "Exporting…" and is disabled; the other two
+    // stay in their normal state and clickable — each edition is an independent round trip.
     exporter.mockImplementation(() => new Promise(() => {}));
     const user = userEvent.setup();
     render(<ExportPanel exporter={exporter} downloadName="export" />);
 
     await user.click(screen.getByRole('button', { name: 'PDF edition' }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'DOCX edition' })).toBeDisabled());
+    // The clicked button reflects its own in-flight state...
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Exporting…' })).toBeDisabled());
+    // ...and the other two are untouched: enabled, unchanged labels (never "selected").
+    expect(screen.getByRole('button', { name: 'DOCX edition' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'EPUB edition' })).toBeEnabled();
   });
 
   it('surfaces a real export failure instead of failing silently', async () => {

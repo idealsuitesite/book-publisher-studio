@@ -129,7 +129,11 @@ export class SqliteProjectRepository implements ProjectRepository {
       id: row.id,
       name: row.name,
       bookTitle: row.book_title,
-      author: row.author,
+      // The denormalized `author` column is NOT NULL; an absent author is stored as '' and read
+      // back as undefined (FOUNDER_TRAVERSAL defect 2) — the aggregate JSON is the honest source
+      // of truth (author already undefined there), this column is a listing cache. No migration:
+      // '' satisfies the existing schema and means "absent" on every existing DB.
+      author: row.author || undefined,
       coverAssetId: row.cover_asset_id ?? undefined,
       versionCount: row.version_count,
       publishedTargets: JSON.parse(row.published_targets) as string[],
@@ -166,7 +170,7 @@ export class SqliteProjectRepository implements ProjectRepository {
           JSON.stringify(stripped),
           summary.name,
           summary.bookTitle,
-          summary.author,
+          summary.author ?? '',
           summary.versionCount,
           JSON.stringify(summary.publishedTargets),
           summary.coverAssetId ?? null,

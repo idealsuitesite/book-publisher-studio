@@ -62,8 +62,13 @@ describe('PDFRenderer — drift parity on the real corpus (ADR-0051)', () => {
     //     unplannedPageBreaks 2 -> 1. The model count is renderer-independent, so it stays 235.
     // Net vs the pre-chantier baseline (238 / 234 / 2): the CONTRACT number IMPROVED to 1 (never
     // rose -- a shrinkage this file's header demands be updated consciously, which is what this is).
+    // Re-locked CONSCIOUSLY for FOUNDER_TRAVERSAL defect 2: faith-alone carries no author, so it
+    // no longer gets a synthesised "© 2026 Unknown" copyright page (the placeholder is gone). That
+    // is ONE planned front-matter page removed from the RENDERED count only — the model count
+    // (235) never counted front matter, so it is unchanged, and unplannedPageBreaks (1, the
+    // paragraph-136 ±1-line residual) is unaffected. Rendered 238 -> 237.
     expect(result.metrics.unplannedPageBreaks).toBe(1);
-    expect(result.metrics.pageCount).toBe(238);
+    expect(result.metrics.pageCount).toBe(237);
     // The model's own count stays the anchor the renderer answers to.
     expect(paginated.pages.length).toBe(235);
   }, 120_000);

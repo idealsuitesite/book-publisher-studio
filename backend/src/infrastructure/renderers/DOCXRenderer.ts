@@ -246,8 +246,12 @@ function buildFrontMatterParagraphs(front: FrontMatter, theme: Theme): Paragraph
       paragraphs.push(new Paragraph({ spacing: { after: 480 }, alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: tagline, font: theme.fonts.body, size: 22, italics: true })] }));
     }
-    paragraphs.push(new Paragraph({ spacing: { before: 2400 }, alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: author, font: theme.fonts.body, size: 28 })] }));
+    // Conditional like every other line (FOUNDER_TRAVERSAL defect 2): no real author, no author
+    // paragraph — never an empty leaf reading as 'Unknown author'.
+    if (author) {
+      paragraphs.push(new Paragraph({ spacing: { before: 2400 }, alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: author, font: theme.fonts.body, size: 28 })] }));
+    }
     paragraphs.push(new Paragraph({ children: [new PageBreak()] }));
   }
 

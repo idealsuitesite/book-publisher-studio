@@ -40,11 +40,21 @@ export interface Book {
 export interface BookMetadata {
   title: string;
   subtitle?: string;
-  author: string;
+  // Optional on purpose (FOUNDER_TRAVERSAL, defect 2 / ADR-0050 applied to metadata): a field the
+  // author never supplied is ABSENT, not the placeholder string 'Unknown'. Absent means it never
+  // reaches a rendered page and stays visible in the validation report as the thing to supply.
+  // `title` stays required — the filename is a legitimate stand-in for it (titleFromFileName),
+  // never an invention like an author's name would be.
+  author?: string;
   publisher?: string;
   isbn?: string;
   issn?: string;
-  language: string; // ISO 639-1 (e.g., "en", "fr")
+  // Optional (FOUNDER_TRAVERSAL defect 3): the language the author declared, or ABSENT. It was a
+  // hardcoded 'fr' constant — no detection ever existed — which labelled every English manuscript
+  // French. Now the model asserts a language only when one is genuinely known; consumers omit the
+  // declaration rather than invent one, and the validation report names MISSING_LANGUAGE. A real
+  // detector, and an author-set language field, are their own future work (LANGUAGE_DETECTION).
+  language?: string; // ISO 639-1 (e.g., "en", "fr")
 
   // Cover & Marketing
   coverImage?: Image;
@@ -86,7 +96,9 @@ export interface FrontMatter {
 export interface TitlePage {
   title: string;
   subtitle?: string;
-  author: string;
+  // Optional (FOUNDER_TRAVERSAL defect 2): a title page with no author prints no author line —
+  // never 'Unknown author'. FrontMatterBuilder emits this only when a real author exists.
+  author?: string;
   publisherLogo?: Image;
   tagline?: string;
 }

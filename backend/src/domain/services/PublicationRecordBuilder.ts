@@ -19,7 +19,8 @@ export interface PublicationRecordEntry {
 export interface PublicationRecord {
   projectName: string;
   bookTitle: string;
-  author: string;
+  // Optional (FOUNDER_TRAVERSAL defect 2): the record carries the book's real author or none.
+  author?: string;
   isbn?: string;
   generatedAt: Date;
   entries: PublicationRecordEntry[];
