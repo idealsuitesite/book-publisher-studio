@@ -1,7 +1,17 @@
 # Mini Design Review — Chapter.subtitle: the gesture, the rendering, the retirement of Novel's asterisk
 
-**Status:** 🟡 DRAFT — awaiting CTO approval. **No code before it** (the standing gate).
-**Date:** 2026-07-22
+**Status:** ✅ CTO-APPROVED (2026-07-22) **with three amendments, integrated below before any
+code:** **A1** — the unblock guard written into the TODO entry itself (our own Subtitle-styled
+export NEVER triggers the unblock — the fabricated-material variant the CTO already forbade on
+RECALIBRATE; re-importing our export is an extra exercise the day an EXTERNAL manuscript fires
+it, never the trigger); **A2** — first-row-only enters §8 as disclosed v1 boundary n°6 with its
+exit door; **A3** — the already-populated/clear-on-empty throws prove themselves TYPED at both
+levels: the route tests assert the named `ApiErrorCode` in BOTH directions (a screen may only
+show an error it can name — IMPORT_FIDELITY's rule applied to defense-in-depth). Build
+authorized: commits 1–2, then **MANDATORY STOP at commit 3** — the gestured faith-alone page
+rendered in Novel, rasterised for the CTO (subtitle rendered, drop cap on the prose) before
+0.6/italic lock; commit 4 amends the existing TODO entry for A1 rather than creating it.
+**Date:** 2026-07-22, approved 2026-07-22
 **Inputs:** `SUBTITLE_FIELD_SCOPE.md` (measured) · the CTO's four §6 answers + the
 already-populated ruling (2026-07-22) · `THIRD_THEME_NOVEL.md` §6 (the consigned limitation this
 retires).
@@ -102,7 +112,8 @@ populated, both handlers' mutations.
 
 Ops unit tests FIRST (mark/clear/plain-text round trip both directions/eligibility/
 already-populated throw/unknown id/immutability) · route tests with the whitelist (same
-commit) · the gestured-fixture export lock on faith-alone (subtitle out of the flow, rendered
+commit), **asserting the named `ApiErrorCode` on BOTH refusal directions — mark-on-populated
+AND clear-on-empty (A3: the throw typed at both levels, never a bare 500 path)** · the gestured-fixture export lock on faith-alone (subtitle out of the flow, rendered
 in all three formats — DOCX carries the real `Subtitle` style — clear restores) · corpus parity
 byte-stability (no gesture, no change) · the §3 cache trio · frontend jsdom · **the screenshot
 loop closing on the CTO's required page: gestured faith-alone in Novel — the subtitle rendered,
@@ -130,6 +141,11 @@ exposed it.**
 3. The italic-measure ±1-line residual class (§4).
 4. The §3 cache correction to the scope report (clear = conservative MISS, not legitimate HIT).
 5. V1 boundary: top-level chapters only (Sections carry no subtitle field).
+6. **V1 boundary (A2): the mark affordance sits on the FIRST paragraph row only** — the gesture
+   means "the line under the title", where the real case lives. A manuscript whose chapter
+   opens on an epigraph BEFORE its subtitle will one day exist and will not see the affordance
+   there; the exit door is extending the affordance's placement if a real case demands it (the
+   op itself already accepts any top-level-chapter paragraph — a UI decision, not a model one).
 
 ## Related
 `SUBTITLE_FIELD_SCOPE.md` (corrected by §3) · `THIRD_THEME_NOVEL.md` §6 · `MINI_DR_SUBTITLE_SPACING.md`
