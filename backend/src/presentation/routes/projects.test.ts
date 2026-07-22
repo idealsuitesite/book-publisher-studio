@@ -334,4 +334,41 @@ describe('POST /api/projects/:id/structure — manual structure editing (STRUCTU
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('CONTENT_NOT_FOUND');
   });
+
+  // MINI_DR_EDIT_FRONT_MATTER (Phase 3b) — the untrusted-body boundary tested with the dispatch.
+  it('editFrontMatter: replaces the title page, 200 + the DTO carries it + snapshot', async () => {
+    const { app, id } = await seedProject();
+
+    const res = await request(app)
+      .post(`/api/projects/${id}/structure`)
+      .send({ type: 'editFrontMatter', titlePage: { title: 'A Better Title', author: 'The Author', tagline: 'A tagline' } });
+
+    expect(res.status).toBe(200);
+    expect(res.body.book.frontMatter.titlePage).toEqual({ title: 'A Better Title', author: 'The Author', tagline: 'A tagline' });
+    expect(res.body.versions).toHaveLength(1); // snapshot-before-edit
+  });
+
+  it('editFrontMatter: null CLEARS the copyright page — gone from the DTO, undoable via versions', async () => {
+    const { app, id } = await seedProject();
+    // The import seeded a built copyright page (Q3: FrontMatterBuilder at import); clear it.
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'editFrontMatter', copyrightPage: null });
+
+    expect(res.status).toBe(200);
+    expect(res.body.book.frontMatter?.copyrightPage).toBeUndefined();
+    expect(res.body.versions).toHaveLength(1);
+  });
+
+  it('400 INVALID_MUTATION on malformed editFrontMatter bodies (empty title, empty text, touches nothing)', async () => {
+    const { app, id } = await seedProject();
+    for (const body of [
+      { type: 'editFrontMatter', titlePage: { title: '  ', author: 'A' } },
+      { type: 'editFrontMatter', titlePage: { title: 'T' } }, // author missing
+      { type: 'editFrontMatter', copyrightPage: { text: '' } },
+      { type: 'editFrontMatter' }, // touches nothing — malformed, not a no-op to snapshot
+    ]) {
+      const res = await request(app).post(`/api/projects/${id}/structure`).send(body);
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('INVALID_MUTATION');
+    }
+  });
 });

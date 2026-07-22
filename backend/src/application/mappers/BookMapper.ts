@@ -2,6 +2,7 @@ import type { Book, Content } from '../../domain/models/Book';
 import { isChapter } from '../../domain/models/Book';
 import type { BookDTO, ContentDTO } from '../dto/BookDTO';
 import type { MetadataDTO } from '../dto/MetadataDTO';
+import type { FrontMatterDTO } from 'shared-types';
 import { ChapterMapper } from './ChapterMapper';
 import { SectionMapper } from './SectionMapper';
 
@@ -16,9 +17,31 @@ export class BookMapper {
       id: book.id,
       metadata: this.mapMetadata(book),
       mainContent: book.mainContent.map((content) => this.mapContent(content)),
+      frontMatter: this.mapFrontMatter(book),
       wordCount: book.wordCount,
       pageCount: book.pageCount,
       readingTime: book.readingTime,
+    };
+  }
+
+  /** The rendered sections only (Phase 3b, FrontMatterDTO's own scope boundary); absent when
+   * neither exists so an empty front matter stays honestly empty in the DTO. */
+  private mapFrontMatter(book: Book): FrontMatterDTO | undefined {
+    const { titlePage, copyrightPage } = book.frontMatter;
+    if (!titlePage && !copyrightPage) return undefined;
+    return {
+      titlePage: titlePage
+        ? { title: titlePage.title, subtitle: titlePage.subtitle, author: titlePage.author, tagline: titlePage.tagline }
+        : undefined,
+      copyrightPage: copyrightPage
+        ? {
+            text: copyrightPage.text,
+            isbn: copyrightPage.isbn,
+            copyrightText: copyrightPage.copyrightText,
+            legalNotice: copyrightPage.legalNotice,
+            printingInfo: copyrightPage.printingInfo,
+          }
+        : undefined,
     };
   }
 

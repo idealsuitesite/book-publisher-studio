@@ -108,5 +108,15 @@ describe('ExportProjectUseCase pagination cache invalidation', () => {
     // states because they ARE the same state; "invalidation" means never serving the WRONG
     // geometry, which the insert-side miss above proves for the state that was genuinely new.
     expect(paginate).toHaveBeenCalledTimes(5);
+
+    // MINI_DR_EDIT_FRONT_MATTER §2.6: a front-matter edit is a book change -> a new hash -> a MISS
+    // (title/copyright pages are renderer-planned front pages, but the key must not care WHICH
+    // part of the book moved — completeness is the rule, MINI_DR_PAGINATION_REUSE §2.3).
+    project = svc.replaceBook(
+      project,
+      editing.editFrontMatter(svc.currentBook(project), { titlePage: { title: 'Edited', author: 'A' } })
+    );
+    await useCase.execute(project.id, 'pdf'); // MISS -> paginate #6
+    expect(paginate).toHaveBeenCalledTimes(6);
   });
 });
