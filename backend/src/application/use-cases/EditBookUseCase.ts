@@ -81,6 +81,16 @@ export class EditBookUseCase {
         const book = this.editingService.setCallout(this.projectService.currentBook(project), mutation.blockId, mutation.on);
         return this.projectService.replaceBook(snapped, book);
       }
+      case 'markAsSubtitle': {
+        const snapped = this.projectService.snapshot(project, 'before subtitle mark');
+        const book = this.editingService.markAsSubtitle(this.projectService.currentBook(project), mutation.blockId);
+        return this.projectService.replaceBook(snapped, book);
+      }
+      case 'clearSubtitle': {
+        const snapped = this.projectService.snapshot(project, 'before subtitle clear');
+        const book = this.editingService.clearSubtitle(this.projectService.currentBook(project), mutation.chapterId);
+        return this.projectService.replaceBook(snapped, book);
+      }
       case 'editFrontMatter': {
         const snapped = this.projectService.snapshot(project, 'before front matter edit');
         const book = this.editingService.editFrontMatter(this.projectService.currentBook(project), {

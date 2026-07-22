@@ -154,6 +154,68 @@ export class BookEditingService {
   }
 
   /**
+   * Move a paragraph's text into its top-level chapter's `subtitle` field — the gesture that
+   * makes a subtitle-stored-as-paragraph become what it claims to be (MINI_DR_SUBTITLE_FIELD
+   * commit 1; retires THIRD_THEME_NOVEL §6's consigned limitation by position alone: once the
+   * line leaves content[0], the drop-cap trigger lands on the prose with no trigger change).
+   *
+   * V1 boundary (disclosed): paragraphs directly in a TOP-LEVEL chapter only — Sections carry
+   * no subtitle field. Rejects when the chapter already has a subtitle (CTO decision 5: the
+   * author clears first, explicitly — no hidden compound op; this throw is defense-in-depth
+   * behind the disabled affordance, surfaced as a named code at the route, never a 500).
+   * Plain text moves; inline formatting is lost and does NOT return at clear (disclosure 1,
+   * both directions — the promoteToChapter precedent). No book-level updatedAt bump (the
+   * convention the callout instrument enforced).
+   */
+  markAsSubtitle(book: Book, blockId: string): Book {
+    let found = false;
+    const mainContent = book.mainContent.map((content): Content => {
+      if (content.type !== 'chapter') return content;
+      const index = content.content.findIndex((b) => b.id === blockId && b.type === 'paragraph');
+      if (index === -1) return content;
+      found = true;
+      const block = content.content[index] as Paragraph;
+      if (!block.text.trim()) {
+        throw new ContentNotFoundError(`markAsSubtitle: paragraph "${blockId}" has no text to make a subtitle of`);
+      }
+      if (content.subtitle) {
+        throw new ContentNotFoundError(
+          `markAsSubtitle: chapter "${content.id}" already has a subtitle — clear it first (no hidden replace)`
+        );
+      }
+      return { ...content, subtitle: block.text, content: content.content.filter((_, i) => i !== index) };
+    });
+    if (!found) {
+      throw new ContentNotFoundError(`markAsSubtitle: no paragraph with id "${blockId}" directly in a top-level chapter`);
+    }
+    return { ...book, mainContent };
+  }
+
+  /**
+   * The inverse: the subtitle text returns as the chapter's FIRST paragraph (a freshly minted
+   * id — a content-hash cache therefore re-paginates once, the conservative correct MISS the
+   * review's §3 pins) and the field is removed. Round trip is PLAIN-TEXT identity.
+   */
+  clearSubtitle(book: Book, chapterId: string): Book {
+    let found = false;
+    const mainContent = book.mainContent.map((content): Content => {
+      if (content.type !== 'chapter' || content.id !== chapterId) return content;
+      found = true;
+      if (!content.subtitle) {
+        throw new ContentNotFoundError(`clearSubtitle: chapter "${chapterId}" has no subtitle to clear`);
+      }
+      const restored: Paragraph = { type: 'paragraph', id: this.idGenerator(), text: content.subtitle };
+      const cleared = { ...content, content: [restored, ...content.content] };
+      delete cleared.subtitle; // property removed, not set to undefined
+      return cleared;
+    });
+    if (!found) {
+      throw new ContentNotFoundError(`clearSubtitle: no top-level chapter with id "${chapterId}"`);
+    }
+    return { ...book, mainContent };
+  }
+
+  /**
    * Promote a paragraph/heading block (in a TOP-LEVEL container) to a new chapter, splitting that
    * container at the block: blocks before stay, the block's text becomes the new chapter's title,
    * blocks after become its content. Chapters renumber. The one op that lets an author carve
