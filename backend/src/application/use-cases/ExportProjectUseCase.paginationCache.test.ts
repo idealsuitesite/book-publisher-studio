@@ -157,5 +157,25 @@ describe('ExportProjectUseCase pagination cache invalidation', () => {
     project = svc.replaceBook(project, editing.setCallout(svc.currentBook(project), calloutTargetId, false));
     await useCase.execute(project.id, 'pdf'); // legitimate HIT
     expect(paginate).toHaveBeenCalledTimes(8);
+
+    // MINI_DR_SUBTITLE_FIELD §3 — the honest trio, INCLUDING the correction to its own scope
+    // report: mark moves title-block geometry -> MISS; clear reinserts under a FRESHLY MINTED
+    // block id, so the cleared book is NOT byte-identical to pre-mark — a conservative, CORRECT
+    // miss (a content-hash key cannot know two differently-id'd books share a geometry; cost:
+    // one pagination, risk: none). The genuine legitimate HIT is the UNDO shape: restoring the
+    // byte-identical pre-mark book serves the cached geometry.
+    const preMarkBook = svc.currentBook(project);
+    const subtitleChapter = preMarkBook.mainContent.find((c) => c.type === 'chapter' && c.content[0]?.type === 'paragraph')!;
+    project = svc.replaceBook(project, editing.markAsSubtitle(preMarkBook, subtitleChapter.content[0].id));
+    await useCase.execute(project.id, 'pdf'); // MISS -> paginate #9
+    expect(paginate).toHaveBeenCalledTimes(9);
+
+    project = svc.replaceBook(project, editing.clearSubtitle(svc.currentBook(project), subtitleChapter.id));
+    await useCase.execute(project.id, 'pdf'); // conservative MISS (fresh block id) -> paginate #10
+    expect(paginate).toHaveBeenCalledTimes(10);
+
+    project = svc.replaceBook(project, preMarkBook); // the undo shape: byte-identical restore
+    await useCase.execute(project.id, 'pdf'); // legitimate HIT
+    expect(paginate).toHaveBeenCalledTimes(10);
   });
 });

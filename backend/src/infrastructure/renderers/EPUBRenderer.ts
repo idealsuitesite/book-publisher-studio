@@ -12,6 +12,7 @@ import type { Content, Block, Image, FrontMatter } from '../../domain/models/Boo
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { dropCapScaleOf } from '../../domain/services/dropCapMetrics';
+import { CHAPTER_SUBTITLE_RATIO } from '../../domain/services/titleMetrics';
 import { CALLOUT_GAP_PT, CALLOUT_PAD_V_PT, CALLOUT_RULE_PT, calloutRuleColorOf, calloutTintOf } from '../../domain/services/calloutMetrics';
 
 type EpubFn = (options: EpubOptions, content: EpubChapter[]) => Promise<Buffer>;
@@ -158,6 +159,7 @@ export class EPUBRenderer implements Renderer<Buffer> {
       table, th, td { border: 1px solid #999; border-collapse: collapse; padding: 4px; }
       ${dropCapCss(dropCapScaleOf(theme))}
       ${calloutCss(theme)}
+      .chapter-subtitle { font-style: italic; font-size: ${theme.fontSizes.h1 * CHAPTER_SUBTITLE_RATIO}pt; color: ${theme.colors.accent}; margin: 0 0 ${theme.spacing.paragraphSpacing}pt; }
     `;
   }
 
@@ -222,6 +224,11 @@ export class EPUBRenderer implements Renderer<Buffer> {
     if (content.title) {
       const level = content.type === 'chapter' ? 1 : Math.min(6, Math.max(1, content.level));
       parts.push(`<h${level}>${escapeHtml(content.title)}</h${level}>`);
+      // A chapter's subtitle (MINI_DR_SUBTITLE_FIELD §4): its own element directly under the
+      // heading, styled by the .chapter-subtitle rule built from the shared ratio (buildCss).
+      if (content.type === 'chapter' && content.subtitle) {
+        parts.push(`<p class="chapter-subtitle">${escapeHtml(content.subtitle)}</p>`);
+      }
     }
 
     for (const block of content.content) {
