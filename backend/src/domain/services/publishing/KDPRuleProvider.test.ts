@@ -14,15 +14,18 @@ function emptyBundle(): PublishingBundle {
 }
 
 describe('KDPRuleProvider', () => {
-  it('implements ValidationRuleProvider - getRules() returns the 5 real rules, not a promise or a class', () => {
+  it('implements ValidationRuleProvider - getRules() returns the 6 real rules, not a promise or a class', () => {
     const provider = new KDPRuleProvider();
 
     const rules = provider.getRules();
 
-    expect(rules).toHaveLength(5);
+    // 6 since GUTTER_VALIDATION_FIRST: MarginComplianceRule is the first consumer the
+    // marginsByPageCount table has ever had (it was dead data, GUTTER_SCOPE §1).
+    expect(rules).toHaveLength(6);
     expect(rules.map((r) => r.name).sort()).toEqual([
       'CoverPresenceRule',
       'InteriorFormatAvailabilityRule',
+      'MarginComplianceRule',
       'PageCountRule',
       'RequiredMetadataFieldsRule',
       'StructurePresenceRule',
