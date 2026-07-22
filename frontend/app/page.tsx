@@ -6,6 +6,7 @@ import type { ProjectSummaryDTO } from 'shared-types';
 import { listProjects } from '@/lib/api-client';
 import { UploadDropzone } from '@/components/UploadDropzone';
 import { Card } from '@/components/ui';
+import { recencyLabel } from '@/lib/recency';
 
 /**
  * Home (HOME_WORKSPACE.md §0): the library. Answers the CTO's three questions — quels projets,
@@ -63,7 +64,12 @@ export default function Home() {
         <section aria-label="Start" className="flex flex-col gap-6">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight text-app-text">Your studio</h1>
-            <p className="mt-1 text-sm text-app-text-muted">Bring in a manuscript to start your first project.</p>
+            {/* First contact carries the PROMISE (HOME_TIGHTEN_SCOPE Point A): what the product
+                does, plainly — the returning screen carries the task instead, so the pitch never
+                becomes wallpaper. */}
+            <p className="mt-1 text-sm text-app-text-muted">
+              Import your manuscript — leave with a professional, publish-ready book.
+            </p>
           </div>
           <UploadDropzone />
           {/* The honest empty state (ADR-0046/0047) — also the post-restart state; a fake-persistent
@@ -76,41 +82,70 @@ export default function Home() {
 
   // Non-empty library: the library LEADS, with a visible primary import button (not the full form
   // competing for the first screen) — the §3A problem this fixes.
+  const [latest, ...rest] = projects;
   return (
     <div className="flex flex-1 flex-col gap-10 px-8 py-10 lg:px-16">
       <section aria-label="Start" className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-app-text">Your studio</h1>
-          <p className="mt-1 text-sm text-app-text-muted">Continue where you left off, or import a new manuscript.</p>
+          {/* The returning author reads their TASK, not the pitch (Point A's split). */}
+          <p className="mt-1 text-sm text-app-text-muted">Pick up your book where you left it, or import a new manuscript.</p>
         </div>
         <UploadDropzone variant="button" />
       </section>
 
-      <section aria-label="Recent projects" className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold text-app-text">Recent projects</h2>
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project) => (
-            <li key={project.id}>
-              <Card className="flex h-full flex-col gap-2 px-6 py-5">
-                <p className="text-base font-semibold text-app-text">{project.name}</p>
-                <p className="text-sm text-app-text-muted">
-                  {project.bookTitle} · {project.author}
-                </p>
-                <p className="text-xs text-app-text-muted">
-                  {project.versionCount} version{project.versionCount === 1 ? '' : 's'}
-                  {project.publishedTargets.length > 0 && ` · published: ${project.publishedTargets.join(', ')}`}
-                </p>
-                <Link
-                  href={`/projects/${project.id}`}
-                  className="mt-auto pt-2 text-sm font-medium text-app-text underline underline-offset-4 dark:text-app-text"
-                >
-                  Continue
-                </Link>
-              </Card>
-            </li>
-          ))}
-        </ul>
+      {/* HOME_TIGHTEN_SCOPE Point B1: the last-worked-on project is THE primary action of the
+          screen — one wide hero card — and the rest of the library keeps its compact grid below.
+          projects[0] is already the most recent (the repository orders updated_at DESC, §0.1);
+          with a single project the hero IS the library and the grid section simply doesn't render
+          (no duplicate card). No new route; HOME_WORKSPACE Decision 1 and Option D untouched. */}
+      <section aria-label="Continue" className="flex flex-col gap-3">
+        <Card className="flex flex-col gap-2 px-8 py-6">
+          <p className="text-xs text-app-text-muted">{recencyLabel(latest.updatedAt)}</p>
+          <p className="text-xl font-semibold text-app-text">{latest.name}</p>
+          <p className="text-sm text-app-text-muted">
+            {latest.bookTitle} · {latest.author}
+          </p>
+          <p className="text-xs text-app-text-muted">
+            {latest.versionCount} version{latest.versionCount === 1 ? '' : 's'}
+            {latest.publishedTargets.length > 0 && ` · published: ${latest.publishedTargets.join(', ')}`}
+          </p>
+          <Link
+            href={`/projects/${latest.id}`}
+            className="mt-2 inline-flex w-fit items-center gap-2 rounded-lg border-2 border-app-accent bg-app-surface-2 px-5 py-2.5 text-sm font-medium text-app-text transition-colors hover:bg-app-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent"
+          >
+            Continue →
+          </Link>
+        </Card>
       </section>
+
+      {rest.length > 0 && (
+        <section aria-label="All projects" className="flex flex-col gap-4">
+          <h2 className="text-lg font-semibold text-app-text">All projects</h2>
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {rest.map((project) => (
+              <li key={project.id}>
+                <Card className="flex h-full flex-col gap-2 px-6 py-5">
+                  <p className="text-base font-semibold text-app-text">{project.name}</p>
+                  <p className="text-sm text-app-text-muted">
+                    {project.bookTitle} · {project.author}
+                  </p>
+                  <p className="text-xs text-app-text-muted">
+                    {project.versionCount} version{project.versionCount === 1 ? '' : 's'}
+                    {project.publishedTargets.length > 0 && ` · published: ${project.publishedTargets.join(', ')}`}
+                  </p>
+                  <Link
+                    href={`/projects/${project.id}`}
+                    className="mt-auto pt-2 text-sm font-medium text-app-text underline underline-offset-4 dark:text-app-text"
+                  >
+                    Continue
+                  </Link>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {published.length > 0 && (
         <section aria-label="Recent publications" className="flex flex-col gap-3">
