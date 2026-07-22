@@ -271,3 +271,70 @@ describe('BookEditingService — setPartRole', () => {
     expect(book.mainContent.every((c) => c.role === undefined)).toBe(true); // input untouched
   });
 });
+
+// ── MINI_DR_CALLOUTS commit 1: setCallout ────────────────────────────────────────────────────────
+// The author's marking gesture — the producer that ships WITH the capability (the C1-trap exit,
+// CALLOUTS_SCOPE.md §3). Generic per the CTO's D2 (no kind taxonomy); Shape B per §2 (an additive
+// Paragraph field, no Block-union extension).
+
+function calloutPara(id: string, text = 'Body text.'): Paragraph {
+  return { type: 'paragraph', id, text };
+}
+
+/** Paragraph-bearing structure at every depth: chapter-direct, in a section, in a subsection. */
+function calloutBook(): Book {
+  const sub: Section = { ...section('sub1', 'Sub', 3), content: [calloutPara('p-sub')] };
+  const sec: Section = { ...section('sec1', 'Sec', 2, [sub]), content: [calloutPara('p-sec')] };
+  const ch: Chapter = { ...chapter('ch1', 1, 'One', [sec]), content: [calloutPara('p-top'), { type: 'heading', id: 'h1', level: 2, text: 'H' } as Block] };
+  return createBook({ title: 'T', author: 'A', language: 'en' }, [ch]);
+}
+
+describe('BookEditingService — setCallout (MINI_DR_CALLOUTS commit 1)', () => {
+  const flagOf = (book: Book, path: 'top' | 'sec' | 'sub'): true | undefined => {
+    const ch = book.mainContent[0] as Chapter;
+    if (path === 'top') return (ch.content[0] as Paragraph).callout;
+    const sec = ch.sections![0];
+    if (path === 'sec') return (sec.content[0] as Paragraph).callout;
+    return (sec.subsections![0].content[0] as Paragraph).callout;
+  };
+
+  it('marks a paragraph at ANY depth — chapter-direct, section, subsection', () => {
+    expect(flagOf(service.setCallout(calloutBook(), 'p-top', true, NOW), 'top')).toBe(true);
+    expect(flagOf(service.setCallout(calloutBook(), 'p-sec', true, NOW), 'sec')).toBe(true);
+    expect(flagOf(service.setCallout(calloutBook(), 'p-sub', true, NOW), 'sub')).toBe(true);
+  });
+
+  it('unmarking removes the property entirely — round-trip is EXACT identity (no timestamp on Paragraph)', () => {
+    const original = calloutBook();
+    const marked = service.setCallout(original, 'p-sec', true, NOW);
+    const back = service.setCallout(marked, 'p-sec', false, NOW);
+    expect('callout' in ((back.mainContent[0] as Chapter).sections![0].content[0] as Paragraph)).toBe(false);
+    // The strongest identity this model allows: strict deep equality of the whole content tree.
+    expect(back.mainContent).toEqual(original.mainContent);
+  });
+
+  it('rejects a no-op toggle as malformed — marking the already-marked, unmarking the unmarked', () => {
+    const marked = service.setCallout(calloutBook(), 'p-top', true, NOW);
+    expect(() => service.setCallout(marked, 'p-top', true, NOW)).toThrow(ContentNotFoundError);
+    expect(() => service.setCallout(calloutBook(), 'p-top', false, NOW)).toThrow(ContentNotFoundError);
+  });
+
+  it('only paragraphs can be callouts — a heading id is not a valid target (quotes/lists stay out, v1 boundary)', () => {
+    expect(() => service.setCallout(calloutBook(), 'h1', true, NOW)).toThrow(ContentNotFoundError);
+  });
+
+  it('throws for an unknown id and never mutates the input', () => {
+    const book = calloutBook();
+    expect(() => service.setCallout(book, 'ghost', true, NOW)).toThrow(ContentNotFoundError);
+    expect(flagOf(book, 'top')).toBeUndefined();
+  });
+
+  it('real-fixture round-trip (faith-alone): mark then unmark is byte-equal on the whole tree', async () => {
+    const book = await importCorpus('faith-alone-styled.docx');
+    const target = book.mainContent.flatMap((c) => c.content).find((b) => b.type === 'paragraph')!;
+    const marked = service.setCallout(book, target.id, true, NOW);
+    expect(marked).not.toEqual(book); // the mark is a real change (a genuine cache MISS later)
+    const back = service.setCallout(marked, target.id, false, NOW);
+    expect(back.mainContent).toEqual(book.mainContent);
+  }, 30_000);
+});

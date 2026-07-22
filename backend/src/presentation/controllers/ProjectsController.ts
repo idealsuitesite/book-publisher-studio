@@ -43,6 +43,12 @@ function parseMutation(body: unknown): StructureMutation | null {
   if (m.type === 'removePartOpener' && typeof m.id === 'string' && m.id) {
     return { type: 'removePartOpener', id: m.id };
   }
+  // MINI_DR_CALLOUTS commit 1: whitelisted here, with route tests, in the same commit as the
+  // dispatch — the standing setPartRole lesson (the untrusted-body boundary is where the last
+  // live gap shipped).
+  if (m.type === 'setCallout' && typeof m.blockId === 'string' && m.blockId && typeof m.on === 'boolean') {
+    return { type: 'setCallout', blockId: m.blockId, on: m.on };
+  }
   // MINI_DR_EDIT_FRONT_MATTER (Phase 3b): whitelisted with route tests in the same commit (the
   // standing setPartRole lesson). The route enforces the SHAPE and the non-emptiness the pure op
   // also requires — so the op's own throw stays defense-in-depth, never a 500 path.
