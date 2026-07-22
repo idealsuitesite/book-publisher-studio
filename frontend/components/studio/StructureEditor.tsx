@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import type { ProjectDTO, BookDTO } from 'shared-types';
+import type { ProjectDTO, BookDTO, StructureMutation } from 'shared-types';
+import { FrontMatterEditor } from './FrontMatterEditor';
 import {
   DndContext,
   KeyboardSensor,
@@ -185,6 +186,20 @@ export async function applyRemovePartOpener(
     deps.onEdited(await deps.editStructure(projectId, { type: 'removePartOpener', id }));
   } catch (error) {
     deps.onError(error instanceof ApiError ? 'That part divider could not be removed.' : 'Could not reach the server.');
+  }
+}
+
+/** Edit or clear the rendered front-matter sections (Phase 3b, MINI_DR_EDIT_FRONT_MATTER):
+ * undefined leaves a section untouched, null clears it, an object replaces it whole. */
+export async function applyEditFrontMatter(
+  projectId: string,
+  patch: Pick<Extract<StructureMutation, { type: 'editFrontMatter' }>, 'titlePage' | 'copyrightPage'>,
+  deps: { editStructure: typeof editStructure; onEdited: (updated: ProjectDTO) => void; onError: (message: string) => void }
+): Promise<void> {
+  try {
+    deps.onEdited(await deps.editStructure(projectId, { type: 'editFrontMatter', ...patch }));
+  } catch (error) {
+    deps.onError(error instanceof ApiError ? 'That front-matter change could not be saved.' : 'Could not reach the server.');
   }
 }
 
@@ -620,6 +635,15 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
     setPending(false);
   }
 
+  async function onEditFrontMatter(
+    patch: Pick<Extract<StructureMutation, { type: 'editFrontMatter' }>, 'titlePage' | 'copyrightPage'>
+  ) {
+    setError(null);
+    setPending(true);
+    await applyEditFrontMatter(project.id, patch, { editStructure, onEdited: captureUndo, onError: setError });
+    setPending(false);
+  }
+
   async function onUndo() {
     if (!undoVersionId) return;
     setError(null);
@@ -705,6 +729,15 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
           </ul>
         </SortableContext>
       </DndContext>
+
+      {/* Phase 3b (MINI_DR_EDIT_FRONT_MATTER): the rendered front-matter sections, editable.
+          Keyed on updatedAt so a server-applied edit re-seeds the form with the stored values. */}
+      <FrontMatterEditor
+        key={project.updatedAt}
+        frontMatter={book.frontMatter}
+        disabled={pending}
+        onApply={(patch) => void onEditFrontMatter(patch)}
+      />
     </Card>
   );
 }
