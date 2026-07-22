@@ -1,8 +1,12 @@
 # Mini Design Review — Blockless Titles Are Charged, and a Stranded Title Has a Name
 
-**Date:** 2026-07-22 · **Status:** CTO-directed (the TYPOGRAPHY_QUALITY_SCOPE §1 ruling: "un
-correctif préalable dans la lignée PART_LEVEL, pas le chantier de goût") · **Lineage:**
-PART_LEVEL_STRUCTURE commit 1 (the blockless-chapter drift fix), one level down.
+**Date:** 2026-07-22 · **Status:** ✅ **DELIVERED AND MERGED (`1aeee04`, 3 commits
+`b6d59bb`/`c3bfda6`/`0f55e9a`, same day)** — all three §4 locks held: Modern p.40 repaired on
+the real page (census 0 hits all themes), parity re-locked with measured attributed deltas
+(probe5; Classic letter unmoved), `unplannedTitleBreaks` + the §10.3 corpus gate shipped.
+Originally CTO-directed (the TYPOGRAPHY_QUALITY_SCOPE §1 ruling: "un correctif préalable dans
+la lignée PART_LEVEL, pas le chantier de goût") · **Lineage:** PART_LEVEL_STRUCTURE commit 1
+(the blockless-chapter drift fix), one level down.
 **Cadrage:** `TYPOGRAPHY_QUALITY_SCOPE.md` §1 — the cause is located and triply verified
 (AST census, renderer warning, code reading), so this goes straight to mini-DR per the CTO
 directive; the scope report is de facto this review's §1.

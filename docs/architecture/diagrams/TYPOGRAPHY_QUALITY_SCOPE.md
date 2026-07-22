@@ -5,6 +5,14 @@ the chantier takes its name only after this measurement is read. This report the
 **no options, no chantier name, no priority ranking** — those are the CTO's next decision. No
 production code was opened; every instrument is a read-only spike (§7).
 
+> **Outcome (CTO rulings, same day — recorded so this frozen report never misleads):**
+> **A** → prerequisite fidelity fix, **DELIVERED AND MERGED** (`MINI_DR_BLOCKLESS_TITLES`,
+> `1aeee04`); **B+C** → the taste chantier takes its name: **`TYPOGRAPHY_QUALITY`** — one
+> decision, justification WITH real-dictionary hyphenation (never naive, ADR-0024 discipline),
+> full Design Review, the dormant §2 residual in the same scope, opening AFTER the founder
+> traversal; **D** → consigned as **`LEADING_FIDELITY`** (after B+C, own cadrage); **E** →
+> `LIST_SPLITTING_ACROSS_PAGES` amended to today's numbers in `TODO.md`.
+
 **Repo state verified first (not assumed):** `main` at `c1b07ab` — one docs commit ahead of the
 handoff's expected `32688bd` (the final session-close pass, `32688bd` is its direct parent); tree
 clean, in sync with `origin/main`; backend re-run **795/795** before any measurement.
