@@ -433,10 +433,14 @@ export class PDFRenderer implements Renderer<Buffer> {
       // Keep-with-next (ADR-0051): a non-chapter titled content whose first block begins a
       // planned page moved WITH its title — the model's flushBeforeTitleIfOrphaned invariant —
       // so the break comes BEFORE the title, never stranding it at a spent page bottom.
-      if (!ownerPage && content.title && firstBlockId) {
-        const sectionStart = pageStarts.get(firstBlockId);
+      // A BLOCKLESS titled content has no first block to key by: its planned page carries the
+      // content's OWN id (MINI_DR_BLOCKLESS_TITLES, the ownsBarePage precedent one level down),
+      // so the same protocol matches on that — one key, no new mechanism.
+      const keepWithNextKey = firstBlockId ?? (content.title ? content.id : undefined);
+      if (!ownerPage && content.title && keepWithNextKey) {
+        const sectionStart = pageStarts.get(keepWithNextKey);
         if (sectionStart) {
-          pageStarts.delete(firstBlockId);
+          pageStarts.delete(keepWithNextKey);
           this.plannedAddPage(doc);
           pageOwners.push(sectionStart);
         }

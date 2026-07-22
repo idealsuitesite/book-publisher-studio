@@ -51,19 +51,21 @@ describe('Modern theme — parity lock + tri-format accent/fonts (real corpus)',
   });
 
   it('R2 parity — Modern on faith-alone holds its own charged==consumed numbers', async () => {
-    // Re-locked CONSCIOUSLY for MINI_DR_SUBTITLE_SPACING: renderTitle now spends flat
-    // titleSpaceBefore/titleSpaceAfter (Modern 14/6) in lock-step with titleHeightOf, and skips
-    // spacing for empty titles. On Modern the corpus counts shift (letter 90 -> 88); reconciliations
-    // drop letter 2 -> 1 (the empty-title guard closed a latent drift whose reconciliation happened
-    // to fall on a letter page boundary) but stay 2 on kdp-6x9 (there the untitled section's spacing
-    // did not straddle a page break, so no reconciliation was riding on it). Both remain <= 2.
+    // Re-locked CONSCIOUSLY twice. MINI_DR_SUBTITLE_SPACING: flat title spacing (Modern 14/6)
+    // in lock-step, empty titles skip spacing (letter 90 -> 88, reconciliations letter 2 -> 1).
+    // Then MINI_DR_BLOCKLESS_TITLES: the blockless §3 section's title is now CHARGED (~38pt on
+    // Modern) — the kdp reconciliation that fired *while rendering that title*, stranding an
+    // 18pt heading at the bottom of real p.40 (TYPOGRAPHY_QUALITY_SCOPE §1), is GONE: kdp
+    // 158/2 -> 157/1, the remaining 1 being paragraph-123's ±1-line bold-run residual — the
+    // disclosed class surviving exactly where it genuinely fires. Letter drops 88/1 -> 87/0:
+    // its reconciliation was riding the same uncharged title.
     const letter = await new PDFRenderer().render(paginate('modern', LetterPageLayout), { language: 'en' });
-    expect(letter.metrics.pageCount).toBe(88);
-    expect(letter.metrics.unplannedPageBreaks).toBe(1);
+    expect(letter.metrics.pageCount).toBe(87);
+    expect(letter.metrics.unplannedPageBreaks).toBe(0);
 
     const kdp = await new PDFRenderer().render(paginate('modern', KDP6x9PageLayout), { language: 'en' });
-    expect(kdp.metrics.pageCount).toBe(158); // Modern's own number (Classic is 159 — tighter heading spacing)
-    expect(kdp.metrics.unplannedPageBreaks).toBe(2);
+    expect(kdp.metrics.pageCount).toBe(157); // Modern's own number, never Classic's
+    expect(kdp.metrics.unplannedPageBreaks).toBe(1); // paragraph-123, the ±1-line residual class
   }, 30_000); // renders the 40k-word corpus twice — needs headroom under full-suite parallel load
 
   it('the accent reaches all three formats (colors.accent exercised by a real theme)', async () => {
