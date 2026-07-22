@@ -110,6 +110,19 @@ missing-editor family as defect 4).
 consequence. The correctif's *shape* (detector vs default vs author-set) is a CTO call; the
 minimal honest floor is: stop asserting a language the manuscript never declared.
 
+**RESOLVED (fix `719a99f` + EPUB-500 review `6316b86`).** The floor shipped: the model asserts no
+language (`ASTBuilder` → undefined). The CTO's EPUB-500 review then caught a self-contradiction in
+this report's first draft ("omit the lang key" vs "undefined 500s epub-gen") and demanded a
+measurement (`epub-lang-behavior-probe.ts`). Measured truth: setting `lang: undefined` EXPLICITLY
+throws inside epub-gen; OMITTING the key generates fine (epub-gen falls back to 'en'). The SHIPPED
+code omitted the key — so Author B never hit a 500; the code was right, the report's wording was
+wrong. Hardened anyway per the CTO's principle ("the adapter handles its format's constraint; a
+book never fails to export because an optional field is empty"): the EPUB adapter now supplies its
+`'en'` fallback EXPLICITLY, owning it rather than depending on epub-gen's fragile undocumented
+default, with the model staying language-unknown. A named test pins Author B's scenario (a
+no-language book exports a valid EPUB with a non-empty `dc:language`). `LANGUAGE_DETECTION` +
+an author-set language field (Lot 3) remain the future work.
+
 ---
 
 ## Defect 4 — `TITLE_FIELDS_DECOUPLED` — **LIVE (the bug), and an information-architecture truth (Lot 3)**
