@@ -73,11 +73,12 @@ export class TypographyResolver {
   resolve(styled: StyledBook, options?: TypographyOptions): StyledBook {
     const smartQuotes = options?.smartQuotes ?? true;
     const dropCaps = options?.dropCaps ?? true;
+    const openingIds = dropCaps ? this.chapterOpeningParagraphIds(styled) : new Set<string>();
     const blockTypography: Record<string, ResolvedTypography> = {};
 
     const walkBlocks = (blocks: Block[]): void => {
       for (const block of blocks) {
-        Object.assign(blockTypography, this.resolveBlockTypography(block, smartQuotes, dropCaps));
+        Object.assign(blockTypography, this.resolveBlockTypography(block, smartQuotes, dropCaps, openingIds.has(block.id)));
       }
     };
     const walkContent = (contents: Content[]): void => {
@@ -93,6 +94,32 @@ export class TypographyResolver {
     walkContent(styled.book.mainContent);
 
     return { ...styled, blockTypography };
+  }
+
+  /**
+   * The theme-declared drop-cap trigger (MINI_DR_DROP_CAPS §6 commit 2): under
+   * `scope: 'chapterOpening'`, the id of each chapter's FIRST block — iff that block is a
+   * paragraph with real text. Strictly positional (§2/Q1: positional, never inferential); the
+   * §5 edge cases are each this one rule's direct consequence, pinned in the resolver's tests:
+   *  - a chapter opening with a heading/quote/image has no opening paragraph → nothing fires,
+   *    and the rule never slides to a later paragraph (that would ornament mid-flow text);
+   *  - an empty chapter — including the blockless part-opener divider — fires nothing;
+   *  - text under sections is a SECTION opening, never the chapter's → the rule never descends
+   *    (which also covers the untitled section a structure-editing split leaves behind);
+   *  - a chapter carved out mid-flow by promoteToChapter DOES fire: the resolver cannot tell
+   *    and must not guess that its first paragraph was once mid-flow — the author made it a
+   *    chapter, so it opens like one (the correction path is their own undo/merge).
+   * The plain `text` field is the emptiness signal, consistent with LayoutEngine's split gate.
+   */
+  private chapterOpeningParagraphIds(styled: StyledBook): Set<string> {
+    const ids = new Set<string>();
+    if (styled.theme.presentation?.dropCap?.scope !== 'chapterOpening') return ids;
+    for (const content of styled.book.mainContent) {
+      if (content.type !== 'chapter') continue;
+      const first = content.content[0];
+      if (first?.type === 'paragraph' && first.text.trim().length > 0) ids.add(first.id);
+    }
+    return ids;
   }
 
   // Resolves Block.inlines (or a plain-text fallback) into TypeRun[], plus drop-cap
@@ -111,7 +138,8 @@ export class TypographyResolver {
   private resolveBlockTypography(
     block: Block,
     smartQuotes: boolean,
-    dropCaps: boolean
+    dropCaps: boolean,
+    isChapterOpening: boolean
   ): Record<string, ResolvedTypography> {
     switch (block.type) {
       case 'heading':
@@ -126,7 +154,9 @@ export class TypographyResolver {
         return {
           [blockTypographyKey(block.id)]: {
             runs: resolveRuns(block.text, block.inlines, smartQuotes),
-            dropCap: dropCaps && block.dropCap === true,
+            // Union, not exclusion: the deprecated per-block path (Block.dropCap, DECISIONS.md)
+            // keeps rendering while it exists; the theme trigger adds openings, never subtracts.
+            dropCap: dropCaps && (block.dropCap === true || isChapterOpening),
             staysWithNext: false,
           },
         };

@@ -1,27 +1,35 @@
 # Mini Design Review — Drop Caps (BOOK_PRESENTATION §4 row 4, as amended)
 
-**Status:** ✅ CTO-APPROVED (2026-07-22) — **IN FLIGHT on `feature/dropcap-capability` (UNMERGED):
-commit 1 of the §6 plan is BUILT and green (`302e0f7`, backend 739/739 on the branch)**; commits
-2–4 remain. **RESUME POINT for a fresh session: §6 commit 2** — `Theme.presentation.dropCap` + the
-positional trigger in `TypographyResolver`, with the §5 positional edge cases (first block not a
-paragraph, empty chapter, split continuation) **enumerated in the resolver's tests BEFORE
-implementation**; then commit 3 carries the CTO's two closure attention points (pricing MEASURED
-against the renderer — never derived from scale arithmetic, the list-prefix lesson — and the owed
-`DROPCAP_PARAGRAPH_ATOMICITY` observable-overflow test), then commit 4 (tri-format proof theme +
-live verification + docs). The mid-item stop rule stands: any frame quirk beyond Findings A/B
-stops the work and reports.
-**Commit 1, verified in real Word on the renderer's own output:** the custom `NativeDropCapFrame`
-XmlComponent (never the spike's patch) emits the attribute-free native framePr; `DOCXRenderer`
-(optional measurer, fallback = the documented inline degradation) renders the letter in its own
-framed paragraph sized by the shared `dropCapMetrics` arithmetic (`dropCapLetterSizePt` — Finding
-B's third consumer); Word's OM classifies the output's letters as native drop caps with
+**Status:** ✅ DELIVERED AND MERGED to `main` (2026-07-22) — all four §6 commits built and gated
+(1 `302e0f7`, 2 `3746c70`, 3 `f6e82dc`, 4 `bcac820`), merged on the CTO's accord.
+Both shipped themes declare `scope: 'none'` — the capability ships dark, proven live in the studio
+(faith-alone: Proof 90 p. unchanged on a fresh backend, PDF export 200, the residual
+reconciliation exactly 1 — the known ±1-line class — zero console errors). **Tri-format proven on
+REAL faith-alone** (`dropCapTriformat.corpus.test.ts` + real Word): the §5 rule computes 17
+openings on the real book → 17 PDF bands (unplanned ≤ residual, degraded 0), 17 native DOCX
+frames — **Word 16.0's own OM reads back 17 drop-cap constructs, LinesToDrop=2 uniform** (the OM
+reports each construct on BOTH the letter and body paragraph: 34 paragraph hits = 2×17, an
+instrument behaviour to know, not a defect) — and 17 EPUB floated spans; visual counterpart
+`spikes/output/faith-alone-dropcap-p4.png` (INTRODUCTION's T, two-line band, rendered to PDF by
+Word itself). **Commit-2 decisions CTO-ratified 2026-07-22:** the split-continuation case FIRES
+(positional, never inferential — no edit-history memory in the model), and `lines` DERIVES from
+the declared scale through the shared arithmetic, never a second declared knob (better than §6's
+original "scale/lines" wording, ratified as such). **Commit 3 exposed this chantier's THIRD
+instrument-liar** — `unplannedPageBreaks` is blind to the overcharge direction; §7 addendum below.
+**Observed nuance, named not hidden:** editorial parts (INTRODUCTION, Conclusion) are typed
+chapters, so under `chapterOpening` their openings receive drop caps too; suppressing them would
+extend the editorial classifier's authority into presentation — a future taste decision, not
+taken here.
+**Commit 1's record, kept in full:** the custom `NativeDropCapFrame` XmlComponent (never the
+spike's patch) emits the attribute-free native framePr; `DOCXRenderer` (optional measurer,
+fallback = the documented inline degradation) renders the letter in its own framed paragraph
+sized by the shared `dropCapMetrics` arithmetic (`dropCapLetterSizePt` — Finding B's third
+consumer); Word's OM classified that first output's letters as native drop caps with
 **LinesToDrop=2 — exactly the PDF's Gelasio band**, title untouched, rastered page visually clean
 (`spikes/output/renderer-native-dropcap.png`); 5 XML tests incl. the no-leak parity guard.
-The §4bis question was **SETTLED as item 1** (Option A — converge up, CTO 2026-07-22) on a
-POSITIVE real-Word spike whose visual proof was seen **before** validation, as the CTO conditioned
-(`spikes/output/dropcap-frame-sized.png`). §4 is reframed accordingly; the item-1 plan and the
-verification-instrument rules (including one explicit exclusion) are below.
-**Date:** 2026-07-21, reopened 2026-07-22
+*(§4bis was settled as item 1 — Option A on the positive real-Word spike, visual proof seen
+before validation, `dropcap-frame-sized.png`.)*
+**Date:** 2026-07-21, reopened 2026-07-22, delivered and merged 2026-07-22
 
 ---
 
@@ -257,6 +265,16 @@ Commit plan (one responsibility each; gate green before the next):
 - Word's object-model read-back (`Paragraph.DropCap.Position` / `.LinesToDrop`) on OUR files;
 - a human-visible rendered page (Word → PDF → WinRT raster) in the build's screenshot loop;
 - the §3 pricing/atomicity/parity instruments for the PDF side.
+
+**TRUSTED WITH A KNOWN BLIND DIRECTION (added at commit 3, 2026-07-22) —
+`RenderMetrics.unplannedPageBreaks`:** it cannot see an OVERCHARGE. A model pricing a bigger
+scale than the renderer draws yields underfull pages and zero unplanned breaks — metrics all
+green over a real charged-vs-consumed divergence. Any scale-consistency instrument must pair it
+with the geometric bound (the band clearing a glyph at the DECLARED scale,
+`dropCapCapability.test.ts` §3.1); the pairing's teeth are PROVEN by
+`spikes/dropcap-scale-teeth-probe.ts` (simulated defect: plan at 5, renderer at 2.5 → unplanned=0
+while the bound fails on 20 origins). The third instrument-liar of this chantier, after the
+height invariance and `Range.Information`.
 
 **EXCLUDED — `Word Range.Information` positional geometry (wdVertical/HorizontalPositionRelativeToPage), with the reason on the record:** it reports paragraph
 anchors, not laid-out line positions. Measured 2026-07-22: it returned the SAME "not wrapped"

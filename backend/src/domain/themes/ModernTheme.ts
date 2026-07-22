@@ -42,6 +42,11 @@ export const ModernTheme: Theme = {
     titleSpaceBefore: 14, // tighter than Classic (18/8), matching Modern's rhythm
     titleSpaceAfter: 6,
   },
+  // scope 'none' — same mandate as Classic (MINI_DR_DROP_CAPS §3 instrument 3): Modern's own
+  // parity/calibration numbers must not move; adopting drop caps is a screenshot-loop decision.
+  presentation: {
+    dropCap: { scope: 'none', scale: 2.5 },
+  },
   runningHead: {
     show: true,
     position: 'right',

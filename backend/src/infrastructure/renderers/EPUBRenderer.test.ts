@@ -7,6 +7,7 @@ import { TypographyResolver } from '../../domain/services/TypographyResolver';
 import { ClassicTheme } from '../../domain/themes/ClassicTheme';
 import { LetterPageLayout } from '../../domain/layouts/LetterPageLayout';
 import { createBook } from '../../domain/models/Book';
+import type { Theme } from '../../domain/models/Theme';
 import type { Chapter, Section, Content, Heading, Paragraph, Table, Image, List, Quote, InlineElement } from '../../domain/models/Book';
 
 function paragraph(id: string, text = 'Some body text.', inlines?: InlineElement[]): Paragraph {
@@ -218,6 +219,28 @@ describe('EPUBRenderer', () => {
     const buffer = (await renderer.render(paginated, {})).output;
     const html = await extractChapterHtml(buffer);
 
+    expect(html).toContain('<span class="dropcap">O</span>nce upon a time.');
+  });
+
+  it('sizes the floated drop cap from the theme-declared scale, triggered by the SAME theme (§6 commit 2)', async () => {
+    // No per-block dropCap flag anywhere here: the theme both TRIGGERS the ornament
+    // (scope chapterOpening → the chapter's first paragraph) and SIZES it (scale → the em value
+    // in the stylesheet). One declared value, consumed end to end through this renderer.
+    const scaledTheme: Theme = {
+      ...ClassicTheme,
+      name: 'dropcap-scale-test',
+      presentation: { dropCap: { scope: 'chapterOpening', scale: 3.25 } },
+    };
+    const book = createBook({ title: 'T', author: 'A', language: 'en' }, [chapter([paragraph('p-1', 'Once upon a time.')])]);
+    const typeset = new TypographyResolver().resolve(new ThemeEngine().applyTheme(book, scaledTheme));
+    const paginated = new LayoutEngine().paginate(typeset, LetterPageLayout);
+
+    const buffer = (await renderer.render(paginated, {})).output;
+
+    const zip = await JSZip.loadAsync(buffer);
+    const texts = await Promise.all(Object.values(zip.files).filter((f) => !f.dir).map((f) => f.async('string')));
+    expect(texts.join('\n')).toContain('font-size: 3.25em');
+    const html = await extractChapterHtml(buffer);
     expect(html).toContain('<span class="dropcap">O</span>nce upon a time.');
   });
 });

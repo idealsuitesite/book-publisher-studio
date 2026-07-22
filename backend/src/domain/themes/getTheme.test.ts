@@ -38,6 +38,15 @@ describe('resolveTheme — per-project accent override (MINI_DR_PER_THEME_ACCENT
   it('still rejects an unknown theme name', () => {
     expect(() => resolveTheme('nonexistent', '#AABBCC')).toThrow(/Unknown theme/);
   });
+
+  it('preserves theme presentation (drop-cap rule) through accent AND typography overrides', () => {
+    // resolveTheme rebuilds the theme by spread when overrides apply; a field-by-field rebuild
+    // would silently DROP presentation, and the declared drop-cap rule would never reach a render
+    // that carries any override. This pins the passthrough (MINI_DR_DROP_CAPS §6 commit 2).
+    const resolved = resolveTheme('classic', '#1D4E68', { preset: 'large', bodyFont: 'sans' });
+    expect(resolved.presentation).toEqual(ClassicTheme.presentation);
+    expect(ClassicTheme.presentation?.dropCap).toEqual({ scope: 'none', scale: 2.5 });
+  });
 });
 
 describe('listThemeNames', () => {

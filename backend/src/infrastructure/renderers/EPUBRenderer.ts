@@ -11,6 +11,7 @@ import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTy
 import type { Content, Block, Image, FrontMatter } from '../../domain/models/Book';
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
+import { dropCapScaleOf } from '../../domain/services/dropCapMetrics';
 
 type EpubFn = (options: EpubOptions, content: EpubChapter[]) => Promise<Buffer>;
 
@@ -38,13 +39,14 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
-// EPUB is just HTML+CSS, so unlike PDFRenderer/DOCXRenderer (which both need a "v1
-// approximation" for drop caps, since neither PDFKit nor docx does real line-aware text
-// wrap-around), EPUB gets a real drop cap: CSS `float: left` makes the reading system's own
-// layout engine wrap the following text around the enlarged letter, same technique any web
-// page uses. No approximation needed here - this renderer's own documented gap elsewhere
-// (superscript/subscript in PDFRenderer, etc.) doesn't apply to this feature.
-const DROP_CAP_CSS = '.dropcap { float: left; font-size: 2.5em; line-height: 0.8em; padding-right: 0.08em; font-weight: bold; }';
+// EPUB is just HTML+CSS: CSS `float: left` makes the reading system's own layout engine wrap
+// the following text around the enlarged letter, same technique any web page uses. The em size
+// is the theme's declared scale (dropCapScaleOf, §6 commit 2) — the same knob the PDF glyph and
+// the Word letter derive from; the 0.08em padding mirrors DROP_CAP_GUTTER_EM so the three
+// formats space the ornament alike.
+function dropCapCss(scale: number): string {
+  return `.dropcap { float: left; font-size: ${scale}em; line-height: 0.8em; padding-right: 0.08em; font-weight: bold; }`;
+}
 
 // Renders one TypeRun as HTML, nesting tags for runs with multiple flags set (e.g. bold +
 // italic). Every TypeRun flag maps onto a real HTML element - unlike PDFKit, nothing here
@@ -143,7 +145,7 @@ export class EPUBRenderer implements Renderer<Buffer> {
       p { font-size: ${theme.fontSizes.body}pt; margin: 0 0 ${theme.spacing.paragraphSpacing}pt; }
       blockquote { margin-left: 1.5em; }
       table, th, td { border: 1px solid #999; border-collapse: collapse; padding: 4px; }
-      ${DROP_CAP_CSS}
+      ${dropCapCss(dropCapScaleOf(theme))}
     `;
   }
 
