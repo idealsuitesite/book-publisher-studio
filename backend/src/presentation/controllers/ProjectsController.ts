@@ -7,7 +7,7 @@ import type { ExportProjectUseCase, ProjectExportFormat } from '../../applicatio
 import type { PublishProjectUseCase } from '../../application/use-cases/PublishProjectUseCase';
 import type { PublishingReportMapper } from '../../application/mappers/PublishingReportMapper';
 import type { EditBookUseCase } from '../../application/use-cases/EditBookUseCase';
-import type { ProjectListResponseDTO, UpdateProjectSettingsDTO, StructureMutation } from 'shared-types';
+import type { ProjectListResponseDTO, UpdateProjectSettingsDTO, StructureMutation, TitlePageDTO, CopyrightPageDTO } from 'shared-types';
 import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
 import { UnknownLayoutError } from '../../shared/errors/UnknownLayoutError';
 import { ContentNotFoundError } from '../../shared/errors/ContentNotFoundError';
@@ -42,6 +42,29 @@ function parseMutation(body: unknown): StructureMutation | null {
   }
   if (m.type === 'removePartOpener' && typeof m.id === 'string' && m.id) {
     return { type: 'removePartOpener', id: m.id };
+  }
+  // MINI_DR_EDIT_FRONT_MATTER (Phase 3b): whitelisted with route tests in the same commit (the
+  // standing setPartRole lesson). The route enforces the SHAPE and the non-emptiness the pure op
+  // also requires — so the op's own throw stays defense-in-depth, never a 500 path.
+  if (m.type === 'editFrontMatter') {
+    const isTitlePatch = (v: unknown): v is TitlePageDTO | null | undefined =>
+      v === undefined ||
+      v === null ||
+      (typeof v === 'object' &&
+        typeof (v as TitlePageDTO).title === 'string' &&
+        (v as TitlePageDTO).title.trim() !== '' &&
+        typeof (v as TitlePageDTO).author === 'string' &&
+        (v as TitlePageDTO).author.trim() !== '');
+    const isCopyrightPatch = (v: unknown): v is CopyrightPageDTO | null | undefined =>
+      v === undefined ||
+      v === null ||
+      (typeof v === 'object' && typeof (v as CopyrightPageDTO).text === 'string' && (v as CopyrightPageDTO).text.trim() !== '');
+
+    // An edit that touches nothing is a malformed request, not a no-op to snapshot.
+    if (isTitlePatch(m.titlePage) && isCopyrightPatch(m.copyrightPage) && !(m.titlePage === undefined && m.copyrightPage === undefined)) {
+      return { type: 'editFrontMatter', titlePage: m.titlePage, copyrightPage: m.copyrightPage };
+    }
+    return null;
   }
   return null;
 }

@@ -23,6 +23,7 @@ export type {
 } from './BlockDTO';
 export type { SectionDTO } from './SectionDTO';
 export type { ChapterDTO } from './ChapterDTO';
+export type { FrontMatterDTO, TitlePageDTO, CopyrightPageDTO } from './FrontMatterDTO';
 export type { MetadataDTO } from './MetadataDTO';
 export type { BookDTO, ContentDTO } from './BookDTO';
 export type { ValidationIssueDTO } from './ValidationIssueDTO';

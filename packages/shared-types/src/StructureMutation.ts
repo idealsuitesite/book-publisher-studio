@@ -1,3 +1,5 @@
+import type { TitlePageDTO, CopyrightPageDTO } from './FrontMatterDTO';
+
 /**
  * A typed manual-structure-editing command (STRUCTURE_EDITING.md Q4 — one generic command, not a
  * route per verb). Discriminated on `type` so both sides dispatch exhaustively and the route can
@@ -22,4 +24,8 @@ export type StructureMutation =
   // PART_LEVEL_STRUCTURE (§3.4): insert a "Part I" divider at a mainContent index, and remove one
   // by id (opener-only — a real chapter can never be deleted through this op).
   | { type: 'insertPartOpener'; index: number; title: string }
-  | { type: 'removePartOpener'; id: string };
+  | { type: 'removePartOpener'; id: string }
+  // MINI_DR_EDIT_FRONT_MATTER (Phase 3b): edit the RENDERED front-matter sections. undefined =
+  // untouched, null = cleared (a book with no copyright page is a legitimate author choice),
+  // object = replaced whole.
+  | { type: 'editFrontMatter'; titlePage?: TitlePageDTO | null; copyrightPage?: CopyrightPageDTO | null };

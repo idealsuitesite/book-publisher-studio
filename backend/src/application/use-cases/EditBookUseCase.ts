@@ -76,6 +76,14 @@ export class EditBookUseCase {
         const book = this.editingService.removePartOpener(this.projectService.currentBook(project), mutation.id);
         return this.projectService.replaceBook(snapped, book);
       }
+      case 'editFrontMatter': {
+        const snapped = this.projectService.snapshot(project, 'before front matter edit');
+        const book = this.editingService.editFrontMatter(this.projectService.currentBook(project), {
+          titlePage: mutation.titlePage,
+          copyrightPage: mutation.copyrightPage,
+        });
+        return this.projectService.replaceBook(snapped, book);
+      }
       case 'restoreVersion':
         // Undo: no new snapshot — restoreVersion sets book+settings from the version and keeps the
         // whole log (nothing after it is deleted). ProjectService owns that invariant.
