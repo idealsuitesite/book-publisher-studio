@@ -160,6 +160,33 @@ export async function applySetCallout(
   }
 }
 
+/** Move a paragraph's text into its chapter's subtitle field (MINI_DR_SUBTITLE_FIELD commit 3)
+ * — the gesture that retires Novel's subtitle-drop-cap limitation; extracted like the others. */
+export async function applyMarkAsSubtitle(
+  projectId: string,
+  blockId: string,
+  deps: { editStructure: typeof editStructure; onEdited: (updated: ProjectDTO) => void; onError: (message: string) => void }
+): Promise<void> {
+  try {
+    deps.onEdited(await deps.editStructure(projectId, { type: 'markAsSubtitle', blockId }));
+  } catch (error) {
+    deps.onError(error instanceof ApiError ? 'That subtitle change could not be saved.' : 'Could not reach the server.');
+  }
+}
+
+/** The inverse: the subtitle returns as the chapter's first paragraph. */
+export async function applyClearSubtitle(
+  projectId: string,
+  chapterId: string,
+  deps: { editStructure: typeof editStructure; onEdited: (updated: ProjectDTO) => void; onError: (message: string) => void }
+): Promise<void> {
+  try {
+    deps.onEdited(await deps.editStructure(projectId, { type: 'clearSubtitle', chapterId }));
+  } catch (error) {
+    deps.onError(error instanceof ApiError ? 'That subtitle change could not be saved.' : 'Could not reach the server.');
+  }
+}
+
 /** Merge a chapter back into the previous container — the inverse of promote. */
 export async function applyMerge(
   projectId: string,
@@ -322,19 +349,37 @@ function BlockList({
   disabled,
   onPromote,
   onSetCallout,
+  canMarkSubtitle = false,
+  onMarkSubtitle,
 }: {
   blocks: ContentBlocks;
   disabled: boolean;
   onPromote: (blockId: string) => void;
   onSetCallout: (blockId: string, on: boolean) => void;
+  /** MINI_DR_SUBTITLE_FIELD decision 5 + A2: true only for a top-level chapter with NO subtitle. */
+  canMarkSubtitle?: boolean;
+  onMarkSubtitle?: (blockId: string) => void;
 }) {
   const actionBtn =
     'shrink-0 rounded px-1.5 py-0.5 text-xs text-app-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent disabled:cursor-not-allowed disabled:text-app-text-muted disabled:no-underline';
   return (
     <ul className="mt-1.5 flex max-h-56 flex-col gap-0.5 overflow-y-auto border-l border-app-border pl-3">
-      {blocks.map((block) => (
+      {blocks.map((block, index) => (
         <li key={block.id} className="flex items-center justify-between gap-2 py-0.5 text-sm">
           <span className="min-w-0 flex-1 truncate text-app-text-muted">{blockPreview(block)}</span>
+          {/* MINI_DR_SUBTITLE_FIELD commit 3: FIRST paragraph row only (A2, disclosed v1
+              boundary — the gesture means "the line under the title") and only while the
+              chapter has no subtitle (decision 5: clear first, explicitly). */}
+          {canMarkSubtitle && index === 0 && block.type === 'paragraph' && onMarkSubtitle && (
+            <button
+              onClick={() => onMarkSubtitle(block.id)}
+              disabled={disabled}
+              title="Move this line into the chapter's subtitle, under the title"
+              className={actionBtn}
+            >
+              Make this the chapter subtitle
+            </button>
+          )}
           {/* MINI_DR_CALLOUTS commit 4: the marking gesture, on the row already rendered (D5 —
               no new rows, the folded panel's height budget untouched). Generic per D2: the badge
               names the mechanism, never a taxonomy. */}
@@ -437,6 +482,8 @@ function SortableChapterRow({
   onInsertPart,
   onRemovePart,
   onSetCallout,
+  onMarkSubtitle,
+  onClearSubtitle,
 }: {
   content: BookDTO['mainContent'][number];
   index: number;
@@ -448,6 +495,8 @@ function SortableChapterRow({
   onInsertPart: (index: number) => void;
   onRemovePart: (id: string) => void;
   onSetCallout: (blockId: string, on: boolean) => void;
+  onMarkSubtitle: (blockId: string) => void;
+  onClearSubtitle: (chapterId: string) => void;
 }) {
   const isPartOpener = content.type === 'chapter' && content.partOpener === true;
   const isUnstructured = content.type === 'section' && !content.title.trim();
@@ -550,6 +599,22 @@ function SortableChapterRow({
         </button>
       </div>
 
+      {/* MINI_DR_SUBTITLE_FIELD commit 3: a populated chapter shows its subtitle in the header
+          area with the visible clear gesture (decision 5 — its own undo, no hidden compound). */}
+      {content.type === 'chapter' && content.subtitle && (
+        <div className="mt-1 flex items-center gap-2 pl-6">
+          <span className="min-w-0 flex-1 truncate text-sm italic text-app-text-muted">{content.subtitle}</span>
+          <button
+            onClick={() => onClearSubtitle(content.id)}
+            disabled={disabled}
+            title="Return the subtitle to the chapter's first paragraph"
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs text-app-text-muted hover:text-app-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-accent disabled:cursor-not-allowed"
+          >
+            Remove subtitle
+          </button>
+        </div>
+      )}
+
       {/* CREATE_CHAPTER.md D5: block rows expanded for the unstructured container (act here), on
           demand for a chapter. Only text blocks (paragraph/heading) can become a chapter. */}
       {isUnstructured ? (
@@ -562,7 +627,14 @@ function SortableChapterRow({
           <summary className="cursor-pointer select-none text-xs text-app-text-muted">
             {blocks.length} {blocks.length === 1 ? 'block' : 'blocks'} — split into chapters
           </summary>
-          <BlockList blocks={blocks} disabled={disabled} onPromote={onPromote} onSetCallout={onSetCallout} />
+          <BlockList
+            blocks={blocks}
+            disabled={disabled}
+            onPromote={onPromote}
+            onSetCallout={onSetCallout}
+            canMarkSubtitle={content.type === 'chapter' && !isPartOpener && !content.subtitle}
+            onMarkSubtitle={onMarkSubtitle}
+          />
         </details>
       ) : null}
 
@@ -693,6 +765,20 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
     setPending(false);
   }
 
+  async function onMarkSubtitle(blockId: string) {
+    setError(null);
+    setPending(true);
+    await applyMarkAsSubtitle(project.id, blockId, { editStructure, onEdited: captureUndo, onError: setError });
+    setPending(false);
+  }
+
+  async function onClearSubtitle(chapterId: string) {
+    setError(null);
+    setPending(true);
+    await applyClearSubtitle(project.id, chapterId, { editStructure, onEdited: captureUndo, onError: setError });
+    setPending(false);
+  }
+
   async function onEditFrontMatter(
     patch: Pick<Extract<StructureMutation, { type: 'editFrontMatter' }>, 'titlePage' | 'copyrightPage'>
   ) {
@@ -783,6 +869,8 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
                 onInsertPart={onInsertPart}
                 onRemovePart={onRemovePart}
                 onSetCallout={onSetCallout}
+                onMarkSubtitle={onMarkSubtitle}
+                onClearSubtitle={onClearSubtitle}
               />
             ))}
           </ul>
