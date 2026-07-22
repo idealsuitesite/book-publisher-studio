@@ -1,12 +1,26 @@
 # Mini Design Review — Drop Caps (BOOK_PRESENTATION §4 row 4, as amended)
 
-**Status:** REOPENED FOR IMPLEMENTATION (2026-07-22, queue item 5) — **DRAFT awaiting CTO approval
-of the reopened review; no code before it.** The §4bis question is **SETTLED as item 1** (Option A
-— converge up, CTO 2026-07-22) on a POSITIVE real-Word spike whose visual proof was seen **before**
-validation, as the CTO conditioned (`spikes/output/dropcap-frame-sized.png` — four real wrapped
-drop caps rendered by Word 16.0 itself from our sized, cleaned markup). §4 is reframed
-accordingly; the item-1 plan and the verification-instrument rules (including one explicit
-exclusion) are below.
+**Status:** ✅ CTO-APPROVED (2026-07-22) — **IN FLIGHT on `feature/dropcap-capability` (UNMERGED):
+commit 1 of the §6 plan is BUILT and green (`302e0f7`, backend 739/739 on the branch)**; commits
+2–4 remain. **RESUME POINT for a fresh session: §6 commit 2** — `Theme.presentation.dropCap` + the
+positional trigger in `TypographyResolver`, with the §5 positional edge cases (first block not a
+paragraph, empty chapter, split continuation) **enumerated in the resolver's tests BEFORE
+implementation**; then commit 3 carries the CTO's two closure attention points (pricing MEASURED
+against the renderer — never derived from scale arithmetic, the list-prefix lesson — and the owed
+`DROPCAP_PARAGRAPH_ATOMICITY` observable-overflow test), then commit 4 (tri-format proof theme +
+live verification + docs). The mid-item stop rule stands: any frame quirk beyond Findings A/B
+stops the work and reports.
+**Commit 1, verified in real Word on the renderer's own output:** the custom `NativeDropCapFrame`
+XmlComponent (never the spike's patch) emits the attribute-free native framePr; `DOCXRenderer`
+(optional measurer, fallback = the documented inline degradation) renders the letter in its own
+framed paragraph sized by the shared `dropCapMetrics` arithmetic (`dropCapLetterSizePt` — Finding
+B's third consumer); Word's OM classifies the output's letters as native drop caps with
+**LinesToDrop=2 — exactly the PDF's Gelasio band**, title untouched, rastered page visually clean
+(`spikes/output/renderer-native-dropcap.png`); 5 XML tests incl. the no-leak parity guard.
+The §4bis question was **SETTLED as item 1** (Option A — converge up, CTO 2026-07-22) on a
+POSITIVE real-Word spike whose visual proof was seen **before** validation, as the CTO conditioned
+(`spikes/output/dropcap-frame-sized.png`). §4 is reframed accordingly; the item-1 plan and the
+verification-instrument rules (including one explicit exclusion) are below.
 **Date:** 2026-07-21, reopened 2026-07-22
 
 ---
