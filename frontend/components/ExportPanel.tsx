@@ -28,11 +28,15 @@ const FORMATS: { format: ExportFormat; label: string }[] = [
 
 
 export function ExportPanel({ exporter, downloadName, onDownloaded }: ExportPanelProps) {
-  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
+  // FOUNDER_TRAVERSAL defect 5: only the button IN FLIGHT changes state. The founder read the old
+  // "disable all three while one exports" as "PDF selected all three editions". Each format is an
+  // independent round trip (see the header note), so we track a SET of in-flight formats — a
+  // button reflects only its OWN export, the other two stay untouched and clickable.
+  const [exporting, setExporting] = useState<ReadonlySet<ExportFormat>>(new Set());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleDownload(format: ExportFormat) {
-    setExportingFormat(format);
+    setExporting((prev) => new Set(prev).add(format));
     setErrorMessage(null);
     try {
       const blob = await exporter(format);
@@ -48,7 +52,11 @@ export function ExportPanel({ exporter, downloadName, onDownloaded }: ExportPane
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : `${format.toUpperCase()} export failed.`);
     } finally {
-      setExportingFormat(null);
+      setExporting((prev) => {
+        const next = new Set(prev);
+        next.delete(format);
+        return next;
+      });
     }
   }
 
@@ -64,9 +72,9 @@ export function ExportPanel({ exporter, downloadName, onDownloaded }: ExportPane
             key={format}
             variant="secondary"
             onClick={() => void handleDownload(format)}
-            disabled={exportingFormat !== null}
+            disabled={exporting.has(format)}
           >
-            {exportingFormat === format ? 'Exporting…' : label}
+            {exporting.has(format) ? 'Exporting…' : label}
           </Button>
         ))}
       </div>
