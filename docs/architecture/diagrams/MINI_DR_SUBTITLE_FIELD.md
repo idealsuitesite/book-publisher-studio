@@ -1,6 +1,15 @@
 # Mini Design Review — Chapter.subtitle: the gesture, the rendering, the retirement of Novel's asterisk
 
-**Status:** ✅ CTO-APPROVED (2026-07-22) **with three amendments, integrated below before any
+**Status:** ✅ DELIVERED on `feature/chapter-subtitle` — all four §7 commits built and gated
+(1 `7aca991` ops+route · 2 `f951eac` render+price lock-step · 3 `b44a2cf` studio+live · 4 = this
+commit), **the screenshot stop PASSED: `CHAPTER_SUBTITLE_RATIO = 0.6` and the italic are LOCKED
+(CTO taste stop 2026-07-22, one round — the exhibit is `spikes/output/subtitle-novel-p4.png`,
+the gestured faith-alone page in Novel: subtitle subordinate-not-timid inside the title block,
+the drop cap on the PROSE — the THIRD_THEME_NOVEL §6 limitation retired on the page that
+exposed it, with zero trigger code).** A future ratio change requires a new screenshot loop.
+**AWAITING MERGE on the CTO's accord — granted 2026-07-22; the closure sequence runs.**
+The loop's secondary verdicts, §9 below. Originally:
+CTO-APPROVED (2026-07-22) **with three amendments, integrated below before any
 code:** **A1** — the unblock guard written into the TODO entry itself (our own Subtitle-styled
 export NEVER triggers the unblock — the fabricated-material variant the CTO already forbade on
 RECALIBRATE; re-importing our export is an extra exercise the day an EXTERNAL manuscript fires
@@ -146,6 +155,29 @@ exposed it.**
    opens on an epigraph BEFORE its subtitle will one day exist and will not see the affordance
    there; the exit door is extending the affordance's placement if a real case demands it (the
    op itself already accepts any top-level-chapter paragraph — a UI decision, not a model one).
+
+## 9. Screenshot-loop record (2026-07-22 — the verdicts and the two measured findings)
+
+1. **The ratio LOCKED in one round** (§-status above; the exhibit named). The comparison of the
+   two exhibits — generator vs real studio export, geometry identical to the point — was itself
+   the CTO's secondary verdict: the pipeline prints exactly what is stored.
+2. **Counter discrepancy, MEASURED (CTO point 1):** sidebar 16 ch (`Explorer.tsx` →
+   `computeBookFacts` — the EDITORIAL count, classifier-excluded canonical parts) vs station
+   header 17 chapters (`StructureEditor` — the STRUCTURAL count, the Part-chantier's deliberate
+   "counts what things ARE"). **Nothing invented: two true notions, deliberately decided in two
+   chantiers, never confronted — the defect is the UNLABELED disagreement** (15 vs 17 even
+   without the rename). CTO ruling: **label, never merge** → `COUNTER_LABELLING` (TODO), form
+   at a future capture-based taste stop.
+3. **"(edited)", MEASURED (CTO point 2):** stored in `Chapter.title` (DB probe), provenance
+   `version 1: "before rename"` — the phase-3 live rename never undone; it printed faithfully
+   in the export (the exhibit shows it). **Not a fidelity defect — demo-data pollution.**
+   Repaired by the real rename route on CTO authorization; the classifier effect RE-MEASURED
+   after (editorial count 16 → 15). **The lesson, consigned (DEVELOPMENT_WORKFLOW):** a live
+   verification that mutates the permanent library undoes itself in the same session — the
+   harness-cleanup rule extended to manual gestures.
+4. **The two UI findings** (long titles breaking one-word-per-line; block lists scrolling
+   horizontally) predate this chantier → `STRUCTURE_ROW_LAYOUT` + the umbrella
+   `STRUCTURE_STATION_ERGONOMICS` (TODO), never folded into commit 3 (one commit, one intent).
 
 ## Related
 `SUBTITLE_FIELD_SCOPE.md` (corrected by §3) · `THIRD_THEME_NOVEL.md` §6 · `MINI_DR_SUBTITLE_SPACING.md`

@@ -8,8 +8,11 @@
  * chapter title; DOCX/EPUB: the theme's h1) — one universal treatment (the callout-D1 logic),
  * per-theme values only if the screenshot loop ever demands them.
  *
- * STARTING POINT, not a lock (CTO): 0.6 is judged on the gestured faith-alone page rendered in
- * Novel at the commit-3 screenshot stop — the page that exposed the subtitle-drop-cap
- * limitation — before it locks.
+ * LOCKED at 0.6 — CTO taste stop, 2026-07-22, on the gestured faith-alone page rendered in
+ * Novel (the exhibit: `spikes/output/subtitle-novel-p4.png`, the page that exposed the
+ * subtitle-drop-cap limitation): "subordonné sans être timide — une seconde ligne de titre,
+ * pas une première ligne de prose égarée"; the shared accent binds title and subtitle into one
+ * block, the italic alone distinguishes. A future change requires a NEW screenshot loop (the
+ * callout-0.96 precedent), never a code-side tweak.
  */
 export const CHAPTER_SUBTITLE_RATIO = 0.6;
