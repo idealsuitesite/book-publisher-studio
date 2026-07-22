@@ -46,6 +46,11 @@ export const ModernTheme: Theme = {
   // parity/calibration numbers must not move; adopting drop caps is a screenshot-loop decision.
   presentation: {
     dropCap: { scope: 'none', scale: 2.5 },
+    // D4 (MINI_DR_CALLOUTS): Modern carries the tint — it already owns the visible accent, and
+    // an author choosing Modern chose visible colour (the grayscale consequence is Modern's
+    // identity, recorded in the review, not a bug). Tint = accent mixed toward paper
+    // (calloutTintOf), so an accentOverride re-inks the chrome too.
+    callout: { tint: 'accent' },
   },
   runningHead: {
     show: true,

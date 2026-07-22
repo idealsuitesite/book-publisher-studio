@@ -1,5 +1,6 @@
 import type { StyledBook } from '../models/Theme';
 import { dropCapGeometry, dropCapScaleOf } from './dropCapMetrics';
+import { CALLOUT_PAD_V_PT, calloutTextIndentPt } from './calloutMetrics';
 import type { PageLayout } from '../models/PageLayout';
 import type { Page, PaginatedBook } from '../models/PaginatedBook';
 import type { Content, Block, TOCEntry } from '../models/Book';
@@ -226,8 +227,10 @@ export class LayoutEngine {
       } else if (overflow) {
         // Try the cut before surrendering the space (measured mode, plain paragraphs only:
         // quotes/scriptures render with a first-line indent whose continuation semantics
-        // differ, and a drop-cap paragraph's first lines are typographically special).
-        if (this.measurer && block.type === 'paragraph' && block.text.trim() && !styled.blockTypography?.[block.id]?.dropCap) {
+        // differ, a drop-cap paragraph's first lines are typographically special, and a
+        // CALLOUT is atomic — its chrome cannot break mid-box (MINI_DR_CALLOUTS §4, the third
+        // member of the atomicity family; the loud overflow test ships with this exclusion).
+        if (this.measurer && block.type === 'paragraph' && block.text.trim() && block.callout !== true && !styled.blockTypography?.[block.id]?.dropCap) {
           const style = styled.blockStyles[block.id];
           const fontSize = style?.fontSize ?? styled.theme.fontSizes.body;
           const line = this.measurer.lineHeight(fontSize, { theme: styled.theme });
@@ -502,6 +505,21 @@ export class LayoutEngine {
         case 'heading':
           return measure(block.text, true);
         case 'paragraph': {
+          // A callout's chrome consumes real height: vertical padding above and below, and a
+          // text column narrowed by the rule + gap (MINI_DR_CALLOUTS §4 — the SAME calloutMetrics
+          // constants the renderer spends, lock-step; the subtitle-spacing pattern). A callout
+          // never carries the drop-cap path: the resolver decides that exclusion once, upstream.
+          if (block.callout === true) {
+            return (
+              CALLOUT_PAD_V_PT * 2 +
+              this.measurer.measureHeight(block.text, {
+                fontSize,
+                width: usableWidth - calloutTextIndentPt(),
+                theme: styled.theme,
+              }) +
+              spaceAfter
+            );
+          }
           // A drop cap makes the paragraph's first lines wrap in a NARROWED column, beside the
           // glyph (DROPCAP_TEXT_OVERLAP). Charging it at full width under-charges by exactly the
           // lines the narrowing pushes down — the charged-vs-consumed class RENDER_DRIFT closed.

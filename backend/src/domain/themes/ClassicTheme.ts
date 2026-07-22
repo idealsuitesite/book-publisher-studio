@@ -40,6 +40,10 @@ export const ClassicTheme: Theme = {
   // declaring it changes no byte.
   presentation: {
     dropCap: { scope: 'none', scale: 2.5 },
+    // D4 (MINI_DR_CALLOUTS): Classic ships tint-free — rule only. KDP interiors are mostly
+    // B&W, and a printed tint becomes a grey slab; Classic stays sober and print-safe. The
+    // rule renders in Classic's accent (#000000 — a plain black rule).
+    callout: { tint: 'none' },
   },
   // Matches today's pre-Sprint-6 PDF running-head/footer defaults (top running head, "Page N
   // of TOTAL" footer, size-9 default font) minus the hardcoded 'Book Publisher Studio' literal

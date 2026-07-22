@@ -14,6 +14,8 @@ import {
   PageNumber,
   AlignmentType,
   PageBreak,
+  BorderStyle,
+  ShadingType,
   type ISectionOptions,
   type IStylesOptions,
   type ParagraphChild,
@@ -28,6 +30,7 @@ import type { Content, Block, Chapter, Section, TOCEntry, FrontMatter } from '..
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { dropCapLetterSizePt, dropCapScaleOf } from '../../domain/services/dropCapMetrics';
+import { CALLOUT_GAP_PT, CALLOUT_RULE_PT, calloutRuleColorOf, calloutTintOf } from '../../domain/services/calloutMetrics';
 import type { TextMeasurer } from '../../domain/ports/TextMeasurer';
 import { withNativeDropCapFrame } from './docxDropCapFrame';
 
@@ -489,6 +492,30 @@ export class DOCXRenderer implements Renderer<Buffer> {
         const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
         const dropCap = blockTypography?.[block.id]?.dropCap ?? false;
         const alignment = block.align === 'justify' ? 'both' : block.align;
+        // Callout chrome (MINI_DR_CALLOUTS §3): Word's OWN paragraph chrome — a left border
+        // (w:pBdr, size in eighths of a point, space = the gap in points) plus shading (w:shd)
+        // only when the theme declares the tint. Colours from the one shared module; Word
+        // reflows, so no R2 surface here (the ADR-0045 asymmetry).
+        if (block.callout === true) {
+          const tint = calloutTintOf(theme);
+          return [
+            new Paragraph({
+              pageBreakBefore,
+              spacing,
+              alignment,
+              border: {
+                left: {
+                  style: BorderStyle.SINGLE,
+                  size: CALLOUT_RULE_PT * 8,
+                  space: CALLOUT_GAP_PT,
+                  color: calloutRuleColorOf(theme).replace(/^#/, '').toUpperCase(),
+                },
+              },
+              ...(tint ? { shading: { type: ShadingType.CLEAR, fill: tint.replace(/^#/, '').toUpperCase() } } : {}),
+              children: buildRuns(runs, font, size, color),
+            }),
+          ];
+        }
         // Word-NATIVE drop cap (MINI_DR_DROP_CAPS §6 commit 1, §4bis Option A): the letter in its
         // own framePr paragraph — the structure Word's DropCap.Enable() itself produces — sized by
         // the shared dropCapMetrics arithmetic. Needs a measurer; without one, the inline

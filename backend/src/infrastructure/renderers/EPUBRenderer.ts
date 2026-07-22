@@ -12,6 +12,7 @@ import type { Content, Block, Image, FrontMatter } from '../../domain/models/Boo
 import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { dropCapScaleOf } from '../../domain/services/dropCapMetrics';
+import { CALLOUT_GAP_PT, CALLOUT_PAD_V_PT, CALLOUT_RULE_PT, calloutRuleColorOf, calloutTintOf } from '../../domain/services/calloutMetrics';
 
 type EpubFn = (options: EpubOptions, content: EpubChapter[]) => Promise<Buffer>;
 
@@ -46,6 +47,16 @@ function escapeHtml(text: string): string {
 // formats space the ornament alike.
 function dropCapCss(scale: number): string {
   return `.dropcap { float: left; font-size: ${scale}em; line-height: 0.8em; padding-right: 0.08em; font-weight: bold; }`;
+}
+
+// Callout chrome (MINI_DR_CALLOUTS §3): the reflowable format's native box — a left border in
+// the resolved accent, padding from the shared constants, background only when the theme
+// declares the tint (a LITERAL pre-mixed hex from calloutTintOf; reader CSS gets no opacity
+// tricks, the same computed ink as the PDF rect and Word's w:shd).
+function calloutCss(theme: Theme): string {
+  const tint = calloutTintOf(theme);
+  const box = `.callout { border-left: ${CALLOUT_RULE_PT}pt solid ${calloutRuleColorOf(theme)}; padding: ${CALLOUT_PAD_V_PT}pt 0 ${CALLOUT_PAD_V_PT}pt ${CALLOUT_GAP_PT}pt; }`;
+  return tint ? `${box}\n      .callout { background-color: ${tint}; }` : box;
 }
 
 // Renders one TypeRun as HTML, nesting tags for runs with multiple flags set (e.g. bold +
@@ -146,6 +157,7 @@ export class EPUBRenderer implements Renderer<Buffer> {
       blockquote { margin-left: 1.5em; }
       table, th, td { border: 1px solid #999; border-collapse: collapse; padding: 4px; }
       ${dropCapCss(dropCapScaleOf(theme))}
+      ${calloutCss(theme)}
     `;
   }
 
@@ -234,8 +246,11 @@ export class EPUBRenderer implements Renderer<Buffer> {
         const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
         const dropCap = blockTypography?.[block.id]?.dropCap ?? false;
         const align = block.align && block.align !== 'left' ? ` style="text-align: ${block.align}"` : '';
+        // Callout chrome (MINI_DR_CALLOUTS §3): one CSS class, its rules built from the shared
+        // calloutMetrics module in buildCss. A callout is never drop-capped (resolver exclusion).
+        const cls = block.callout === true ? ' class="callout"' : '';
         const inner = dropCap ? renderRunsWithDropCap(runs) : renderRuns(runs);
-        return `<p${align}>${inner}</p>`;
+        return `<p${cls}${align}>${inner}</p>`;
       }
 
       case 'quote':

@@ -17,6 +17,7 @@ import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
 import { renderedImageSize } from '../../domain/services/renderedImageSize';
 import { dropCapGeometry, dropCapScaleOf, type DropCapGeometry } from '../../domain/services/dropCapMetrics';
+import { CALLOUT_PAD_V_PT, CALLOUT_RULE_PT, calloutRuleColorOf, calloutTextIndentPt, calloutTintOf } from '../../domain/services/calloutMetrics';
 import { assertPlausibleCapHeight } from '../fonts/PdfKitTextMeasurer';
 
 // The drop-cap scale now lives in the Domain (dropCapMetrics), because the pagination model
@@ -597,6 +598,12 @@ export class PDFRenderer implements Renderer<Buffer> {
         const runs = runsOrPlainFallback(blockTypography?.[block.id], block.text);
         const dropCap = blockTypography?.[block.id]?.dropCap ?? false;
         const options: PDFKit.Mixins.TextOptions = { align: block.align === 'justify' ? 'justify' : (block.align ?? 'left') };
+        if (block.callout === true) {
+          // Atomic (never in the split plan) and never drop-capped (the resolver's exclusion).
+          this.renderCalloutParagraph(doc, runs, resolveBody, fontSize, color, options, theme);
+          this.spendSpaceAfter(doc, spaceAfter);
+          return;
+        }
         const segments = splits.segments.get(block.id);
         if (segments && !dropCap) {
           this.renderSplitRuns(doc, runs, resolveBody, fontSize, color, options, segments, splits.continuations.get(block.id) ?? [], pageOwners);
@@ -818,6 +825,49 @@ export class PDFRenderer implements Renderer<Buffer> {
       }
     }
     return best;
+  }
+
+  /**
+   * The callout chrome (MINI_DR_CALLOUTS §3): a left rule in the resolved accent, an optional
+   * theme-declared tint behind the text, the text in a column narrowed by rule + gap, vertical
+   * padding above and below — every number from `calloutMetrics`, the same the model charged.
+   *
+   * The chrome's height is MEASURED here on this document (plain concatenated text, the same
+   * arithmetic `estimateBlockHeight` ran), drawn BEFORE the text so the ink sits behind it.
+   * Bold-heavy runs can wrap a line past the measured box (the standing ±1-line residual class,
+   * same as renderSplitRuns') — the cursor then advances to wherever the real text ended, never
+   * backwards over drawn text. On the atomic-overflow debt case (a callout taller than a page)
+   * PDFKit breaks the page mid-box: counted as a reconciliation, and the chrome rects stay on
+   * the first page — the disclosed shape of that debt, not a silent defect.
+   */
+  private renderCalloutParagraph(
+    doc: PDFKit.PDFDocument,
+    runs: TypeRun[],
+    resolveFont: FontResolver,
+    fontSize: number,
+    color: string,
+    paragraphOptions: PDFKit.Mixins.TextOptions,
+    theme: Theme
+  ): void {
+    const xLeft = doc.page.margins.left;
+    const usableWidth = doc.page.width - xLeft - doc.page.margins.right;
+    const narrowWidth = usableWidth - calloutTextIndentPt();
+
+    doc.font(resolveFont(false, false)).fontSize(fontSize);
+    const plain = runs.map((run) => run.text).join('');
+    const boxHeight = doc.heightOfString(plain, { width: narrowWidth }) + 2 * CALLOUT_PAD_V_PT;
+
+    const y0 = doc.y;
+    const tint = calloutTintOf(theme);
+    if (tint) doc.rect(xLeft, y0, usableWidth, boxHeight).fill(tint);
+    doc.rect(xLeft, y0, CALLOUT_RULE_PT, boxHeight).fill(calloutRuleColorOf(theme));
+
+    doc.x = xLeft + calloutTextIndentPt();
+    doc.y = y0 + CALLOUT_PAD_V_PT;
+    this.renderRuns(doc, runs, resolveFont, fontSize, color, { ...paragraphOptions, width: narrowWidth });
+
+    doc.x = xLeft;
+    doc.y = Math.max(doc.y + CALLOUT_PAD_V_PT, y0 + boxHeight);
   }
 
   private renderRunsWithDropCap(
