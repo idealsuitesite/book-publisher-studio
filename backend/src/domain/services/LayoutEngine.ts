@@ -305,6 +305,43 @@ export class LayoutEngine {
           flushPage();
           continue;
         }
+        // MINI_DR_BLOCKLESS_TITLES: any OTHER titled content whose own `content` is empty —
+        // a nested or top-level section (with or without children), or a chapter whose text
+        // lives entirely under its sections. Every renderer draws such a title, but the block
+        // loop below never runs for it, so its height was charged at ZERO — the live ADR-0051
+        // drift TYPOGRAPHY_QUALITY_SCOPE §1 measured stranding a real 18pt heading at a page
+        // bottom on Modern (model +0 / renderer +~38pt). The page records the content's OWN id
+        // (the ownsBarePage precedent above): planned breaks become expressible via the
+        // renderers' startKey protocol, and the TOC's existing `content.id` fallback resolves a
+        // real page number. An UNTITLED blockless content stays charged at zero — the renderer
+        // draws nothing for it, and charging phantom heights would be the inverse drift.
+        if (content.title && content.content.length === 0) {
+          if (isTopLevel && content.type === 'chapter') {
+            // The full chapter-opening protocol (MINI_DR_BLOCKLESS_TITLES D2): this shape —
+            // reachable from any import whose chapter heading is immediately followed by a
+            // section heading — previously got NO opening break and never claimed the
+            // running-head attribution either (its pages kept the previous chapter's name).
+            flushPage();
+            if (content.startPageNumber !== undefined) pageNumber = content.startPageNumber;
+            const needed = blankPagesNeededFor(content.openingPageStyle, pageNumber);
+            pendingBlankPagesBefore = needed;
+            pageNumber += needed;
+          } else {
+            // D3 orphan guard — the flushBeforeTitleIfOrphaned floor applied to the shape that
+            // has no first block to key on: the title plus a 2-line start must fit, else the
+            // break comes BEFORE the title and whatever follows lands under it.
+            const titleHeight = titleHeightOf(content);
+            if (titleHeight > 0 && currentPageBlocks.length > 0) {
+              const line = this.measurer!.lineHeight(styled.theme.fontSizes.body, { theme: styled.theme });
+              if (currentHeight + titleHeight + 2 * line > usableHeight) flushPage();
+            }
+          }
+          if (isTopLevel) currentTopLevelTitle = content.title;
+          const titleHeight = titleHeightOf(content);
+          currentPageBlocks.push(content.id);
+          currentPageHeights.push(titleHeight);
+          currentHeight += titleHeight;
+        }
         const startsChapter = isTopLevel && content.type === 'chapter';
         let isFirstBlock = true;
         for (const block of content.content) {

@@ -40,6 +40,17 @@ export interface RenderMetrics {
   unplannedPageBreaks?: number;
 
   /**
+   * The subset of `unplannedPageBreaks` that fired while a TITLE was being drawn
+   * (MINI_DR_BLOCKLESS_TITLES D5). This is the §10.3 heading-gate failure mode made nameable: a
+   * reconciliation mid-title strands a heading at a page bottom — the exact defect
+   * TYPOGRAPHY_QUALITY_SCOPE §1 measured on a real page — and before this field it added
+   * anonymously into the total, indistinguishable from a benign ±1-line paragraph residual.
+   * The corpus gate test pins it at 0 across all themes; the anonymous total remains the
+   * ADR-0051 ledger. Undefined where `unplannedPageBreaks` is (DOCX reflows, EPUB has no pages).
+   */
+  unplannedTitleBreaks?: number;
+
+  /**
    * Drop caps the renderer had to abandon, rendering the paragraph as ordinary text instead.
    *
    * Happens only when the font-metric guard refuses to answer — a cap height outside the

@@ -711,3 +711,131 @@ describe('LayoutEngine - paragraph splitting (Phase B)', () => {
     }
   });
 });
+
+// MINI_DR_BLOCKLESS_TITLES: a titled content whose own `content` is empty is charged in-flow at
+// every level — the renderer draws that title unconditionally, so a zero charge is a live
+// ADR-0051 drift (TYPOGRAPHY_QUALITY_SCOPE §1: model +0 / renderer +~38pt, one real page on
+// Modern stranding an 18pt heading at the page bottom). The page records the content's OWN id
+// (the PART_LEVEL ownsBarePage precedent) so planned breaks are expressible and the TOC's
+// existing `content.id` fallback resolves a real page number.
+describe('LayoutEngine - blockless titled contents (MINI_DR_BLOCKLESS_TITLES)', () => {
+  // Same deterministic ruler as the Phase B block: 1 word = 1 line of 10pt; a title costs its
+  // word count ×10 + Classic's flat 18 before / 8 after (titleHeightOf).
+  const wordMeasurer: TextMeasurer = {
+    measureHeight: (text) => Math.max(1, text.trim() ? text.trim().split(/\s+/).length : 0) * 10,
+    lineHeight: () => 10,
+    measureWidth: (text) => text.length * 5,
+    capHeight: (fontSize) => fontSize * 0.7,
+  };
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
+  const sectionOf = (id: string, title: string, content: Block[] = [], overrides: Partial<Section> = {}): Section => {
+    const now = new Date();
+    return { type: 'section', id, title, content, level: 2, createdAt: now, updatedAt: now, ...overrides };
+  };
+
+  it("charges a blockless section's title and never strands it: too little room flushes first, the new page starts with the SECTION's id", () => {
+    // Chapter title 36 + p-1 (550+8) = 594; remaining 54. The empty section's title needs
+    // 36 + 2 body lines (20) = 56 > 54 → flush BEFORE the title (the D3 orphan guard, the same
+    // floor flushBeforeTitleIfOrphaned uses). Page 2 opens with the section's own id, then the
+    // sibling section's paragraph lands under it — never a title stranded at a page bottom.
+    const styled = styledBookFrom([
+      chapter([paragraph('p-1', words(55))], {
+        sections: [sectionOf('s-empty', 'S'), sectionOf('s-next', '', [paragraph('p-2', words(4))])],
+      }),
+    ]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages).toHaveLength(2);
+    expect(result.pages[0].blocks).toEqual(['p-1']);
+    expect(result.pages[1].blocks).toEqual(['s-empty', 'p-2']);
+  });
+
+  it('charges an in-flow blockless title mid-page: the following split retreats by exactly the charged height', () => {
+    // Chapter title 36 + p-1 (300+8) = 344; remaining 304. WITHOUT the charge p-2 splits at 29
+    // lines (the Phase B baseline — "fills the remainder" above, same numbers); the empty
+    // section's 36pt charge shrinks the remainder to 268 → 26 lines (a non-final segment pays
+    // no spaceAfter; the half-line safety reserve rules out 27). The id sits in-flow between
+    // p-1 and p-2 — 29 → 26 IS the charge, observed in the split plan.
+    const styled = styledBookFrom([
+      chapter([paragraph('p-1', words(30))], {
+        sections: [sectionOf('s-empty', 'S'), sectionOf('s-next', '', [paragraph('p-2', words(40))])],
+      }),
+    ]);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages[0].blocks).toEqual(['p-1', 's-empty', 'p-2']);
+    expect(result.pages[0].splitAfterLines).toBe(26);
+    expect(result.pages[1].startsWithContinuation).toBe(true);
+  });
+
+  it('a blockless chapter WITH sections gets the full chapter protocol: its own page, its title charged, running heads attributed to IT', () => {
+    // Reachable from any real import whose chapter heading is immediately followed by a section
+    // heading — today such a chapter neither breaks (forceNewPage lives in the block loop) nor
+    // charges its title nor claims currentTopLevelTitle (running heads keep the PREVIOUS
+    // chapter's name on its pages).
+    const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, content: 'chapterTitle' } };
+    const styled = styledBookFromWithTheme(
+      [
+        chapter([paragraph('p-a', words(10))], { id: 'c-a', title: 'Alpha' }),
+        chapter([], { id: 'c-b', title: 'Beta', sections: [sectionOf('s-b', '', [paragraph('p-b', words(5))])] }),
+      ],
+      theme
+    );
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages).toHaveLength(2);
+    expect(result.pages[0].blocks).toEqual(['p-a']);
+    expect(result.pages[1].blocks).toEqual(['c-b', 'p-b']);
+    expect(result.pages[0].headerFooterTitle).toBe('Alpha');
+    expect(result.pages[1].headerFooterTitle).toBe('Beta');
+  });
+
+  it('a blockless TOP-LEVEL section is charged in-flow and takes the running-head attribution (the LayoutEngine.ts:280-283 disclosed variant)', () => {
+    const theme: Theme = { ...ClassicTheme, runningHead: { ...ClassicTheme.runningHead!, content: 'chapterTitle' } };
+    const book = createBook({ title: 'T', author: 'A', language: 'en' }, [
+      chapter([paragraph('p-1', words(10))], { id: 'c-1', title: 'Alpha' }),
+      sectionOf('s-top', 'Standalone', [], { level: 1 }) as unknown as Chapter,
+    ]);
+    const styled = new ThemeEngine().applyTheme(book, theme);
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    // Fits in-flow (plenty of room): same page, id recorded, no phantom page — and the page's
+    // running head belongs to the LAST top-level content, exactly as for block-bearing sections.
+    expect(result.pages).toHaveLength(1);
+    expect(result.pages[0].blocks).toEqual(['p-1', 's-top']);
+    expect(result.pages[0].headerFooterTitle).toBe('Standalone');
+  });
+
+  it('without a measurer the id is still recorded (TOC page numbers) and the charge stays zero — the estimate path invents no heights', () => {
+    const styled = styledBookFrom([
+      chapter([paragraph('p-1', words(5))], {
+        sections: [sectionOf('s-empty', 'S'), sectionOf('s-next', '', [paragraph('p-2', words(4))])],
+      }),
+    ]);
+
+    const result = new LayoutEngine().paginate(styled, LETTER_LAYOUT);
+
+    expect(result.pages).toHaveLength(1);
+    expect(result.pages[0].blocks).toEqual(['p-1', 's-empty', 'p-2']);
+  });
+
+  it("a blockless section's TOC entry resolves a real page number through the existing content-id fallback (the disclosed bonus, pinned not surprised)", () => {
+    const styled = styledBookFromWithToc(
+      [
+        chapter([paragraph('p-1', words(55))], {
+          sections: [sectionOf('s-empty', 'The Empty One'), sectionOf('s-next', '', [paragraph('p-2', words(4))])],
+        }),
+      ],
+      { entries: [], generateAutomatically: true }
+    );
+
+    const result = new LayoutEngine(wordMeasurer).paginate(styled, LETTER_LAYOUT);
+
+    const entry = result.tableOfContents?.find((e) => e.title === 'The Empty One');
+    expect(entry?.pageNumber).toBe(2);
+  });
+});

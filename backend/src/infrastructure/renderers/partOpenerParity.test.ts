@@ -74,22 +74,27 @@ describe('Part-opener parity on real faith-alone (kdp-6x9, classic, auto-TOC)', 
     // Exact locks, loud in both directions (the parity-suite style). Base is the corpus-level
     // byte-identity guard: these are the SAME numbers as before the ownsBarePage branch existed
     // (measured pre-fix by part-level-geometry-spike.ts — the branch is unreachable from any
-    // real import). The base 3 unplanned breaks are the auto-TOC front matter spilling past its
-    // single planned page — pre-existing to this chantier, observable per ADR-0051.
+    // real import). Re-locked for MINI_DR_BLOCKLESS_TITLES: one of the base 3 unplanned was the
+    // blockless §3 section's uncharged title (TYPOGRAPHY_QUALITY_SCOPE §1) — now charged, so
+    // 161/3 -> 160/2. Both remaining unplanned are the auto-TOC front matter spilling past its
+    // single planned page (attributed "front matter" in the warnings) — pre-existing,
+    // observable per ADR-0051. The model count is renderer-independent and stays 155: the
+    // ~36pt charge absorbs into existing page slack without adding a model page.
     expect(baseRun.paginated.pages.length).toBe(155);
-    expect(baseRun.metrics.pageCount).toBe(161);
-    expect(baseRun.metrics.unplannedPageBreaks).toBe(3);
+    expect(baseRun.metrics.pageCount).toBe(160);
+    expect(baseRun.metrics.unplannedPageBreaks).toBe(2);
 
     // charged == consumed on the opener shape: the model now charges the 3 opener pages
     // (155→158) — pre-fix it charged +0 while the renderer drew +3 as unplanned breaks.
     expect(openerRun.paginated.pages.length).toBe(158);
-    expect(openerRun.metrics.pageCount).toBe(165);
-    // 4, not 6: the 3 opener drifts are GONE (planned pages now). The remaining +1 over base is
-    // the known ±1-line bold-run residual class (RENDER_DRIFT disclosed) firing on
-    // paragraph-136 because the openers legitimately shifted its page context — attributed and
-    // logged, never silent. NOT an opener break: pre-fix, with an identical model, it did not
-    // fire; it appears only because pagination genuinely changed.
-    expect(openerRun.metrics.unplannedPageBreaks).toBe(4);
+    expect(openerRun.metrics.pageCount).toBe(164);
+    // 3, not 5: the 3 opener drifts are GONE (planned pages now, PART_LEVEL), and the
+    // paragraph-136 residual this comment used to carry vanished when MINI_DR_BLOCKLESS_TITLES
+    // charged the §3 title and re-flowed its page context (moved by the re-flow, not cured —
+    // Modern's kdp anchor still carries the class). The +1 over base is the auto-TOC front
+    // matter spilling one page further with 3 more opener entries in the TOC — all three
+    // warnings attribute to "front matter", none to an opener or a body block.
+    expect(openerRun.metrics.unplannedPageBreaks).toBe(3);
 
     // The ADR-0051 ledger balances in BOTH runs: every real page is a planned model page, one of
     // the 3 planned front-matter pages (title, copyright, the TOC's first), or a counted

@@ -85,12 +85,19 @@ describe('ownsBarePage — the Part-opener shape owns a page', () => {
 });
 
 describe('ownsBarePage — every other shape paginates exactly as before (byte-identity at unit level)', () => {
-  it('an empty-content chapter WITH sections flows as before — no content-id page', () => {
+  it('an empty-content chapter WITH sections opens like a chapter and charges its title (MINI_DR_BLOCKLESS_TITLES supersedes the old no-charge pin)', () => {
+    // This test previously pinned the OPPOSITE ("flows as before — no content-id page"): that
+    // pin encoded the very drift TYPOGRAPHY_QUALITY_SCOPE §1 measured (a drawn title charged at
+    // zero, the chapter's opening break never planned, running heads misattributed). The shape
+    // now takes the full chapter protocol; its id on the page is the planned-break key AND the
+    // TOC page-number anchor. Deliberate behavior change, not a weakened assertion.
     const withSections = chapter('ch-s', 1, 'Sectioned', [], { sections: [section('s1', 'S', [para('sp1')])] });
     const { pages } = paginate([withSections]);
 
-    expect(pages.some((p) => p.blocks.includes('ch-s'))).toBe(false);
-    expect(pages.some((p) => p.blocks.includes('sp1'))).toBe(true);
+    expect(pages.some((p) => p.blocks.includes('ch-s'))).toBe(true);
+    const chapterPage = pages.find((p) => p.blocks.includes('ch-s'))!;
+    expect(chapterPage.blocks.indexOf('ch-s')).toBe(0);
+    expect(chapterPage.blocks).toContain('sp1'); // the section's text lands under the charged title
   });
 
   it('a blockless UNTITLED chapter stays invisible — the renderer draws nothing for it', () => {
@@ -101,11 +108,16 @@ describe('ownsBarePage — every other shape paginates exactly as before (byte-i
     expect(pages.some((p) => p.blocks.includes('ch-u'))).toBe(false);
   });
 
-  it('a blockless titled top-level SECTION gets no dedicated page (out-of-scope shape, disclosed)', () => {
+  it('a blockless titled top-level SECTION is charged in-flow — id on the page, still no dedicated page (the LayoutEngine disclosure retired by MINI_DR_BLOCKLESS_TITLES)', () => {
+    // Previously pinned as "gets no dedicated page (out-of-scope shape, disclosed)" with the id
+    // absent — the PART_LEVEL out-of-scope note. The id-absent half was the uncharged-title
+    // drift; the no-dedicated-page half was correct and STAYS pinned: in-flow charge, not a
+    // bare page (only the Part-opener chapter shape owns one).
     const bareSection = section('sec-b', 'Interlude', []);
     const { pages } = paginate([chapter('ch1', 1, 'One', [para('p1')]), bareSection]);
 
-    expect(pages.some((p) => p.blocks.includes('sec-b'))).toBe(false);
+    expect(pages).toHaveLength(1); // in-flow: no bare page for a section
+    expect(pages[0].blocks).toEqual(['p1', 'sec-b']);
   });
 
   it('an ordinary titled chapter with blocks never carries its own content id on a page', () => {

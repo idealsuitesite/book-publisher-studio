@@ -64,17 +64,21 @@ describe('Novel theme — parity lock (drop caps lit) + tri-format (real corpus)
   });
 
   it('R2 parity — Novel on faith-alone holds its own charged==consumed numbers WITH the ornament priced', async () => {
-    // Measured 2026-07-22 (PUBLICATION_QUALITY_BAR §10.5). The ornament is live on every
-    // chapter opening and the reconciliations stay in the residual class on BOTH anchors —
-    // the drop-cap pricing instruments carrying a shipped theme for the first time.
+    // Measured 2026-07-22 (PUBLICATION_QUALITY_BAR §10.5), re-locked the same day for
+    // MINI_DR_BLOCKLESS_TITLES: charging the blockless §3 section's title (~36pt) re-flowed
+    // chapter 3 onward and the ±1-line residual that used to straddle a boundary on both
+    // anchors no longer does — letter 90/1 -> 89/0, kdp 161/1 -> 160/0. The residual class is
+    // MOVED out of the unlucky straddle by the re-flow, not cured (Modern's kdp anchor still
+    // carries its own, same class, still counted). The ornament stays live on all 17 openings,
+    // degraded 0 on both anchors.
     const letter = await new PDFRenderer().render(paginate('novel', LetterPageLayout), { language: 'en' });
-    expect(letter.metrics.pageCount).toBe(90);
-    expect(letter.metrics.unplannedPageBreaks).toBe(1);
+    expect(letter.metrics.pageCount).toBe(89);
+    expect(letter.metrics.unplannedPageBreaks).toBe(0);
     expect(letter.metrics.degradedDropCaps).toBe(0);
 
     const kdp = await new PDFRenderer().render(paginate('novel', KDP6x9PageLayout), { language: 'en' });
-    expect(kdp.metrics.pageCount).toBe(161);
-    expect(kdp.metrics.unplannedPageBreaks).toBe(1);
+    expect(kdp.metrics.pageCount).toBe(160);
+    expect(kdp.metrics.unplannedPageBreaks).toBe(0);
     expect(kdp.metrics.degradedDropCaps).toBe(0);
   }, 60_000); // renders the 40k-word corpus twice under full-suite parallel load
 
