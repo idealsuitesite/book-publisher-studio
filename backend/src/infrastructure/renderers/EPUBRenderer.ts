@@ -121,10 +121,16 @@ export class EPUBRenderer implements Renderer<Buffer> {
         ...domainBook.mainContent.map((content) => this.buildChapter(content, blockTypography, tmpDir)),
       ];
 
+      // FOUNDER_TRAVERSAL defect 3: EPUB requires a language, but WE no longer invent one. We set
+      // `lang` ONLY when it is genuinely known; when absent, the key is OMITTED (not set to
+      // undefined, which epub-gen rejects with a 500) so the library applies its own format-
+      // required default — that fallback is the library's, never our assertion of a language the
+      // manuscript never declared (which is how English books shipped labelled 'fr').
+      const language = context.metadata?.language ?? domainBook.metadata.language;
       const options: EpubOptions = {
         title: context.metadata?.title ?? domainBook.metadata.title,
         author: context.metadata?.author ?? domainBook.metadata.author,
-        lang: context.metadata?.language ?? domainBook.metadata.language ?? 'en',
+        ...(language ? { lang: language } : {}),
         version: 3,
         // We render every title ourselves (chapter and nested section headings) for parity with
         // DOCXRenderer/PDFRenderer, rather than relying on the library's own default behavior.

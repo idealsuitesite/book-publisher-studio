@@ -26,9 +26,10 @@ export function inspectorRows(
   const meta = project.book.metadata;
   const bookRows: Row[] = [
     { label: 'Title', value: meta.title },
-    // Absent, not invented (FOUNDER_TRAVERSAL defect 2): no author row rather than "Unknown".
+    // Absent, not invented (FOUNDER_TRAVERSAL defects 2 & 3): no author/language row rather than
+    // "Unknown" / a hardcoded code.
     ...(meta.author ? [{ label: 'Author', value: meta.author }] : []),
-    { label: 'Language', value: meta.language.toUpperCase() },
+    ...(meta.language ? [{ label: 'Language', value: meta.language.toUpperCase() }] : []),
     ...(project.book.wordCount != null ? [{ label: 'Words', value: project.book.wordCount.toLocaleString('en-US') }] : []),
     ...(measuredPages ? [{ label: 'Pages (measured)', value: String(measuredPages) }] : []),
     ...(project.sourceFilename ? [{ label: 'Source', value: project.sourceFilename }] : []),

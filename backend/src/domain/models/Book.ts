@@ -49,7 +49,12 @@ export interface BookMetadata {
   publisher?: string;
   isbn?: string;
   issn?: string;
-  language: string; // ISO 639-1 (e.g., "en", "fr")
+  // Optional (FOUNDER_TRAVERSAL defect 3): the language the author declared, or ABSENT. It was a
+  // hardcoded 'fr' constant — no detection ever existed — which labelled every English manuscript
+  // French. Now the model asserts a language only when one is genuinely known; consumers omit the
+  // declaration rather than invent one, and the validation report names MISSING_LANGUAGE. A real
+  // detector, and an author-set language field, are their own future work (LANGUAGE_DETECTION).
+  language?: string; // ISO 639-1 (e.g., "en", "fr")
 
   // Cover & Marketing
   coverImage?: Image;

@@ -324,7 +324,14 @@ export class ASTBuilder {
       // real content and print as "Unknown" / "© 2026 Unknown". The validation report still names
       // the gap (BookValidator / ComplianceRule flag a missing author). Empty/whitespace → absent.
       author: doc.metadata.author?.trim() || undefined,
-      language: 'fr',
+      // FOUNDER_TRAVERSAL defect 3: was a hardcoded 'fr' — never a detector, so every English
+      // manuscript came in labelled French. NOTHING in the import today carries a language (the
+      // normalizer's DocumentMetadata has no such field), so the hardcoded constant was the ONLY
+      // source, and the honest floor is to assert none: ABSENT (MetadataRule names
+      // MISSING_LANGUAGE). No default 'en' — the same false assertion in the other language.
+      // Reading a DOCX-declared language, or a real detector, are their own future work
+      // (LANGUAGE_DETECTION), each with its own measured bar; an author-set field is Lot 3.
+      language: undefined,
     };
   }
 

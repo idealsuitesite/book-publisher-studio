@@ -389,6 +389,13 @@ describe('ASTBuilder', () => {
       expect(book.metadata.title).toBe('manuscript');
     });
 
+    it('leaves language ABSENT — never a hardcoded constant (FOUNDER_TRAVERSAL defect 3)', () => {
+      // Was `language: 'fr'` unconditionally — no detector, so every English book came in French.
+      const book = new ASTBuilder().build(buildDocument([heading(1, 'Chapter One')]));
+
+      expect(book.metadata.language).toBeUndefined();
+    });
+
     it('converts a footnote node with a sequential number', () => {
       const doc = buildDocument([heading(1, 'Chapter One'), footnote('See appendix A.')]);
       const book = new ASTBuilder().build(doc);
