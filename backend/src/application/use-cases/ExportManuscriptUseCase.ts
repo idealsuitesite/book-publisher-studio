@@ -11,6 +11,7 @@ import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 import type { PageLayout } from '../../domain/models/PageLayout';
 import type { PaginatedBook } from '../../domain/models/PaginatedBook';
 import type { Book } from '../../domain/models/Book';
+import type { TypographyOverride } from '../../domain/models/Project';
 import type { PaginationCache } from '../../domain/ports/PaginationCache';
 import { resolveTheme } from '../../domain/themes/getTheme';
 import { orderByRole } from '../../domain/services/orderByRole';
@@ -63,11 +64,13 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
     themeName: string,
     pageLayout: PageLayout,
     accentOverride?: string,
-    paginationCache?: PaginationCache
+    paginationCache?: PaginationCache,
+    typographyOverride?: TypographyOverride
   ): Promise<Buffer> {
-    // resolveTheme applies the optional per-project accent over the named theme, in the ONE shared
-    // seam (MINI_DR_PER_THEME_ACCENT). No override -> the named theme, unchanged.
-    const theme = resolveTheme(themeName, accentOverride);
+    // resolveTheme applies the optional per-project overrides over the named theme, in the ONE
+    // shared seam (MINI_DR_PER_THEME_ACCENT / MINI_DR_TYPOGRAPHY_TUNING). No overrides -> the
+    // named theme, unchanged.
+    const theme = resolveTheme(themeName, accentOverride, typographyOverride);
     // Editorial-part placement (MINI_DR_EDITORIAL_PLACEMENT): front/back-tagged parts are ordered
     // before/after the chapters here, in the shared tail, before pagination — so pagination, TOC and
     // running heads all follow. A book with no tagged part is returned untouched (byte-identical).
@@ -82,7 +85,7 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
     // the fresh `typeset` is what applies the new colour without re-flowing. Absent cache (the
     // raw-bytes /export route) -> paginate every time, unchanged.
     const paginated: PaginatedBook = paginationCache
-      ? this.paginateCached(paginationCache, book, themeName, pageLayout, typeset)
+      ? this.paginateCached(paginationCache, book, themeName, pageLayout, typeset, typographyOverride)
       : this.layoutEngine.paginate(typeset, pageLayout);
 
     // Metrics are discarded here on purpose: the export path has no validator to feed, and an
@@ -95,9 +98,10 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
     book: Book,
     themeName: string,
     pageLayout: PageLayout,
-    typeset: PaginatedBook['styledBook']
+    typeset: PaginatedBook['styledBook'],
+    typographyOverride?: TypographyOverride
   ): PaginatedBook {
-    const key = paginationKey(book, themeName, pageLayout);
+    const key = paginationKey(book, themeName, pageLayout, typographyOverride);
     const cached = cache.get(key);
     if (cached) {
       // Reuse the accent-invariant geometry with the fresh (new-accent) typeset. The pages carry
@@ -117,10 +121,20 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
  * invalidate. `Book` has no usable version stamp (`Project.updatedAt` is bumped by every settings
  * change including accent, and the book is re-deserialised per request so object identity does not
  * survive), so the book contributes a content hash. Any structure/content edit yields a new book →
- * a new hash → a miss; theme or layout change → a different key → a miss. A future geometry-affecting
- * setting MUST be added here (MINI_DR_PAGINATION_REUSE §2.3 — the key completeness IS the R2 guard).
+ * a new hash → a miss; theme or layout change → a different key → a miss.
+ *
+ * `typographyOverride` IS here (MINI_DR_TYPOGRAPHY_TUNING §2.5 — the §2.3 completeness rule's
+ * anticipated case): it moves geometry (±14–17%/preset step, measured) while changing neither the
+ * book nor the theme name, so leaving it out would serve STALE geometry — the silent-drift class.
+ * Absent → the key is byte-identical to the pre-tuning format, so existing cached entries stay valid.
  */
-export function paginationKey(book: Book, themeName: string, pageLayout: PageLayout): string {
+export function paginationKey(
+  book: Book,
+  themeName: string,
+  pageLayout: PageLayout,
+  typographyOverride?: TypographyOverride
+): string {
   const bookHash = createHash('md5').update(JSON.stringify(book)).digest('hex');
-  return `${bookHash}|${themeName}|${JSON.stringify(pageLayout)}`;
+  const typography = typographyOverride ? `|${JSON.stringify(typographyOverride)}` : '';
+  return `${bookHash}|${themeName}|${JSON.stringify(pageLayout)}${typography}`;
 }

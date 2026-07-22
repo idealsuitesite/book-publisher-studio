@@ -2,7 +2,7 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { ProjectDTO, ManuscriptOptionsDTO } from 'shared-types';
+import type { ProjectDTO, ManuscriptOptionsDTO, UpdateProjectSettingsDTO } from 'shared-types';
 import {
   ApiError,
   getProject,
@@ -220,7 +220,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
     { id: 'home', label: 'Back to the studio', run: () => router.push('/') },
   ];
 
-  async function changeSettings(patch: { layoutName?: string; themeName?: string; accentOverride?: string | null }) {
+  async function changeSettings(patch: UpdateProjectSettingsDTO) {
     try {
       setSettingsError(null);
       await updateProjectSettings(id, patch);
@@ -274,9 +274,11 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
             selectedLayout={project.settings.layoutName}
             selectedTheme={project.settings.themeName}
             selectedAccent={project.settings.accentOverride}
+            selectedTypography={project.settings.typographyOverride}
             onLayoutChange={(layoutName) => void changeSettings({ layoutName })}
             onThemeChange={(themeName) => void changeSettings({ themeName })}
             onAccentChange={(accentOverride) => void changeSettings({ accentOverride })}
+            onTypographyChange={(typographyOverride) => void changeSettings({ typographyOverride })}
           />
         )}
         {view === 'proof' && (

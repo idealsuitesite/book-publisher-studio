@@ -118,5 +118,21 @@ describe('ExportProjectUseCase pagination cache invalidation', () => {
     );
     await useCase.execute(project.id, 'pdf'); // MISS -> paginate #6
     expect(paginate).toHaveBeenCalledTimes(6);
+
+    // MINI_DR_TYPOGRAPHY_TUNING §2.5 — the CTO's non-negotiable, BOTH directions on the same book:
+    // a typography change moves geometry while changing neither book nor themeName -> MUST MISS...
+    project = svc.updateSettings(project, { typographyOverride: { preset: 'comfort' } });
+    await useCase.execute(project.id, 'pdf'); // MISS -> paginate #7
+    expect(paginate).toHaveBeenCalledTimes(7);
+
+    // ...while an accent change OVER the typography-overridden book is still colour-only -> HIT.
+    project = svc.updateSettings(project, { accentOverride: '#AA3300' });
+    await useCase.execute(project.id, 'pdf'); // HIT (typography unchanged, accent excluded from the key)
+    expect(paginate).toHaveBeenCalledTimes(7);
+
+    // Clearing the typography override returns to the no-override key, whose geometry is cached.
+    project = svc.updateSettings(project, { typographyOverride: undefined });
+    await useCase.execute(project.id, 'pdf'); // HIT (the pre-override geometry for this exact book)
+    expect(paginate).toHaveBeenCalledTimes(7);
   });
 });

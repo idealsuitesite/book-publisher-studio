@@ -130,6 +130,19 @@ describe('paginationKey', () => {
     expect(paginationKey(book, 'classic', { ...LetterPageLayout, marginLeft: 99 })).not.toBe(base);
   });
 
+  it('the typography override IS a key input (geometry-moving), and absent keeps the pre-tuning key', async () => {
+    const book = await buildBook();
+    const base = paginationKey(book, 'classic', LetterPageLayout);
+    // Absent override -> byte-identical to the old key format (existing cached entries stay valid).
+    expect(paginationKey(book, 'classic', LetterPageLayout, undefined)).toBe(base);
+    // A preset moves geometry -> a different key (MINI_DR_TYPOGRAPHY_TUNING §2.5).
+    expect(paginationKey(book, 'classic', LetterPageLayout, { preset: 'comfort' })).not.toBe(base);
+    // Two identical overrides -> the same key (stable serialization for the same object shape).
+    expect(paginationKey(book, 'classic', LetterPageLayout, { preset: 'comfort' })).toBe(
+      paginationKey(book, 'classic', LetterPageLayout, { preset: 'comfort' })
+    );
+  });
+
   it('changes when the book content changes', async () => {
     const a = paginationKey(await buildBook(['One.']), 'classic', LetterPageLayout);
     const b = paginationKey(await buildBook(['One.', 'Two.']), 'classic', LetterPageLayout);

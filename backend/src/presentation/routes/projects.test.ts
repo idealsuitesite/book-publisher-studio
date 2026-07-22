@@ -119,6 +119,36 @@ describe('GET /api/projects', () => {
     expect((await request(app).get(`/api/projects/${id}`)).body.settings.accentOverride).toBeUndefined();
   });
 
+  it('sets, persists and clears a typography override; rejects unknown enums (MINI_DR_TYPOGRAPHY_TUNING)', async () => {
+    const app = createApp();
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });
+    const imported = await request(app)
+      .post('/api/manuscripts/import')
+      .attach('file', buffer, { filename: 't.docx', contentType: DOCX_MIME });
+    const id = imported.body.projectId;
+
+    // Set: a preset + a pairing role are stored and returned.
+    const set = await request(app)
+      .patch(`/api/projects/${id}/settings`)
+      .send({ typographyOverride: { preset: 'comfort', bodyFont: 'sans' } });
+    expect(set.status).toBe(200);
+    expect(set.body.settings.typographyOverride).toEqual({ preset: 'comfort', bodyFont: 'sans' });
+    expect((await request(app).get(`/api/projects/${id}`)).body.settings.typographyOverride).toEqual({ preset: 'comfort', bodyFont: 'sans' });
+
+    // Reject: unknown preset, unknown role, or an object that touches nothing — stored value untouched.
+    for (const bad of [{ preset: 'huge' }, { bodyFont: 'gothic' }, {}]) {
+      const res = await request(app).patch(`/api/projects/${id}/settings`).send({ typographyOverride: bad });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('INVALID_SETTINGS');
+    }
+    expect((await request(app).get(`/api/projects/${id}`)).body.settings.typographyOverride).toEqual({ preset: 'comfort', bodyFont: 'sans' });
+
+    // Clear: null removes it.
+    const cleared = await request(app).patch(`/api/projects/${id}/settings`).send({ typographyOverride: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.settings.typographyOverride).toBeUndefined();
+  });
+
   it('exports from the STORED source - no re-upload, the whole point of Decision 6', async () => {
     const app = createApp();
     const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });

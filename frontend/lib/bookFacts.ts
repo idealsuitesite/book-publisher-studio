@@ -12,7 +12,10 @@ export function proofRefreshKey(project: ProjectDTO): string {
   // Includes accentOverride so a shade change re-inks the Proof on its OWN signal, not merely as a
   // side effect of updatedAt — closing the D5 stale-Proof risk explicitly (MINI_DR_PER_THEME_ACCENT,
   // the same class as the undo-vs-versions.length trap in STRUCTURE_EDITING_PHASE3).
-  return `${project.settings.layoutName}/${project.settings.themeName}/${project.settings.accentOverride ?? ''}/${project.updatedAt}`;
+  // typographyOverride likewise (MINI_DR_TYPOGRAPHY_TUNING §2.6) — it MOVES pages, so a stale
+  // Proof here would misstate the book's length, worse than a stale colour.
+  const typography = project.settings.typographyOverride ? JSON.stringify(project.settings.typographyOverride) : '';
+  return `${project.settings.layoutName}/${project.settings.themeName}/${project.settings.accentOverride ?? ''}/${typography}/${project.updatedAt}`;
 }
 
 /**

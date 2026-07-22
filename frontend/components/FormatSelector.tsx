@@ -1,4 +1,4 @@
-import type { LayoutOptionDTO, ManuscriptOptionsDTO } from 'shared-types';
+import type { LayoutOptionDTO, ManuscriptOptionsDTO, TypographyOverrideDTO } from 'shared-types';
 import { Badge, Card, cx } from '@/components/ui';
 
 /**
@@ -15,11 +15,29 @@ interface FormatSelectorProps {
   selectedTheme: string;
   /** The per-project accent override (hex), or undefined for the theme's own accent. */
   selectedAccent?: string;
+  /** The per-project typography override, or undefined for the theme's own typography. */
+  selectedTypography?: TypographyOverrideDTO;
   onLayoutChange: (name: string) => void;
   onThemeChange: (name: string) => void;
   /** Set (hex) or clear (null) the accent override. */
   onAccentChange: (hex: string | null) => void;
+  /** Set (an object) or clear (null) the typography override. */
+  onTypographyChange: (typography: TypographyOverrideDTO | null) => void;
 }
+
+/** The four CTO-locked presets (MINI_DR_TYPOGRAPHY_TUNING): names, not point values — a name
+ * tells the author what they get; the re-inking Proof shows them the page-count cost live. */
+const TEXT_SIZE_PRESETS: Array<{ value: NonNullable<TypographyOverrideDTO['preset']>; label: string }> = [
+  { value: 'compact', label: 'Compact' },
+  { value: 'standard', label: 'Standard' },
+  { value: 'comfort', label: 'Comfort' },
+  { value: 'large', label: 'Large print' },
+];
+
+const FONT_ROLE_LABELS: Array<{ value: 'serif' | 'sans'; label: string }> = [
+  { value: 'serif', label: 'Gelasio (serif)' },
+  { value: 'sans', label: 'Inter (sans)' },
+];
 
 const CATEGORY_LABELS: Record<LayoutOptionDTO['category'], string> = {
   standard: 'Standard',
@@ -95,10 +113,20 @@ export function FormatSelector({
   selectedLayout,
   selectedTheme,
   selectedAccent,
+  selectedTypography,
   onLayoutChange,
   onThemeChange,
   onAccentChange,
+  onTypographyChange,
 }: FormatSelectorProps) {
+  // Merge-and-set: each control patches its own field over the current override. If every field
+  // ends up unset (e.g. both fonts back to "Theme default" with no preset), degrade to a CLEAR —
+  // the backend rightly rejects an override that touches nothing.
+  const patchTypography = (patch: Partial<TypographyOverrideDTO>) => {
+    const merged = { ...selectedTypography, ...patch };
+    const hasAny = merged.preset !== undefined || merged.bodyFont !== undefined || merged.headingFont !== undefined;
+    onTypographyChange(hasAny ? merged : null);
+  };
   const categories = Array.from(new Set(options.layouts.map((layout) => layout.category)));
 
   return (
@@ -157,6 +185,76 @@ export function FormatSelector({
             <span className="text-xs text-app-text-muted">Classic is the first resident.</span>
           </div>
         </div>
+      </div>
+
+      {/* Typography (MINI_DR_TYPOGRAPHY_TUNING): text-size presets + font pairing. GEOMETRY-
+          moving, unlike the accent — the Proof re-inks and its page count IS the disclosure
+          (the CTO's chosen honesty: the author watches the book lengthen live). */}
+      <div className="flex flex-col gap-3 px-8 py-6">
+        <h3 className="text-lg font-semibold text-app-text">Typography</h3>
+        <p className="text-xs text-app-text-muted">
+          Text size and fonts over your chosen theme. The Proof shows the page count change live.
+        </p>
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-app-text-muted">Text size</p>
+          <div className="flex flex-wrap gap-2">
+            {TEXT_SIZE_PRESETS.map((preset) => (
+              <button
+                key={preset.value}
+                onClick={() => patchTypography({ preset: preset.value })}
+                aria-pressed={(selectedTypography?.preset ?? 'standard') === preset.value}
+                className={cx(
+                  'rounded-lg border px-3 py-1.5 text-sm transition-colors duration-[var(--motion-micro)]',
+                  (selectedTypography?.preset ?? 'standard') === preset.value
+                    ? 'border-app-accent bg-app-surface-2 font-medium text-app-text shadow-[var(--shadow-sheet)]'
+                    : 'border-app-border text-app-text-muted hover:border-app-text-muted'
+                )}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex flex-col gap-1 text-xs text-app-text-muted">
+            Body font
+            <select
+              value={selectedTypography?.bodyFont ?? ''}
+              onChange={(e) => patchTypography({ bodyFont: (e.target.value || undefined) as 'serif' | 'sans' | undefined })}
+              className="rounded border border-app-border bg-app-surface-1 px-2 py-1 text-sm text-app-text"
+            >
+              <option value="">Theme default</option>
+              {FONT_ROLE_LABELS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-app-text-muted">
+            Heading font
+            <select
+              value={selectedTypography?.headingFont ?? ''}
+              onChange={(e) => patchTypography({ headingFont: (e.target.value || undefined) as 'serif' | 'sans' | undefined })}
+              className="rounded border border-app-border bg-app-surface-1 px-2 py-1 text-sm text-app-text"
+            >
+              <option value="">Theme default</option>
+              {FONT_ROLE_LABELS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {selectedTypography && (
+          <button
+            onClick={() => onTypographyChange(null)}
+            className="w-fit text-sm text-app-text-muted underline hover:text-app-text"
+          >
+            Reset to theme default
+          </button>
+        )}
       </div>
 
       {/* Accent (MINI_DR_PER_THEME_ACCENT): the one theme value an author can tune. Colour-only,
