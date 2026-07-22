@@ -52,7 +52,8 @@ export class ExportProjectUseCase {
       project.settings.themeName,
       pageLayout,
       project.settings.accentOverride,
-      this.paginationCache
+      this.paginationCache,
+      project.settings.typographyOverride
     );
   }
 }

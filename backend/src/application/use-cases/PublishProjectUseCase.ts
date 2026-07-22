@@ -43,7 +43,8 @@ export class PublishProjectUseCase {
       this.projectService.currentBook(project),
       project.settings.themeName,
       pageLayout,
-      project.settings.accentOverride
+      project.settings.accentOverride,
+      project.settings.typographyOverride
     );
 
     const recorded = this.projectService.recordPublication(withVersion, report, version.id);

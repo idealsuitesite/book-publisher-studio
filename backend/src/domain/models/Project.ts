@@ -103,6 +103,27 @@ export interface ProjectSettings {
    * including Classic (an explicit author choice, not an error to prevent).
    */
   accentOverride?: string;
+
+  /**
+   * Optional per-project typography override (MINI_DR_TYPOGRAPHY_TUNING). UNLIKE the accent this
+   * one MOVES GEOMETRY (a preset step is ±14–17% of the book, measured) — so it participates in
+   * the pagination-cache key (the §2.3 completeness rule's anticipated case) and in
+   * `proofRefreshKey`. Applied in the single `resolveTheme` seam; absent means the theme's own
+   * typography, untouched.
+   */
+  typographyOverride?: TypographyOverride;
+}
+
+/**
+ * Mirror of `TypographyOverrideDTO` (shared-types) on the Domain side. `preset` resolves as an
+ * OFFSET from the theme's default body (compact −1 / standard 0 / comfort +1 / large +2), so
+ * "standard" is always the theme's designed default; fonts are logical roles, resolved against
+ * the registry's real families in `resolveTheme`.
+ */
+export interface TypographyOverride {
+  preset?: 'compact' | 'standard' | 'comfort' | 'large';
+  bodyFont?: 'serif' | 'sans';
+  headingFont?: 'serif' | 'sans';
 }
 
 /**

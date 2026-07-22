@@ -31,6 +31,22 @@ export interface ProjectSettingsDTO {
   themeName: string;
   /** Optional per-project accent colour (hex) overriding the theme's accent (MINI_DR_PER_THEME_ACCENT). */
   accentOverride?: string;
+  /** Optional per-project typography override (MINI_DR_TYPOGRAPHY_TUNING). */
+  typographyOverride?: TypographyOverrideDTO;
+}
+
+/**
+ * Per-project typography tuning (MINI_DR_TYPOGRAPHY_TUNING, the four CTO-locked decisions).
+ * `preset` is stored by NAME and resolved as an OFFSET from the theme's own default body
+ * (compact −1 / standard 0 / comfort +1 / large +2 pt — numerically 10/11/12/13 for every
+ * current theme), so "standard" always means the theme's designed default. Fonts are logical
+ * ROLES resolved against the registry's real families (serif → Georgia/Gelasio, sans →
+ * Helvetica/Inter) — a pairing, never a font browser.
+ */
+export interface TypographyOverrideDTO {
+  preset?: 'compact' | 'standard' | 'comfort' | 'large';
+  bodyFont?: 'serif' | 'sans';
+  headingFont?: 'serif' | 'sans';
 }
 
 export interface ProjectDTO {
@@ -59,4 +75,7 @@ export interface UpdateProjectSettingsDTO {
    * unchanged (MINI_DR_PER_THEME_ACCENT).
    */
   accentOverride?: string | null;
+  /** Set (an object) or CLEAR (null) the per-project typography override. Omitted leaves it
+   * unchanged (MINI_DR_TYPOGRAPHY_TUNING). */
+  typographyOverride?: TypographyOverrideDTO | null;
 }

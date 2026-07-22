@@ -9,6 +9,7 @@ import type { TypographyResolver } from '../../domain/services/TypographyResolve
 import type { LayoutEngine } from '../../domain/services/LayoutEngine';
 import type { PageLayout } from '../../domain/models/PageLayout';
 import type { Book } from '../../domain/models/Book';
+import type { TypographyOverride } from '../../domain/models/Project';
 import type { PublishingReport } from '../../domain/models/PublishingReport';
 import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 import { resolveTheme } from '../../domain/themes/getTheme';
@@ -61,10 +62,17 @@ export class PublishingUseCase implements UseCase<PublishRequest, PublishingRepo
    * front matter reach what KDP validates. Publishing the stored book also keeps publish and
    * export rendering the *same* book by construction (ADR-0045's original concern; ADR-0052).
    */
-  async publishBook(book: Book, themeName: string, pageLayout: PageLayout, accentOverride?: string): Promise<PublishingReport> {
-    // The publish tail applies the same per-project accent override as the export tail, through the
-    // one shared resolveTheme seam (MINI_DR_PER_THEME_ACCENT) — publish and export stay identical.
-    const theme = resolveTheme(themeName, accentOverride);
+  async publishBook(
+    book: Book,
+    themeName: string,
+    pageLayout: PageLayout,
+    accentOverride?: string,
+    typographyOverride?: TypographyOverride
+  ): Promise<PublishingReport> {
+    // The publish tail applies the same per-project overrides as the export tail, through the one
+    // shared resolveTheme seam (MINI_DR_PER_THEME_ACCENT / MINI_DR_TYPOGRAPHY_TUNING) — publish
+    // and export stay identical, so what KDP validates is what the author's Proof shows.
+    const theme = resolveTheme(themeName, accentOverride, typographyOverride);
     // Editorial-part placement (MINI_DR_EDITORIAL_PLACEMENT): same ordering as the export tail, so
     // publish and export place front/back matter identically (ADR-0052).
     const styled = this.themeEngine.applyTheme(orderByRole(book), theme);

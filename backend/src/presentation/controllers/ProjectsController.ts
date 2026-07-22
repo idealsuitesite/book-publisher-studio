@@ -7,7 +7,7 @@ import type { ExportProjectUseCase, ProjectExportFormat } from '../../applicatio
 import type { PublishProjectUseCase } from '../../application/use-cases/PublishProjectUseCase';
 import type { PublishingReportMapper } from '../../application/mappers/PublishingReportMapper';
 import type { EditBookUseCase } from '../../application/use-cases/EditBookUseCase';
-import type { ProjectListResponseDTO, UpdateProjectSettingsDTO, StructureMutation, TitlePageDTO, CopyrightPageDTO } from 'shared-types';
+import type { ProjectListResponseDTO, UpdateProjectSettingsDTO, StructureMutation, TitlePageDTO, CopyrightPageDTO, TypographyOverrideDTO } from 'shared-types';
 import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
 import { UnknownLayoutError } from '../../shared/errors/UnknownLayoutError';
 import { ContentNotFoundError } from '../../shared/errors/ContentNotFoundError';
@@ -67,6 +67,16 @@ function parseMutation(body: unknown): StructureMutation | null {
     return null;
   }
   return null;
+}
+
+/** Validates an untrusted typographyOverride body: known enums only, at least one field set. */
+function isValidTypographyOverride(v: unknown): v is TypographyOverrideDTO {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  const presetOk = o.preset === undefined || o.preset === 'compact' || o.preset === 'standard' || o.preset === 'comfort' || o.preset === 'large';
+  const roleOk = (r: unknown) => r === undefined || r === 'serif' || r === 'sans';
+  const hasAny = o.preset !== undefined || o.bodyFont !== undefined || o.headingFont !== undefined;
+  return presetOk && roleOk(o.bodyFont) && roleOk(o.headingFont) && hasAny;
 }
 
 const EXPORT_CONTENT_TYPE: Record<ProjectExportFormat, string> = {
@@ -160,7 +170,12 @@ export class ProjectsController {
         return;
       }
       const body = req.body as UpdateProjectSettingsDTO;
-      const patch: Partial<{ layoutName: string; themeName: string; accentOverride: string | undefined }> = {};
+      const patch: Partial<{
+        layoutName: string;
+        themeName: string;
+        accentOverride: string | undefined;
+        typographyOverride: TypographyOverrideDTO | undefined;
+      }> = {};
       if (typeof body.layoutName === 'string' && body.layoutName) patch.layoutName = body.layoutName;
       if (typeof body.themeName === 'string' && body.themeName) patch.themeName = body.themeName;
       // Accent override (MINI_DR_PER_THEME_ACCENT): a hex string SETS it, null/'' CLEARS it, omitted
@@ -174,6 +189,23 @@ export class ProjectsController {
           patch.accentOverride = body.accentOverride;
         } else {
           res.status(400).json({ error: 'accentOverride must be a hex colour like #1D4E68', code: 'INVALID_SETTINGS' });
+          return;
+        }
+      }
+
+      // Typography override (MINI_DR_TYPOGRAPHY_TUNING): an object SETS it (enums validated —
+      // preset name, logical font roles), null CLEARS it, omitted leaves it. Geometry-moving,
+      // unlike the accent — the Proof's live re-ink is the CTO-chosen disclosure of the cost.
+      if (body.typographyOverride !== undefined) {
+        if (body.typographyOverride === null) {
+          patch.typographyOverride = undefined;
+        } else if (isValidTypographyOverride(body.typographyOverride)) {
+          patch.typographyOverride = body.typographyOverride;
+        } else {
+          res.status(400).json({
+            error: 'typographyOverride must carry a known preset (compact|standard|comfort|large) and/or serif|sans font roles',
+            code: 'INVALID_SETTINGS',
+          });
           return;
         }
       }
