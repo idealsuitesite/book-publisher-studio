@@ -142,6 +142,43 @@ weakened (3). If A is chosen, §4's "v1 approximation" framing updates (the capa
 a real drop cap in all three formats) and the A-spike precedes any wiring. **The decision — A or
 B — is not taken here.**
 
+### §4bis SPIKE RESULT (2026-07-22 — Option A chosen by the CTO; the gating real-Word spike, run before any wiring as conditioned)
+
+**Verdict: POSITIVE — with two real findings the type signature hid, both bounded** (the exact
+scenario the CTO's condition anticipated). Instruments: `docx-dropcap-frame-spike.ts` (generation
++ emitted-XML proof) and Word 16.0 itself via COM (the real software, ADR-0019/0020).
+
+1. **The generated markup, cleaned, is attribute-for-attribute IDENTICAL to Word's own.** Ground
+   truth obtained by having Word CREATE a native drop cap (`Paragraph.DropCap.Enable()` via COM)
+   and reading what it saves: `<w:framePr w:dropCap="drop" w:lines="3" w:wrap="around"
+   w:vAnchor="text" w:hAnchor="text"/>` — ours matches exactly (order aside). Word's own object
+   model classifies OUR file as a native drop cap (`DropCap.Position = 1` wdDropNormal,
+   `LinesToDrop = 3`), the document opens clean, and Word exports it to PDF without complaint.
+   Native structure confirmed = ours (the letter split into its own framePr paragraph).
+2. **Finding A — the library's public types cannot emit the native shape directly.** Both frame
+   variants (`IXYFrameOptions`/`IAlignmentFrameOptions`) extend `IBaseFrameOptions`, which
+   REQUIRES `width`/`height` (+ position/alignment) — attributes Word's native drop caps OMIT;
+   forced zeros land in the XML. Implementation must produce the attribute-free shape: a small
+   custom `XmlComponent` for the frame (the clean path — the API is public) or a documented
+   post-generation adjustment. Bounded, but real work the type signature concealed.
+3. **Finding B — Word auto-sizes the native letter; a library caller must size it itself.** The
+   native letter shipped at **129 half-points (64.5pt)** for `lines=3` — the cap-height-spans-N-
+   lines arithmetic **our shared `dropCapMetrics` already implements for the PDF**. The DOCX
+   letter size becomes one more consumer of the same module: the convergence is deeper than
+   visual — the three formats would share the sizing arithmetic too.
+4. **Instrument honesty (recorded because it nearly killed Option A wrongly):** the first wrap
+   measurement (`Range.Information` vertical/horizontal on the body text) said NOT wrapped — but
+   the SAME instrument gives the SAME "not wrapped" signature on Word's known-good native drop
+   cap, which by definition wraps. The instrument reports paragraph anchors, not laid-out line
+   positions; it was the liar, exposed by testing it against a known-good reference before
+   trusting its verdict. The DR's verification plan must therefore rely on: the XML-identity
+   proof, Word's own `DropCap` OM read-back, and a human-visible check (a Word-exported page) in
+   the build's screenshot loop — never `Range.Information` geometry.
+
+**Next (per the CTO's sequencing): report, then reopen this review with §4bis settled as item 1,
+§4 reframed (a real tri-format drop cap, no longer a v1 approximation), and the standing §3
+instruments (measured pricing, observable atomicity, Classic `scope:'none'` byte-stability).**
+
 ## 5. Risks, and one open question
 
 - **The pricing is wrong in either direction.** Under-charge → overflow and reconciliation pages; over-charge → under-full pages. Instrument: §3.1 plus parity. This is the single largest risk, and the reason §3.1 insists the added height be measured rather than computed from the scale factor.
