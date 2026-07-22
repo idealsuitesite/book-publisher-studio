@@ -134,6 +134,7 @@ export class PDFRenderer implements Renderer<Buffer> {
             pageCount: measured.pageCount,
             pageLayout: book.pageLayout,
             unplannedPageBreaks: reconciliation.unplannedPageBreaks,
+            unplannedTitleBreaks: reconciliation.unplannedTitleBreaks,
             degradedDropCaps: degradationTally(doc).degradedDropCaps,
           },
         })
@@ -199,7 +200,7 @@ export class PDFRenderer implements Renderer<Buffer> {
       // reconciliation event: counted into RenderMetrics, logged with its trigger block, and
       // given an owner so header/footer attribution stays aligned even when a residual drift
       // (e.g. bold-run wrapping, the ±1-line class) slips past the aligned charges.
-      const reconciliation = { unplannedPageBreaks: 0 };
+      const reconciliation = { unplannedPageBreaks: 0, unplannedTitleBreaks: 0 };
       const origAddPage = doc.addPage.bind(doc);
       (doc as unknown as { addPage: () => PDFKit.PDFDocument }).addPage = () => {
         const marker = doc as unknown as { __plannedBreak?: boolean; __currentBlockId?: string };
@@ -207,6 +208,12 @@ export class PDFRenderer implements Renderer<Buffer> {
         marker.__plannedBreak = false;
         if (!planned) {
           reconciliation.unplannedPageBreaks += 1;
+          // MINI_DR_BLOCKLESS_TITLES D5: a reconciliation that fires while a TITLE is being
+          // drawn strands a heading at a page bottom — the §10.3 heading gate's failure mode.
+          // It gets its own named count instead of adding anonymously into the total
+          // (renderTitle stamps the marker with `title "…"`; the gate test pins this at 0 on
+          // the whole corpus).
+          if (marker.__currentBlockId?.startsWith('title "')) reconciliation.unplannedTitleBreaks += 1;
           console.warn(
             `[PDFRenderer] unplanned page break #${reconciliation.unplannedPageBreaks} while rendering ${marker.__currentBlockId ?? 'front matter'} — real flow exceeded the plan (ADR-0051)`
           );

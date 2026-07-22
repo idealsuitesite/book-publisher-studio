@@ -1,11 +1,19 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { MammothParser } from '../parsers/MammothParser';
+import { HtmlNormalizer } from '../normalizers/HtmlNormalizer';
+import { ASTBuilder } from '../../domain/services/ASTBuilder';
+import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 import { LayoutEngine } from '../../domain/services/LayoutEngine';
 import { ThemeEngine } from '../../domain/services/ThemeEngine';
 import { TypographyResolver } from '../../domain/services/TypographyResolver';
 import { ClassicTheme } from '../../domain/themes/ClassicTheme';
+import { getTheme } from '../../domain/themes/getTheme';
 import { createBook } from '../../domain/models/Book';
-import type { Chapter, Section, Block } from '../../domain/models/Book';
+import type { Book, Chapter, Section, Block } from '../../domain/models/Book';
 import { LetterPageLayout } from '../../domain/layouts/LetterPageLayout';
+import { KDP6x9PageLayout } from '../../domain/layouts/KDP6x9PageLayout';
 import { PdfKitTextMeasurer } from '../fonts/PdfKitTextMeasurer';
 import { PDFRenderer } from './PDFRenderer';
 
@@ -70,4 +78,32 @@ describe('PDFRenderer - blockless titled section planned break', () => {
     expect(result.metrics.unplannedPageBreaks).toBe(0);
     expect(result.metrics.pageCount).toBe(paginated.pages.length);
   });
+});
+
+/**
+ * The §10.3 heading gate, renderer-enforced (MINI_DR_BLOCKLESS_TITLES D5): a reconciliation
+ * that fires while a title is being drawn strands a heading at a page bottom. PUBLICATION_
+ * QUALITY_BAR §10.3 claimed this was "enforced by construction and measured 0" — the cadrage
+ * measured 1 real violation on Modern (the blockless §3 section). The claim is now a TEST on
+ * the real corpus, per theme, via the named counter — not a construction argument.
+ */
+describe('§10.3 heading gate — unplannedTitleBreaks is 0 on the real corpus, all themes', () => {
+  const CORPUS = join(__dirname, '..', '..', '..', 'verification', 'corpus', 'faith-alone-styled.docx');
+  let faith: Book;
+  beforeAll(async () => {
+    const raw = await new MammothParser().parse(readFileSync(CORPUS));
+    const built = new ASTBuilder().build(new HtmlNormalizer().normalize(raw.html, { fileName: 'faith-alone-styled.docx' }));
+    faith = { ...built, frontMatter: new FrontMatterBuilder().build(built) };
+  }, 30_000);
+
+  it.each(['classic', 'modern', 'novel'])('%s: no title is ever stranded by a reconciliation (kdp-6x9)', async (name) => {
+    const styled = new ThemeEngine().applyTheme(faith, getTheme(name));
+    const paginated = new LayoutEngine(new PdfKitTextMeasurer()).paginate(new TypographyResolver().resolve(styled), KDP6x9PageLayout);
+    const origWarn = console.warn;
+    console.warn = () => {};
+    const result = await new PDFRenderer().render(paginated, { language: 'en' });
+    console.warn = origWarn;
+
+    expect(result.metrics.unplannedTitleBreaks).toBe(0);
+  }, 60_000);
 });
