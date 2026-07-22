@@ -14,6 +14,7 @@ import { listLayoutNames } from '../../domain/services/ManualLayoutSelector';
 const THEME_LABELS: Record<string, string> = {
   classic: 'Classic',
   modern: 'Modern',
+  novel: 'Novel',
 };
 
 const LAYOUT_LABELS: Record<string, string> = {
