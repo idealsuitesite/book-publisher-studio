@@ -97,6 +97,51 @@ paragraph heights for the same declared value.
 value reaches each format's native mechanism), or must the strategies converge first? **Not decided.
 Not to be rediscovered.**
 
+### §4bis RE-MEASURED (2026-07-22, queue item 5 — the convergence dossier; the decision is the CTO's, taken nowhere below)
+
+Re-verified against `main` at `19eb54d` (non-negotiable #7 — the overlap fix, the shared pricing
+and the `docx` library had all moved since this section was written). **Three premise shifts:**
+
+1. **Two of the three formats ALREADY converge visually.** Since PR #26, PDF's strategy is
+   glyph-at-scale **with the band lines indented beside it** (`renderRunsWithDropCap` +
+   `dropCapGeometry`) — visually a true drop cap, not the "enlarged letter, no wrap" §4 describes.
+   EPUB floats (`.dropcap { float: left … }`) — the same visual concept. **The divergence has
+   narrowed to ONE outlier: DOCX** (enlarged inline run; Word grows the line box — the "degraded
+   but lossless" form). §4's "no wrap-around in all three renderers" is stale on two counts and
+   survives only as a description of DOCX.
+2. **The "three different paragraph heights for one declared value" concern has an R2 dimension
+   only in PDF — and that one is already priced.** DOCX reflows in Word and EPUB is reflowable;
+   neither height is a locked artifact (the exact asymmetry pagination already accepts, ADR-0045).
+   The PDF height runs through the shared `dropCapMetrics` (model and renderer, same arithmetic,
+   same measured inputs). The spacing already converges too (`DROP_CAP_GUTTER_EM` mirrors the
+   EPUB stylesheet's `padding-right: 0.08em`).
+3. **NEW, decisive for the cost side: the installed `docx` 9.7.1 natively supports Word's REAL
+   drop-cap mechanism** — `IBaseFrameOptions.dropCap` (`DropCapType`) with `lines`, the frame
+   properties Word's own "Drop Cap" command produces (`dist/index.d.ts:916-929`, read not
+   assumed). When this section was written, converging DOCX was an unknown, presumed-expensive
+   path; it is now a bounded, library-supported change (still owing a spike in real Word for
+   frame quirks before any lock — the ADR-0019/0020 discipline).
+
+**The two real options (the taste/architecture stop — the CTO's call):**
+
+- **Option A — converge UP: DOCX adopts Word's native drop-cap frame.** All three formats then
+  render the same visual concept (a glyph `bandLines` tall with text beside it), each via its
+  native mechanism; the theme's declared scale means ONE thing everywhere. Cost: a DOCX renderer
+  change + a real-Word spike (frame borders/spacing/compat quirks); zero R2 surface (Word
+  reflows). This is the option premise-shift 3 just made cheap.
+- **Option B — accept the divergence, disclosed:** each format keeps its current native strategy;
+  the declared value means "first letter at N× scale", with line behaviour per-format (the
+  pagination-asymmetry precedent). Cheapest; but it ships the typographically weakest form in the
+  format authors open most (Word), and §4bis's own founding instinct — *a single declared value
+  masking different behaviours is the divergence class this chantier refused to leave invisible* —
+  weighs against it now that convergence is cheap.
+
+**What the dossier asserts, and stops at:** the outlier is DOCX alone (1); R2 is not the deciding
+axis (2 — PDF is priced, the others reflow); the cost objection to convergence has materially
+weakened (3). If A is chosen, §4's "v1 approximation" framing updates (the capability would theme
+a real drop cap in all three formats) and the A-spike precedes any wiring. **The decision — A or
+B — is not taken here.**
+
 ## 5. Risks, and one open question
 
 - **The pricing is wrong in either direction.** Under-charge → overflow and reconciliation pages; over-charge → under-full pages. Instrument: §3.1 plus parity. This is the single largest risk, and the reason §3.1 insists the added height be measured rather than computed from the scale factor.
