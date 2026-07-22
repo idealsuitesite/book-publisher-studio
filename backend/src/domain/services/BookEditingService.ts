@@ -357,9 +357,16 @@ export class BookEditingService {
    */
   editFrontMatter(book: Book, patch: FrontMatterPatch, now: Date = new Date()): Book {
     const frontMatter = { ...book.frontMatter };
+    // FOUNDER_TRAVERSAL defect 4: the title the author edits and the title the Proof prints are
+    // ONE title. Editing the title-page title writes the canonical `book.metadata.title` in
+    // lock-step, so the author never has to discover that "the book title" and "the title page"
+    // were separate fields. (The project NAME stays deliberately distinct — a working label, not
+    // the published title; the deeper "what is a title, to an author" question is Lot 3.)
+    let metadata = book.metadata;
 
     if (patch.titlePage !== undefined) {
       if (patch.titlePage === null) {
+        // Removing the title PAGE never erases the book's own title — the canonical stays.
         delete frontMatter.titlePage;
       } else {
         const title = patch.titlePage.title.trim();
@@ -371,6 +378,7 @@ export class BookEditingService {
           subtitle: patch.titlePage.subtitle?.trim() || undefined,
           tagline: patch.titlePage.tagline?.trim() || undefined,
         };
+        metadata = { ...metadata, title };
       }
     }
 
@@ -390,7 +398,7 @@ export class BookEditingService {
       }
     }
 
-    return { ...book, frontMatter, updatedAt: now };
+    return { ...book, metadata, frontMatter, updatedAt: now };
   }
 
   /** Renumber top-level chapters 1..N in reading order; a chapter whose number changed advances its

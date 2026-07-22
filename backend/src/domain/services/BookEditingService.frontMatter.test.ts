@@ -32,6 +32,25 @@ describe('editFrontMatter (MINI_DR_EDIT_FRONT_MATTER)', () => {
     expect(edited.frontMatter.copyrightPage?.text).toBe('© 2026 Ruan Carlos');
   });
 
+  it('writes the CANONICAL book title in lock-step with the title-page title — one title, not two (FOUNDER_TRAVERSAL defect 4)', () => {
+    const before = bookWithFrontMatter();
+    expect(before.metadata.title).toBe('T'); // canonical and title-page were out of sync
+
+    const edited = service.editFrontMatter(before, {
+      titlePage: { title: 'The Real Book Title', author: 'A' },
+    });
+
+    expect(edited.frontMatter.titlePage?.title).toBe('The Real Book Title');
+    expect(edited.metadata.title).toBe('The Real Book Title'); // the canonical followed
+  });
+
+  it('removing the title PAGE leaves the canonical book title intact — a page is not the title', () => {
+    const edited = service.editFrontMatter(bookWithFrontMatter(), { titlePage: null });
+
+    expect('titlePage' in edited.frontMatter).toBe(false);
+    expect(edited.metadata.title).toBe('T');
+  });
+
   it('replaces the copyright page whole', () => {
     const edited = service.editFrontMatter(bookWithFrontMatter(), {
       copyrightPage: { text: '© 2027 Someone Else', legalNotice: 'All rights reserved.' },
