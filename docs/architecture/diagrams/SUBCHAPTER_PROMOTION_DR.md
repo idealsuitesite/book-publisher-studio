@@ -1,9 +1,12 @@
 # SUBCHAPTER_PROMOTION — Design Review (full, Level 2) — B5
 
-**Date:** 2026-07-23 · **Status: PROPOSED — awaits CTO validation before construction.** No code is
-written until this DR is approved (non-negotiable #4). FOUNDER_TRAVERSAL_3 Lot B, item B5 — the
-third structural form. Built on the **measured** foundation of traversal 3, the third member of the
-`STRUCTURE_ASSIST` / `STRUCTURE_CLEANUP` family, on the **same doctrinal invariant**.
+**Date:** 2026-07-23 · **Status: VALIDATED (CTO, 2026-07-23) — D1–D4 answered, cleared for
+construction.** FOUNDER_TRAVERSAL_3 Lot B, item B5 — the third structural form. Built on the
+**measured** foundation of traversal 3, the third member of the `STRUCTURE_ASSIST` /
+`STRUCTURE_CLEANUP` family, on the **same doctrinal invariant**. The §2 restraint (the 34 descriptive
+sub-headings have no deductive signal and are EXCLUDED, not heuristicised — `HEURISTIC_STRUCTURE_DETECTION`
+honoured on a new case) is CTO-endorsed; `DESCRIPTIVE_SUBHEADING_DETECTION` consigned, opened only if
+a signal is ever measured.
 
 ## §1 The law this serves, and the founder's constat
 
@@ -78,21 +81,34 @@ WITH the freshly-measured gesture-counter probe (the RENDER_DRIFT 284→246 / as
    in every chapter; make each a section of its chapter?" Confirm-all + per-item dismiss. Silent when
    no recurring editorial marker exists.
 
-## §6 Decisions owed (the CTO's, on this proposal)
+## §6 Decisions (CTO, 2026-07-23 — SETTLED)
 
-- **D1 — the sub-section op.** A new `promoteToSubsection` mutation vs extending `promoteToChapter` to
-  a section target. Both reuse CREATE_CHAPTER's split logic; the boundary (a Section under a Chapter,
-  carrying the marker's following prose) is new. Which, and its exact split semantics.
-- **D2 — scope: repetition-only for v1?** Confirm B5 v1 handles ONLY the recurring canonical editorial
-  name (the deductive signal), and the descriptive ALL-CAPS sub-headings are deferred (no measured
-  signal) — named `DESCRIPTIVE_SUBHEADING_DETECTION`, opened only if a signal is ever measured.
-- **D3 — the taxonomy relationship with A2.** The A2 guard drops repeated editorial names from chapter
-  proposals; B5 offers them as sub-sections. Confirm these are two faces of one recognition (the guard
-  suppresses the wrong offer; B5 makes the right one) and share the repetition computation — one
-  source of truth, not two thresholds.
-- **D4 — ordering / dependency.** B5 needs chapters to exist first. Confirm it is a Structure-station
-  on-demand action gated on "chapters present", not offered on the raw unstructured import (that is
-  the assist's moment).
+- **D1 — a NEW `promoteToSubsection` mutation, NOT an extension of `promoteToChapter`.** ✅ The two
+  produce things of different nature (a top-level entry vs a child section); giving the existing op a
+  "section target" would put two intentions under one name (the project's constant: one op, one
+  intention, one typed guard). **But REUSE CREATE_CHAPTER's split logic rather than duplicate it** (as
+  cleanup reused `removePartOpener`'s removal mechanism). **Two conditions:** (1) a **named typed
+  guard** — refuse if the block is not inside a chapter, refuse if the target chapter does not exist,
+  **tested both ways**; (2) a test pinning that **the following prose migrates correctly into the new
+  section and nothing is lost** — the cousin's `.sections` lesson, applied preemptively.
+- **D2 — repetition-only for v1.** ✅ The deductive signal, nothing else; widen only on measurement.
+  The descriptive sub-headings are deferred (`DESCRIPTIVE_SUBHEADING_DETECTION`).
+- **D3 — one source of truth.** ✅ The A2 guard and B5 are two faces of one recognition — the guard
+  suppresses the wrong (chapter) proposal, B5 makes the right (sub-section) one. **The repetition
+  computation is SHARED, not duplicated** (two thresholds that could diverge would be a latent defect).
+  **Test:** the SAME input produces a chapter-side suppression AND a sub-section-side proposal — never
+  one without the other.
+- **D4 — gated on chapters existing.** ✅ An on-demand Structure-station action, never offered on the
+  raw unstructured import (that moment is the assist's).
+
+## §6b The rendering requirement (CTO, 2026-07-23 — a mandatory end-stop, touches the founder directly)
+
+Book 3 will turn **26 "Conclusion" into sections**. Beyond the gesture counter (26→1, the judge of
+labour saved), **the rendered page is the judge of the result.** Verify on REAL pages that tri-format
+rendering handles an end-of-chapter section correctly: it **does not break pagination**, **does not
+steal the next chapter's drop cap** (the Novel-theme case), and **does not appear in the TOC as if it
+were a chapter**. This ships with the chantier — the gesture counter AND a real book-3 page rendered
+with its sections are the two mandatory stops.
 
 ## §7 Disclosures
 
