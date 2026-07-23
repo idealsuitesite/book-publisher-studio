@@ -10,6 +10,9 @@ export function projectRoutes(controller: ProjectsController): Router {
   // STRUCTURE_ASSIST: read-only suggestion surface — never mutates (applying a suggestion is the
   // separate promoteToChapter mutation via POST /:id/structure).
   router.get('/:id/structure-suggestions', controller.suggestStructure);
+  // STRUCTURE_CLEANUP: read-only cleanup surface — never mutates (applying a suggestion is the
+  // separate collapseMarker mutation via POST /:id/structure).
+  router.get('/:id/cleanup-suggestions', controller.suggestCleanup);
   router.patch('/:id/settings', express.json(), controller.patchSettings);
   // POST rather than GET for export: it renders on the server (real work, ADR-0041's measured
   // 598ms) and mirrors the existing manuscript export route's verb.

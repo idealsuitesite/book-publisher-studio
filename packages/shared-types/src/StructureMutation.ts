@@ -25,6 +25,12 @@ export type StructureMutation =
   // by id (opener-only — a real chapter can never be deleted through this op).
   | { type: 'insertPartOpener'; index: number; title: string }
   | { type: 'removePartOpener'; id: string }
+  // STRUCTURE_CLEANUP (STRUCTURE_CLEANUP_DR.md §6.2): collapse an empty MARKER heading (CHAPTER n /
+  // editorial) the author styled as its own Heading 1, into the real chapter that follows it. The
+  // over-structured author's one-gesture repair; the inverse of promoteToChapter. Not a merge — the
+  // marker is empty, so the follower flows up and auto-numbers (A1), or inherits the editorial title
+  // with its own title kept as a subtitle (A2).
+  | { type: 'collapseMarker'; markerId: string }
   // MINI_DR_CALLOUTS commit 1: mark/unmark a paragraph as a generic callout (Shape B — the flag
   // lives on the paragraph; the chrome lives in the theme). The author action; never inferred.
   | { type: 'setCallout'; blockId: string; on: boolean }
