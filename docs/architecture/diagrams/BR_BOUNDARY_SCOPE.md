@@ -64,10 +64,18 @@ ALL extraction sites (the class). Preserving line breaks is a separate, richer q
 for `AUTHOR_EXPERIENCE`/typography, not this fidelity correctif). **Awaiting the CTO's decision
 before coding `fix/heading-br-boundary`.**
 
-## §4 The correctif's shape (once the CTO decides)
+## §4 The correctif — DELIVERED (CTO option a, `f6e38d2`)
 
-One atomic commit, tests first, at the CLASS level: a shared helper that extracts block text while
-collapsing `<br>`-runs to a single space, applied to every site (heading, paragraph inline walker,
-list item, table cell, quote). Tests pin all seven sites in both directions (a `<br>` yields a
-boundary; a normal multi-run paragraph is unchanged; a `<br><br>` yields a single space, not two).
-Real-fixture verification on art-of-captivating (42 `<br>`) and, read-only, the founder's books.
+One atomic commit, tests first, at the CLASS level: a **single helper `collapseLineBreaks(html)`**
+(HtmlNormalizer.ts) applied ONCE to the raw HTML before parsing, so no `<br>` survives into the
+tree and every site — present or future — is covered by construction. A run of `<br>` plus
+surrounding whitespace collapses to exactly one space: `<br><br>` → one space (never two),
+`word <br> word` → `word word`. Tests pin all seven sites in both directions + the non-regression
+guard (a `<br>`-free paragraph is byte-identical). Real-fixture verified: founder-2's title is now
+`…Protection FOREWORD`; the founder books' body jams drop from hundreds to ~2 residual (non-`<br>`
+patterns); a 0-`<br>` file (faith-alone) is untouched — **proven by the whole corpus parity suite
+staying green**. Backend 829/829, tsc + eslint clean, pushed.
+
+**Deferred (not this correctif):** preserving an *intentional* line break as a real break in the
+model (option b) — a richer typography/`AUTHOR_EXPERIENCE` question, out of scope for the fidelity
+fix.

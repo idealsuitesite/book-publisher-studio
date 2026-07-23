@@ -46,10 +46,16 @@ The book title and "FOREWORD" print concatenated with no boundary. Localized pre
   import defect, not the founder's manual editing and not a render-side adjacency.
 
 **Locus: the normalizer's heading-text extraction (a lost word boundary at `<br>`).** It is a real
-fidelity defect — two distinct words corrupted into one — regardless of whether the author's
-one-paragraph-with-breaks structure was ideal. **Candidate fix (separate, upstream of
-`STRUCTURE_ASSIST`):** treat a `<br>` inside heading text as a boundary (insert a space) when
-flattening. **Awaiting the CTO's verdict** on whether to open it now as its own small correctif.
+fidelity defect — two distinct words corrupted into one.
+
+**RESOLVED — and it was the tip of an iceberg (`BR_BOUNDARY_SCOPE.md`, fix `f6e38d2`).** The CTO's
+"measure the class, not the specimen" turned the single title into a class-wide finding: **all 7
+extraction sites** lost the `<br>` boundary, and the founder's books carry **215 and 185 `<br>` in
+body paragraphs** — hundreds of jammed sentences (`…discipline.Others`) hidden behind a perfect
+compositor. Fixed at the class level (`collapseLineBreaks(html)`, CTO option a: one boundary space),
+tests bilateral on all 7 sites, corpus parity proving 0-`<br>` files are byte-identical. **The
+gravest text-corruption defect found in the project, and the clearest proof yet that measuring the
+class before coding the specimen is not ceremony.**
 
 ## Findings 3 & 4 — Over-segmentation and the intro/text offset: ONE situation, faithfully imported (priority 3)
 
@@ -71,6 +77,17 @@ proof) — the shared root is **proven, not assumed**:
   independent defects.** *Honest caveat:* I could not inspect the founder's "image 5", so I cannot
   fully exclude a distinct render-spacing issue layered on top; the structural over-segmentation is
   what is measured and reproducible.
+- **3≡4 CONFIRMED, no residual (`founder2-offset-probe.ts`).** The CTO supplied image 5
+  ("INTRODUCTION" at top, an almost-empty page, the text only on the next page) and asked whether it
+  is FULLY explained by a 0-word chapter or leaves a residual spacing (a finding 4-bis). Measured on
+  the paginated book: **page 6 is exactly that — the empty `INTRODUCTION` chapter (entry [1], 0
+  words) renders as a title on an otherwise-empty page (0 body words), and the next content
+  (`JESUS CHRIST…`) starts on page 7.** The offset IS the empty chapter, via the `ownsBarePage`
+  mechanism (a titled blockless childless chapter owns a page carrying only its title). Decisively,
+  **the CONTENT chapters render NORMALLY** — pages 7/11/13/15 carry their title AND their prose
+  together (135/93/76/108 words), with no abnormal title→content gap. So the offset is entirely the
+  over-segmentation; **there is no residual render-spacing defect. Finding 3 and finding 4 are ONE
+  defect — proven, not assumed (the TABLE_DUPLICATION discipline satisfied).**
 
 **Strategic consequence for `STRUCTURE_ASSIST` (the reason these were measured before building):**
 the two traversals reveal that structure problems are **bidirectional**:
