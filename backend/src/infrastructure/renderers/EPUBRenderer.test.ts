@@ -136,6 +136,50 @@ describe('EPUBRenderer', () => {
     expect(html).toContain('Preamble text with no chapter wrapper.');
   });
 
+  // FOUNDER_TRAVERSAL_3 A4: the untitled preamble section is OMITTED from the EPUB navigation (no
+  // fabricated "Untitled"/"1." label — the "Unknown" class, and matching the model's auto-TOC which
+  // skips empty titles, so PDF/DOCX already show nothing: tri-format consistency). Pinned BOTH ways:
+  // the untitled section's CONTENT still renders (only its nav line is gone); a titled section keeps
+  // its nav entry.
+  async function extractNavLabels(buffer: Buffer): Promise<string[]> {
+    const zip = await JSZip.loadAsync(buffer);
+    const ncxName = Object.keys(zip.files).find((f) => f.endsWith('.ncx'));
+    const navName = Object.keys(zip.files).find((f) => /nav\.xhtml$/.test(f));
+    const ncx = ncxName ? await zip.file(ncxName)!.async('string') : '';
+    const nav = navName ? await zip.file(navName)!.async('string') : '';
+    // NCX navLabels (skip the doc-title/author <text> in <docTitle>/<docAuthor>) + EPUB3 nav <a> text.
+    const ncxLabels = [...ncx.matchAll(/<navPoint[\s\S]*?<text>([\s\S]*?)<\/text>/g)].map((m) => m[1].trim());
+    const navLabels = [...nav.matchAll(/<a[^>]*>([\s\S]*?)<\/a>/g)].map((m) => m[1].replace(/<[^>]*>/g, '').trim());
+    return [...ncxLabels, ...navLabels];
+  }
+
+  it('A4: an untitled preamble is OMITTED from the nav, but its content still renders', async () => {
+    const preamble = section([paragraph('p-1', 'Preamble body that must survive in the book.')], { title: '', id: 's-pre' });
+    const realChapter = chapter([paragraph('p-2', 'The real chapter body.')], { title: 'The Real Chapter', id: 'c-1' });
+    const paginated = paginate([preamble, realChapter]);
+
+    const buffer = (await renderer.render(paginated, {})).output;
+
+    // Non-disappearance: the untitled preamble's CONTENT is still in the EPUB.
+    const html = await extractChapterHtml(buffer);
+    expect(html).toContain('Preamble body that must survive in the book.');
+
+    // The nav has NO fabricated label for the untitled section, and NO empty/bare-number placeholder.
+    const labels = await extractNavLabels(buffer);
+    expect(labels).not.toContain('Untitled');
+    expect(labels.some((l) => !l || /^\d+\.?\s*$/.test(l))).toBe(false); // no blank or bare "1." entry
+    // Both ways: the TITLED chapter keeps its nav entry.
+    expect(labels.some((l) => l.includes('The Real Chapter'))).toBe(true);
+  });
+
+  it('A4 (the other direction): a TITLED section keeps its nav entry', async () => {
+    const titled = section([paragraph('p-1', 'Body.')], { title: 'A Named Section', level: 1, id: 's-named' });
+    const paginated = paginate([titled]);
+    const buffer = (await renderer.render(paginated, {})).output;
+    const labels = await extractNavLabels(buffer);
+    expect(labels.some((l) => l.includes('A Named Section'))).toBe(true);
+  });
+
   it('falls back to a text placeholder for images without embedded base64 data', async () => {
     const image: Image = { type: 'image', id: 'img-1', url: 'https://example.com/a.png', caption: 'A cover' };
     const paginated = paginate([chapter([image])]);
