@@ -46,4 +46,10 @@ export type StructureMutation =
   // MINI_DR_EDIT_FRONT_MATTER (Phase 3b): edit the RENDERED front-matter sections. undefined =
   // untouched, null = cleared (a book with no copyright page is a legitimate author choice),
   // object = replaced whole.
-  | { type: 'editFrontMatter'; titlePage?: TitlePageDTO | null; copyrightPage?: CopyrightPageDTO | null };
+  | { type: 'editFrontMatter'; titlePage?: TitlePageDTO | null; copyrightPage?: CopyrightPageDTO | null }
+  // BATCH_CONFIRM_LATENCY correctif A: apply a suggester's "…all" gesture as ONE command — one
+  // snapshot, one save (BATCH_CONFIRM_LATENCY_SCOPE.md §4 Option A). The single `op` field makes a
+  // MIXED batch impossible to express (one op per batch, structurally). `ids` are blockIds for the
+  // two promotes, markerIds for collapse. The order law is the SERVER'S, computed from the book, never
+  // the client array order (the greedy splits apply reverse document order; collapse is order-free).
+  | { type: 'batchApply'; op: 'promoteToChapter' | 'collapseMarker' | 'promoteToSubsection'; ids: string[] };

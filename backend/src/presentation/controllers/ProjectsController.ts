@@ -57,6 +57,19 @@ function parseMutation(body: unknown): StructureMutation | null {
   if (m.type === 'promoteToSubsection' && typeof m.blockId === 'string' && m.blockId) {
     return { type: 'promoteToSubsection', blockId: m.blockId };
   }
+  // BATCH_CONFIRM_LATENCY correctif A: whitelisted here with route tests, same commit as the dispatch
+  // (the standing setPartRole lesson). ONE op per batch is enforced by the shape (a single `op`), and
+  // the untrusted array must be a NON-EMPTY list of non-empty strings — the server, not the client,
+  // owns the apply ORDER (BookEditingService.applyBatch), so no order is read from this body.
+  if (
+    m.type === 'batchApply' &&
+    (m.op === 'promoteToChapter' || m.op === 'collapseMarker' || m.op === 'promoteToSubsection') &&
+    Array.isArray(m.ids) &&
+    m.ids.length > 0 &&
+    m.ids.every((x) => typeof x === 'string' && x)
+  ) {
+    return { type: 'batchApply', op: m.op, ids: m.ids as string[] };
+  }
   // MINI_DR_CALLOUTS commit 1: whitelisted here, with route tests, in the same commit as the
   // dispatch — the standing setPartRole lesson (the untrusted-body boundary is where the last
   // live gap shipped).

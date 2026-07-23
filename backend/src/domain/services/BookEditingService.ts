@@ -260,6 +260,72 @@ export class BookEditingService {
   }
 
   /**
+   * BATCH_CONFIRM_LATENCY correctif A (BATCH_CONFIRM_LATENCY_SCOPE.md §4 Option A). Apply ONE
+   * suggester "…all" gesture as a single command over `ids` of a SINGLE op type. The persistence win
+   * (one snapshot, one save) is the caller's (`EditBookUseCase.batchApply`); the Domain's concern is
+   * correctness and — the load-bearing point (§V3b) — the ORDER LAW, computed SERVER-SIDE from the
+   * book, NEVER inherited from the client array order (the frontend loop that used to carry it is
+   * deleted; the server takes it over explicitly, locked by the "wrong order in → same result" test).
+   *
+   * Atomicity (CTO amendment 1, the property in play): this is a PURE reduce — it returns a fully
+   * transformed Book or throws, and throwing discards every earlier step's in-memory result with it.
+   * The caller snapshots/saves only a RETURNED Book, so **success ⇒ +1 version; failure ⇒ +0 and the
+   * stored book byte-identical** (no half-transformed book, no phantom version). Locked by test, not
+   * assumed.
+   *
+   * Order law per op:
+   *  - `promoteToChapter` / `promoteToSubsection` are GREEDY (`splitContentAt` takes ALL blocks after
+   *    the marker), so a batch over markers in one container MUST go REVERSE document order or an
+   *    earlier marker swallows a later one (`SUBSECTION_APPLY_ORDER`). Document order is read from THIS
+   *    book, then reversed — the client's array order is ignored by construction.
+   *  - `collapseMarker` is order-independent (removing one empty marker never changes another marker's
+   *    immediate successor) — applied in the given order.
+   */
+  applyBatch(
+    book: Book,
+    op: 'promoteToChapter' | 'collapseMarker' | 'promoteToSubsection',
+    ids: string[],
+    now: Date = new Date()
+  ): Book {
+    if (ids.length === 0) {
+      throw new ContentNotFoundError(`applyBatch: no ids to apply "${op}" to`);
+    }
+    if (op === 'collapseMarker') {
+      // order-independent — but each id still passes collapseMarker's own strict guard (atomic: one
+      // bad id throws and the whole batch is discarded before the caller ever sees a Book).
+      return ids.reduce((b, id) => this.collapseMarker(b, id, now), book);
+    }
+    // Greedy split ops: reverse document order, computed from the book itself (V3b — not the client
+    // array). Sorting by descending document position keeps every still-unprocessed marker a valid
+    // top-level split when its turn comes.
+    const order = this.documentOrderIndex(book);
+    const ordered = [...ids].sort((a, c) => (order.get(c) ?? -1) - (order.get(a) ?? -1));
+    const single =
+      op === 'promoteToChapter'
+        ? (b: Book, id: string): Book => this.promoteToChapter(b, id, now)
+        : (b: Book, id: string): Book => this.promoteToSubsection(b, id, now);
+    return ordered.reduce((b, id) => single(b, id), book);
+  }
+
+  /**
+   * A document-position index for every TOP-LEVEL container's own body block — the basis of the batch
+   * order law. Only these blocks are batch targets (both greedy ops act on a top-level container's own
+   * `content`), so a single-level walk is exact; an id absent here sorts last and its single op throws
+   * (atomic). Never trusts caller-supplied order.
+   */
+  private documentOrderIndex(book: Book): Map<string, number> {
+    const index = new Map<string, number>();
+    let position = 0;
+    for (const content of book.mainContent) {
+      for (const block of content.content) {
+        index.set(block.id, position);
+        position += 1;
+      }
+    }
+    return index;
+  }
+
+  /**
    * The shared split (CREATE_CHAPTER's découpe, reused not duplicated — CTO D1): find a promotable
    * text block in a content list and return the blocks BEFORE it, the block itself, and the blocks
    * AFTER it. Throws a named `ContentNotFoundError` if the id is absent or the block is not text.
