@@ -101,6 +101,12 @@ a misleading metric. What the measurement reveals is an **unexploited signal —
   a placeholder that reaches the author, **the same class as the "Unknown" we chased out** (Lot-1
   defect 2). **VERDICT: measure FIRST what this remainder should be — a legitimate untitled chapter
   the author should be able to name, front matter, or nothing at all — and report before coding.**
+  **✅ MEASURED (`A4_UNTITLED_REMAINDER.md`, 2026-07-23):** the untitled preamble is an ASTBuilder
+  **import** artifact (pre-first-heading content, a level-0 `section`), NOT a promotion one — older and
+  broader than our op; on book 3 it is a **real Introduction** (755 w, first body line "INTRODUCTION"),
+  not front matter and not junk (books 1/2 carry none); epub-gen does **not** require a non-empty title
+  (it labels an empty one "1. "), so `"Untitled"` is our adapter's invention — the "Unknown" class.
+  Awaiting the CTO's verdicts on the fix.
 
 ## §3 Lot B — the hierarchy (cadrages, stopped at the constats)
 
