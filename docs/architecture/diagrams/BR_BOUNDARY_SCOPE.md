@@ -79,3 +79,29 @@ staying green**. Backend 829/829, tsc + eslint clean, pushed.
 **Deferred (not this correctif):** preserving an *intentional* line break as a real break in the
 model (option b) — a richer typography/`AUTHOR_EXPERIENCE` question, out of scope for the fidelity
 fix.
+
+## §5 The measured corpus consequence + the gate-coverage lesson (recorded 2026-07-23)
+
+§4's "proven by the whole corpus parity suite staying green" is TRUE but **incomplete**, and the
+gap taught a real lesson. The **byte-parity suite is a PDF-geometry lock on 0-`<br>` fixtures**
+(faith-alone), so it is **blind by construction** to a word-count change on a `<br>`-bearing file.
+There WAS such a change, and it is the fix working correctly:
+
+- **`art-of-captivating-list-dense.docx`: 9,280 → 9,322 words (+42).** The fixture carries **exactly
+  42 `<br>` tags**, and the count rose by **exactly 42** — one faithful word recovered per break, the
+  un-jamming the correctif exists to do. `9,322` is the correct post-fix count; `9,280` was the
+  pre-fix jammed count.
+- **The stale assertion.** This count is asserted by `verify-real-import` — a **server-only**
+  harness (it needs a running server, `npm run verify-real-import`). The `<br>` merge re-ran the
+  **in-suite** parity byte-locks but **did not re-run the server-only harnesses**, so the assertion
+  kept the pre-fix `9_280` and slept on `main`. It surfaced later, at the STRUCTURE_ASSIST
+  post-merge **live** gate (which runs the three harnesses), and was **re-locked to the measured
+  truth `9_322` with full attribution in the fixture comment** (`6ac3c89`) — a re-lock, not a
+  softening (the assertion stays exact `===`; the number moves to what the fix correctly produces).
+
+**The lesson (`HARNESS_RERUN_AFTER_EXTRACTION_CHANGE`, TODO named follow-up):** a fidelity fix that
+changes **text extraction** — word/character/sentence boundaries — can leave a server-only harness
+assertion stale even when the in-suite byte-parity stays green, because the two instruments measure
+different things. **Any extraction-changing fix must re-run the live `verify-real-*` harnesses, not
+only the in-suite suite.** The `<br>` fix was itself correct throughout; only its verification was
+incomplete.
