@@ -546,6 +546,85 @@ describe('POST /api/projects/:id/structure — manual structure editing (STRUCTU
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('INVALID_MUTATION');
   });
+
+  // SUBCHAPTER_PROMOTION (B5) — the promoteToSubsection mutation carried end to end, whitelisted WITH
+  // these route tests (the standing setPartRole lesson).
+  async function seedWithConclusion(): Promise<{ app: ReturnType<typeof createApp>; id: string }> {
+    const app = createApp();
+    // A chapter whose own body ends with a "Conclusion" sub-heading typed as text (book-3 shape).
+    const buffer = await buildTestDocxBuffer({
+      blocks: [
+        { type: 'heading', text: 'Chapter One', level: 1 },
+        { type: 'paragraph', text: 'The chapter body.' },
+        { type: 'paragraph', text: 'Conclusion' },
+        { type: 'paragraph', text: 'The concluding thoughts.' },
+      ],
+    });
+    const imported = await request(app).post('/api/manuscripts/import').attach('file', buffer, { filename: 'ch.docx', contentType: DOCX_MIME });
+    return { app, id: imported.body.projectId as string };
+  }
+
+  it('promoteToSubsection: demotes an in-chapter marker to a section, 200 + snapshot', async () => {
+    const { app, id } = await seedWithConclusion();
+    const got = await request(app).get(`/api/projects/${id}`);
+    const chapter = got.body.book.mainContent.find((c: { type: string }) => c.type === 'chapter');
+    const conclusionBlock = chapter.content.find((b: { text?: string }) => b.text === 'Conclusion');
+
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'promoteToSubsection', blockId: conclusionBlock.id });
+
+    expect(res.status).toBe(200);
+    const ch = res.body.book.mainContent.find((c: { type: string }) => c.type === 'chapter');
+    expect(ch.sections).toHaveLength(1);
+    expect(ch.sections[0].title).toBe('Conclusion');
+    expect(res.body.book.mainContent.filter((c: { type: string }) => c.type === 'chapter')).toHaveLength(1); // chapter count unchanged
+    expect(res.body.versions).toHaveLength(1);
+  });
+
+  it('400 CONTENT_NOT_FOUND when promoteToSubsection targets a block not in a chapter\'s own body', async () => {
+    const { app, id } = await seedWithConclusion();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'promoteToSubsection', blockId: 'ghost' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('CONTENT_NOT_FOUND');
+  });
+
+  it('400 INVALID_MUTATION on a promoteToSubsection with no blockId', async () => {
+    const { app, id } = await seedProject();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'promoteToSubsection' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_MUTATION');
+  });
+});
+
+describe('GET /api/projects/:id/subchapter-suggestions — SUBCHAPTER_PROMOTION read-only surface', () => {
+  it('proposes each recurring editorial marker as a section of its chapter', async () => {
+    const app = createApp();
+    const buffer = await buildTestDocxBuffer({
+      blocks: [
+        { type: 'heading', text: 'Chapter One', level: 1 }, { type: 'paragraph', text: 'Body one.' }, { type: 'paragraph', text: 'Conclusion' }, { type: 'paragraph', text: 'End one.' },
+        { type: 'heading', text: 'Chapter Two', level: 1 }, { type: 'paragraph', text: 'Body two.' }, { type: 'paragraph', text: 'Conclusion' }, { type: 'paragraph', text: 'End two.' },
+      ],
+    });
+    const imported = await request(app).post('/api/manuscripts/import').attach('file', buffer, { filename: 'recurring.docx', contentType: DOCX_MIME });
+    const res = await request(app).get(`/api/projects/${imported.body.projectId}/subchapter-suggestions`);
+    expect(res.status).toBe(200);
+    expect(res.body.suggestions).toHaveLength(2); // one per chapter
+    expect(res.body.suggestions.every((s: { proposedTitle: string }) => s.proposedTitle === 'Conclusion')).toBe(true);
+  });
+
+  it('stays SILENT (the third silence pole) when no editorial marker recurs', async () => {
+    const app = createApp();
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Just prose, no recurring marker.'] });
+    const imported = await request(app).post('/api/manuscripts/import').attach('file', buffer, { filename: 'plain.docx', contentType: DOCX_MIME });
+    const res = await request(app).get(`/api/projects/${imported.body.projectId}/subchapter-suggestions`);
+    expect(res.status).toBe(200);
+    expect(res.body.suggestions).toEqual([]);
+  });
+
+  it('404 PROJECT_NOT_FOUND on an unknown project', async () => {
+    const res = await request(createApp()).get('/api/projects/nope/subchapter-suggestions');
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('PROJECT_NOT_FOUND');
+  });
 });
 
 describe('GET /api/projects/:id/cleanup-suggestions — STRUCTURE_CLEANUP read-only surface', () => {

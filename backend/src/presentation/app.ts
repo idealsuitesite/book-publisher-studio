@@ -37,6 +37,7 @@ import { BookEditingService } from '../domain/services/BookEditingService';
 import { EditBookUseCase } from '../application/use-cases/EditBookUseCase';
 import { SuggestStructureUseCase } from '../application/use-cases/SuggestStructureUseCase';
 import { SuggestCleanupUseCase } from '../application/use-cases/SuggestCleanupUseCase';
+import { SuggestSubchapterUseCase } from '../application/use-cases/SuggestSubchapterUseCase';
 import { ProjectSummaryMapper } from '../application/mappers/ProjectSummaryMapper';
 import { ProjectsController } from './controllers/ProjectsController';
 import { projectRoutes } from './routes/projects';
@@ -176,7 +177,8 @@ export function createApp(): Express {
     new PublishingReportMapper(),
     new EditBookUseCase(projectRepository, projectService, new BookEditingService()),
     new SuggestStructureUseCase(projectRepository),
-    new SuggestCleanupUseCase(projectRepository)
+    new SuggestCleanupUseCase(projectRepository),
+    new SuggestSubchapterUseCase(projectRepository)
   );
   app.use('/api/projects', projectRoutes(projectsController));
 

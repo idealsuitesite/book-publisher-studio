@@ -22,13 +22,13 @@ const service = new BookEditingService(() => 'sec-id');
 const wordCount = (book: Book): number => {
   const w = (t?: string) => (t ? t.trim().split(/\s+/).filter(Boolean).length : 0);
   let n = 0;
-  const walk = (c: { title?: string; content?: { text?: string }[]; sections?: Section[]; subsections?: Section[] }) => {
+  const walk = (c: Chapter | Section) => {
     n += w(c.title);
-    for (const b of c.content ?? []) n += w(b.text);
-    for (const s of c.sections ?? []) walk(s);
-    for (const s of c.subsections ?? []) walk(s);
+    for (const b of c.content) if ('text' in b) n += w(b.text);
+    const children = c.type === 'chapter' ? c.sections : c.subsections;
+    for (const s of children ?? []) walk(s);
   };
-  (book.mainContent as Chapter[]).forEach((c) => walk(c));
+  (book.mainContent as (Chapter | Section)[]).forEach(walk);
   return n;
 };
 
@@ -51,6 +51,40 @@ describe('BookEditingService.promoteToSubsection — the founder\'s continuity (
     expect(wordCount(result)).toBe(wordsBefore);
     // Immutability (ADR-0001): the original is untouched.
     expect((book.mainContent[0] as Chapter).sections).toBeUndefined();
+  });
+
+  // ACCEPTANCE CONDITION (CTO 2026-07-23): a chapter with TWO repeated markers, promoted in batch,
+  // must yield TWO distinct sections and lose nothing. The op is greedy (takes all blocks after the
+  // marker), so a forward batch would let the first swallow the second — the batch applies REVERSE
+  // document order. This test locks that so a future "simplification" of the apply order cannot
+  // silently reintroduce the defect.
+  it('two repeated markers in one chapter, promoted REVERSE order, produce two distinct sections and lose nothing', () => {
+    const ch: Chapter = {
+      type: 'chapter', id: 'c1', number: 1, title: 'Chapter One',
+      content: [
+        para('a', 'Opening prose.'),
+        para('m1', 'Conclusion'), para('p1', 'First conclusion prose.'),
+        para('m2', 'Conclusion'), para('p2', 'Second conclusion prose.'),
+      ],
+      createdAt: OLD, updatedAt: OLD,
+    };
+    const book = createBook({ title: 'T', author: 'A', language: 'en' }, [ch]);
+    const wordsBefore = wordCount(book);
+
+    // Reverse document order: promote m2 first, then m1 — so m1 does not swallow m2.
+    const step1 = service.promoteToSubsection(book, 'm2', NOW);
+    const result = service.promoteToSubsection(step1, 'm1', NOW);
+
+    const chapter = result.mainContent[0] as Chapter;
+    expect(result.mainContent).toHaveLength(1);              // still one chapter
+    expect(chapter.sections).toHaveLength(2);                // TWO distinct sections
+    expect(chapter.sections!.every((s) => s.title === 'Conclusion')).toBe(true);
+    // Each section carries its OWN following prose — nothing merged, nothing swallowed.
+    const sectionProse = chapter.sections!.map((s) => (s.content as Paragraph[]).map((b) => b.text).join('|'));
+    expect(sectionProse).toContain('First conclusion prose.');
+    expect(sectionProse).toContain('Second conclusion prose.');
+    expect(chapter.content.map((b) => (b as Paragraph).text)).toEqual(['Opening prose.']); // before-blocks stay
+    expect(wordCount(result)).toBe(wordsBefore);             // nothing lost
   });
 
   it('appends to a chapter that already has sections (order preserved)', () => {

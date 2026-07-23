@@ -11,6 +11,7 @@ import type {
   StructureMutation,
   StructureSuggestionDTO,
   CleanupSuggestionDTO,
+  SubchapterSuggestionDTO,
 } from 'shared-types';
 
 // Sprint 7 Decision 2 (docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md) - the
@@ -243,6 +244,25 @@ export async function fetchCleanupSuggestions(id: string): Promise<CleanupSugges
     throw await apiErrorFrom(response, 'Cleanup suggestions');
   }
   const json = (await response.json()) as { suggestions: CleanupSuggestionDTO[] };
+  return json.suggestions;
+}
+
+/**
+ * SUBCHAPTER_PROMOTION — fetches the READ-ONLY sub-section suggestions (recurring editorial markers)
+ * for a book whose chapters exist (SUBCHAPTER_PROMOTION_DR §5). Never mutates; the author confirms
+ * via `editStructure({ type: 'promoteToSubsection', blockId })`.
+ */
+export async function fetchSubchapterSuggestions(id: string): Promise<SubchapterSuggestionDTO[]> {
+  const response = await request(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(id)}/subchapter-suggestions`,
+    { method: 'GET' },
+    'Sub-section suggestions',
+    OPTIONS_TIMEOUT_MS
+  );
+  if (!response.ok) {
+    throw await apiErrorFrom(response, 'Sub-section suggestions');
+  }
+  const json = (await response.json()) as { suggestions: SubchapterSuggestionDTO[] };
   return json.suggestions;
 }
 
