@@ -30,7 +30,10 @@ interface Props {
 export function StructureSuggestionsPanel({ projectId, refreshKey, onEdited }: Props) {
   const [suggestions, setSuggestions] = useState<StructureSuggestionDTO[] | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
-  const [busy, setBusy] = useState(false);
+  // FOUNDER_TRAVERSAL_3 A1: track WHICH control is in flight ('all', or a block's id), not one shared
+  // flag — so an operation changes only its OWN button's state (the EDITION_BUTTON_STATE fix, defect 5
+  // pattern: a Set of in-flight keys, the other buttons stay clickable). Latency is BATCH_CONFIRM_LATENCY.
+  const [busyKeys, setBusyKeys] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,8 +50,8 @@ export function StructureSuggestionsPanel({ projectId, refreshKey, onEdited }: P
   const active = suggestions.filter((s) => !dismissed.has(s.blockId));
   if (active.length === 0) return null; // nothing to suggest → stay silent (the over-structured pole)
 
-  async function promote(blockIds: string[]) {
-    setBusy(true);
+  async function promote(blockIds: string[], key: string) {
+    setBusyKeys((prev) => new Set(prev).add(key));
     setError(null);
     try {
       let updated: ProjectDTO | undefined;
@@ -61,7 +64,11 @@ export function StructureSuggestionsPanel({ projectId, refreshKey, onEdited }: P
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create the chapter.');
     } finally {
-      setBusy(false);
+      setBusyKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     }
   }
 
@@ -79,8 +86,8 @@ export function StructureSuggestionsPanel({ projectId, refreshKey, onEdited }: P
             We found headings you typed as text. Confirm to turn them into chapters — nothing changes until you do.
           </p>
         </div>
-        <Button onClick={() => void promote(active.map((s) => s.blockId))} disabled={busy}>
-          {busy ? 'Working…' : 'Make all chapters'}
+        <Button onClick={() => void promote(active.map((s) => s.blockId), 'all')} disabled={busyKeys.has('all')}>
+          {busyKeys.has('all') ? 'Working…' : 'Make all chapters'}
         </Button>
       </div>
 
@@ -93,16 +100,17 @@ export function StructureSuggestionsPanel({ projectId, refreshKey, onEdited }: P
               {s.proposedTitle}
             </span>
             <span className="flex shrink-0 items-center gap-2">
+              {/* A1: only THIS row's Make chapter shows the in-flight state; every other button stays live. */}
               <button
                 className="text-xs font-medium text-app-text underline underline-offset-2 hover:no-underline disabled:opacity-50"
-                disabled={busy}
-                onClick={() => void promote([s.blockId])}
+                disabled={busyKeys.has(s.blockId)}
+                onClick={() => void promote([s.blockId], s.blockId)}
               >
-                Make chapter
+                {busyKeys.has(s.blockId) ? 'Working…' : 'Make chapter'}
               </button>
+              {/* Dismiss is synchronous (no round-trip) — it is never disabled by an in-flight op. */}
               <button
-                className="text-xs text-app-text-muted hover:text-app-text disabled:opacity-50"
-                disabled={busy}
+                className="text-xs text-app-text-muted hover:text-app-text"
                 onClick={() => setDismissed((prev) => new Set(prev).add(s.blockId))}
               >
                 Dismiss

@@ -74,6 +74,25 @@ describe('CleanupSuggestionsPanel (STRUCTURE_CLEANUP)', () => {
     expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'collapseMarker', markerId: 'm2' });
   });
 
+  it('A1: an in-flight collapse changes ONLY its own button — the others stay live', async () => {
+    vi.mocked(fetchCleanupSuggestions).mockResolvedValue([numbered('m1', 'CHAPTER 1', 'A'), numbered('m2', 'CHAPTER 2', 'B')]);
+    let resolveEdit: (p: ProjectDTO) => void = () => {};
+    vi.mocked(editStructure).mockImplementation(() => new Promise<ProjectDTO>((res) => { resolveEdit = res; }));
+    render(<CleanupSuggestionsPanel projectId="p1" refreshKey="k" onEdited={vi.fn()} />);
+
+    await screen.findByText('CHAPTER 1');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Collapse' })[0]); // the m1 row
+
+    // Only the m1 row shows the in-flight state.
+    expect(screen.getByRole('button', { name: 'Working…' })).toBeDisabled();
+    // Every other control stays live: m2's Collapse, "Collapse all", and both Dismiss buttons.
+    expect(screen.getByRole('button', { name: 'Collapse' })).toBeEnabled(); // only m2's remains
+    expect(screen.getByRole('button', { name: 'Collapse all' })).toBeEnabled();
+    screen.getAllByRole('button', { name: 'Dismiss' }).forEach((b) => expect(b).toBeEnabled());
+
+    resolveEdit({ updatedAt: 'x' } as ProjectDTO); // release the pending op
+  });
+
   it('"Dismiss" removes a candidate without collapsing it (session-remembered)', async () => {
     vi.mocked(fetchCleanupSuggestions).mockResolvedValue([numbered('m1', 'CHAPTER 1', 'A'), numbered('m2', 'CHAPTER 2', 'B')]);
     render(<CleanupSuggestionsPanel projectId="p1" refreshKey="k" onEdited={vi.fn()} />);
