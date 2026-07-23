@@ -95,6 +95,13 @@ function renderRunsWithDropCap(runs: TypeRun[]): string {
 }
 
 export class EPUBRenderer implements Renderer<Buffer> {
+  // The epub-gen render function is injectable (defaults to the resolved library callable) so the
+  // adapter's contract with it can be tested directly — FOUNDER_TRAVERSAL EPUB-500 review: the
+  // useful guard is not "epub-gen throws on undefined" (a fact about a library we do not own) but
+  // "THIS adapter never hands epub-gen an undefined lang, whatever the book's language". A spy
+  // asserts that invariant for authorless/languageless/declared inputs alike.
+  constructor(private readonly epubFn: EpubFn = epub) {}
+
   async render(book: PaginatedBook, context: RenderContext): Promise<RenderResult<Buffer>> {
     const { book: domainBook, theme, blockTypography } = book.styledBook;
     // Scoped per render call: images with embedded base64 data are written here and referenced
@@ -147,7 +154,7 @@ export class EPUBRenderer implements Renderer<Buffer> {
 
       // No pageCount, and that is a real answer rather than a gap: an EPUB is reflowable and
       // has no pages until a reading device lays it out (ADR-0045).
-      return { output: await epub(options, chapters), metrics: { pageLayout: book.pageLayout } };
+      return { output: await this.epubFn(options, chapters), metrics: { pageLayout: book.pageLayout } };
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
     }

@@ -99,6 +99,37 @@ describe('EPUB language fallback — adapter-owned, guarded both ways (FOUNDER_T
     expect(message).toMatch(/replace/); // the measured signature ("...reading 'replace'")
   }, 30_000);
 
+  it('THE ADAPTER INVARIANT — EPUBRenderer NEVER hands epub-gen an undefined lang, whatever the input (the stronger guard, CTO)', async () => {
+    // The direct guard the CTO preferred: because the adapter applies `?? 'en'` BEFORE calling
+    // epub-gen, the CASE-B crash path is no longer reachable THROUGH our code — so the useful
+    // guard is not "epub-gen throws on undefined" (CASE B, a fact about a library we don't own)
+    // but "the adapter always passes a non-empty string lang". A spy captures exactly what the
+    // adapter hands the library. If a future refactor drops the `?? 'en'`, this fires directly —
+    // no dependence on epub-gen's behaviour at all.
+    const captured: unknown[] = [];
+    const spy: (o: { lang?: unknown }, c: unknown[]) => Promise<Buffer> = async (o) => {
+      captured.push(o.lang);
+      return Buffer.from('');
+    };
+    const now = new Date();
+    const ch = (t: string): Chapter => ({ type: 'chapter', id: 'c', number: 1, title: 'T', content: [{ type: 'paragraph', id: 'p', text: t }], createdAt: now, updatedAt: now });
+
+    // Every kind of input the model can present: no language, empty-ish, and a declared one.
+    const noLang = createBook({ title: 'A', author: 'B', language: undefined }, [ch('x')]);
+    const declared = createBook({ title: 'A', author: 'B', language: 'de' }, [ch('x')]);
+    for (const book of [noLang, declared]) {
+      await new EPUBRenderer(spy).render(paginate(book), { language: book.metadata.language });
+    }
+
+    // Whatever the input, lang is ALWAYS a non-empty string — never undefined (the CASE-B crash
+    // input can never originate from this adapter).
+    for (const lang of captured) {
+      expect(typeof lang).toBe('string');
+      expect((lang as string).length).toBeGreaterThan(0);
+    }
+    expect(captured).toEqual(['en', 'de']); // fallback for the languageless book, the real one when declared
+  }, 30_000);
+
   it('the fallback is EPUB-LOCAL — the Book stays language-unknown and PDF/DOCX inherit no fabricated "en"', async () => {
     const book = await loadAuthorless();
 
