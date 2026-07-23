@@ -24,22 +24,26 @@ their own chantiers, decided or waiting.
 
 ## §1 The four named principles (founder-locked, 2026-07-22)
 
-### Principle 1 — The non-removal law, Sense 1, with pruning
+### Principle 1 — The non-encombrement law (CORRECTED 2026-07-23 — the founder's formulation)
 
-No **useful capability** is removed without a **measured reason and the founder's validation**.
-But hierarchy is not removal: **ranking a capability under a "More…" affordance, making it
-discreet, or revealing it on hover is encouraged**, not a suppression — density is solved by
-layout, never by amputation (the same spirit as `STRUCTURE_STATION_ERGONOMICS`'s no-action-removed
-law). **Removing what only adds clutter is permitted — with validation.** A capability that earns
-its place stays reachable; a capability that only crowds the screen may go, once measured and
-confirmed.
+> **⚠ CORRECTION (CTO, 2026-07-23, FOUNDER_TRAVERSAL_3).** The version below **replaces** an earlier
+> hardened wording ("no useful capability is removed without a measured reason") that put the burden
+> of proof on *removal*. The founder's formulation reverses it: **the burden of proof is on KEEPING,
+> not on removal.** The earlier boundary (this is interface, not the ADR-0050 content law) still holds.
 
-**Explicit boundary — do not confuse this with the content law.** This principle governs *interface
-capabilities*. The *content* law is separate and lives in ADR-0050: **content is never removed
-silently — it is flagged, never removed** (a missing field is surfaced in validation, not
-discarded; an editorial part absent from the export is reported, not deleted). The two laws share
-a spirit but must never be conflated: one is about what the UI offers, the other about what the
-book carries.
+**Keep what serves a comprehensible purpose; remove what clutters or confuses.** The burden of proof
+is on **maintaining** a capability, not on removing it: a control must justify its place, and one
+whose consequence the author cannot guess — `Dismiss` is the measured example (two opposite-nature
+gestures at the same visual weight, one mutating the book, one not) — **becomes obvious or
+disappears.** Hierarchy is a tool, not the only one: ranking a capability under a "More…" affordance,
+making it discreet, or revealing it on hover is encouraged where the capability earns its place — but
+where it does not, it goes. **Founder validation is required on removals.** (Same spirit as, but now
+stronger than, `STRUCTURE_STATION_ERGONOMICS`'s no-action-removed default.)
+
+**Explicit boundary — this is the interface law, not the content law (ADR-0050).** Content is never
+removed silently — it is flagged, never discarded. The two share a spirit but are never conflated;
+and the author's own right to delete *content* is the separate `CONTENT_DELETION_BY_AUTHOR`
+(ADR-0044 amendment, `DECISIONS.md`).
 
 ### Principle 2 — Multi-page architecture
 
@@ -68,6 +72,28 @@ multi-page studio that an author gets lost in is worse than one crowded station.
 judged by the founder on screenshots, will settle the balance** — the wireframe/capture review is
 where "distributed but not scattered" is verified, the same screenshot-loop discipline every taste
 decision in this project has used.
+
+## §1b Design laws engraved 2026-07-23 (FOUNDER_TRAVERSAL_3 — govern B4/B5 and the redesign)
+
+### Law A — "Une ligne, une décision"
+
+**One row, one decision.** The author understands in **one second** what is proposed and what he must
+answer. **The software brings the title; the author never retypes what he has already written.** Rare
+cases (edit a proposed title, an exceptional override) live behind a **discreet secondary gesture,
+never a field on the row.** This is why `TITLE_FROM_FOLLOWING_LINE` (B4) proposes the descriptive line
+the author already wrote rather than a marker, and why the D4 "edit the title" affordance — **not
+cancelled, located** — is the secondary gesture, not an input on every suggestion row.
+
+### Law B — `CHAPTER_TITLE_PRESENTATION` (a standing constraint — no chantier may close this door)
+
+The author chooses among **three chapter-title treatments**: (1) "Chapter 1" then the title below;
+(2) the title alone, large; (3) the name at the head at a size clearly above the subtitles. **Technical
+invariant, load-bearing:** the chapter **number is a datum of the chapter, never text inside the
+title** — computed by position (`Chapter.number` / `renumberChapters`), auto-renumbered, and **shown
+or not by the theme.** Consequence, already live: STRUCTURE_ASSIST proposing "CHAPTER 1" as the
+*title text* violates this (the number would print even under treatment 2) — the B4 defect. The model
+is already correct; **no current or future chantier may put the number back into the title text.**
+Pointer: `DECISIONS.md` (with `CONTENT_DELETION_BY_AUTHOR`, the ADR-0044 amendment, recorded there).
 
 ## §2 What this dossier does NOT do
 

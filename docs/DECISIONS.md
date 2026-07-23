@@ -1206,6 +1206,15 @@ Margins are therefore **symmetric**, with no inside/outside distinction and no r
 
 **Related:** `AGGREGATES_AND_PERSISTENCE.md` Risk 5 (closed by this) and section 2 (the boundary this confirms), ADR-0041 (persistence prerequisite; this is sequenced before its spike), ADR-0001 (immutability - `archive()` returns a new Project), `docs/architecture/diagrams/PROJECT_LIFECYCLE.md`
 
+**AMENDMENT (CTO, 2026-07-23, FOUNDER_TRAVERSAL_3 — `CONTENT_DELETION_BY_AUTHOR`).** The 2026-07-18 override that kept **deletion out of the UI** ("no UI caller until persistence is real") is **superseded — the conditions it named have changed.** Persistence is now durable (ADR-0048), versions are real, and a trash is expressible. The founder's decision: **the author must be able to delete — no content should become oppressive over time.** The procedure engraved:
+- **Whole books only** in the trash. Deleting an *edited* work takes a **double confirmation** → the book sits in a **7-day trash** → then **permanent deletion**. (An unedited just-imported project may go more directly; the double-confirm guards work the author invested in.)
+- **Inside a book, there is no delete-to-trash** — restoration of content is **undo + versions**, with **re-importing the original manuscript as the last resort**. The trash is a book-level bin, not a content-level one.
+- **Distinct from ADR-0050**, which forbids *the software* removing content on its own initiative. This is the *author's* deliberate act on his *own* book — the opposite direction. ADR-0050 stays intact.
+- **Resolves `HARNESS_CLEANUP_PATH`** (TODO named follow-up): the absence of a DELETE route is exactly why the STRUCTURE_CLEANUP harness cleanup went through raw SQL on the store. A real book-deletion path gives harness maintenance a legitimate, tested route — build the two together.
+- **Still owed before a delete button ships** (unchanged from the original ADR): the publication-record export, a legitimate read of the author's own history, must exist first.
+
+This is recorded as an ADR amendment, not a dossier note, because a reversal of a CTO override that lives only in conversation is lost (non-negotiable #3 discipline). The build waits for its own DR in the sequence; this fixes the *decision*, not the schedule.
+
 ---
 
 ## ADR-0045: Render Metrics Come From the Renderer - Correcting an Approved Decision, and the Publish/Export Divergence It Exposed

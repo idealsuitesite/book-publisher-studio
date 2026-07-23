@@ -47,7 +47,7 @@ A navigable table of every Architectural Decision Record in `docs/DECISIONS.md`,
 | 0041 | Two Scalability Constraints Framed, Not Fixed — Event-Loop Blocking and the Persistence Prerequisite | 2026-07-18 | Architecture, Governance | **OPEN** — both deferred, each awaiting its own Design Review |
 | 0042 | Render Metrics Reach the Publishing Engine as a Narrow, Per-Format Value Object | 2026-07-18 | Publishing, Rendering | APPROVED — resolves 0038 |
 | 0043 | `PageLayout` Has No Gutter — Every Paperback This Product Generates Is Non-Compliant | 2026-07-18 | Rendering, Layout | **OPEN** — confirmed defect, fix deferred to its own review |
-| 0044 | Archiving and Deletion Are Two Operations, Decided Before the Storage Spike | 2026-07-18 | Architecture, Product Object Model | APPROVED — closes Aggregates Risk 5 |
+| 0044 | Archiving and Deletion Are Two Operations, Decided Before the Storage Spike | 2026-07-18 | Architecture, Product Object Model | APPROVED — closes Aggregates Risk 5; **AMENDED 2026-07-23** (`CONTENT_DELETION_BY_AUTHOR` — author-facing deletion now IN, the no-UI-delete override superseded) |
 | 0045 | Render Metrics Come From the Renderer — Correcting an Approved Decision | 2026-07-18 | Publishing, Rendering, Governance | APPROVED — corrects 0042 Q1, supersedes its ADR-0012 claim |
 | 0046 | Persistence Store Spike — SQLite via node:sqlite Recommended | 2026-07-18 | Product Object Model, Persistence | APPROVED — answers Aggregates Q6; implementation gated on Sprint 11 |
 | 0047 | A Successful Import Creates a Project — Decision 2 Amended in Code | 2026-07-18 | Product Object Model, Architecture | APPROVED — CTO-directed |
