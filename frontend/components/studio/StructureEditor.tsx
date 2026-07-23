@@ -5,6 +5,7 @@ import type { ProjectDTO, BookDTO, StructureMutation } from 'shared-types';
 import { FrontMatterEditor } from './FrontMatterEditor';
 import { StructureSuggestionsPanel } from './StructureSuggestionsPanel';
 import { CleanupSuggestionsPanel } from './CleanupSuggestionsPanel';
+import { SubchapterSuggestionsPanel } from './SubchapterSuggestionsPanel';
 import {
   DndContext,
   KeyboardSensor,
@@ -849,6 +850,11 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
           headings, offered for one-gesture collapse. Silent when there is nothing to collapse —
           the bidirectional mirror (an under-structured book yields nothing here). */}
       <CleanupSuggestionsPanel projectId={project.id} refreshKey={project.updatedAt} onEdited={captureUndo} />
+
+      {/* SUBCHAPTER_PROMOTION: a recurring editorial name (e.g. "Conclusion" in every chapter) offered
+          as a per-chapter section — the founder's continuity, never N peer chapters. Silent when
+          nothing recurs (the third silence pole). */}
+      <SubchapterSuggestionsPanel projectId={project.id} refreshKey={project.updatedAt} onEdited={captureUndo} />
 
       {error && (
         <p role="alert" className="text-sm text-app-error">
