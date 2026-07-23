@@ -120,8 +120,9 @@ chantier P1 → the AUTHOR_EXPERIENCE Design Review → mockups → founder vali
 
 ## §7 Correctif A — the mini-DR record and the build (2026-07-23)
 
-**Status: BUILT on `feat/batch-confirm-latency` (3 gated commits), gate green, awaiting the CTO's word
-to merge (gate 5 / GR-1). Not on `main`.**
+**Status: ✅ MERGED to `main` (`--no-ff` `712057e`, 4 commits), post-merge gate green (backend 905/905,
+frontend 230/230, tsc + eslint + builds clean, harnesses 4/4·16/16·4/4 on a throwaway server, real
+store untouched). B+D consigned as `APPEND_ONLY_PERSISTENCE`.**
 
 ### CTO verdicts (on §6)
 1. **Shape — A now; B consigned with its OWN cadrage, never folded into A.** A is bounded, does not
@@ -186,3 +187,25 @@ Instrument `backend/spikes/batch-confirm-latency-cadrage.ts`, extended to the sh
   4/4** — the correctif touches only structure-editing, not the import/export/publish path.
 - **Gate: backend 905/905, frontend 230/230, tsc + eslint(src)/eslint + builds clean.** Taste-stop:
   none (mechanics, not aspect) — the founder judges the result by feeling "Make all" become instant.
+
+### The N-figure correction (non-negotiable #7, applied to the CTO's own sentence)
+The CTO's "N≈56" was the **pre-guard** figure; the real assist batch on book 3 is **N=30** — the A2
+`REPEATED_EDITORIAL_MARKERS` guard already drops the 26 repeated "Conclusion" (the traversal-3 56→30;
+those go to the subchapter panel). Measured, not remembered — #7 applied to a sentence, the CTO
+validated the correction expressly. Consigned here so it is not re-lost.
+
+### Gate-5 incident and the preventive rule (recorded, not hidden)
+Mid-build, the three correctif commits were made on **local `main`** directly. It was caught by the
+author, nothing was pushed, the commits were moved to `feat/batch-confirm-latency` and `main` reset to
+`b43c998` — transparently, before any remote trace. **The preventive rule (CTO): the feature branch is
+created AT the DR gate, BEFORE commit 1 — so the gate the CTO gives is mechanically the branch point,
+never an afterthought.** Transparency the registry shows, not conceals.
+
+### Store baseline 8, attributed (the pre-merge check the CTO required)
+The CTO refuses to merge on an unexplained count. The live-verification baseline had moved 7→8; the
+8th project was **measured** read-only before merge: `1784830746689-d7bticjiw` "Rachat et expiation
+bibliques 2" (a second copy of book 3), created 18:19:06 (before this session), version log **31 ×
+"before promote to chapter" (18:22–18:36, human cadence) + v32 "publication" (19:11:30, the mtime)** —
+the FOUNDER re-importing book 3, running "Make all" the OLD sequential way (31 versions where the
+correctif now makes 1 — the defect caught live in his own store), and publishing. Attributable to the
+founder; **the new baseline is 8.** Author "(absent)" is the designed authorless-manuscript behavior.
