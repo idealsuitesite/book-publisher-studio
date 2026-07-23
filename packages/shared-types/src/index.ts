@@ -36,3 +36,4 @@ export type { ProjectDTO, ProjectVersionDTO, ProjectPublicationDTO, ProjectSetti
 export type { ApiErrorCode, ApiErrorDTO } from './ApiErrorDTO';
 export type { StructureMutation } from './StructureMutation';
 export type { StructureSuggestionDTO, StructureSuggestionsResponseDTO } from './StructureSuggestionDTO';
+export type { CleanupSuggestionDTO, CleanupSuggestionsResponseDTO } from './CleanupSuggestionDTO';

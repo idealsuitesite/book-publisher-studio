@@ -495,4 +495,92 @@ describe('POST /api/projects/:id/structure — manual structure editing (STRUCTU
       expect(res.body.code).toBe('INVALID_MUTATION');
     }
   });
+
+  // STRUCTURE_CLEANUP commit 2 — the collapseMarker mutation carried end to end through the
+  // untrusted-body boundary (whitelisted WITH these route tests, the standing setPartRole lesson).
+  async function seedOverStructured(): Promise<{ app: ReturnType<typeof createApp>; id: string }> {
+    const app = createApp();
+    // An empty `CHAPTER 1` marker heading immediately followed by a real title + its prose — the
+    // founder's over-structured shape (STRUCTURE_CLEANUP_SCOPE Constat 1).
+    const buffer = await buildTestDocxBuffer({
+      blocks: [
+        { type: 'heading', text: 'CHAPTER 1', level: 1 },
+        { type: 'heading', text: 'The Holiness Of God', level: 1 },
+        { type: 'paragraph', text: 'The holiness of God is the ground of everything that follows.' },
+      ],
+    });
+    const imported = await request(app)
+      .post('/api/manuscripts/import')
+      .attach('file', buffer, { filename: 'over.docx', contentType: DOCX_MIME });
+    return { app, id: imported.body.projectId as string };
+  }
+
+  it('collapseMarker: removes the empty CHAPTER n marker, the real chapter survives, 200 + snapshot', async () => {
+    const { app, id } = await seedOverStructured();
+    const got = await request(app).get(`/api/projects/${id}`);
+    const marker = got.body.book.mainContent.find((c: { title: string }) => c.title === 'CHAPTER 1');
+    expect(marker).toBeDefined();
+
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'collapseMarker', markerId: marker.id });
+
+    expect(res.status).toBe(200);
+    const titles = res.body.book.mainContent.map((c: { title: string }) => c.title);
+    expect(titles).not.toContain('CHAPTER 1');
+    expect(titles).toContain('The Holiness Of God');
+    expect(res.body.versions).toHaveLength(1); // snapshot-before-edit
+  });
+
+  it('400 CONTENT_NOT_FOUND when collapseMarker targets a non-empty chapter (the strict guard, named at the boundary)', async () => {
+    const { app, id } = await seedOverStructured();
+    const got = await request(app).get(`/api/projects/${id}`);
+    const real = got.body.book.mainContent.find((c: { title: string }) => c.title === 'The Holiness Of God');
+
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'collapseMarker', markerId: real.id });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('CONTENT_NOT_FOUND');
+  });
+
+  it('400 INVALID_MUTATION on a collapseMarker with no markerId', async () => {
+    const { app, id } = await seedProject();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'collapseMarker' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_MUTATION');
+  });
+});
+
+describe('GET /api/projects/:id/cleanup-suggestions — STRUCTURE_CLEANUP read-only surface', () => {
+  it('proposes a collapse for the empty marker, naming its following real title', async () => {
+    const app = createApp();
+    const buffer = await buildTestDocxBuffer({
+      blocks: [
+        { type: 'heading', text: 'CHAPTER 1', level: 1 },
+        { type: 'heading', text: 'The Holiness Of God', level: 1 },
+        { type: 'paragraph', text: 'Prose.' },
+      ],
+    });
+    const imported = await request(app).post('/api/manuscripts/import').attach('file', buffer, { filename: 'over.docx', contentType: DOCX_MIME });
+    const id = imported.body.projectId as string;
+
+    const res = await request(app).get(`/api/projects/${id}/cleanup-suggestions`);
+    expect(res.status).toBe(200);
+    expect(res.body.suggestions).toHaveLength(1);
+    expect(res.body.suggestions[0].markerText).toBe('CHAPTER 1');
+    expect(res.body.suggestions[0].targetTitle).toBe('The Holiness Of God');
+    expect(res.body.suggestions[0].kind).toBe('numbered');
+  });
+
+  it('stays SILENT (no suggestions) on a normally-structured manuscript', async () => {
+    const app = createApp();
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Hello.'] });
+    const imported = await request(app).post('/api/manuscripts/import').attach('file', buffer, { filename: 'ok.docx', contentType: DOCX_MIME });
+    const res = await request(app).get(`/api/projects/${imported.body.projectId}/cleanup-suggestions`);
+    expect(res.status).toBe(200);
+    expect(res.body.suggestions).toEqual([]);
+  });
+
+  it('404 PROJECT_NOT_FOUND on an unknown project', async () => {
+    const res = await request(createApp()).get('/api/projects/nope/cleanup-suggestions');
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('PROJECT_NOT_FOUND');
+  });
 });

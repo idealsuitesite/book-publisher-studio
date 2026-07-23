@@ -8,6 +8,7 @@ import type { PublishProjectUseCase } from '../../application/use-cases/PublishP
 import type { PublishingReportMapper } from '../../application/mappers/PublishingReportMapper';
 import type { EditBookUseCase } from '../../application/use-cases/EditBookUseCase';
 import type { SuggestStructureUseCase } from '../../application/use-cases/SuggestStructureUseCase';
+import type { SuggestCleanupUseCase } from '../../application/use-cases/SuggestCleanupUseCase';
 import type { ProjectListResponseDTO, UpdateProjectSettingsDTO, StructureMutation, TitlePageDTO, CopyrightPageDTO, TypographyOverrideDTO } from 'shared-types';
 import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
 import { UnknownLayoutError } from '../../shared/errors/UnknownLayoutError';
@@ -43,6 +44,12 @@ function parseMutation(body: unknown): StructureMutation | null {
   }
   if (m.type === 'removePartOpener' && typeof m.id === 'string' && m.id) {
     return { type: 'removePartOpener', id: m.id };
+  }
+  // STRUCTURE_CLEANUP commit 2: whitelisted here, with route tests, in the same commit as the
+  // dispatch (the standing setPartRole lesson — the untrusted-body boundary is where the last live
+  // gap shipped). The op's strict guard surfaces as the named CONTENT_NOT_FOUND at this boundary.
+  if (m.type === 'collapseMarker' && typeof m.markerId === 'string' && m.markerId) {
+    return { type: 'collapseMarker', markerId: m.markerId };
   }
   // MINI_DR_CALLOUTS commit 1: whitelisted here, with route tests, in the same commit as the
   // dispatch — the standing setPartRole lesson (the untrusted-body boundary is where the last
@@ -119,8 +126,29 @@ export class ProjectsController {
     private publishProject: PublishProjectUseCase,
     private publishingReportMapper: PublishingReportMapper,
     private editBook: EditBookUseCase,
-    private suggestStructureUseCase: SuggestStructureUseCase
+    private suggestStructureUseCase: SuggestStructureUseCase,
+    private suggestCleanupUseCase: SuggestCleanupUseCase
   ) {}
+
+  /**
+   * STRUCTURE_CLEANUP — the READ-ONLY cleanup surface (STRUCTURE_CLEANUP_DR.md §6). A GET that
+   * returns candidate marker collapses for an OVER-structured manuscript (empty `CHAPTER n` /
+   * `INTRODUCTION` headings the author styled by hand). It NEVER mutates — applying a suggestion is
+   * the separate `collapseMarker` mutation through `POST /:id/structure`. The invariant (§3) is
+   * proven in the Domain suite: running the suggester leaves the book byte-identical.
+   */
+  suggestCleanup = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const suggestions = await this.suggestCleanupUseCase.execute(req.params.id);
+      if (!suggestions) {
+        res.status(404).json({ error: 'Project not found', code: 'PROJECT_NOT_FOUND' });
+        return;
+      }
+      res.json({ suggestions });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   /**
    * STRUCTURE_ASSIST — the READ-ONLY suggestion surface (STRUCTURE_ASSIST_DR.md §6). A GET that

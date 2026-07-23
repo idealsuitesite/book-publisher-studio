@@ -10,6 +10,7 @@ import type {
   PublishingResponseDTO,
   StructureMutation,
   StructureSuggestionDTO,
+  CleanupSuggestionDTO,
 } from 'shared-types';
 
 // Sprint 7 Decision 2 (docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md) - the
@@ -223,6 +224,25 @@ export async function fetchStructureSuggestions(id: string): Promise<StructureSu
     throw await apiErrorFrom(response, 'Structure suggestions');
   }
   const json = (await response.json()) as { suggestions: StructureSuggestionDTO[] };
+  return json.suggestions;
+}
+
+/**
+ * STRUCTURE_CLEANUP — fetches the READ-ONLY marker-collapse suggestions for an OVER-structured
+ * manuscript (STRUCTURE_CLEANUP_DR.md §6). This never mutates; the author confirms a suggestion via
+ * `editStructure({ type: 'collapseMarker', markerId })`.
+ */
+export async function fetchCleanupSuggestions(id: string): Promise<CleanupSuggestionDTO[]> {
+  const response = await request(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(id)}/cleanup-suggestions`,
+    { method: 'GET' },
+    'Cleanup suggestions',
+    OPTIONS_TIMEOUT_MS
+  );
+  if (!response.ok) {
+    throw await apiErrorFrom(response, 'Cleanup suggestions');
+  }
+  const json = (await response.json()) as { suggestions: CleanupSuggestionDTO[] };
   return json.suggestions;
 }
 

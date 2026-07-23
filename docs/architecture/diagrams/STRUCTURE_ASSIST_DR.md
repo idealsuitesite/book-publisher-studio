@@ -224,10 +224,20 @@ chantier scale).
   saw (image 5) is those empty title-chapters occupying their own pages (§3≡4 proven in
   `FOUNDER_TRAVERSAL_2.md`).
 - **The operation:** recognise an empty `CHAPTER n` marker immediately followed by a real title and
-  **propose to COLLAPSE them into one chapter** ("`CHAPTER 1` and the next title look like one
-  chapter — merge?"). It REMOVES structure where the assist ADDS it.
-- **Same invariant, same gate:** it too only PROPOSES — never merges without an authorial act — and
+  **propose to COLLAPSE them into one chapter**. It REMOVES structure where the assist ADDS it.
+- **Same invariant, same gate:** it too only PROPOSES — never mutates without an authorial act — and
   discarding its proposal leaves the Book byte-identical. It shares the invariant test harness and
-  the author-as-gate doctrine, and reuses the existing merge op (`mergeChapterIntoPrevious`).
+  the author-as-gate doctrine.
 - **Built AFTER STRUCTURE_ASSIST**, on the same foundation. The two founder books remain the test
   cases of the two chantiers.
+
+> **⚠ CORRECTION (2026-07-23, `STRUCTURE_CLEANUP_SCOPE.md` Constat 3 / `STRUCTURE_CLEANUP_DR.md` §4).**
+> This section originally said cleanup "reuses the existing merge op (`mergeChapterIntoPrevious`)".
+> **That is MEASURED FALSE and destructive — do not build it.** The cadrage simulated that op on the
+> founder's real over-structured book and found it (1) keeps the WRONG survivor (the marker title,
+> demoting the real title to a paragraph) and (2) **silently drops `.sections`** — it concatenates
+> only `.content` (`BookEditingService.ts:294`), discarding the prose of 28 of the 29 chapters (an
+> ADR-0050 violation). **The correct operation is REMOVE the empty marker** (the marker is empty, so
+> nothing merges into anything; the following chapter flows up and auto-numbers) — via a generalized
+> `removePartOpener` removal mechanism, NOT a merge. Full record and the op design in
+> `STRUCTURE_CLEANUP_DR.md` §4/§6. Non-negotiable #7 on a line the CTO himself had approved.
