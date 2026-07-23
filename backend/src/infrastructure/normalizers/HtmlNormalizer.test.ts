@@ -287,4 +287,65 @@ describe('HtmlNormalizer', () => {
       expect(doc.nodes.map((n) => n.type)).toEqual(['list']);
     });
   });
+
+  // FOUNDER_TRAVERSAL finding 2 — a <br> (soft line break) inside any block was flattened to
+  // NOTHING, jamming the words on either side (…ProtectionFOREWORD, …discipline.Others). Measured
+  // class-wide (BR_BOUNDARY_SCOPE.md): all 7 extraction sites lost the boundary, and real books
+  // carry hundreds of <br> in body paragraphs. Fix (single class-level helper, CTO option a): a
+  // <br>-run (plus surrounding whitespace) collapses to ONE space — a word/sentence boundary, the
+  // right thing for reflowable text. Guarded in BOTH directions: <br> yields a boundary; a double
+  // <br> yields ONE space not two; whitespace around a <br> collapses to one; and a normal block
+  // WITHOUT <br> is untouched (a file with no <br> renders byte-identically — the corpus parity
+  // locks are that guard at the corpus level).
+  describe('line-break (<br>) boundary — the fidelity fix, guarded both ways', () => {
+    const nodeText = (node: unknown): string => {
+      const n = node as { text?: string; inlines?: { text?: string }[]; items?: string[]; rows?: { cells: string[] }[] };
+      if (typeof n.text === 'string') return n.text;
+      if (n.inlines) return n.inlines.map((i) => i.text ?? '').join('');
+      if (n.items) return n.items.join(' | ');
+      if (n.rows) return n.rows.map((r) => r.cells.join(',')).join(' | ');
+      return '';
+    };
+    const firstText = (html: string) => nodeText(normalizer.normalize(html).nodes[0]);
+
+    it('heading: <br> becomes a single-space boundary — never "AlphaBravo"', () => {
+      expect(firstText('<h1>Alpha<br />Bravo</h1>')).toBe('Alpha Bravo');
+    });
+    it('heading: a DOUBLE <br> collapses to ONE space, not two (the correctif never introduces a double space)', () => {
+      expect(firstText('<h1>Alpha<br /><br />Bravo</h1>')).toBe('Alpha Bravo');
+    });
+    it('heading: whitespace AROUND the <br> collapses to one space ("word <br> word" → "word word")', () => {
+      expect(firstText('<h1>Alpha <br /> Bravo</h1>')).toBe('Alpha Bravo');
+    });
+    it('paragraph (plain): the body sentence boundary is restored', () => {
+      expect(firstText('<p>discipline.<br />Others with consistency.</p>')).toBe('discipline. Others with consistency.');
+    });
+    it('paragraph (rich runs): the boundary is inserted between runs, not swallowed', () => {
+      // "Echo " + <strong>Fox</strong> + <br/> + "Golf" → the <br> boundary sits between Fox and Golf.
+      expect(firstText('<p>Echo <strong>Fox</strong><br />Golf</p>')).toBe('Echo Fox Golf');
+    });
+    it('list item: <br> becomes a boundary', () => {
+      expect(firstText('<ul><li>Hotel<br />India</li></ul>')).toBe('Hotel India');
+    });
+    it('table cell: <br> becomes a boundary', () => {
+      expect(firstText('<table><tr><td>Juliet<br />Kilo</td></tr></table>')).toBe('Juliet Kilo');
+    });
+    it('quote: <br> becomes a boundary', () => {
+      expect(firstText('<blockquote><p>Lima<br />Mike</p></blockquote>')).toBe('Lima Mike');
+    });
+
+    // NON-REGRESSION: a block with NO <br> must be untouched — the fix only acts where <br> exists.
+    it('a normal multi-run paragraph WITHOUT <br> is unchanged (byte-for-byte the same inlines)', () => {
+      const doc = normalizer.normalize('<p>Echo <strong>Fox</strong> Golf</p>');
+      const p = doc.nodes[0] as ParagraphNode;
+      expect(p.inlines).toEqual([
+        { type: 'text', text: 'Echo ' },
+        { type: 'bold', text: 'Fox' },
+        { type: 'text', text: ' Golf' },
+      ]);
+    });
+    it('a normal heading WITHOUT <br> is unchanged', () => {
+      expect(firstText('<h1>Chapter One</h1>')).toBe('Chapter One');
+    });
+  });
 });

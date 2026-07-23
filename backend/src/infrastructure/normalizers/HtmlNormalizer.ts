@@ -11,9 +11,33 @@ import type {
 import { createIdGenerator } from '../../shared/utils/idGenerator';
 import type { DocumentNormalizer } from '../../domain/ports/DocumentNormalizer';
 
+/**
+ * Collapse every soft line break to a single boundary space — the ONE class-level fix for the
+ * `<br>`-boundary defect (FOUNDER_TRAVERSAL finding 2, BR_BOUNDARY_SCOPE.md). A `<br>` carries no
+ * text, so every extraction site (`.text()` on headings/cells/list-items/quotes, and the inline
+ * walker, which skipped it as an empty tag) flattened it to nothing and jammed the words on either
+ * side (`…ProtectionFOREWORD`, `…discipline.Others`). Measured class-wide: all 7 sites lost it, and
+ * real books carry hundreds of `<br>` in body paragraphs.
+ *
+ * Applied ONCE to the raw HTML before parsing, so no `<br>` survives into the tree and EVERY site
+ * — present or future — is covered by construction (fix the class, not the specimen). A RUN of
+ * `<br>` plus any surrounding whitespace collapses to exactly ONE space: `<br><br>` → one space
+ * (never two, the trap), and `word <br> word` → `word word` (the surrounding whitespace is absorbed
+ * into the single boundary). A block with NO `<br>` is returned unchanged — so a manuscript without
+ * soft breaks normalises byte-for-byte as before (the corpus parity locks are that guard).
+ *
+ * Deliberately a boundary SPACE, not a preserved line break (CTO option a): in reflowable text a
+ * soft break between sentences is a word boundary, not a hard break; the layout engine re-wraps.
+ * Preserving intentional line breaks is a richer question that belongs to typography/AUTHOR_EXPERIENCE,
+ * not to this fidelity correctif.
+ */
+export function collapseLineBreaks(html: string): string {
+  return html.replace(/(?:\s*<br\s*\/?>\s*)+/gi, ' ');
+}
+
 export class HtmlNormalizer implements DocumentNormalizer {
   normalize(html: string, metadata: Partial<DocumentMetadata> = {}): NormalizedDocument {
-    const $ = load(html);
+    const $ = load(collapseLineBreaks(html));
     const ids = this.createIdGenerators();
     const nodes: AnyNormalizedNode[] = [];
     const diagnostics: NormalizationDiagnostic[] = [];
