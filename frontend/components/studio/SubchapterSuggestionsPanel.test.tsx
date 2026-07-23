@@ -36,7 +36,7 @@ describe('SubchapterSuggestionsPanel (SUBCHAPTER_PROMOTION)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('"Make sections" applies each promoteToSubsection in REVERSE document order', async () => {
+  it('"Make sections" issues ONE batch call for the group (BATCH_CONFIRM_LATENCY) — server owns the order', async () => {
     vi.mocked(fetchSubchapterSuggestions).mockResolvedValue([sug('b1', 'c1'), sug('b2', 'c2'), sug('b3', 'c3')]);
     const onEdited = vi.fn();
     render(<SubchapterSuggestionsPanel projectId="p1" refreshKey="k" onEdited={onEdited} />);
@@ -44,9 +44,8 @@ describe('SubchapterSuggestionsPanel (SUBCHAPTER_PROMOTION)', () => {
     await screen.findByText(/repeats in 3 chapters/);
     await userEvent.click(screen.getByRole('button', { name: 'Make sections' }));
 
-    await waitFor(() => expect(vi.mocked(editStructure)).toHaveBeenCalledTimes(3));
-    const order = vi.mocked(editStructure).mock.calls.map((c) => (c[1] as { blockId: string }).blockId);
-    expect(order).toEqual(['b3', 'b2', 'b1']); // reverse document order (the greedy-op lock)
+    await waitFor(() => expect(vi.mocked(editStructure)).toHaveBeenCalledTimes(1)); // ONE round-trip, not N
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'batchApply', op: 'promoteToSubsection', ids: ['b1', 'b2', 'b3'] });
     expect(onEdited).toHaveBeenCalledTimes(1);
   });
 

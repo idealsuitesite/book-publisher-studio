@@ -50,17 +50,13 @@ export function CleanupSuggestionsPanel({ projectId, refreshKey, onEdited }: Pro
   const active = suggestions.filter((s) => !dismissed.has(s.markerId));
   if (active.length === 0) return null; // nothing to collapse → stay silent (the bidirectional pole)
 
-  async function collapse(markerIds: string[], key: string) {
+  // BATCH_CONFIRM_LATENCY correctif A: "Collapse all" is ONE call now (was N sequential saves).
+  // collapseMarker is order-independent (the domain applyBatch documents it), so the ids go as-is.
+  async function run(key: string, call: () => Promise<ProjectDTO>) {
     setBusyKeys((prev) => new Set(prev).add(key));
     setError(null);
     try {
-      let updated: ProjectDTO | undefined;
-      // Order-independent: collapseMarker acts by id, and removing one empty marker never changes
-      // another marker's immediate successor — so document order is safe.
-      for (const markerId of markerIds) {
-        updated = await editStructure(projectId, { type: 'collapseMarker', markerId });
-      }
-      if (updated) onEdited(updated); // the refreshKey change re-fetches the now-smaller proposal
+      onEdited(await call()); // the refreshKey change re-fetches the now-smaller proposal
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not collapse the marker.');
     } finally {
@@ -71,6 +67,9 @@ export function CleanupSuggestionsPanel({ projectId, refreshKey, onEdited }: Pro
       });
     }
   }
+
+  const collapseAll = (ids: string[]) => run('all', () => editStructure(projectId, { type: 'batchApply', op: 'collapseMarker', ids }));
+  const collapseOne = (markerId: string) => run(markerId, () => editStructure(projectId, { type: 'collapseMarker', markerId }));
 
   return (
     <section
@@ -86,7 +85,7 @@ export function CleanupSuggestionsPanel({ projectId, refreshKey, onEdited }: Pro
             You styled these as their own empty headings. Collapse each into the chapter it belongs to — nothing changes until you confirm.
           </p>
         </div>
-        <Button onClick={() => void collapse(active.map((s) => s.markerId), 'all')} disabled={busyKeys.has('all')}>
+        <Button onClick={() => void collapseAll(active.map((s) => s.markerId))} disabled={busyKeys.has('all')}>
           {busyKeys.has('all') ? 'Working…' : 'Collapse all'}
         </Button>
       </div>
@@ -105,7 +104,7 @@ export function CleanupSuggestionsPanel({ projectId, refreshKey, onEdited }: Pro
               <button
                 className="text-xs font-medium text-app-text underline underline-offset-2 hover:no-underline disabled:opacity-50"
                 disabled={busyKeys.has(s.markerId)}
-                onClick={() => void collapse([s.markerId], s.markerId)}
+                onClick={() => void collapseOne(s.markerId)}
               >
                 {busyKeys.has(s.markerId) ? 'Working…' : 'Collapse'}
               </button>

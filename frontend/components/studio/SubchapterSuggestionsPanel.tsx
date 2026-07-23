@@ -12,10 +12,10 @@ import { Button } from '@/components/ui';
  *
  * Governed by the founder's law "une ligne, une décision": recurring occurrences of the SAME name are
  * ONE row and ONE decision — "'Conclusion' repeats in 26 chapters — make each a section?" — not 26
- * identical rows, no input field, no competing options. "Make sections" applies each `promoteToSubsection`
- * in REVERSE document order (the op is greedy — the assist's Make-all pattern — locked by the
- * reverse-order acceptance test). Button state follows A1: a Set of in-flight keys, only the in-flight
- * button changes state. Silent when nothing recurs — the family's third silence pole.
+ * identical rows, no input field, no competing options. "Make sections" is ONE batch call
+ * (BATCH_CONFIRM_LATENCY correctif A — `batchApply` op `promoteToSubsection`); the greedy
+ * reverse-document-order law lives SERVER-SIDE now. Button state follows A1: a Set of in-flight keys,
+ * only the in-flight button changes state. Silent when nothing recurs — the family's third silence pole.
  */
 interface Props {
   projectId: string;
@@ -60,17 +60,14 @@ export function SubchapterSuggestionsPanel({ projectId, refreshKey, onEdited }: 
   const active = groups.filter((g) => !dismissed.has(g.key));
   if (active.length === 0) return null; // nothing recurs → stay silent (the third silence pole)
 
+  // BATCH_CONFIRM_LATENCY correctif A: a group's "Make sections" is ONE call now (was one round-trip
+  // per marker). The greedy reverse-document-order law moved SERVER-SIDE (BookEditingService.applyBatch),
+  // so the panel sends the group's ids as-is; the server orders them from the book.
   async function makeSections(group: Group) {
     setBusyKeys((prev) => new Set(prev).add(group.key));
     setError(null);
     try {
-      let updated: ProjectDTO | undefined;
-      // Reverse document order: promoteToSubsection is greedy, so last-first keeps two markers in one
-      // chapter from swallowing each other (the reverse-order acceptance test locks this).
-      for (const blockId of [...group.blockIds].reverse()) {
-        updated = await editStructure(projectId, { type: 'promoteToSubsection', blockId });
-      }
-      if (updated) onEdited(updated);
+      onEdited(await editStructure(projectId, { type: 'batchApply', op: 'promoteToSubsection', ids: group.blockIds }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not make the section.');
     } finally {

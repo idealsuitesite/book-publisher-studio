@@ -37,7 +37,7 @@ describe('StructureSuggestionsPanel (STRUCTURE_ASSIST)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('"Make all chapters" promotes every marker in REVERSE order (so each stays a top-level split)', async () => {
+  it('"Make all chapters" issues ONE batch call (BATCH_CONFIRM_LATENCY) — the server owns the order', async () => {
     vi.mocked(fetchStructureSuggestions).mockResolvedValue([suggestion('b1', 'INTRODUCTION'), suggestion('b2', 'CHAPTER 1'), suggestion('b3', 'CHAPTER 2')]);
     const onEdited = vi.fn();
     render(<StructureSuggestionsPanel projectId="p1" refreshKey="k" onEdited={onEdited} />);
@@ -45,9 +45,8 @@ describe('StructureSuggestionsPanel (STRUCTURE_ASSIST)', () => {
     await screen.findByText('INTRODUCTION');
     await userEvent.click(screen.getByRole('button', { name: 'Make all chapters' }));
 
-    await waitFor(() => expect(vi.mocked(editStructure)).toHaveBeenCalledTimes(3));
-    const order = vi.mocked(editStructure).mock.calls.map((c) => (c[1] as { blockId: string }).blockId);
-    expect(order).toEqual(['b3', 'b2', 'b1']); // reverse document order
+    await waitFor(() => expect(vi.mocked(editStructure)).toHaveBeenCalledTimes(1)); // ONE round-trip, not N
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'batchApply', op: 'promoteToChapter', ids: ['b1', 'b2', 'b3'] });
     expect(onEdited).toHaveBeenCalledTimes(1);
   });
 
