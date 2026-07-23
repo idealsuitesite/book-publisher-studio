@@ -35,3 +35,4 @@ export type { ProjectSummaryDTO, ProjectListResponseDTO } from './ProjectSummary
 export type { ProjectDTO, ProjectVersionDTO, ProjectPublicationDTO, ProjectSettingsDTO, UpdateProjectSettingsDTO, TypographyOverrideDTO } from './ProjectDTO';
 export type { ApiErrorCode, ApiErrorDTO } from './ApiErrorDTO';
 export type { StructureMutation } from './StructureMutation';
+export type { StructureSuggestionDTO, StructureSuggestionsResponseDTO } from './StructureSuggestionDTO';

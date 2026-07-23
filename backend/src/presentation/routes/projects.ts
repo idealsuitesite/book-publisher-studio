@@ -7,6 +7,9 @@ export function projectRoutes(controller: ProjectsController): Router {
 
   router.get('/', controller.list);
   router.get('/:id', controller.get);
+  // STRUCTURE_ASSIST: read-only suggestion surface — never mutates (applying a suggestion is the
+  // separate promoteToChapter mutation via POST /:id/structure).
+  router.get('/:id/structure-suggestions', controller.suggestStructure);
   router.patch('/:id/settings', express.json(), controller.patchSettings);
   // POST rather than GET for export: it renders on the server (real work, ADR-0041's measured
   // 598ms) and mirrors the existing manuscript export route's verb.
