@@ -84,13 +84,20 @@ const CORPUS: CorpusExpectation[] = [
   },
   {
     // Second real varied-structure fixture (CTO-authorized 2026-07-21, LIST_PAGINATION_DRIFT.md):
-    // a real 9,280-word, chapterless, list-dense manuscript (214 lists / 1,067 items, 0 tables).
+    // a real chapterless, list-dense manuscript (214 lists / 1,067 items, 0 tables).
     // The DIRECT measurement that corrected the PM-notes proxy extrapolation and confirmed the
     // list-dense reconciliation phenomenon on real data. Kept here so the shape stays covered;
     // its pagination behaviour is the ongoing calibration evidence toward the CTO's >=3 trigger.
+    // WORD COUNT RE-LOCKED 9_280 -> 9_322 (2026-07-23): the class-wide <br> boundary fix
+    // (BR_BOUNDARY_SCOPE.md, collapseLineBreaks in HtmlNormalizer) un-jammed exactly the 42 word
+    // pairs this fixture had glued together across <br> line breaks — the file carries exactly 42
+    // <br> tags and the count rose by exactly 42, one faithful word recovered per break. 9_322 is
+    // the CORRECT post-fix count; 9_280 was the pre-fix jammed count. The <br> merge re-locked the
+    // in-suite parity byte-locks but did not re-run this server-only harness, so the stale
+    // assertion surfaced at the STRUCTURE_ASSIST post-merge gate (which does not touch import).
     file: 'art-of-captivating-list-dense.docx',
     chapters: 0,
-    words: 9_280,
+    words: 9_322,
     mustFind: ['UNSTRUCTURED_MANUSCRIPT'],
     mustNotFind: ['EMPTY_HEADING_DROPPED'],
     createsProject: true,
