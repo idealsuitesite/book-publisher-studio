@@ -95,6 +95,26 @@ or not by the theme.** Consequence, already live: STRUCTURE_ASSIST proposing "CH
 is already correct; **no current or future chantier may put the number back into the title text.**
 Pointer: `DECISIONS.md` (with `CONTENT_DELETION_BY_AUTHOR`, the ADR-0044 amendment, recorded there).
 
+### `UNTITLED_PREAMBLE_NAMEABLE` — a named input this DR must address (FOUNDER_TRAVERSAL_3 A4)
+
+**The problem, measured (`A4_UNTITLED_REMAINDER.md`):** when a manuscript's body begins with prose
+before its first heading, ASTBuilder creates an untitled level-0 **preamble section** (`ASTBuilder.ts:100`).
+On the founder's book 3 that section is a **real Introduction** (755 words, first body line
+"INTRODUCTION"), left under-structured. The fidelity half is fixed (the EPUB no longer prints
+"Untitled"; the section is omitted from the nav like PDF/DOCX already do). **The experience half
+remains: the author cannot currently SEE or NAME that section** — it exists in the book but has no
+title and no affordance to give it one, so it stays silently un-navigable.
+
+**Why it belongs here, not in an isolated fix:** naming it is an *experience* decision — how the
+author perceives a titleless leading section and gives it a title — touching the import/model
+representation and the Structure-station UI. The doctrine is the same as everywhere: **the software
+shows, the author decides** (never a guessed title, never front-matter inference). A measured path
+already exists to fold into the design: the section's own first line is a typed marker ("INTRODUCTION")
+that the assist — with the A2 repetition guard — **already proposes**, so promoting it is one gesture;
+what is missing is that the untitled section not be **invisible** while it waits for the author to act.
+The DR decides how it is surfaced (a nameable Structure entry, an assist offer, or both) under
+"une ligne, une décision" and `CHAPTER_TITLE_PRESENTATION`.
+
 ## §2 What this dossier does NOT do
 
 Design the pages, choose the navigation model, or propose wireframes — those are the DR's work,

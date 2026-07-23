@@ -228,10 +228,17 @@ export class EPUBRenderer implements Renderer<Buffer> {
   private buildChapter(content: Content, blockTypography: Record<string, ResolvedTypography> | undefined, tmpDir: string): EpubChapter {
     const parts: string[] = [];
     this.renderContentInto(content, blockTypography, parts, tmpDir);
-    // An untitled top-level Section ("preamble", see the mainContent comment above) has an
-    // empty title - fall back to a non-blank label for the TOC entry specifically, without
-    // fabricating heading text in the body (renderContentInto already omits an empty heading tag).
-    return { title: content.title || 'Untitled', content: parts.join('\n') };
+    // An untitled top-level Section (the ASTBuilder "preamble" — content that preceded the first
+    // heading, ASTBuilder.ts:100) gets NO navigation entry (FOUNDER_TRAVERSAL_3 A4). We do NOT
+    // fabricate a label: "Untitled" was a software-invented placeholder reaching the author's EPUB
+    // nav — the "Unknown" class (Lot-1 defect 2) — and epub-gen requires no title (it tolerates an
+    // empty one). This matches the model's own auto-TOC, which skips empty titles (LayoutEngine.ts:437),
+    // so PDF and DOCX already show no entry — tri-format consistency. `excludeFromToc` removes only the
+    // nav line; the preamble's CONTENT still renders in the spine (pinned by test, both directions).
+    // Making that untitled section author-nameable is the separate experience work (UNTITLED_PREAMBLE_NAMEABLE).
+    const title = content.title?.trim() ? content.title : '';
+    if (!title) return { title: '', content: parts.join('\n'), excludeFromToc: true };
+    return { title, content: parts.join('\n') };
   }
 
   private renderContentInto(
