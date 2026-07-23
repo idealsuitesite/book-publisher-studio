@@ -1,26 +1,38 @@
 # STRUCTURE_ASSIST — Design Review (full, Level 2)
 
-**Date:** 2026-07-22 · **Status: DESIGN REVIEW — proposal, awaiting CTO approval before any code**
-(non-negotiable #4). The core of the founder's dream, opened by his own traversal
-(`FOUNDER_TRAVERSAL_1.md` Lot 2, `STRUCTURE_ASSIST_SCOPE.md`). This is a full DR, not a mini: it
-introduces a new capability (structure suggestion) governed by a doctrinal invariant.
+**Date:** 2026-07-22 · **Updated 2026-07-23** with the CTO's decisions (D1–D4 settled, the
+bidirectional invariant, `STRUCTURE_CLEANUP` named as the sibling capability) · **Status: DR
+RE-SUBMITTED for CTO re-validation before any code** (non-negotiable #4 — a Design Review that
+moved is re-validated; these decisions change the *nature* of the chantier, they do not merely
+adjust it). The core of the founder's dream. Full DR, not a mini: a new capability (structure
+suggestion) governed by a doctrinal invariant.
 
-## §1 The law this serves (engraved)
+## §1 The law this serves, and the bidirectional truth the two traversals revealed
 
-**The author spends neither time nor energy to obtain a professional document.** The founder
-imported a ~114-page book that arrived with **zero** detected chapters and hand-built its
-structure across 10 versions — exactly the labour the product exists to remove.
+**The author spends neither time nor energy to obtain a professional document.** This is **Author
+B** made concrete (`VISION.md` — the unprepared manuscript, no formatting effort, satisfied on
+opening the exported file). The success criterion is the real exported file, not a green pipeline.
 
-This is **Author B** made concrete (`VISION.md` — the unprepared manuscript, no formatting effort,
-satisfied on opening the exported file). STRUCTURE_ASSIST is the capability that lets Author B skip
-the structure work entirely; the success criterion is the real exported file, not a green pipeline.
+**The two founder traversals proved the structure problem is BIDIRECTIONAL** — the single most
+important finding for this DR, and the reason it was re-validated before building:
+- **Traversal 1 — UNDER-structured** (`FOUNDER_TRAVERSAL_1.md`): a ~114-page book with **zero**
+  detected chapters; the author had typed `CHAPTER 1…4 / FOREWORD / INTRODUCTION` as plain ALL-CAPS
+  body text the importer dropped, and hand-built structure across many versions. **This is what
+  STRUCTURE_ASSIST solves** — suggest the chapters the author already marked in words.
+- **Traversal 2 — OVER-structured** (`FOUNDER_TRAVERSAL_2.md`): a book with real Word headings,
+  imported faithfully as **127 top-level entries incl. 29 empty chapters** — the author styled
+  `CHAPTER n` as its OWN empty heading, separate from the real title. **Suggestion does NOT solve
+  this** — it needs the INVERSE operation, cleanup/merge. Named here as `STRUCTURE_CLEANUP` (§9), a
+  sibling capability, built after, on the same invariant.
 
-**In-progress inputs (founder's second traversal, "The Secret Of Spiritual Protection", live):**
-the founder is measuring further symptoms on a fresh manuscript — a `ProtectionFOREWORD`-style
-title concatenation, chapters reporting 0 words, an introduction/text offset, and a confirmed-good
-body composition. These feed this DR before it is built (the engraved sequence's measurement step
-between Lot 1 and this review); they are to be measured read-only, never by mutating the founder's
-live project.
+So STRUCTURE_ASSIST is **one half of a bidirectional problem, and the other half is named and
+expected** — no future session may believe this chantier covers the over-structured case. Both
+founder manuscripts are the fixtures of the bidirectional invariant test (§3).
+
+**Prerequisite fixes done first (the fidelity defects the traversals surfaced, cleared before
+building on the pipeline):** the metadata-honesty Lot 1, and — the gravest — the class-wide `<br>`
+boundary corruption (`BR_BOUNDARY_SCOPE.md`, hundreds of jammed body sentences behind a perfect
+compositor). The author's text is no longer corrupted; STRUCTURE_ASSIST builds on a clean base.
 
 ## §2 The problem, measured (from the scope report, re-stated as the DR's premise)
 
@@ -55,6 +67,19 @@ the Book without a confirmation, it is exactly what the closure forbade. Concret
 - **A test pins that running the suggester over a manuscript and discarding the proposal leaves
   the Book byte-identical** — the "no silent import" invariant made mechanical.
 
+**The BIDIRECTIONAL clause (CTO, 2026-07-23) — tested on BOTH founder books as fixtures:**
+- **On the UNDER-structured book (traversal 1):** the suggester PROPOSES the typed markers, the
+  author CONFIRMS; and — the invariant — discarding the proposal leaves the Book byte-identical
+  (nothing enters without the authorial act).
+- **On the OVER-structured book (traversal 2):** the suggester must **NEVER worsen it** — it does
+  not add structure to a book that already (over-)has it; it stays effectively silent (the markers
+  are already headings, not buried body text), and discarding its proposal leaves the Book
+  byte-identical. Adding suggestions to an already-structured book is the failure this clause
+  forbids. (Collapsing the over-structure is `STRUCTURE_CLEANUP`'s job, §9 — not this suggester's.)
+- So the byte-identical-after-discard property holds in **both regimes**, and the two manuscripts
+  are the two poles the test pins. This is the clause that stops STRUCTURE_ASSIST from becoming a
+  chantier that helps one author and harms another.
+
 ## §4 What the existing canonical recognition already covers (measured FIRST, per the CTO)
 
 Before proposing anything new, the DR measured `frontend/lib/editorialParts.ts`
@@ -88,24 +113,38 @@ The taxonomy the assist proposes is therefore: **{ the 17 canonical editorial na
 { numbered-chapter patterns, EN+FR }** — one shared, CTO-owned list, extending a list the product
 already trusts.
 
+**D1 DECIDED (CTO):** extend `EDITORIAL_CATEGORIES` with the numbered-chapter patterns, and
+**relocate the list where BOTH the Domain suggester and the frontend read it.** Constraint: if it
+travels through `shared-types` it stays **pure transport data — no runtime logic** (the monorepo
+rule); if the match logic must live with it, it is a Domain resource the frontend consumes. The
+implementation DR picks the exact home; **the list is ONE, owned by the CTO.** (Today the list +
+`classifyEditorialTitle` live frontend-only; the suggester is Domain — so the move is real, not
+cosmetic.)
+
 ## §5 Success is a NUMBER — the gesture counter (the 284→246 of this chantier)
 
 The metric is not "feels smart" but **how many author gestures it takes to structure the founder's
 real book**:
 
-- **Today (measured):** the manuscript is 3,028 blocks. Fully structuring it means finding each of
-  the ~6–7 typed markers (`FOREWORD`, `INTRODUCTION`, `CHAPTER 1…4`) *among 3,028 blocks* and
-  clicking "Make this a chapter" on each — **≈ 6–7 promote gestures plus the hunt**. The founder,
-  in practice, made only 3 and stopped — the labour is real enough to abandon.
-- **With the assist (target):** the suggester proposes all ~6–7 boundaries at once; the author
-  reviews and **confirms in 1 gesture** (with per-candidate dismiss/edit for the exceptions). The
-  one prose-title boundary he genuinely authored stays a manual add — correctly.
-- **The locked success criterion:** the gesture count to reach the founder's intended structure
-  drops from **≈7 (+ hunting 3,028 blocks) to ≈1**, measured by a committed probe over his real
-  manuscript (the analogue of RENDER_DRIFT's 284→246). The DR ships with that measurement or it is
-  not done.
+- **The shape:** without assist, structuring the under-structured book means finding each typed
+  marker among thousands of blocks and clicking "Make this a chapter" on each — several promote
+  gestures plus the hunt (the founder made only a few and stopped — the labour is real enough to
+  abandon). With assist, the suggester proposes all the boundaries at once; the author **confirms
+  in ≈1 gesture** (with per-candidate dismiss/edit for exceptions). The prose-title boundary the
+  author genuinely wrote stays a manual add — correctly.
+- **⚠ The number is RE-MEASURED on the current state, never cited from yesterday (non-negotiable #7
+  applied to my own measurement, CTO).** The earlier "≈7 / 3,028 blocks" figure is STALE: book 1
+  has since gained the `<br>` corrections (its block/text shape changed) AND the founder edited it
+  live (10 → 19 versions). The committed gesture-counter probe therefore measures on a **fresh
+  re-import of the current source through today's pipeline** (the unstructured state an author
+  actually starts from), not the founder's edited aggregate and not a remembered constant. It
+  reports both poles: the under-structured book's before/after gesture count, AND — the
+  bidirectional check — that the over-structured book yields **≈0 useful suggestions** (its
+  structure already exists; the assist correctly proposes little to nothing).
+- **The locked rule:** the DR ships WITH this freshly-measured probe (the RENDER_DRIFT 284→246
+  analogue) or it is not done.
 
-## §6 Proposed mechanism (for CTO decision, not yet built)
+## §6 Mechanism (D2 & D4 folded in)
 
 1. **A pure suggestion service** (Domain, no infrastructure): input a `Book` with unstructured
    content, output `StructureSuggestion[]` — each `{ blockId, proposedTitle, category?, evidence }`.
@@ -114,23 +153,34 @@ real book**:
    measured ("Next Step" fired 19× — a curated list, not raw keyword soup).
 2. **A read-only API** surfacing the proposal (never a mutation) — the ADR-0049 explorable-finding
    shape, evidence attached.
-3. **The studio review UI** (Structure station): the proposal as a checklist; confirm-all /
-   per-item confirm / edit-title / dismiss. Each confirmation calls the EXISTING `promoteToChapter`
-   (no new mutation surface — the CREATE_CHAPTER capability already exists and is proven).
-4. **The invariant test** (§3) and the **gesture-counter probe** (§5) ship with it.
+3. **Where it runs (D2 DECIDED):** at the **`UNSTRUCTURED_MANUSCRIPT` moment on import** (offered
+   immediately on a 0-chapter book — exactly where the founder hit the wall) **AND on demand in the
+   Structure station** (for an already-imported book). **Import PROPOSES, never executes** — the
+   0-chapter import still creates the project and shows the offer; nothing is structured without
+   the author's confirmation.
+4. **The studio review UI** (Structure station): the proposal as a checklist. **Confirmation
+   granularity (D4 DECIDED): confirm-ALL and per-item, both** — confirm-all delivers the ≈1-gesture
+   target; per-item dismiss/edit handles the exceptions (e.g. the prose title the author promoted by
+   hand). **A dismissed candidate is remembered in the editing session** (undo-able), **not beyond
+   it** — consistent with the existing version model. Each confirmation calls the EXISTING
+   `promoteToChapter` (no new mutation surface — CREATE_CHAPTER is proven).
+5. **The bidirectional invariant test (§3) and the freshly-measured gesture-counter probe (§5) ship
+   with it** — or the chantier is not done.
 
-## §7 Open questions for the CTO (the DR's decision points)
+## §7 Decisions (D1–D4 settled by the CTO)
 
-- **D1 — the shared taxonomy list's ownership and contents:** confirm extending
-  `EDITORIAL_CATEGORIES` with numbered-chapter patterns is right, and whether the list moves to a
-  shared location (it is frontend-only today; the suggester is Domain/backend).
-- **D2 — where suggestion runs:** at import (offer immediately on a 0-chapter book, the
-  `UNSTRUCTURED_MANUSCRIPT` moment) vs on demand in the Structure station. The scope suggests the
-  import moment is the natural one (it is exactly when the founder hit the wall).
-- **D3 — numbered-pattern breadth:** `CHAPTER n` / `Chapitre n` / `Part n` / roman numerals /
-  "Chapter One" (spelled) — how wide, measured against false positives on real manuscripts.
-- **D4 — the confirmation granularity** (confirm-all vs per-item) and whether a dismissed
-  candidate is remembered.
+- **D1 — shared taxonomy:** ✅ extend `EDITORIAL_CATEGORIES` with numbered-chapter patterns;
+  relocate to where Domain + frontend both read it (pure transport data if via `shared-types`, no
+  runtime logic; else a Domain resource). One list, CTO-owned. (§4)
+- **D2 — where it runs:** ✅ at the `UNSTRUCTURED_MANUSCRIPT` import moment (propose, never execute)
+  AND on demand in the Structure station. (§6.3)
+- **D3 — numbered-pattern breadth:** ✅ **start NARROW** — `CHAPTER n` / `Chapitre n` / spelled
+  ("Chapter One") EN+FR, the forms the founder's manuscript actually carries. `Part n` / roman
+  numerals only if MEASURED without false positives on real manuscripts — each added pattern is
+  measured against the false-positive risk before it enters (the closure's lesson; n=1 today, no
+  widening on hypothesis).
+- **D4 — confirmation granularity:** ✅ confirm-all AND per-item; dismissed candidate remembered in
+  the editing session, not beyond. (§6.4)
 
 ## §8 Disclosures
 
@@ -142,5 +192,32 @@ real book**:
 - **Not every manuscript types its markers.** The founder did; others may not. The assist helps
   where the author left a textual trace and is silent (honestly) where none exists — it never
   invents structure, so a manuscript with no markers simply gets no suggestions, not wrong ones.
-- **This is a proposal.** No code is written until the CTO approves the invariant (§3), the metric
-  (§5), the taxonomy approach (§4), and the open questions (§7).
+- **The bidirectional test carries both books as fixtures.** The under-structured manuscript
+  (traversal 1) and the over-structured one (traversal 2) are the two poles the invariant test pins
+  — the assist proposes on the first, stays silent-and-harmless on the second, byte-identical after
+  a discarded proposal in both. Measured on their CURRENT source (re-imported through today's
+  pipeline), never a stale figure (§5).
+- **This is a re-submitted proposal.** No code is written until the CTO re-validates the moved DR —
+  the bidirectional invariant (§3), the freshly-measured metric (§5), the taxonomy relocation (§4,
+  D1), the mechanism (§6, D2/D4), the narrow-first patterns (D3), and the named sibling `STRUCTURE_
+  CLEANUP` (§9).
+
+## §9 `STRUCTURE_CLEANUP` — the sibling capability (named, scoped, NOT built here)
+
+Named so no session ever believes STRUCTURE_ASSIST covers the over-structured case. It is the
+**inverse** operation, and inverses must not share a chantier ("one commit, one intent" at the
+chantier scale).
+
+- **The problem it owns (traversal 2):** a book imported from an over-structured Word file — the
+  author styled `CHAPTER n` as its own EMPTY heading, separate from the real chapter title
+  (measured: 29 empty top-level chapters, 27 standalone `CHAPTER n`). The render offset the founder
+  saw (image 5) is those empty title-chapters occupying their own pages (§3≡4 proven in
+  `FOUNDER_TRAVERSAL_2.md`).
+- **The operation:** recognise an empty `CHAPTER n` marker immediately followed by a real title and
+  **propose to COLLAPSE them into one chapter** ("`CHAPTER 1` and the next title look like one
+  chapter — merge?"). It REMOVES structure where the assist ADDS it.
+- **Same invariant, same gate:** it too only PROPOSES — never merges without an authorial act — and
+  discarding its proposal leaves the Book byte-identical. It shares the invariant test harness and
+  the author-as-gate doctrine, and reuses the existing merge op (`mergeChapterIntoPrevious`).
+- **Built AFTER STRUCTURE_ASSIST**, on the same foundation. The two founder books remain the test
+  cases of the two chantiers.
