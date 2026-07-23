@@ -181,6 +181,15 @@ two-book limit on Home; button fluidity.
 
 ## §6 The engraved sequence (CTO)
 
-**A1 button-state fix → A2 repetition-guard fix → A4 measure (what the remainder should be) → B5
-Design Review.** `BATCH_CONFIRM_LATENCY` and Lot C consigned. Each correctif measured-first, its own
-atomic commit, his projects strictly read-only, no fabricated fixtures.
+**A1 button-state fix ✅ → A2 repetition-guard fix ✅ → A4 measure (what the remainder should be) →
+B5 Design Review.** `BATCH_CONFIRM_LATENCY` and Lot C consigned. Each correctif measured-first, its
+own atomic commit, his projects strictly read-only, no fabricated fixtures.
+
+**✅ A1 + A2 MERGED to `main` (`--no-ff` `d0c78b0`, 2026-07-23).** A1 (`f00fc6e`) — the shared-`busy`
+flag became a Set of in-flight keys; only the in-flight button changes state, pinned by test in both
+panels (Dismiss stays live, synchronous); latency deferred to `BATCH_CONFIRM_LATENCY`. A2 (`7a3ecbf`)
+— the `N>1` repetition guard, bilateral test + synthetic CI lock (real-book proof in the probe,
+`PRIVATE_MANUSCRIPT_FIXTURES`); book 3 56→30 (26 "Conclusion" dropped, unique "Introduction" kept,
+`CHAPTER n` incl. the author's dup 8 untouched). **Post-merge gate: backend 868/868, frontend
+225/225, tsc + eslint(src) + builds clean; live harnesses 4/4 · 16/16 · 4/4** (store restored to its
+7 real projects, no trace; founder idle 125 min). **NEXT: A4 measure, then the B5 DR.**
