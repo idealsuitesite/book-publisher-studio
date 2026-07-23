@@ -1,5 +1,7 @@
 # STRUCTURE_ASSIST — Design Review (full, Level 2)
 
+> **⏩ DELIVERY STATUS (2026-07-23):** the CTO VALIDATED this DR for construction, and the chantier is **BUILT and PUSHED on `feat/structure-assist` (4 atomic gated commits, NOT yet merged to `main`)** — Domain foundation + the bidirectional invariant `eb8d5ff`, read-only API `5d067c3`, review panel `77f053a`, the gesture-counter judge `5520885`. Branch gate: backend 838/838, frontend 218/218, clean. **§5's judge is measured, both poles (see §5 on the branch): 14→1 under (precision 100%, zero post-confirm corrections), silent over.** Awaiting the CTO's delivery validation before merge; ONE open question — whether the two founder books are committed as the invariant fixtures (today: synthetic-committed + real-in-probe). The body below is the DR as re-submitted; the ≈7→≈1 target in §5 was re-measured to a true **14→1** on the current state (the books moved, #7).
+
 **Date:** 2026-07-22 · **Updated 2026-07-23** with the CTO's decisions (D1–D4 settled, the
 bidirectional invariant, `STRUCTURE_CLEANUP` named as the sibling capability) · **Status: DR
 RE-SUBMITTED for CTO re-validation before any code** (non-negotiable #4 — a Design Review that
