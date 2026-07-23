@@ -34,7 +34,7 @@ export interface StructureSuggestion {
  */
 export class StructureSuggester {
   suggest(book: Book): StructureSuggestion[] {
-    const suggestions: StructureSuggestion[] = [];
+    const candidates: StructureSuggestion[] = [];
     // Only TOP-LEVEL containers' own body paragraphs are candidates — that is exactly what
     // promoteToChapter can act on. Content already sitting under a chapter/section title is
     // structured; we never propose to re-cut it (the over-structured guard, §3 bidirectional).
@@ -45,7 +45,7 @@ export class StructureSuggester {
         if (!text || !text.trim()) continue;
         const marker = classifyMarker(text);
         if (!marker) continue;
-        suggestions.push({
+        candidates.push({
           blockId: block.id,
           proposedTitle: marker.label,
           kind: marker.kind,
@@ -54,6 +54,20 @@ export class StructureSuggester {
         });
       }
     }
-    return suggestions;
+
+    // REPEATED_EDITORIAL_MARKERS guard (FOUNDER_TRAVERSAL_3 A2). A canonical editorial name that
+    // appears MORE THAN ONCE is a recurring section title, not a book part: a book has exactly one
+    // Conclusion, so N>1 occurrences (the founder's per-chapter "Conclusion" ×26) prove a
+    // sub-structure — never N chapters. Such a name STOPS being proposed as a chapter (all its
+    // occurrences drop). The signal is DEDUCTIVE, not a tuned threshold: the cutoff is N>1 because a
+    // thing there can be only one of cannot legitimately appear twice as a book part. What becomes of
+    // the dropped lines (nothing, or a "make sub-section" offer) is STRUCTURE_CLEANUP's sibling
+    // chantier (SUBCHAPTER_PROMOTION), not this suggester. Numbered-chapter markers are untouched —
+    // a duplicated `CHAPTER 8` is the author's own content, not a repeated editorial name.
+    const editorialCounts = new Map<string, number>();
+    for (const s of candidates) {
+      if (s.kind === 'editorial') editorialCounts.set(s.key, (editorialCounts.get(s.key) ?? 0) + 1);
+    }
+    return candidates.filter((s) => s.kind !== 'editorial' || editorialCounts.get(s.key) === 1);
   }
 }
