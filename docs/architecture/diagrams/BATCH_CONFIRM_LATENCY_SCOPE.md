@@ -115,3 +115,74 @@ data-retention / undo-depth decision with its own tradeoffs — consign, do not 
 **Sequence (CTO, re-engraved):** cadrage P2 (this) → CTO verdicts → correctif P2 → cadrage P1 →
 chantier P1 → the AUTHOR_EXPERIENCE Design Review → mockups → founder validation → construction.
 **Nothing is coded before the verdicts above.**
+
+---
+
+## §7 Correctif A — the mini-DR record and the build (2026-07-23)
+
+**Status: BUILT on `feat/batch-confirm-latency` (3 gated commits), gate green, awaiting the CTO's word
+to merge (gate 5 / GR-1). Not on `main`.**
+
+### CTO verdicts (on §6)
+1. **Shape — A now; B consigned with its OWN cadrage, never folded into A.** A is bounded, does not
+   touch the persistence contract, reaches the measured ceiling, answers the founder's real complaint.
+   B is real (sweep S proves it) but its cadrage must weigh **B and D together** — an O(1) append save
+   and a version-log cap are two answers to the same O(v) term; deciding them apart risks redundant
+   work or a retention decision smuggled inside a perf chantier. → consigned **`APPEND_ONLY_PERSISTENCE`**
+   (`TODO.md`): B+D as one cadrage, **undo depth a PRODUCT question for the founder**, not settled by
+   technique. **Trigger:** after A ships, re-measure the real gesture on the founder's book — if a
+   unitary edit on a long session stays under the felt threshold, B waits; else it rises. The
+   measurement decides urgency, not a date.
+2. **Undo — "Make all" = ONE undo point. Confirmed** (Q2 applied; the founder's "une ligne, une
+   décision" — the gesture is a decision, its undo is a decision). Two guardrails: the version **label
+   says what it was** ("Convert all — N chapters created", never generic); and the coarse undo is
+   acceptable **because the fine inverse gesture exists** — the per-item button stays one-gesture-one-
+   version, and the family carries the inverse (cleanup re-glues a chapter unduly created).
+3. **Scope — ONE shape covering all three poles, one op type per batch.** Building assist-only would
+   leave cleanup/subchapter with the measured defect and invite a divergent second implementation.
+   Two firm constraints: **(a)** a batch carries a **single op type** (never mixed — no UI gesture
+   produces a mixed batch; accepting it would be generality without a client); **(b)** each pole keeps
+   its **engraved order law applied SERVER-SIDE** — `SUBSECTION_APPLY_ORDER` (reverse document order,
+   greedy splits) is computed by the server from the book and locked by test per pole, **not inherited
+   from the deleted frontend loop.** This is where the correctif could break silently; it is guarded.
+
+### CTO amendments
+- **Amendment 1 — atomicity both ways.** Beyond "a bad id → typed CONTENT_NOT_FOUND, never a 500", the
+  real property: a batch that fails mid-course leaves the book **byte-identical** and the version log
+  at **+0**. Success ⇒ +1 version, failure ⇒ +0. Locked by assertion (domain: input untouched;
+  use-case + route: +0 and stored book unchanged), not assumed.
+- **Amendment 2 — a verification (not work).** Confirmed the pushed ADR-0054 consignation contains the
+  Approval-Cadence directive ALONE — no "authority chain" / CTO-sole-channel content anywhere
+  (`git show origin/main:docs/DECISIONS.md` checked). A directive retracted before transmission never
+  reached the registry; nothing to retract.
+
+### The three registry validations (CTO)
+- The inactivity check + documented push were correct, incl. the residual-servers-vs-write-activity
+  distinction.
+- The **two-order test on `collapseMarker`** converts "documented order-independent" into a measured
+  property — kept even though it looks redundant; it is what licenses trusting the doc.
+- The **coarse-undo line** ("acceptable because the fine inverse exists") is recorded here.
+
+### The design, as built
+- `StructureMutation` gains `{ type:'batchApply', op, ids }` — one `op` field makes a mixed batch
+  inexpressible (constraint a, structural).
+- `BookEditingService.applyBatch` — the order law is the server's (`documentOrderIndex` → reverse for
+  the greedy ops; collapse order-free); a pure reduce, so atomicity is inherent (amendment 1).
+- `EditBookUseCase.batchApply` — ONE snapshot (descriptive label) + ONE save.
+- `parseMutation` whitelists it with route tests, same commit (the standing setPartRole lesson).
+- The three panels each send ONE call; per-item buttons unchanged (guardrail 2ii).
+
+### The judge (gate)
+Instrument `backend/spikes/batch-confirm-latency-cadrage.ts`, extended to the shipped path:
+- **Real `batchApply`, N=40: 4.6 ms, ONE version**, label "Convert all — 40 chapters created", db
+  197 KB — vs the current N-sequential path ~1776 ms / 40 versions / 6.6 MB. **The ceiling is reached.**
+- **Founder-book probe (read-only, book 3): N=30** (the A2 repetition guard already drops the 26
+  "Conclusion" repeats — the traversal-3 56→30; those go to the subchapter panel) → **65.6 ms, ONE
+  version, 30 chapters created**, in a throwaway temp repo. **The founder's stored project was never
+  written** (store verified: 8 projects, mtime unchanged).
+- **Bidirectional invariant intact** (the suggester purity tests stay green; the batch never touches
+  the suggester). **Full live harnesses** re-run against a throwaway server (spare port, temp
+  `DATABASE_PATH`, discarded): **verify-real-import 4/4 · verify-real-export 16/16 · verify-real-publish
+  4/4** — the correctif touches only structure-editing, not the import/export/publish path.
+- **Gate: backend 905/905, frontend 230/230, tsc + eslint(src)/eslint + builds clean.** Taste-stop:
+  none (mechanics, not aspect) — the founder judges the result by feeling "Make all" become instant.
