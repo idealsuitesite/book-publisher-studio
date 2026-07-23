@@ -13,6 +13,9 @@ export function projectRoutes(controller: ProjectsController): Router {
   // STRUCTURE_CLEANUP: read-only cleanup surface — never mutates (applying a suggestion is the
   // separate collapseMarker mutation via POST /:id/structure).
   router.get('/:id/cleanup-suggestions', controller.suggestCleanup);
+  // SUBCHAPTER_PROMOTION: read-only sub-section surface — never mutates (applying is the separate
+  // promoteToSubsection mutation via POST /:id/structure).
+  router.get('/:id/subchapter-suggestions', controller.suggestSubchapter);
   router.patch('/:id/settings', express.json(), controller.patchSettings);
   // POST rather than GET for export: it renders on the server (real work, ADR-0041's measured
   // 598ms) and mirrors the existing manuscript export route's verb.

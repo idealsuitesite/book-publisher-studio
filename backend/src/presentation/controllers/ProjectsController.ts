@@ -9,6 +9,7 @@ import type { PublishingReportMapper } from '../../application/mappers/Publishin
 import type { EditBookUseCase } from '../../application/use-cases/EditBookUseCase';
 import type { SuggestStructureUseCase } from '../../application/use-cases/SuggestStructureUseCase';
 import type { SuggestCleanupUseCase } from '../../application/use-cases/SuggestCleanupUseCase';
+import type { SuggestSubchapterUseCase } from '../../application/use-cases/SuggestSubchapterUseCase';
 import type { ProjectListResponseDTO, UpdateProjectSettingsDTO, StructureMutation, TitlePageDTO, CopyrightPageDTO, TypographyOverrideDTO } from 'shared-types';
 import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
 import { UnknownLayoutError } from '../../shared/errors/UnknownLayoutError';
@@ -50,6 +51,11 @@ function parseMutation(body: unknown): StructureMutation | null {
   // gap shipped). The op's strict guard surfaces as the named CONTENT_NOT_FOUND at this boundary.
   if (m.type === 'collapseMarker' && typeof m.markerId === 'string' && m.markerId) {
     return { type: 'collapseMarker', markerId: m.markerId };
+  }
+  // SUBCHAPTER_PROMOTION (B5): whitelisted here, with route tests, in the same commit as the dispatch
+  // (the standing lesson). The op's typed guard surfaces as the named CONTENT_NOT_FOUND, never a 500.
+  if (m.type === 'promoteToSubsection' && typeof m.blockId === 'string' && m.blockId) {
+    return { type: 'promoteToSubsection', blockId: m.blockId };
   }
   // MINI_DR_CALLOUTS commit 1: whitelisted here, with route tests, in the same commit as the
   // dispatch — the standing setPartRole lesson (the untrusted-body boundary is where the last
@@ -127,8 +133,27 @@ export class ProjectsController {
     private publishingReportMapper: PublishingReportMapper,
     private editBook: EditBookUseCase,
     private suggestStructureUseCase: SuggestStructureUseCase,
-    private suggestCleanupUseCase: SuggestCleanupUseCase
+    private suggestCleanupUseCase: SuggestCleanupUseCase,
+    private suggestSubchapterUseCase: SuggestSubchapterUseCase
   ) {}
+
+  /**
+   * SUBCHAPTER_PROMOTION — the READ-ONLY sub-section surface (SUBCHAPTER_PROMOTION_DR §5). A GET that
+   * returns recurring editorial markers proposed as sections of their chapters. It NEVER mutates —
+   * applying a suggestion is the separate `promoteToSubsection` mutation through `POST /:id/structure`.
+   */
+  suggestSubchapter = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const suggestions = await this.suggestSubchapterUseCase.execute(req.params.id);
+      if (!suggestions) {
+        res.status(404).json({ error: 'Project not found', code: 'PROJECT_NOT_FOUND' });
+        return;
+      }
+      res.json({ suggestions });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   /**
    * STRUCTURE_CLEANUP — the READ-ONLY cleanup surface (STRUCTURE_CLEANUP_DR.md §6). A GET that

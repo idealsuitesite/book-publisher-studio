@@ -81,6 +81,11 @@ export class EditBookUseCase {
         const book = this.editingService.collapseMarker(this.projectService.currentBook(project), mutation.markerId);
         return this.projectService.replaceBook(snapped, book);
       }
+      case 'promoteToSubsection': {
+        const snapped = this.projectService.snapshot(project, 'before promote to subsection');
+        const book = this.editingService.promoteToSubsection(this.projectService.currentBook(project), mutation.blockId);
+        return this.projectService.replaceBook(snapped, book);
+      }
       case 'setCallout': {
         const snapped = this.projectService.snapshot(project, mutation.on ? 'before callout mark' : 'before callout unmark');
         const book = this.editingService.setCallout(this.projectService.currentBook(project), mutation.blockId, mutation.on);

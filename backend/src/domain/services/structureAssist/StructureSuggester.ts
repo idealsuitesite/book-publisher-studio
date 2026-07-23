@@ -1,5 +1,6 @@
 import type { Book, Content, Block } from '../../models/Book';
 import { classifyMarker, type MarkerKind } from './structureTaxonomy';
+import { repeatedEditorialKeys } from './repeatedEditorialMarkers';
 
 /**
  * One proposed chapter boundary — a candidate, never an applied change (STRUCTURE_ASSIST_DR.md §3).
@@ -56,18 +57,13 @@ export class StructureSuggester {
     }
 
     // REPEATED_EDITORIAL_MARKERS guard (FOUNDER_TRAVERSAL_3 A2). A canonical editorial name that
-    // appears MORE THAN ONCE is a recurring section title, not a book part: a book has exactly one
-    // Conclusion, so N>1 occurrences (the founder's per-chapter "Conclusion" ×26) prove a
-    // sub-structure — never N chapters. Such a name STOPS being proposed as a chapter (all its
-    // occurrences drop). The signal is DEDUCTIVE, not a tuned threshold: the cutoff is N>1 because a
-    // thing there can be only one of cannot legitimately appear twice as a book part. What becomes of
-    // the dropped lines (nothing, or a "make sub-section" offer) is STRUCTURE_CLEANUP's sibling
-    // chantier (SUBCHAPTER_PROMOTION), not this suggester. Numbered-chapter markers are untouched —
+    // appears MORE THAN ONCE is a recurring section title, not a book part (the founder's per-chapter
+    // "Conclusion" ×26): it STOPS being proposed as a chapter — all its occurrences drop. The repetition
+    // recognition is the SHARED `repeatedEditorialKeys` (D3): this guard SUPPRESSES the wrong offer,
+    // SUBCHAPTER_PROMOTION (B5) MAKES the right one (a section of the chapter) — two faces of one
+    // recognition, one source of truth, never two thresholds. Numbered-chapter markers are untouched —
     // a duplicated `CHAPTER 8` is the author's own content, not a repeated editorial name.
-    const editorialCounts = new Map<string, number>();
-    for (const s of candidates) {
-      if (s.kind === 'editorial') editorialCounts.set(s.key, (editorialCounts.get(s.key) ?? 0) + 1);
-    }
-    return candidates.filter((s) => s.kind !== 'editorial' || editorialCounts.get(s.key) === 1);
+    const repeated = repeatedEditorialKeys(candidates.filter((s) => s.kind === 'editorial').map((s) => s.key));
+    return candidates.filter((s) => s.kind !== 'editorial' || !repeated.has(s.key));
   }
 }

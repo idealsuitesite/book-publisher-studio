@@ -31,6 +31,10 @@ export type StructureMutation =
   // marker is empty, so the follower flows up and auto-numbers (A1), or inherits the editorial title
   // with its own title kept as a subtitle (A2).
   | { type: 'collapseMarker'; markerId: string }
+  // SUBCHAPTER_PROMOTION (SUBCHAPTER_PROMOTION_DR §5, B5): demote a recurring editorial marker in a
+  // chapter's own body into a SECTION of that chapter — the founder's continuity (a per-chapter
+  // "Conclusion" becomes a section, not a peer chapter). A batch applies REVERSE document order.
+  | { type: 'promoteToSubsection'; blockId: string }
   // MINI_DR_CALLOUTS commit 1: mark/unmark a paragraph as a generic callout (Shape B — the flag
   // lives on the paragraph; the chrome lives in the theme). The author action; never inferred.
   | { type: 'setCallout'; blockId: string; on: boolean }
