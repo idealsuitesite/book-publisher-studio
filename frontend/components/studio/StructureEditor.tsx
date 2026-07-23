@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import type { ProjectDTO, BookDTO, StructureMutation } from 'shared-types';
 import { FrontMatterEditor } from './FrontMatterEditor';
+import { StructureSuggestionsPanel } from './StructureSuggestionsPanel';
 import {
   DndContext,
   KeyboardSensor,
@@ -838,6 +839,10 @@ export function StructureEditor({ project, onEdited }: StructureEditorProps) {
           {finding.suggestion && <p className="mt-1 text-sm text-app-text-muted">{finding.suggestion}.</p>}
         </div>
       )}
+
+      {/* STRUCTURE_ASSIST: chapters the author typed as text, offered for one-gesture confirmation.
+          Silent (renders nothing) when there is nothing to suggest — the over-structured pole. */}
+      <StructureSuggestionsPanel projectId={project.id} refreshKey={project.updatedAt} onEdited={captureUndo} />
 
       {error && (
         <p role="alert" className="text-sm text-app-error">

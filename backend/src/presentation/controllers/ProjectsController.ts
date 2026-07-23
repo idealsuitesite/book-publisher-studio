@@ -7,6 +7,7 @@ import type { ExportProjectUseCase, ProjectExportFormat } from '../../applicatio
 import type { PublishProjectUseCase } from '../../application/use-cases/PublishProjectUseCase';
 import type { PublishingReportMapper } from '../../application/mappers/PublishingReportMapper';
 import type { EditBookUseCase } from '../../application/use-cases/EditBookUseCase';
+import type { SuggestStructureUseCase } from '../../application/use-cases/SuggestStructureUseCase';
 import type { ProjectListResponseDTO, UpdateProjectSettingsDTO, StructureMutation, TitlePageDTO, CopyrightPageDTO, TypographyOverrideDTO } from 'shared-types';
 import { UnknownThemeError } from '../../shared/errors/UnknownThemeError';
 import { UnknownLayoutError } from '../../shared/errors/UnknownLayoutError';
@@ -117,8 +118,29 @@ export class ProjectsController {
     private exportProject: ExportProjectUseCase,
     private publishProject: PublishProjectUseCase,
     private publishingReportMapper: PublishingReportMapper,
-    private editBook: EditBookUseCase
+    private editBook: EditBookUseCase,
+    private suggestStructureUseCase: SuggestStructureUseCase
   ) {}
+
+  /**
+   * STRUCTURE_ASSIST — the READ-ONLY suggestion surface (STRUCTURE_ASSIST_DR.md §6). A GET that
+   * returns candidate chapter boundaries for a manuscript whose structure the author typed as
+   * plain text. It NEVER mutates — applying a suggestion is the separate `promoteToChapter`
+   * mutation through `POST /:id/structure` (already whitelisted in parseMutation). The invariant
+   * (§3) is proven in the Domain suite: running the suggester leaves the book byte-identical.
+   */
+  suggestStructure = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const suggestions = await this.suggestStructureUseCase.execute(req.params.id);
+      if (!suggestions) {
+        res.status(404).json({ error: 'Project not found', code: 'PROJECT_NOT_FOUND' });
+        return;
+      }
+      res.json({ suggestions });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   /**
    * Applies a typed structure mutation (STRUCTURE_EDITING.md Q4: one generic command route).

@@ -35,6 +35,7 @@ import { SqliteProjectRepository } from '../infrastructure/repositories/SqlitePr
 import { ProjectService } from '../domain/services/ProjectService';
 import { BookEditingService } from '../domain/services/BookEditingService';
 import { EditBookUseCase } from '../application/use-cases/EditBookUseCase';
+import { SuggestStructureUseCase } from '../application/use-cases/SuggestStructureUseCase';
 import { ProjectSummaryMapper } from '../application/mappers/ProjectSummaryMapper';
 import { ProjectsController } from './controllers/ProjectsController';
 import { projectRoutes } from './routes/projects';
@@ -172,7 +173,8 @@ export function createApp(): Express {
     ),
     new PublishProjectUseCase(projectRepository, projectService, publishUseCase, new ManualLayoutSelector()),
     new PublishingReportMapper(),
-    new EditBookUseCase(projectRepository, projectService, new BookEditingService())
+    new EditBookUseCase(projectRepository, projectService, new BookEditingService()),
+    new SuggestStructureUseCase(projectRepository)
   );
   app.use('/api/projects', projectRoutes(projectsController));
 

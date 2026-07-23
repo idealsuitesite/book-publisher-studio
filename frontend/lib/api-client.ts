@@ -9,6 +9,7 @@ import type {
   UpdateProjectSettingsDTO,
   PublishingResponseDTO,
   StructureMutation,
+  StructureSuggestionDTO,
 } from 'shared-types';
 
 // Sprint 7 Decision 2 (docs/architecture/diagrams/SPRINT_7_FIRST_DEMONSTRABLE_PRODUCT.md) - the
@@ -204,6 +205,25 @@ export async function updateProjectSettings(
   }
   const json = (await response.json()) as { settings: ProjectSettingsDTO };
   return json.settings;
+}
+
+/**
+ * STRUCTURE_ASSIST — fetches the READ-ONLY chapter-boundary suggestions for a manuscript whose
+ * structure the author typed as plain text (STRUCTURE_ASSIST_DR.md §6). This never mutates; the
+ * author confirms a suggestion via `editStructure({ type: 'promoteToChapter', blockId })`.
+ */
+export async function fetchStructureSuggestions(id: string): Promise<StructureSuggestionDTO[]> {
+  const response = await request(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(id)}/structure-suggestions`,
+    { method: 'GET' },
+    'Structure suggestions',
+    OPTIONS_TIMEOUT_MS
+  );
+  if (!response.ok) {
+    throw await apiErrorFrom(response, 'Structure suggestions');
+  }
+  const json = (await response.json()) as { suggestions: StructureSuggestionDTO[] };
+  return json.suggestions;
 }
 
 export async function exportProject(id: string, format: ExportFormat): Promise<Blob> {
