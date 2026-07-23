@@ -1,9 +1,11 @@
 # AUTHOR_EXPERIENCE — the gap cadrage (measurement report, stops at the constats)
 
-**Date:** 2026-07-23 · **Status: GAP CADRAGE — stops at the constats, awaits CTO verdicts. NO design,
-NO production code.** Étape 1 of the CTO directive: measure what the product already has and what is
-really missing, across the seven axes; design nothing. All measured **read-only** against `main @
-febf427`. The founder's projects are untouched.
+**Date:** 2026-07-23 · **Status: GAP CADRAGE — CTO VERDICTS RENDERED (§8, 2026-07-23). Still NO design,
+NO production code — the DR does not open until P2 then P1 are built.** Étape 1 of the CTO directive:
+measure what the product already has and what is really missing, across the seven axes; design nothing.
+All measured **read-only** against `main @ febf427`. The founder's projects are untouched. **The
+verdicts inverted the CTO's own sequence: P2 (`BATCH_CONFIRM_LATENCY`) then P1 (incremental render)
+are now built BEFORE the Design Review — one does not draw a promise the engine cannot hold (§8).**
 
 **The governing principle (founder, §1):** *the book is an editorial structure, not a sequence of
 pages.* The author manipulates objects he understands — a preface, a dedication, a chapter, an
@@ -162,3 +164,56 @@ rest. The skeleton is not empty scaffolding to fill; it is **populated on import
 **Sequence (CTO):** this cadrage → the CTO's verdicts → the Design Review (three panels, the
 scaling constraint, the entry-door differentiator) → mockups → the founder's validation on captures →
 construction. **Nothing is coded before that.**
+
+---
+
+## §8 CTO verdicts (2026-07-23) — rendered on the §7 table, and a sequence inversion
+
+**The load-bearing move: the sequence is inverted, assumed.** Axis 7's measurement decided the order.
+The living Proof re-renders the *whole* book per change; criterion A (everything instant) is **not
+reachable by drawing**, and a mockup that promised it would lie. So **P2 then P1 are built BEFORE the
+Design Review opens** — a reversal of the CTO's own earlier "DR next" sequence, recorded here because
+a reversal that lives only in a conversation is lost. *One does not draw a promise the engine cannot
+keep.*
+
+- **Axis 7 — CONFIRMED, prerequisites, and re-ordered: P2 first, then P1.** Both are real chantiers
+  sequenced ahead of the DR, each with its **own measured cadrage** first. **P2 = `BATCH_CONFIRM_LATENCY`**
+  is the shortest path to the fluidity the founder asks for → its cadrage is `BATCH_CONFIRM_LATENCY_SCOPE.md`
+  (done). **P1 = incremental rendering: do NOT presume the form.** "Render only the affected region"
+  is *one* hypothesis among several — the visible page only, a progressive first-page-first render, or
+  a partial repagination are different candidates with different costs. **Cadrage measured first, as
+  always** — P1's shape is not decided here.
+
+- **Axis 1 — the editorial part becomes a first-class object. This is the heart of the chantier.**
+  The skeleton is split across three representations and none of them *is* the skeleton; a left panel
+  that stitched three models would be fragile and the author would feel it. **Direction: one surface
+  carrying the complete editorial order — chapters and parts together, each with a type and a place.**
+  *Where exactly* — extend `mainContent` with an editorial type, or introduce a unified view above the
+  three — **is the DR's to decide, with the measured cost of each option.** Constraint: **ADR-0001
+  holds, the Book stays immutable, and nothing that exists breaks.**
+
+- **Axis 2 — build the missing paths, restricted v1.** "Add a preface" with no path is the most
+  visible author-side hole. But five dead types at once is five builders and three renderers. **v1:
+  dedication and preface** (the two most asked-for; measured on real books where possible). The rest
+  follow the same pattern once proven. **A type that is added must compose AND render tri-format** —
+  else it re-creates the dead field it was meant to fill.
+
+- **Axis 3 — CONFIRMED: the DR's, not the model's.** The number/title separation already exists. The
+  choice of the three treatments is a **theme** choice with a founder taste-stop.
+
+- **Axis 4 — "Insert" is its own chantier, NOT this one.** Convert covers the current need. Inserting
+  a *new* element (a Part, an image, a cursor-point split) is content **creation**, a different nature
+  from structuring. **Consigned `INSERT_ELEMENTS`.**
+
+- **Axis 5 — real-page thumbnails: YES, in the DR.** Exactly the founder's formula — the author picks
+  a graphic *language*, not fifty parameters; choosing by a *name* betrays that philosophy.
+  **Separators and chapter-opening move INTO the theme in the same movement** — a theme that does not
+  control its separators is not a complete system.
+
+- **Axis 6 — CONFIRMED, blocked behind `TYPOGRAPHY_QUALITY`.** Nothing to expose before the
+  justification-with-hyphenation decision is built.
+
+**Re-engraved sequence (CTO):** cadrage P2 → correctif P2 → cadrage P1 → chantier P1 → the
+AUTHOR_EXPERIENCE Design Review (carrying these verdicts) → mockups → founder validation on captures →
+construction. **Start with cadrage P2 — the shortest path to the fluidity he asks for.** Push when the
+founder is idle.
