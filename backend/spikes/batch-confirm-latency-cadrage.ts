@@ -22,7 +22,7 @@
  * deleted at the end. Never writes the real store. Run: npx tsx spikes/batch-confirm-latency-cadrage.ts
  */
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
@@ -90,6 +90,44 @@ async function freshProject(dir: string, tag: string, book: Book): Promise<{
   const project = projectService.create(book, SETTINGS, 'probe');
   await repo.save(project);
   return { repo, useCase, project, dbPath };
+}
+
+const BOOK3 = '1784812181217-cy7m12l0w'; // founder traversal 3, under-structured (assist's pole, N≈56)
+
+/**
+ * The founder-book probe (PRIVATE_MANUSCRIPT_FIXTURES — behavioural, never committed): read book 3
+ * from the local store READ-ONLY, re-import fresh from its original bytes (#7 discipline), run the
+ * REAL batchApply through EditBookUseCase against a THROWAWAY temp repo. The founder's project is
+ * never written. Skipped cleanly where the store/book is absent (CI).
+ */
+async function founderProbe(dir: string): Promise<void> {
+  const storePath = join(process.cwd(), 'data', 'studio.db');
+  if (!existsSync(storePath)) {
+    console.log('\n## FOUNDER PROBE — skipped (no local store — CI/other machine)');
+    return;
+  }
+  const db = new DatabaseSync(storePath, { readOnly: true });
+  const blobRow = db.prepare('SELECT bytes FROM blobs WHERE project_id = ?').get(BOOK3) as { bytes: Buffer | Uint8Array } | undefined;
+  db.close();
+  if (!blobRow) {
+    console.log('\n## FOUNDER PROBE — skipped (book 3 not in this store)');
+    return;
+  }
+  const raw = await new MammothParser().parse(Buffer.isBuffer(blobRow.bytes) ? blobRow.bytes : Buffer.from(blobRow.bytes));
+  const fresh = new ASTBuilder().build(new HtmlNormalizer().normalize(raw.html, { fileName: 'book3.docx' }));
+  const blockIds = new StructureSuggester().suggest(fresh).map((s) => s.blockId);
+
+  const { repo, useCase, dbPath, project } = await freshProject(dir, 'founder', fresh);
+  const id = project.id;
+  const t0 = process.hrtime.bigint();
+  await useCase.execute(id, { type: 'batchApply', op: 'promoteToChapter', ids: blockIds });
+  const total = ms(process.hrtime.bigint() - t0);
+  const saved = (await repo.findById(id))!;
+  const chapters = saved.book.mainContent.filter((c) => c.type === 'chapter').length;
+  console.log('\n## FOUNDER PROBE — book 3, the REAL assist batch (read-only, temp repo)');
+  console.log(`N (assist suggestions): ${blockIds.length}`);
+  console.log(`batchApply: ${total.toFixed(1)} ms   versions: ${saved.versions.length} (ONE)   chapters created: ${chapters}`);
+  console.log(`db size after: ${dbSizeKb(dbPath)} KB   (the founder's stored project was NEVER written)`);
 }
 
 async function main() {
@@ -174,6 +212,24 @@ async function main() {
       const one = ms(process.hrtime.bigint() - a);
       console.log(`  v0=${String(v0).padStart(2)} versions → one confirm ${one.toFixed(1)} ms   db ${dbSizeKb(dbPath)} KB`);
     }
+
+    // ---- JUDGE: the SAME batch through the REAL batchApply mutation (correctif A shipped) ----
+    {
+      const { repo, useCase, dbPath, project } = await freshProject(dir, 'judge', book);
+      const id = project.id;
+      const t0 = process.hrtime.bigint();
+      await useCase.execute(id, { type: 'batchApply', op: 'promoteToChapter', ids: blockIds });
+      const total = ms(process.hrtime.bigint() - t0);
+      const saved = (await repo.findById(id))!;
+      const chapters = saved.book.mainContent.filter((c) => c.type === 'chapter').length;
+      console.log('\n## JUDGE — the real batchApply mutation (correctif A, one execute)');
+      console.log(`total: ${total.toFixed(1)} ms   versions after: ${saved.versions.length} (ONE)   chapters: ${chapters}`);
+      console.log(`db size after: ${dbSizeKb(dbPath)} KB   version label: "${saved.versions[0]?.label}"`);
+      console.log(`  vs the current N-sequential path above — expected ~ceiling (§the correctif's gate).`);
+    }
+
+    // ---- FOUNDER-BOOK PROBE (read-only): the real book 3 (N≈56) through batchApply, temp repo ----
+    await founderProbe(dir);
 
     console.log('\n(temp db discarded; the real store was never touched.)');
   } finally {
