@@ -235,24 +235,19 @@ export class BookEditingService {
       throw new ContentNotFoundError(`promoteToChapter: no promotable text block with id "${blockId}" in a top-level container`);
     }
     const container = book.mainContent[containerIndex];
-    const blockIndex = container.content.findIndex((b) => b.id === blockId);
-    const block = container.content[blockIndex];
-    // Narrows to a text-bearing block; the findIndex above already guaranteed it.
-    if (block.type !== 'paragraph' && block.type !== 'heading') {
-      throw new ContentNotFoundError(`promoteToChapter: block "${blockId}" is not a text block`);
-    }
+    const { before, block, after } = this.splitContentAt(container.content, blockId, 'promoteToChapter');
 
     const newChapter: Chapter = {
       type: 'chapter',
       id: this.idGenerator(),
       number: 0, // renumbered below
       title: block.text,
-      content: container.content.slice(blockIndex + 1),
+      content: after,
       createdAt: now,
       updatedAt: now,
     };
 
-    const remainder: Content = { ...container, content: container.content.slice(0, blockIndex), updatedAt: now };
+    const remainder: Content = { ...container, content: before, updatedAt: now };
     const keepRemainder = !(remainder.type === 'section' && remainder.title.trim() === '' && remainder.content.length === 0);
 
     const rebuilt: Content[] = [
@@ -262,6 +257,71 @@ export class BookEditingService {
       ...book.mainContent.slice(containerIndex + 1),
     ];
     return { ...book, mainContent: this.renumberChapters(rebuilt, now) };
+  }
+
+  /**
+   * The shared split (CREATE_CHAPTER's découpe, reused not duplicated — CTO D1): find a promotable
+   * text block in a content list and return the blocks BEFORE it, the block itself, and the blocks
+   * AFTER it. Throws a named `ContentNotFoundError` if the id is absent or the block is not text.
+   */
+  private splitContentAt(content: Block[], blockId: string, op: string): { before: Block[]; block: Paragraph; after: Block[] } {
+    const i = content.findIndex((b) => b.id === blockId);
+    const block = content[i];
+    if (!block || (block.type !== 'paragraph' && block.type !== 'heading')) {
+      throw new ContentNotFoundError(`${op}: block "${blockId}" is not a promotable text block`);
+    }
+    // Heading carries `text` like Paragraph; the return type narrows to the text-bearing shape.
+    return { before: content.slice(0, i), block: block as Paragraph, after: content.slice(i + 1) };
+  }
+
+  /**
+   * SUBCHAPTER_PROMOTION (SUBCHAPTER_PROMOTION_DR §5, D1). Promote a text block inside a TOP-LEVEL
+   * CHAPTER's own body into a SECTION under that chapter: the block's text becomes the section title,
+   * the blocks AFTER it MIGRATE into the section, the blocks before stay in the chapter. The chapter
+   * count is unchanged (no renumber). The founder's continuity — a per-chapter "Conclusion" becomes a
+   * section of its chapter, never a peer chapter.
+   *
+   * A NEW op, not an extension of `promoteToChapter` (that makes a top-level entry; this makes a child
+   * section — different natures, one op each, CTO D1) — but it REUSES the same split (`splitContentAt`).
+   *
+   * TYPED GUARD (D1): the block must be a promotable text block inside a TOP-LEVEL CHAPTER's own
+   * content — refuse if it is not in a chapter (a Section, a preamble, or an unknown id), tested both
+   * ways. The following prose migrates into the section and NOTHING is lost (the cousin's `.sections`
+   * lesson, pinned by test). V1 boundary (disclosed, DR §2): the new section is appended to the
+   * chapter's sections — the measured case (a flat chapter whose Conclusion sits at the end of its
+   * own body) has no pre-existing sections to interleave with.
+   */
+  promoteToSubsection(book: Book, blockId: string, now: Date = new Date()): Book {
+    const chapterIndex = book.mainContent.findIndex(
+      (c) => c.type === 'chapter' && c.content.some((b) => b.id === blockId && (b.type === 'paragraph' || b.type === 'heading'))
+    );
+    if (chapterIndex === -1) {
+      throw new ContentNotFoundError(`promoteToSubsection: no promotable text block with id "${blockId}" inside a top-level chapter`);
+    }
+    const chapter = book.mainContent[chapterIndex] as Chapter;
+    const { before, block, after } = this.splitContentAt(chapter.content, blockId, 'promoteToSubsection');
+
+    const newSection: Section = {
+      type: 'section',
+      id: this.idGenerator(),
+      title: block.text,
+      content: after, // the following prose migrates into the section — nothing is lost
+      level: 2,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const updatedChapter: Chapter = {
+      ...chapter,
+      content: before,
+      sections: [...(chapter.sections ?? []), newSection],
+      updatedAt: now,
+    };
+    const rebuilt: Content[] = [
+      ...book.mainContent.slice(0, chapterIndex),
+      updatedChapter,
+      ...book.mainContent.slice(chapterIndex + 1),
+    ];
+    return { ...book, mainContent: rebuilt }; // no renumber — the chapter count is unchanged
   }
 
   /**
