@@ -59,7 +59,18 @@ paid per render regardless of how much changed or is shown — it is font embedd
 tensions PERFORMANCE_SCOPE Option 3's "~75% is doc.text()"; whatever the internal split, rendering
 fewer pages does not reduce the time — a decomposition of the floor is owed, §5.)*
 
+> **⚠ C2 IS RETRACTED — it was an instrument artifact (see §7, the V2 arbitration, 2026-07-23).**
+> `PDFRenderer.renderContents` draws `content.content` (EVERY block); it consults `book.pages` only for
+> page-break placement and headers. **Slicing `book.pages` never reduced the drawn content**, so the
+> flat 1-page-vs-352 curve measured page-metadata, not per-page render cost. The honest curve (truncate
+> BOOK CONTENT) shows render **scales with content** and Option 3's "doc.text() dominates" is the
+> surviving truth. C2's conclusion is FALSE; §7 carries the corrected finding. Kept here, struck, so
+> the error and its correction both stay on the record.
+
 ## §4 What the constats do to the three candidates
+> **⚠ §4 IS SUPERSEDED by §7 (V2 arbitration).** Its verdicts rest on the retracted C2. With the honest
+> curve, candidate 1 (visible-region) and 2 (progressive) are **viable, ~8× leverage** — not dead.
+> Read §7 for the corrected reading. §4 is kept struck, on the record.
 
 - **(1) visible-page-only — near-zero leverage.** The render is a fixed floor; rendering 1 page instead
   of 352 saves ~10–24 ms. It does not touch the floor, and it does not touch pagination. **Measured
@@ -103,3 +114,72 @@ the amount rendered; it does not — it is a fixed per-render floor plus a front
 **Sequence (CTO):** this cadrage → verdicts → (the chosen P1 shape's own DR/correctif) → the
 AUTHOR_EXPERIENCE Design Review → mockups → founder validation → construction. **Nothing is coded
 before the verdicts above.**
+
+---
+
+## §7 V2 arbitration — the instrument that lied, and the corrected picture (2026-07-23)
+
+**The CTO's V2 required the arbitration first: the older Option-3 spike ("~75% doc.text()") and this
+cadrage's C2 ("fixed floor, 1 page ≈ 352 pages") cannot both be true — one instrument lied. Naming it
+was the condition on any floor-reduction work.** Instrument: `backend/spikes/render-floor-decomposition.ts`.
+
+**The liar is C2's page-slice — named by reading the renderer.** `PDFRenderer.renderContents`
+(`PDFRenderer.ts:417/457`) draws `content.content` — EVERY block of the book — and consults
+`book.pages` only for page-break placement and headers/footers. So slicing `book.pages` to `[0]` left
+**all** the text drawn; the flat 1-page-vs-352 curve measured page-METADATA, not content. C2 proved
+nothing about per-page cost. **Option 3 is vindicated.**
+
+**The honest curve — truncate BOOK CONTENT (K chapters), split content-draw vs finalize (`doc.end`):**
+
+| K chapters | pages | total | **content-draw** | finalize (font subset+zlib) | doc.text calls |
+|---|---|---|---|---|---|
+| 1 | 3 | 35 ms | **30 ms** | 5 ms | 19 |
+| 2 | 5 | 36 ms | **30 ms** | 6 ms | 35 |
+| 4 | 32 | 100 ms | **88 ms** | 11 ms | 210 |
+| 8 | 67 | 187 ms | **165 ms** | 22 ms | 463 |
+| 18 (full) | 155 | 282 ms | **248 ms (88%)** | 35 ms (13%) | 1166 |
+
+- **Content-draw dominates (88%) and SCALES with content** (doc.text calls 19 → 1166). Fitting the two
+  ends: content-draw ≈ **26 ms fixed** (font load/registration) **+ ~0.19 ms per text call**.
+- **Finalize (font subset + zlib) is small (~13%, ~35 ms)** and scales mildly — it is NOT the ~350 ms
+  floor C2 imagined.
+
+**The correction reverses §4.** Rendering only the **visible region** (~1–2 pages ≈ 20–40 blocks) costs
+≈ **26 ms fixed + ~5 ms + ~5 ms finalize ≈ 36 ms**, versus **282 ms** for the full book — **~8×**. So:
+- **Candidate 1 (visible-region render) — VIABLE, ~8× leverage.** Draw only the visible page's blocks.
+- **Candidate 2 (progressive first-page) — VIABLE.** First page ≈ 36 ms → a genuinely fast first paint.
+- **Candidate 3 (partial repagination) — the SECOND-ORDER term.** Once render is incremental, pagination
+  (16–38%, and cache-reused on colour-only) becomes the largest remaining backend cost on a content change.
+
+**The catch (for the DR, not decided here):** to draw only the visible region the renderer must (a) know
+which blocks fall on the visible page (from pagination — still whole-book unless made incremental) and
+(b) draw only those. The ~26 ms font-load fixed cost is paid regardless. So the incremental-render budget
+is roughly **pagination (cached ~0 / content-change ~70–190 ms) + visible-region draw (~36 ms)**.
+
+### The felt-stack budget (V2 requirement 2) — "edit → visible" on the founder's real gesture
+
+The final threshold is judged against the TOTAL, not the backend floor. Terms, each sourced:
+
+| term | value | source | cut by an incremental/visible render? |
+|---|---|---|---|
+| debounce | **500 ms** | `PreviewPanel.tsx` `REFRESH_DEBOUNCE_MS` (frontend constant) | no — frontend tuning (V4) |
+| paginate | ~70–190 ms (content change); ~0 cached (colour-only) | measured (§2) | candidate 3 |
+| PDF render | ~282 ms full / **~36 ms visible-region** / ~1.1 s cold first-call | measured (§7) | **yes — candidates 1/2** |
+| HTTP + PDF transfer | part of the ~730 ms round trip earlier measured (defect 6) | FOUNDER_TRAVERSAL Lot-1 | yes — a visible-region PDF is far smaller |
+| `<embed>` reload | the browser re-parses/paints the WHOLE multi-hundred-page PDF blob | `PreviewPanel.tsx` `<embed src=blobUrl>`; browser term — needs a browser probe to isolate | yes — a small PDF parses/paints far faster |
+
+**The reading:** a visible-region incremental render cuts the **largest backend term (render)** AND
+shrinks the **frontend transfer + `<embed>` reload** (a 1–2 page PDF vs 155 pages) — it is the single
+lever touching the most of the budget. The debounce (500 ms) is a fixed frontend floor on its own
+(V4). The `<embed>`-reload term is the one still needing a browser measurement to size exactly.
+
+### Consequence for the CTO's V1–V4 (reported, not acted on — #7, stop (a))
+
+**V1 as issued ("pivot; the three candidates are dead; consign the reversal") rests on the retracted
+C2.** The arbitration shows candidates 1/2 are viable (~8×), so I have **NOT** consigned a
+"three-dead-candidates" reversal — that would engrave a measured-false claim. **This is #7 applied to
+the V1 verdict itself; I stop and report for a re-verdict** rather than build on it. V2's decomposition
+(this §7) is complete; V3 (preview artifact) is even more clearly deferrable — the PDF-as-preview
+survives if a visible-region render holds the budget, so fidelity stays free by construction; V4
+(frontend debounce/`<embed>`) stands unchanged and is confirmed by the budget as real, independent
+latency. **Owed: the CTO's re-verdict on the corrected picture before any P1 build or branch.**
