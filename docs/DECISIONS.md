@@ -1614,3 +1614,53 @@ indent", i.e. "no bug". It was caught by a plausibility check, not by the toolch
 **The real-browser proof (repeatable).** `frontend/scripts/verify-structure-editing.mjs` (`npm run verify-structure-editing`, the `capture-baseline.mjs` harness style — real Playwright chromium, requires both dev servers): imports the real 17-chapter corpus book, **drags a chapter up through the actual UI with a real streamed mouse gesture**, and asserts the stored order changed, the dragged chapter moved earlier, a version was snapshotted (undo target), the new order **survives a reload** (server-authoritative), and the editor has **0 serious/critical axe violations**. Green on 2026-07-21.
 
 **Related:** `STRUCTURE_EDITING_PHASE3.md` (the Level-2 review, §3bis spike + D1 + Q5), `UI_FOUNDATION.md` Decision 1 (build-in-house-except-accessibility), `TESTING_STRATEGY.md` (a test is only as honest as the property it measures), ADR-0019/ADR-0020 (spike-before-lock precedent), ADR-0052 (the export fix that makes a reorder visible in output at all).
+
+## ADR-0054: Approval Cadence — Intra-Chantier Autonomy Between Governance Gates
+
+**Status:** APPROVED (CTO directive, 2026-07-23). Governance principle, standing. Mirrored as
+non-negotiable #8 in `docs/CLAUDE.md`. This ADR is the durable, full-text home; the CLAUDE.md line is
+the pointer.
+
+**The problem it settles.** A confusion had set in between the project's *governance gates* and a
+reflex of requesting approval at every step. This ADR fixes the cadence. It **relaxes no existing
+gate**; it **forbids inventing new ones between them.** Each unjustified interruption dilutes the real
+gates — an approval asked where none is owed teaches that approvals are cheap, which is precisely what
+erodes the gates that matter.
+
+**The gates where an explicit CTO/founder approval is required — and these are the only ones:**
+
+1. **Session bootstrap** — state summary, then wait for approval before any code (`SESSION_BOOTSTRAP.md`).
+2. **Design Review** — every DR (Level 2 or mini-DR) is approved by the CTO *before the branch exists*
+   (non-negotiable #4).
+3. **Cadrages / measurement reports** — a cadrage ends at its constats, submitted to the CTO's verdict;
+   **never chained directly into the correctif.**
+4. **Taste-stops defined in the DR** — real pages, captures, the founder's aesthetic verdicts — at the
+   points the DR *names*, not elsewhere.
+5. **Merge into `main`** — on the CTO's word, never on your own initiative (GR-1).
+6. **Push** — verification that the founder is idle, as already engraved.
+7. **AUTHOR_EXPERIENCE mockups** — the founder's validation on captures before any construction (already
+   engraved).
+
+**Between these gates, autonomy is acquired.** Once a DR is approved and its commit sequence engraved,
+you build the *entire* sequence without re-asking: file edits, tests, lint, builds, **gated commits**.
+"Gated" means **each commit passes the Quality Gate before the next** — not that it waits for a human
+approval. Asking for approval per-file, per-intra-sequence-commit, or per test/lint/build execution is
+**explicitly forbidden.**
+
+**You stop of your own accord in exactly three cases:**
+- **(a) Measurement contradicts a premise of the approved DR** — non-negotiable #7: you report before
+  building on it.
+- **(b) You discover an active fidelity defect** — ADR-0050: it reorders the queue, you flag it.
+- **(c) The work requires leaving the approved perimeter** — a new dependency, a new port, a scope
+  exception: you ask (precedent ADR-0026 / ADR-0031).
+
+**Why an ADR and not only a workflow note.** No session carries memory into the next; a cadence that
+lived only in this conversation would be re-litigated every session as "should I ask here?". Written as
+a numbered decision, it survives, is indexed, and is citable at the moment a session is tempted to
+invent a gate. **This ADR's own consignation is the first application of the cadence** — the CTO
+directed it be recorded *without* requesting approval to do so.
+
+**Related:** `docs/CLAUDE.md` non-negotiable #8 (the pointer), `docs/SESSION_BOOTSTRAP.md` (gate 1),
+`docs/DESIGN_REVIEW_PROCESS.md` (gate 2), non-negotiable #4 (gate 2), ADR-0032 + `docs/QUALITY_GATE.md`
+("gated" = the per-commit Quality Gate), ADR-0050 (stop (b)), non-negotiable #7 (stop (a)),
+ADR-0026 / ADR-0031 (stop (c), scope-exception precedent), GR-1 in `docs/MERGE_CHECKLIST.md` (gate 5).
