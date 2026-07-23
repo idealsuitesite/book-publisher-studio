@@ -143,6 +143,14 @@ real book**:
   structure already exists; the assist correctly proposes little to nothing).
 - **The locked rule:** the DR ships WITH this freshly-measured probe (the RENDER_DRIFT 284→246
   analogue) or it is not done.
+- **MEASURED (2026-07-23, `structure-assist-gesture-counter.ts`, fresh re-import of the current
+  source):** POLE UNDER (founder-1) — **3,030 body blocks, 14 suggestions** (FOREWORD, INTRODUCTION,
+  CHAPTER 1–11, CONCLUSION), **all 14 genuine, 0 suspicious → precision 100% on this book**, so the
+  gesture count is **14 promotes + the hunt → 1 ("Make all"), with ZERO post-confirmation
+  corrections** (CTO vigilance 2: the ≈1 is a true 1 here, not a "confirm-all-then-dismiss-five").
+  POLE OVER (founder-2) — 127 entries, **0 suggestions → silent, the success at the second pole**.
+  The count is **14, not the stale ~7** (#7 paid off: the book carries 11 CHAPTER markers plus
+  FOREWORD/INTRODUCTION/CONCLUSION). **The chantier's success criterion is met, measured honestly.**
 
 ## §6 Mechanism (D2 & D4 folded in)
 
