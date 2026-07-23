@@ -96,9 +96,13 @@ pagination is the term breaking the budget on a real gesture. Not built now.
    (171) AND a continuation page (D1's split-tail case).
 3. **Scroll/zoom preserved across an edit** (D2's continuity criterion, proven in a real browser — the
    Playwright discipline of ADR-0053).
-4. **Invariants + full harnesses:** backend + frontend suites, tsc, eslint, builds, `verify-real-*`
+4. **Accessibility (commit-4 gate, CTO):** the PDF.js surface renders the standard **text layer** — the
+   page's text is **selectable / exposed to screen readers**, asserted by test. Canvas-only would render
+   the book mute to screen readers and text selection — serving author B by excluding some author B's.
+   The requirement carries a test, not only a sentence.
+5. **Invariants + full harnesses:** backend + frontend suites, tsc, eslint, builds, `verify-real-*`
    (throwaway server, zero trace, store baseline 8).
-5. **Founder taste-stop: YES** — the felt fluidity of the living studio is criterion A itself; the founder
+6. **Founder taste-stop: YES** — the felt fluidity of the living studio is criterion A itself; the founder
    judges on the screen, not on our numbers. His validation on the living studio is the last gate.
 
 ## §4 Scope boundaries
@@ -112,8 +116,23 @@ pagination is the term breaking the budget on a real gesture. Not built now.
 - **The `<embed>` ~26 ms carries an asterisk** (CTO): it is the `<embed>` load event, not necessarily the
   full progressive paint — the native viewer loads lazily, so the figure may under-state real paint. No
   verdict consequence (this term is not the bottleneck in either reading), but recorded honestly.
-- **n = 1 book** for the median/continuation judge (book 3). Faith-alone (structured, corpus) is available
-  as a second real book for the fidelity invariant if the CTO wants n = 2.
+- **n = 2 confirmed** (CTO): the fidelity judge runs on book 3 (median 171 + a continuation page — book 3
+  has the long split paragraphs) AND faith-alone (clean median + a Novel drop-cap page, crossing the
+  spike's hard-page requirement).
+
+## §5bis PDF.js feasibility spike — GREEN (2026-07-23, `INCREMENTAL_RENDER_SCOPE.md` will carry the run)
+**Verdict: GREEN — dependency feasible, locks at commit 3.** pdfjs-dist **6.1.200** (Mozilla, mature),
+loaded as ESM from the local build + worker in this env, painted the two HARD pages the CTO required
+(Decision 1): a book-3 **Gelasio** body region and a faith-alone chapter opening with the **Novel 2.5
+drop cap**. Both faithful — embedded Gelasio (serifs, citation italics), the drop cap at correct
+scale with the locked accent `#6E3B2F`, our running heads. Warm canvas **~70 ms/page** (one-time
+~105–132 ms worker init). **The tell that matters — font SUBSTITUTION — is closed** (a fallback font
+would show wrong serifs; it does not). **Disclosed limitation (CTO-accepted):** the side-by-side vs the
+NATIVE viewer was **not capturable** — the native PDF plugin surface does not composite for the
+screenshot tool; this is an **instrument limitation, not a fidelity signal.** Fidelity is established by
+(a) the substitution tell above, (b) the chantier's real guarantee — the byte-level invariant
+page-region ≡ page-export (stronger than a screenshot), and (c) the founder's final taste-stop on the
+living surface.
 
 ## §6 Proposed commit sequence (built only after approval; branch at the gate)
 1. **Backend — `renderPageRange` + the fidelity invariant.** Draw from the full `PaginatedBook`'s pages;
@@ -121,10 +140,11 @@ pagination is the term breaking the budget on a real gesture. Not built now.
    (the split-tail case). The load-bearing commit.
 2. **Backend — the region-render API** (a page-range export for a project), whitelisted + route tests in
    the same commit (the standing `setPartRole` lesson).
-3. **Frontend — the PDF.js feasibility spike** (spike-gated dependency lock: faithful paint of our real
-   PDF + a11y + perf in this install, ADR-0053 precedent). Lock the dependency only if green.
+3. **Frontend — lock the PDF.js dependency** (the feasibility spike is DONE and GREEN, §5bis; `npm i
+   --save pdfjs-dist@6.1.200` — the deliberate lock act, ADR-0053 precedent).
 4. **Frontend — the PDF.js canvas display** replacing the whole-`<embed>` reswap: incremental per-page
-   repaint, scroll/zoom preserved (proven in a real browser).
+   repaint, scroll/zoom preserved (proven in a real browser), **and the standard text layer** so the
+   page text is selectable / screen-reader-exposed (§3 judge point 4, asserted by test).
 5. **Frontend — window policy (D3) + V4 debounce (D4).**
 6. **The judge (§3) + docs reconciliation.** Engine ≤ 300 ms, page identity on both pages, scroll
    preserved, full harnesses — then the founder taste-stop on the living studio.
