@@ -30,7 +30,10 @@ interface Props {
 export function CleanupSuggestionsPanel({ projectId, refreshKey, onEdited }: Props) {
   const [suggestions, setSuggestions] = useState<CleanupSuggestionDTO[] | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
-  const [busy, setBusy] = useState(false);
+  // FOUNDER_TRAVERSAL_3 A1: track WHICH control is in flight ('all', or a marker's id), not one shared
+  // flag — so an operation changes only its OWN button's state (the EDITION_BUTTON_STATE fix, defect 5
+  // pattern: a Set of in-flight keys, the other buttons stay clickable). Latency is BATCH_CONFIRM_LATENCY.
+  const [busyKeys, setBusyKeys] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,8 +50,8 @@ export function CleanupSuggestionsPanel({ projectId, refreshKey, onEdited }: Pro
   const active = suggestions.filter((s) => !dismissed.has(s.markerId));
   if (active.length === 0) return null; // nothing to collapse → stay silent (the bidirectional pole)
 
-  async function collapse(markerIds: string[]) {
-    setBusy(true);
+  async function collapse(markerIds: string[], key: string) {
+    setBusyKeys((prev) => new Set(prev).add(key));
     setError(null);
     try {
       let updated: ProjectDTO | undefined;
@@ -61,7 +64,11 @@ export function CleanupSuggestionsPanel({ projectId, refreshKey, onEdited }: Pro
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not collapse the marker.');
     } finally {
-      setBusy(false);
+      setBusyKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     }
   }
 
@@ -79,8 +86,8 @@ export function CleanupSuggestionsPanel({ projectId, refreshKey, onEdited }: Pro
             You styled these as their own empty headings. Collapse each into the chapter it belongs to — nothing changes until you confirm.
           </p>
         </div>
-        <Button onClick={() => void collapse(active.map((s) => s.markerId))} disabled={busy}>
-          {busy ? 'Working…' : 'Collapse all'}
+        <Button onClick={() => void collapse(active.map((s) => s.markerId), 'all')} disabled={busyKeys.has('all')}>
+          {busyKeys.has('all') ? 'Working…' : 'Collapse all'}
         </Button>
       </div>
 
@@ -94,16 +101,17 @@ export function CleanupSuggestionsPanel({ projectId, refreshKey, onEdited }: Pro
               <span className="text-app-text-muted"> → {s.canonicalLabel ?? s.targetTitle}</span>
             </span>
             <span className="flex shrink-0 items-center gap-2">
+              {/* A1: only THIS row's Collapse shows the in-flight state; every other button stays live. */}
               <button
                 className="text-xs font-medium text-app-text underline underline-offset-2 hover:no-underline disabled:opacity-50"
-                disabled={busy}
-                onClick={() => void collapse([s.markerId])}
+                disabled={busyKeys.has(s.markerId)}
+                onClick={() => void collapse([s.markerId], s.markerId)}
               >
-                Collapse
+                {busyKeys.has(s.markerId) ? 'Working…' : 'Collapse'}
               </button>
+              {/* Dismiss is synchronous (no round-trip) — it is never disabled by an in-flight op. */}
               <button
-                className="text-xs text-app-text-muted hover:text-app-text disabled:opacity-50"
-                disabled={busy}
+                className="text-xs text-app-text-muted hover:text-app-text"
                 onClick={() => setDismissed((prev) => new Set(prev).add(s.markerId))}
               >
                 Dismiss

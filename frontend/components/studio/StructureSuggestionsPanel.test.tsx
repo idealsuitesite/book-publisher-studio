@@ -63,6 +63,23 @@ describe('StructureSuggestionsPanel (STRUCTURE_ASSIST)', () => {
     expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'promoteToChapter', blockId: 'b2' });
   });
 
+  it('A1: an in-flight promote changes ONLY its own button — the others stay live', async () => {
+    vi.mocked(fetchStructureSuggestions).mockResolvedValue([suggestion('b1', 'INTRODUCTION'), suggestion('b2', 'CHAPTER 1')]);
+    let resolveEdit: (p: ProjectDTO) => void = () => {};
+    vi.mocked(editStructure).mockImplementation(() => new Promise<ProjectDTO>((res) => { resolveEdit = res; }));
+    render(<StructureSuggestionsPanel projectId="p1" refreshKey="k" onEdited={vi.fn()} />);
+
+    await screen.findByText('INTRODUCTION');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Make chapter' })[0]); // the b1 row
+
+    expect(screen.getByRole('button', { name: 'Working…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Make chapter' })).toBeEnabled(); // only b2's remains
+    expect(screen.getByRole('button', { name: 'Make all chapters' })).toBeEnabled();
+    screen.getAllByRole('button', { name: 'Dismiss' }).forEach((b) => expect(b).toBeEnabled());
+
+    resolveEdit({ updatedAt: 'x' } as ProjectDTO);
+  });
+
   it('"Dismiss" removes a candidate from the list without promoting it (session-remembered)', async () => {
     vi.mocked(fetchStructureSuggestions).mockResolvedValue([suggestion('b1', 'INTRODUCTION'), suggestion('b2', 'CHAPTER 1')]);
     render(<StructureSuggestionsPanel projectId="p1" refreshKey="k" onEdited={vi.fn()} />);
