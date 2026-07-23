@@ -21,7 +21,7 @@ import { MammothParser } from '../src/infrastructure/parsers/MammothParser';
 import { HtmlNormalizer } from '../src/infrastructure/normalizers/HtmlNormalizer';
 import { ASTBuilder } from '../src/domain/services/ASTBuilder';
 import { classifyMarker } from '../src/domain/services/structureAssist/structureTaxonomy';
-import { classifyEditorialTitle, EDITORIAL_CATEGORIES } from '../../frontend/lib/editorialParts';
+import { classifyEditorialTitle } from '../../frontend/lib/editorialParts';
 import type { Book, Content } from '../src/domain/models/Book';
 
 const BOOK2 = '1784760982271-w4n3yjxxw';
