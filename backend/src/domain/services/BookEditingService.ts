@@ -263,6 +263,14 @@ export class BookEditingService {
    * The shared split (CREATE_CHAPTER's découpe, reused not duplicated — CTO D1): find a promotable
    * text block in a content list and return the blocks BEFORE it, the block itself, and the blocks
    * AFTER it. Throws a named `ContentNotFoundError` if the id is absent or the block is not text.
+   *
+   * ⚠ `SUBSECTION_APPLY_ORDER` (CTO consignation, 2026-07-23). Every op built on this split is
+   * GREEDY BY DESIGN — it takes ALL blocks after the marker (`after`). Consequence: any BATCH
+   * application of `promoteToChapter` / `promoteToSubsection` over several markers in the SAME
+   * container MUST go in REVERSE document order, or an earlier marker swallows a later one. This is
+   * locked by test (`BookEditingService.promoteToSubsection.test.ts` — two markers, reverse order,
+   * two sections, nothing lost; and the panels apply reversed), never by convention. Do not
+   * "simplify" a batch to forward order without seeing that test fail.
    */
   private splitContentAt(content: Block[], blockId: string, op: string): { before: Block[]; block: Paragraph; after: Block[] } {
     const i = content.findIndex((b) => b.id === blockId);

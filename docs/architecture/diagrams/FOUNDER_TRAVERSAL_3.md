@@ -187,6 +187,8 @@ two-book limit on Home; button fluidity.
 
 ## §6 The engraved sequence (CTO)
 
+**A1 button-state fix ✅ → A2 repetition-guard fix ✅ → A4 measure + fix ✅ → B5 Design Review + build ✅ — the lot is CLOSED** (bar `BATCH_CONFIRM_LATENCY`, its own perf DR, and the consigned follow-ups). **B5 `SUBCHAPTER_PROMOTION` MERGED** (`--no-ff` `bcfa2ae`, 4 commits): the recurring editorial name becomes a section of each chapter (book 3 "Conclusion" ×26 → 26 sections, chapters 22→22 unchanged); `promoteToSubsection` + the shared `repeatedEditorialKeys` (D3) + the API/mutation/panel; `SUBSECTION_APPLY_ORDER` locked by test. Post-merge gate: backend 890/890, frontend 230/230, live harnesses 4/4 · 16/16 · 4/4. The structure family is complete — assist / cleanup / subchapter, each silent when it has nothing to say.
+
 **A1 button-state fix ✅ → A2 repetition-guard fix ✅ → A4 measure (what the remainder should be) →
 B5 Design Review.** `BATCH_CONFIRM_LATENCY` and Lot C consigned. Each correctif measured-first, its
 own atomic commit, his projects strictly read-only, no fabricated fixtures.
