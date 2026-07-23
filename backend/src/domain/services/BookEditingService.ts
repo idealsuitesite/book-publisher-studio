@@ -1,5 +1,6 @@
 import type { Book, Content, Section, Chapter, Paragraph, Block, TitlePage, CopyrightPage } from '../models/Book';
 import { ContentNotFoundError } from '../../shared/errors/ContentNotFoundError';
+import { classifyMarker } from './structureAssist/structureTaxonomy';
 
 /**
  * A partial front-matter edit (MINI_DR_EDIT_FRONT_MATTER §2.2): `undefined` leaves a section
@@ -306,6 +307,87 @@ export class BookEditingService {
   }
 
   /**
+   * STRUCTURE_CLEANUP (STRUCTURE_CLEANUP_DR.md §6.2) — collapse an empty MARKER heading the author
+   * styled as its own `Heading 1` (`CHAPTER n`, `INTRODUCTION`) into the real chapter that follows
+   * it. The over-structured author's one-gesture repair (the 29→1 of that chantier).
+   *
+   * It is a REMOVAL, not a merge — the marker is empty (0 blocks, 0 sections), so nothing merges
+   * INTO anything; removing it lets the following chapter flow up and auto-number. This is the
+   * anti-defect of the cadrage's Constat 3: `mergeChapterIntoPrevious` kept the marker's title and
+   * dropped the follower's `.sections` (it concatenates `.content` only) — a mass content loss
+   * (ADR-0050). `collapseMarker` never READS the follower's sections, so they survive by construction
+   * (pinned by the section-survival test, born with this op).
+   *
+   * STRICT typed guard (D2): only an EMPTY marker collapses — 0 content blocks AND 0 sections, a
+   * recognised marker title, NOT a part divider, with a real (non-marker) title immediately after.
+   * Every other case throws `ContentNotFoundError` (the route maps it to the named CONTENT_NOT_FOUND,
+   * never a 500) — tested both ways.
+   *
+   * A1 numbered (`CHAPTER n`): remove the marker; `renumberChapters` gives the follower its number.
+   * A2 editorial (`INTRODUCTION`/`CONCLUSION`, D3, CTO subtitle variant): the follower INHERITS the
+   * editorial identity — its title becomes the canonical label (`Introduction`) so the existing
+   * title-based machinery (`classifyEditorialTitle`, bookFacts count + Proof panel) recognises it,
+   * and its own descriptive title SURVIVES as the `subtitle` (no authored title destroyed, ADR-0050;
+   * reuses `Chapter.subtitle`, shipped MINI_DR_SUBTITLE_FIELD). Placement is NOT auto-set — role stays
+   * the author's own `setPartRole` gesture (MINI_DR_EDITORIAL_PLACEMENT: never auto-inferred).
+   */
+  collapseMarker(book: Book, markerId: string, now: Date = new Date()): Book {
+    const index = book.mainContent.findIndex((c) => c.type === 'chapter' && c.id === markerId);
+    if (index === -1) {
+      throw new ContentNotFoundError(`collapseMarker: no top-level chapter with id "${markerId}"`);
+    }
+    const marker = book.mainContent[index] as Chapter;
+    if (marker.partOpener) {
+      throw new ContentNotFoundError(`collapseMarker: "${markerId}" is a part divider — use removePartOpener`);
+    }
+    // The strict guard: an empty marker is 0 content blocks AND 0 sections. Anything with content or
+    // sections is not a marker to collapse — refuse rather than risk losing it (the Constat-3 defect).
+    if (marker.content.length > 0 || (marker.sections?.length ?? 0) > 0) {
+      throw new ContentNotFoundError(
+        `collapseMarker: chapter "${markerId}" is not an empty marker (it has content or sections) — nothing to collapse`
+      );
+    }
+    const kind = classifyMarker(marker.title);
+    if (!kind) {
+      throw new ContentNotFoundError(`collapseMarker: "${marker.title}" is not a recognised marker`);
+    }
+    const target = book.mainContent[index + 1];
+    if (!target || classifyMarker(target.title)) {
+      throw new ContentNotFoundError(
+        `collapseMarker: no real title follows the marker "${marker.title}" — nothing to collapse into`
+      );
+    }
+
+    // A2: the follower inherits the editorial identity, keeping its descriptive title as the subtitle
+    // (only if it has none already — an existing subtitle is never overwritten). `...target` preserves
+    // its content AND sections untouched — the section-survival guarantee.
+    let mainContent = book.mainContent;
+    if (kind.kind === 'editorial' && target.type === 'chapter') {
+      const editorialTarget: Chapter = {
+        ...target,
+        title: kind.label,
+        subtitle: target.subtitle ?? target.title,
+        updatedAt: now,
+      };
+      mainContent = [...book.mainContent.slice(0, index + 1), editorialTarget, ...book.mainContent.slice(index + 2)];
+    }
+
+    // Remove the empty marker and renumber — the proven removePartOpener mechanism, generalized.
+    return this.removeTopLevelAt({ ...book, mainContent }, index, now);
+  }
+
+  /**
+   * Remove the top-level entry at `index` and renumber — the shared removal mechanism behind
+   * `removePartOpener` (a divider) and `collapseMarker` (an empty marker). The followers flow up by
+   * position; `renumberChapters` reassigns chapter numbers. Each caller owns its OWN strict guard on
+   * WHAT may be removed — this helper only performs the splice, never decides eligibility.
+   */
+  private removeTopLevelAt(book: Book, index: number, now: Date): Book {
+    const rebuilt: Content[] = [...book.mainContent.slice(0, index), ...book.mainContent.slice(index + 1)];
+    return { ...book, mainContent: this.renumberChapters(rebuilt, now) };
+  }
+
+  /**
    * Insert a PART OPENER (Part I / Part II divider, PART_LEVEL_STRUCTURE §3.4) at `index` in
    * `mainContent` (0..length). A titled, blockless chapter flagged `partOpener: true` — its page
    * is the divider; the chapters "in" the part are those that follow it, by position. Continuous
@@ -343,8 +425,8 @@ export class BookEditingService {
     if (index === -1) {
       throw new ContentNotFoundError(`removePartOpener: no part opener with id "${id}"`);
     }
-    const rebuilt: Content[] = [...book.mainContent.slice(0, index), ...book.mainContent.slice(index + 1)];
-    return { ...book, mainContent: this.renumberChapters(rebuilt, now) };
+    // The strict guard (opener-only) is above; the splice+renumber is the shared mechanism.
+    return this.removeTopLevelAt(book, index, now);
   }
 
   /**
