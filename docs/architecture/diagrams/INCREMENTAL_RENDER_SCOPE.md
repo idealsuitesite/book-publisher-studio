@@ -183,3 +183,71 @@ the V1 verdict itself; I stop and report for a re-verdict** rather than build on
 survives if a visible-region render holds the budget, so fidelity stays free by construction; V4
 (frontend debounce/`<embed>`) stands unchanged and is confirmed by the budget as real, independent
 latency. **Owed: the CTO's re-verdict on the corrected picture before any P1 build or branch.**
+
+---
+
+## §8 The two authorized probes (V1 re-verdict) — median region + `<embed>` (2026-07-23)
+
+The CTO's re-verdict: **P1's form is candidate 1 (visible-region render), V4 folded in; candidate 3
+(partial repagination) second-order; V3 deferred; the floor lever dead with C2.** Two read-only probes
+authorized before/at the DR. Threshold set: **the engine contribution of "edit → visible" (paginate +
+region render + transfer + paint, EXCLUDING the 500 ms debounce) ≤ 300 ms hot on the edited book 3.**
+
+### Probe 1 — the real MEDIAN region (`spikes/median-region-render-probe.ts`)
+Not chapter 1, not the document start — a true mid-book window of book 3 (340 pages), with its real
+pagination:
+- **full render 402 ms** (warm); **single mid page 171 = 19 blocks → 19.5 ms (~20×)**; 2-page mid
+  window (171–172) = 39 blocks → 21.2 ms. **The ~20× leverage of candidate 1 is confirmed on a REAL
+  median region** (better than the ~36 ms chapter-1 extrapolation, which carried a chapter opening).
+- **The fidelity trap, demonstrated.** Rendered in isolation, page 171's blocks number from **page 1**,
+  not 171. The full pagination `Page` model already owns what a faithful partial render must thread:
+  `number`, `runningHead`, `startsWithContinuation` / `splitAfterLines`, `blankPagesBefore`. The block
+  y-origin is deterministic (page top, or a continuation tail via `splitAfterLines`). **The DR's judge
+  must assert: page N rendered-in-region ≡ page N of the full export (text, geometry, number) on real
+  book 3 mid-book — and must pick a page that is a CONTINUATION (page 171 was clean), the one case that
+  exercises the split-tail y-origin.**
+
+### Probe 2 — the `<embed>` term (browser, `mcp__Claude_Browser`)
+The last budget unknown. PDFs rendered from book 3, served locally, measured in the real browser:
+- **Sizes:** full 340 pp = **0.48 MB**; region 2 pp = **17 KB** (29× smaller). **HTTP transfer** (curl):
+  full 34 ms, region 1.8 ms. **Browser fetch + `<embed>` load event:** full 26 ms, region 17 ms.
+- **Constat A — the `<embed>` parse+paint is NOT the felt bottleneck.** The native PDF viewer loads the
+  0.48 MB / 340-page doc in ~26 ms (progressive — first page paints fast, rest lazy on scroll). The
+  founder's "several seconds" was the BACKEND stack (debounce + render + round-trip), which candidate 1
+  + V4 attack — not the browser.
+- **Constat B — but `<embed src>` cannot do a STATEFUL incremental swap.** Measured: `<embed>` exposes
+  no page API (`getCurrentPage` absent, `contentDocument` null); setting `.src` replaces the whole
+  plugin → **the author's scroll position and zoom reset on every edit.** To update only the visible
+  region while preserving the author's place, the display surface must be **canvas/PDF.js or a
+  region-PDF**, not a full-PDF `<embed>` reswap. **This is distinct from V3's fidelity risk:** rendering
+  the REAL exported PDF's pages to a PDF.js canvas keeps fidelity free (same bytes, different DISPLAY)
+  while enabling incremental, scroll-preserving updates. The DR must decide the display surface.
+
+### The decomposed "edit → visible" budget (book 3 edited, warm) — for the ≤ 300 ms threshold
+
+| term | full render today | with candidate 1 | source |
+|---|---|---|---|
+| debounce | 500 ms (outside threshold) | 500 ms (V4 tunes it) | `REFRESH_DEBOUNCE_MS` |
+| paginate | ~72 ms | ~72 ms (candidate 3 if needed) | measured |
+| render | ~402 ms | **~20 ms** | Probe 1 |
+| transfer | ~34 ms | ~2 ms | curl/browser |
+| `<embed>` load/paint | ~26 ms | ~17 ms | Probe 2 |
+| **engine total (excl. debounce)** | **~534 ms → OVER** | **~111 ms → UNDER** | — |
+
+**Candidate 1 is decisive:** it takes the engine budget from ~534 ms (over) to **~111 ms (well under
+the 300 ms threshold)**, the render term (402 → 20 ms) being the cut. Pagination (~72 ms) becomes the
+largest remaining term → candidate 3 is the lever IF a re-measure after candidate 1 demands it.
+
+### Consignation + integrity note
+- **`COLD_RENDER_FIRST_OPEN`** consigned (`TODO.md`): the ~1.1 s first-open cold render is a WELCOME
+  problem, OUT of P1 scope — mixing it would dilute criterion A.
+- **Store integrity:** a mtime that appeared to jump 19:11→20:11 was investigated and proved a
+  timezone-display artifact (identical `.368797200` ns; 8 projects, latest `updated_at` 19:11:34, size
+  unchanged) — the founder's store was never written by any probe this session.
+
+### Re-engraved sequence (CTO)
+probes (done: §8) → **DR of candidate 1** (the page-true fidelity question at the centre; V4 gains
+inside; the pagination cache + display-surface articulated) → CTO gate → construction → judge against
+the 300 ms threshold AND page-region ≡ page-export identity (real book 3, mid-book, a continuation
+page) → then the AUTHOR_EXPERIENCE Design Review opens with a PROVEN criterion A. **Branch at the CTO
+gate (preventive rule). Nothing built before the DR is approved.**
