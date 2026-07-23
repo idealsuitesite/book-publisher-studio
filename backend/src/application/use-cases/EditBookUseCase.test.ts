@@ -142,3 +142,59 @@ describe('EditBookUseCase — create ops dispatch (CREATE_CHAPTER.md)', () => {
     expect(saved.versions).toHaveLength(2); // one snapshot per edit
   });
 });
+
+// BATCH_CONFIRM_LATENCY correctif A — the persistence property: ONE gesture = ONE snapshot = ONE save.
+// Success ⇒ +1 version; failure ⇒ +0 and the stored book byte-identical (CTO amendment 1, at the layer
+// where snapshot/save actually happen).
+describe('EditBookUseCase — batchApply is ONE snapshot / ONE save (BATCH_CONFIRM_LATENCY)', () => {
+  let repo: InMemoryProjectRepository;
+  let projectService: ProjectService;
+  let useCase: EditBookUseCase;
+  let id: string;
+
+  // A preamble carrying two typed markers — the assist's "Make all chapters" input.
+  function withMarkers(): Book {
+    return createBook({ title: 'T', author: 'A', language: 'en' }, [
+      {
+        type: 'section', id: 'sec', title: '', level: 1, createdAt: new Date(), updatedAt: new Date(),
+        content: [
+          { type: 'paragraph', id: 'a', text: 'Intro.' },
+          { type: 'paragraph', id: 'm1', text: 'CHAPTER 1' },
+          { type: 'paragraph', id: 'b', text: 'Body one.' },
+          { type: 'paragraph', id: 'm2', text: 'CHAPTER 2' },
+          { type: 'paragraph', id: 'c', text: 'Body two.' },
+        ],
+      },
+    ]);
+  }
+
+  beforeEach(async () => {
+    repo = new InMemoryProjectRepository();
+    projectService = new ProjectService();
+    useCase = new EditBookUseCase(repo, projectService, new BookEditingService());
+    const project = projectService.create(withMarkers(), { layoutName: 'letter', themeName: 'classic' });
+    id = project.id;
+    await repo.save(project);
+  });
+
+  it('success: N promotions become ONE version with a descriptive label, both chapters created', async () => {
+    const ok = await useCase.execute(id, { type: 'batchApply', op: 'promoteToChapter', ids: ['m1', 'm2'] });
+    expect(ok).toBe(true);
+
+    const saved = (await repo.findById(id))!;
+    expect(saved.versions).toHaveLength(1); // +1, not +N — the ceiling property
+    expect(saved.versions[0].label).toBe('Convert all — 2 chapters created'); // V2i: the undo point reads honestly
+    expect(saved.book.mainContent.filter((c) => c.type === 'chapter').map((c) => c.title)).toEqual(['CHAPTER 1', 'CHAPTER 2']);
+  });
+
+  it('failure: a bad id mid-batch persists NOTHING — +0 versions, stored book byte-identical', async () => {
+    const before = (await repo.findById(id))!;
+    await expect(
+      useCase.execute(id, { type: 'batchApply', op: 'promoteToChapter', ids: ['m1', 'ghost'] })
+    ).rejects.toThrow(ContentNotFoundError);
+
+    const saved = (await repo.findById(id))!;
+    expect(saved.versions).toHaveLength(0); // +0: the whole gesture failed, no phantom half-version
+    expect(saved.book).toEqual(before.book); // byte-identical: no half-transformed book left behind
+  });
+});

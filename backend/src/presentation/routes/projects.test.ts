@@ -284,6 +284,62 @@ describe('POST /api/projects/:id/structure — manual structure editing (STRUCTU
     expect(res.body.code).toBe('CONTENT_NOT_FOUND');
   });
 
+  // BATCH_CONFIRM_LATENCY correctif A — the batch mutation carried end to end by the generic route.
+  async function seedTwoPromotable(): Promise<{ app: ReturnType<typeof createApp>; id: string; ids: string[] }> {
+    const app = createApp();
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs: ['Alpha.', 'Beta.', 'Gamma.'] });
+    const imported = await request(app)
+      .post('/api/manuscripts/import')
+      .attach('file', buffer, { filename: 'b.docx', contentType: DOCX_MIME });
+    const id = imported.body.projectId as string;
+    const got = await request(app).get(`/api/projects/${id}`);
+    const content = got.body.book.mainContent[0].content as { id: string }[];
+    return { app, id, ids: [content[1].id, content[2].id] }; // Beta, Gamma
+  }
+
+  it('batchApply: promotes N blocks in ONE gesture — 200, N chapters, ONE snapshot', async () => {
+    const { app, id, ids } = await seedTwoPromotable();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'batchApply', op: 'promoteToChapter', ids });
+    expect(res.status).toBe(200);
+    const chapters = res.body.book.mainContent.filter((c: { type: string }) => c.type === 'chapter');
+    expect(chapters.length).toBe(3); // Chapter One + the two promoted
+    expect(res.body.versions).toHaveLength(1); // ONE version for the whole batch, not N
+  });
+
+  it('400 INVALID_MUTATION on batchApply with an unrecognised op', async () => {
+    const { app, id, ids } = await seedTwoPromotable();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'batchApply', op: 'rename', ids });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_MUTATION');
+  });
+
+  it('400 INVALID_MUTATION on batchApply with an empty id list', async () => {
+    const { app, id } = await seedTwoPromotable();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'batchApply', op: 'promoteToChapter', ids: [] });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_MUTATION');
+  });
+
+  it('400 INVALID_MUTATION on batchApply with a non-string id in the list', async () => {
+    const { app, id } = await seedTwoPromotable();
+    const res = await request(app).post(`/api/projects/${id}/structure`).send({ type: 'batchApply', op: 'promoteToChapter', ids: ['ok', 123] });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_MUTATION');
+  });
+
+  it('400 CONTENT_NOT_FOUND on batchApply with an unknown id — atomic, nothing persisted', async () => {
+    const { app, id, ids } = await seedTwoPromotable();
+    const res = await request(app)
+      .post(`/api/projects/${id}/structure`)
+      .send({ type: 'batchApply', op: 'promoteToChapter', ids: [ids[0], 'ghost'] });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('CONTENT_NOT_FOUND');
+    // the whole gesture failed → no snapshot, book unchanged (still one chapter, zero versions)
+    const after = await request(app).get(`/api/projects/${id}`);
+    expect(after.body.book.mainContent.filter((c: { type: string }) => c.type === 'chapter').length).toBe(1);
+    expect(after.body.versions).toHaveLength(0);
+  });
+
   // MINI_DR_EDITORIAL_PLACEMENT — the generic route must carry setPartRole through parseMutation
   // (the untrusted-body boundary). This closes the gap that shipped a 400 in live testing: the
   // dispatch was wired but the route validator did not whitelist the new variant.

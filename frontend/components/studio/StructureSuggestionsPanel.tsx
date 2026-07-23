@@ -50,17 +50,14 @@ export function StructureSuggestionsPanel({ projectId, refreshKey, onEdited }: P
   const active = suggestions.filter((s) => !dismissed.has(s.blockId));
   if (active.length === 0) return null; // nothing to suggest → stay silent (the over-structured pole)
 
-  async function promote(blockIds: string[], key: string) {
+  // BATCH_CONFIRM_LATENCY correctif A: "Make all" is now ONE call — one snapshot, one save, one
+  // round-trip (was N sequential round-trips each saving the whole aggregate). The reverse-order law
+  // moved SERVER-SIDE (BookEditingService.applyBatch), so the panel sends the ids as they are.
+  async function run(key: string, call: () => Promise<ProjectDTO>) {
     setBusyKeys((prev) => new Set(prev).add(key));
     setError(null);
     try {
-      let updated: ProjectDTO | undefined;
-      // Reverse document order: promoteToChapter pulls the blocks after a marker into its chapter,
-      // so promoting last-first keeps every remaining marker a top-level block (a clean flat split).
-      for (const blockId of [...blockIds].reverse()) {
-        updated = await editStructure(projectId, { type: 'promoteToChapter', blockId });
-      }
-      if (updated) onEdited(updated); // the refreshKey change re-fetches the now-smaller proposal
+      onEdited(await call()); // the refreshKey change re-fetches the now-smaller proposal
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create the chapter.');
     } finally {
@@ -71,6 +68,10 @@ export function StructureSuggestionsPanel({ projectId, refreshKey, onEdited }: P
       });
     }
   }
+
+  const promoteAll = (ids: string[]) => run('all', () => editStructure(projectId, { type: 'batchApply', op: 'promoteToChapter', ids }));
+  // The per-item button stays one-gesture-one-version (its own undo label), not a batch of one.
+  const promoteOne = (blockId: string) => run(blockId, () => editStructure(projectId, { type: 'promoteToChapter', blockId }));
 
   return (
     <section
@@ -86,7 +87,7 @@ export function StructureSuggestionsPanel({ projectId, refreshKey, onEdited }: P
             We found headings you typed as text. Confirm to turn them into chapters — nothing changes until you do.
           </p>
         </div>
-        <Button onClick={() => void promote(active.map((s) => s.blockId), 'all')} disabled={busyKeys.has('all')}>
+        <Button onClick={() => void promoteAll(active.map((s) => s.blockId))} disabled={busyKeys.has('all')}>
           {busyKeys.has('all') ? 'Working…' : 'Make all chapters'}
         </Button>
       </div>
@@ -104,7 +105,7 @@ export function StructureSuggestionsPanel({ projectId, refreshKey, onEdited }: P
               <button
                 className="text-xs font-medium text-app-text underline underline-offset-2 hover:no-underline disabled:opacity-50"
                 disabled={busyKeys.has(s.blockId)}
-                onClick={() => void promote([s.blockId], s.blockId)}
+                onClick={() => void promoteOne(s.blockId)}
               >
                 {busyKeys.has(s.blockId) ? 'Working…' : 'Make chapter'}
               </button>

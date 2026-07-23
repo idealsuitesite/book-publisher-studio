@@ -109,6 +109,14 @@ export class EditBookUseCase {
         });
         return this.projectService.replaceBook(snapped, book);
       }
+      case 'batchApply': {
+        // BATCH_CONFIRM_LATENCY correctif A: ONE gesture → ONE snapshot → ONE save (execute() saves
+        // once). This is the whole win over the old N-round-trip loop. The label is DESCRIPTIVE (CTO
+        // amendment V2i) so the single undo point reads honestly in history, never a generic string.
+        const snapped = this.projectService.snapshot(project, batchLabel(mutation.op, mutation.ids.length));
+        const book = this.editingService.applyBatch(this.projectService.currentBook(snapped), mutation.op, mutation.ids);
+        return this.projectService.replaceBook(snapped, book);
+      }
       case 'restoreVersion':
         // Undo: no new snapshot — restoreVersion sets book+settings from the version and keeps the
         // whole log (nothing after it is deleted). ProjectService owns that invariant.
@@ -118,5 +126,22 @@ export class EditBookUseCase {
         throw new Error(`Unknown structure mutation: ${JSON.stringify(_exhaustive)}`);
       }
     }
+  }
+}
+
+/**
+ * The version label for a batch "…all" gesture (BATCH_CONFIRM_LATENCY correctif A, CTO amendment
+ * V2i). "Make all" is ONE undo point (Q2-coherent) — so the label must say WHAT it was, with the
+ * count, never a generic string, or the coarse undo point is unreadable in the history.
+ */
+function batchLabel(op: 'promoteToChapter' | 'collapseMarker' | 'promoteToSubsection', n: number): string {
+  const s = n === 1 ? '' : 's';
+  switch (op) {
+    case 'promoteToChapter':
+      return `Convert all — ${n} chapter${s} created`;
+    case 'collapseMarker':
+      return `Collapse all — ${n} marker${s} removed`;
+    case 'promoteToSubsection':
+      return `Make all sections — ${n} section${s} created`;
   }
 }

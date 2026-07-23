@@ -45,7 +45,7 @@ describe('CleanupSuggestionsPanel (STRUCTURE_CLEANUP)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('"Collapse all" collapses every marker (document order — order-independent)', async () => {
+  it('"Collapse all" issues ONE batch call (BATCH_CONFIRM_LATENCY)', async () => {
     vi.mocked(fetchCleanupSuggestions).mockResolvedValue([
       numbered('m1', 'CHAPTER 1', 'A'),
       numbered('m2', 'CHAPTER 2', 'B'),
@@ -57,9 +57,8 @@ describe('CleanupSuggestionsPanel (STRUCTURE_CLEANUP)', () => {
     await screen.findByText('CHAPTER 1');
     await userEvent.click(screen.getByRole('button', { name: 'Collapse all' }));
 
-    await waitFor(() => expect(vi.mocked(editStructure)).toHaveBeenCalledTimes(3));
-    const order = vi.mocked(editStructure).mock.calls.map((c) => (c[1] as { markerId: string }).markerId);
-    expect(order).toEqual(['m1', 'm2', 'm3']);
+    await waitFor(() => expect(vi.mocked(editStructure)).toHaveBeenCalledTimes(1)); // ONE round-trip, not N
+    expect(vi.mocked(editStructure)).toHaveBeenCalledWith('p1', { type: 'batchApply', op: 'collapseMarker', ids: ['m1', 'm2', 'm3'] });
     expect(onEdited).toHaveBeenCalledTimes(1);
   });
 
