@@ -457,7 +457,9 @@ real use: (1) the single write path holds live, (2) the never-a-false-N honesty 
 
 ### Milestone 3 — Compose and surfaces (the founder taste-stops land here)
 
-**PROGRESS (2026-07-25): C6 DONE + gated green (`c4b4318`).** C7–C10 remain; the M3 INPUTS below fold into them. Resume at C7.
+**PROGRESS (2026-07-25): C6 + C7 DONE + gated green.** C8–C10 remain; the M3 INPUTS below fold into them. Resume at C8.
+> - **C6 (`c4b4318`)** — D2 dedication + preface composed + tri-format rendered.
+> - **C7 (`4bb7f79`)** — the D2 add-front-matter affordance (verified live: a composed preface surfaces in the skeleton + renders in the Proof, 31→32 pages) + the two P1-defects: **typed human errors** (`lib/structure-errors.ts`, one author-language sentence per transport code, never the raw string; `ApiErrorCode` reconciled with the routes' real codes — #7) and the **visible promote-undo** (an undo bar at the gesture's result; the newest version is the pre-edit snapshot, O(1) after the flip). Frontend 255/255, tsc + eslint clean, backend tsc clean.
 
 | # | Commit | Judge / verification | Taste-stop |
 |---|---|---|---|
