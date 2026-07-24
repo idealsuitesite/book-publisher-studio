@@ -136,8 +136,10 @@ head unchanged" — and its idempotency twin (D3): retried with the same version
 
 ## §5 The real-store migration (requirement c — first-class)
 
-The founder's store is **93 MB — 10 projects, book 3 in THREE copies (v34/v22/v2)**. The migration is a
-first-class deliverable, not a `migrate()` side note:
+The founder's store is **~94 MB — 9 projects, 91 versions, book 3 in THREE copies (v34/v22/v2)**.
+*(Corrected 2026-07-24 from the earlier "10 projects" — the dry-run measured 9; the P1-merge "9-project
+baseline" headers had it right. #7 on this DR's own figure.)* The migration is a first-class deliverable,
+not a `migrate()` side note:
 1. **Backup before** — copy `studio.db` (+ `-wal`, `-shm`) to a timestamped backup; the migration refuses
    to run if the backup step failed.
 2. **Migration proven reversible** — v2 is additive (new columns; the `payload` column is untouched), so
@@ -221,3 +223,39 @@ the real store's behaviour — the whole reason the shared suite exists (ADR-004
 
 **NEXT (fresh session): the dry-run-on-copy + amendment-3 capture → the flip → the migration → the wiring →
 the judge → M3 resumes.** Step 1 is done; the additive foundation de-risks the rest.
+
+---
+
+## §10 BUILD COMPLETE — the flip, the migration, and the judge are GREEN (2026-07-24/25)
+
+The engraved sequence ran end to end; **B is code-complete and green on `feat/append-only-persistence`.**
+
+- **Move 1 — dry-run on a copy: GREEN.** Consistent snapshot of the real store; amendment-3 sample
+  captured via the v1 eager `findById`; the v1→v2 migration applied and verified on the copy (positive
+  control byte-identical, books byte-identical, all 4 publications flagged, reversibility proven at the
+  logical level with the file-byte caveat disclosed). No 93 MB surprise — all 91 payloads clean. Two #7
+  findings surfaced: **9 projects not 10** (DR §5 corrected), and the milestone set is **`{'publication'}`
+  only** (export creates no version → `EXPORT_MILESTONE_VERSION` consigned).
+- **Move 2 — the flip (commit `5acd6b3`): GREEN.** findById head+index; `getVersion`; `save` head-only;
+  version creation through `appendVersion` (metadata columns + milestone); `restoreVersion` via
+  `getVersion` + `restoreToVersion`; publish via `appendVersion` flagging the milestone; schema v2 in
+  `migrate()`; `BookVersion.book/settings` optional; the `projectRepositoryContract` + in-memory twin
+  flipped; the ADR-0048 amendment recorded. **Backend 945/945, tsc + eslint clean.**
+- **Move 3 — the REAL-store migration: GREEN.** Backup taken and **byte-verified (sha256) before** the
+  write; migrated the real store (`user_version` 1→2); **data hash unchanged** vs a pristine v1 copy
+  (aggregates + payloads + blobs byte-identical); positive control (getVersion post ≡ pre-migration
+  payload) on 7 sampled versions incl. all 4 publications; **book 3's `v32 "publication"` flagged
+  `milestone=1`**, edits not; all 9 head books whole; no index entry leaks a payload. Backup retained.
+- **Move 4 — the judge: GREEN.** **The O(v) curve is FLAT:** findById **58 ms @ v34, down from 1736 ms**
+  (the residual spread tracks head-book *size*, not version count — the 2-version book 3 is slower than
+  the 10-version faith-alone). **Full gesture ≈ 229 ms** (findById 58 + engine ~171) — sub-second.
+  `getVersion` (the undo price) ~27–34 ms, one version not N. **Undo functionally unchanged:** edit → undo
+  → head **byte-identical** to pre-edit, log intact (34→35→35), through the real `EditBookUseCase` path on
+  a copy. **Full harnesses green on a throwaway server (port 5091, zero trace):** import 4/4, export 16/16,
+  publish 4/4. Real store verified post-judge: 9 projects, `user_version=2`, 4 milestones, untouched by
+  the harness run.
+
+**NEXT: the CTO's word on merging `feat/append-only-persistence` back → AUTHOR_EXPERIENCE M3 resumes** (D2
+dedication+preface, D5 theme thumbnails/separators, D6 title surface — founder taste-stops). D (version-log
+cap) stays deferred; the felt O(v) tax B removed was the reason to consider pulling it forward, and it is
+gone.
