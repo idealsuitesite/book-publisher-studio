@@ -42,9 +42,11 @@ describe('EditBookUseCase — structure editing persists, snapshots, and undoes'
 
     const saved = (await repo.findById(id))!;
     expect((saved.book.mainContent[1] as Chapter).title).toBe('Renamed');
-    // one validated edit == one version (Q2 coarse granularity), and it holds the PRE-edit title
+    // one validated edit == one version (Q2 coarse granularity), and it holds the PRE-edit title.
+    // The index carries no payload — the pre-edit book is fetched on demand (APPEND_ONLY_PERSISTENCE B).
     expect(saved.versions).toHaveLength(1);
-    expect((saved.versions[0].book.mainContent[1] as Chapter).title).toBe('Two');
+    const snapshot = (await repo.getVersion(id, saved.versions[0].id))!;
+    expect((snapshot.book!.mainContent[1] as Chapter).title).toBe('Two');
   });
 
   it('setPartRole: tags a part, persists, and snapshots before (undo point) — MINI_DR_EDITORIAL_PLACEMENT', async () => {
@@ -54,7 +56,8 @@ describe('EditBookUseCase — structure editing persists, snapshots, and undoes'
     const saved = (await repo.findById(id))!;
     expect((saved.book.mainContent[0] as Chapter).role).toBe('front');
     expect(saved.versions).toHaveLength(1);
-    expect((saved.versions[0].book.mainContent[0] as Chapter).role).toBeUndefined(); // pre-edit: untagged
+    const snapshot = (await repo.getVersion(id, saved.versions[0].id))!;
+    expect((snapshot.book!.mainContent[0] as Chapter).role).toBeUndefined(); // pre-edit: untagged
   });
 
   it('reorderChapters: applies, persists, renumbers, and snapshots before', async () => {
@@ -62,7 +65,8 @@ describe('EditBookUseCase — structure editing persists, snapshots, and undoes'
     const saved = (await repo.findById(id))!;
     expect(saved.book.mainContent.map((c) => c.id)).toEqual(['c2', 'c3', 'c1']);
     expect(saved.book.mainContent.map((c) => (c as Chapter).number)).toEqual([1, 2, 3]);
-    expect(saved.versions[0].book.mainContent.map((c) => c.id)).toEqual(['c1', 'c2', 'c3']); // pre-edit
+    const snapshot = (await repo.getVersion(id, saved.versions[0].id))!;
+    expect(snapshot.book!.mainContent.map((c) => c.id)).toEqual(['c1', 'c2', 'c3']); // pre-edit
   });
 
   it('undo: restoreVersion brings back a prior version without deleting later ones', async () => {
@@ -73,6 +77,16 @@ describe('EditBookUseCase — structure editing persists, snapshots, and undoes'
     const saved = (await repo.findById(id))!;
     expect((saved.book.mainContent[0] as Chapter).title).toBe('One');
     expect(saved.versions).toHaveLength(1); // restore is append-only-safe: nothing deleted
+  });
+
+  it('undo with an unknown version id throws (the lookup moved to the Application step, APPEND_ONLY_PERSISTENCE B)', async () => {
+    await expect(useCase.execute(id, { type: 'restoreVersion', versionId: 'no-such-version' })).rejects.toThrow(
+      /No such version/
+    );
+    // nothing persisted: still zero versions, book untouched
+    const saved = (await repo.findById(id))!;
+    expect(saved.versions).toHaveLength(0);
+    expect((saved.book.mainContent[0] as Chapter).title).toBe('One');
   });
 
   it('a bad target inside a real project throws (caller -> 400), and does NOT persist a snapshot', async () => {
@@ -124,7 +138,8 @@ describe('EditBookUseCase — create ops dispatch (CREATE_CHAPTER.md)', () => {
 
     const saved = (await repo.findById(id))!;
     expect(saved.versions).toHaveLength(1); // pre-edit snapshot (undo point)
-    expect(saved.versions[0].book.mainContent).toHaveLength(1); // the snapshot is the unstructured book
+    const snapshot = (await repo.getVersion(id, saved.versions[0].id))!;
+    expect(snapshot.book!.mainContent).toHaveLength(1); // the snapshot is the unstructured book
     const chapters = saved.book.mainContent.filter((c) => c.type === 'chapter');
     expect(chapters.map((c) => c.title)).toEqual(['Two']);
   });

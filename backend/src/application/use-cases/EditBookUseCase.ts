@@ -34,12 +34,26 @@ export class EditBookUseCase {
     const project = await this.repository.findById(id);
     if (!project) return false;
 
+    // Undo (APPEND_ONLY_PERSISTENCE B, DR D2): the version index findById returned carries no book, so
+    // load the target version's payload on demand — undo pays ONE version's load, not N — set it as the
+    // new head, and save head-only (no new version; the log is untouched, nothing after it deleted).
+    if (mutation.type === 'restoreVersion') {
+      const version = await this.repository.getVersion(id, mutation.versionId);
+      if (!version) throw new Error(`No such version: ${mutation.versionId}`);
+      const restored = this.projectService.restoreToVersion(project, version);
+      await this.repository.save(restored);
+      return true;
+    }
+
+    // Every other mutation is snapshot-before-edit → ONE new version, appended atomically with the head
+    // (DR D3). If `apply` throws on a bad target, appendVersion is never reached: nothing is persisted.
     const updated = this.apply(project, mutation);
-    await this.repository.save(updated);
+    const newVersion = updated.versions[updated.versions.length - 1];
+    await this.repository.appendVersion(updated, newVersion);
     return true;
   }
 
-  private apply(project: Project, mutation: StructureMutation): Project {
+  private apply(project: Project, mutation: Exclude<StructureMutation, { type: 'restoreVersion' }>): Project {
     switch (mutation.type) {
       case 'reorderChapters': {
         const snapped = this.projectService.snapshot(project, 'before reorder');
@@ -117,10 +131,6 @@ export class EditBookUseCase {
         const book = this.editingService.applyBatch(this.projectService.currentBook(snapped), mutation.op, mutation.ids);
         return this.projectService.replaceBook(snapped, book);
       }
-      case 'restoreVersion':
-        // Undo: no new snapshot — restoreVersion sets book+settings from the version and keeps the
-        // whole log (nothing after it is deleted). ProjectService owns that invariant.
-        return this.projectService.restoreVersion(project, mutation.versionId);
       default: {
         const _exhaustive: never = mutation;
         throw new Error(`Unknown structure mutation: ${JSON.stringify(_exhaustive)}`);

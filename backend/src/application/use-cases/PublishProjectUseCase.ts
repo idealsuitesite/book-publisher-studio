@@ -33,7 +33,11 @@ export class PublishProjectUseCase {
     if (!project) return undefined;
 
     const withVersion = this.projectService.snapshot(project, 'publication');
-    const version = withVersion.versions[withVersion.versions.length - 1];
+    // A publication is an AUTOMATIC milestone (APPEND_ONLY_PERSISTENCE option 3 / DR D5) — kept forever,
+    // exempt from any future pruning (D). The migration flags historical publications; this flags new
+    // ones at birth, from the one label set both share (`AUTOMATIC_MILESTONE_LABELS`).
+    const snapped = withVersion.versions[withVersion.versions.length - 1];
+    const version: typeof snapped = { ...snapped, milestone: true };
 
     // Publishes `project.book`, not the retained source bytes — so a manual structure edit is
     // part of what KDP validates, and so publish and export render the exact same book (see
@@ -47,8 +51,10 @@ export class PublishProjectUseCase {
       project.settings.typographyOverride
     );
 
+    // The publication event rides on the head aggregate; the version is appended atomically with it
+    // (DR D3) — save is head-only and never writes version rows.
     const recorded = this.projectService.recordPublication(withVersion, report, version.id);
-    await this.repository.save(recorded);
+    await this.repository.appendVersion(recorded, version);
 
     return report;
   }

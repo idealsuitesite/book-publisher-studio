@@ -182,7 +182,7 @@ describe('ProjectService — versions', () => {
 
     project = service.updateSettings(project, { layoutName: 'a4' });
 
-    expect(project.versions[0].settings.layoutName).toBe('kdp-6x9');
+    expect(project.versions[0].settings!.layoutName).toBe('kdp-6x9');
     expect(project.settings.layoutName).toBe('a4');
   });
 
@@ -193,7 +193,7 @@ describe('ProjectService — versions', () => {
 
     project = service.replaceBook(project, book('Revised title'));
 
-    expect(project.versions[0].book.metadata.title).toBe('First title');
+    expect(project.versions[0].book!.metadata.title).toBe('First title');
     expect(project.book.metadata.title).toBe('Revised title');
   });
 
@@ -206,14 +206,14 @@ describe('ProjectService — versions', () => {
     expect(project.versions[0].label).toBe("before the editor's cuts");
   });
 
-  it('restores a past version as the working manuscript', () => {
+  it('restores a past version (already loaded) as the working manuscript', () => {
     const service = serviceWithSequentialIds();
     let project = service.create(book('Original'), settings);
     project = service.snapshot(project);
-    const firstId = project.versions[0].id;
+    const first = project.versions[0]; // a full version (the Application layer loads it via getVersion)
     project = service.replaceBook(project, book('Rewritten'));
 
-    project = service.restoreVersion(project, firstId);
+    project = service.restoreToVersion(project, first);
 
     expect(project.book.metadata.title).toBe('Original');
   });
@@ -225,16 +225,18 @@ describe('ProjectService — versions', () => {
     project = service.replaceBook(project, book('v2'));
     project = service.snapshot(project);
 
-    project = service.restoreVersion(project, project.versions[0].id);
+    project = service.restoreToVersion(project, project.versions[0]);
 
     expect(project.versions).toHaveLength(2);
   });
 
-  it('throws on an unknown version rather than silently doing nothing', () => {
+  it('refuses to restore a version whose payload was not loaded (an index entry)', () => {
     const service = serviceWithSequentialIds();
     const project = service.create(book(), settings);
+    // The version INDEX carries no book/settings — restoring one is a programming error, not a silent no-op.
+    const indexEntry = { id: 'v-idx', number: 1, createdAt: new Date() };
 
-    expect(() => service.restoreVersion(project, 'nope')).toThrow(/No such version/);
+    expect(() => service.restoreToVersion(project, indexEntry)).toThrow(/no loaded payload/);
   });
 
   it('latestVersion returns undefined for a project never versioned', () => {
@@ -404,7 +406,7 @@ describe('ProjectService — immutability (ADR-0001)', () => {
     const edited = service.replaceBook(project, book('Changed'));
     service.updateSettings(edited, { layoutName: 'a5' });
 
-    expect(version.book.metadata.title).toBe('Frozen');
-    expect(version.settings.layoutName).toBe('kdp-6x9');
+    expect(version.book!.metadata.title).toBe('Frozen');
+    expect(version.settings!.layoutName).toBe('kdp-6x9');
   });
 });
