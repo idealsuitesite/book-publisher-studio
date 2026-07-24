@@ -1,9 +1,26 @@
 # APPEND_ONLY_PERSISTENCE — cadrage (measured, stopped at findings)
 
-**Status:** OPEN — the consigned trigger fired. Measured on the founder's real store; **awaiting the
-CTO's verdicts and the founder's undo-depth answer** before any code. A bounded interlude before M3
-(CTO ruling 2026-07-24): the persistence fix has its own judge (the O(v) curve goes flat), and M3
-resumes immediately after.
+**Status:** CTO-RULED → **the B Design Review is WRITTEN** (`APPEND_ONLY_PERSISTENCE_DR.md`), awaiting the
+CTO's gate. A bounded interlude before AUTHOR_EXPERIENCE M3 (M3 resumes on B's green judge).
+
+> **CTO RULING (2026-07-24).** **Scope: B now, contractually complete; D deferred, never folded into B.**
+> B fixes O(v) in both directions and returns the gesture to the engine (~171 ms) without discarding
+> anything; D is a retention decision that destroys history and does not ride inside a performance
+> chantier. B does not depend on D (head-only findById makes the current cost independent of `v`; D would
+> only bound on-disk file weight, not the felt problem). D stays consigned, activatable later if disk
+> weight becomes a **measured** subject; its shape depends on the founder's undo-depth answer.
+>
+> **The founder product question (undo/history depth) is with the founder, through the CTO** — three
+> options (keep everything / keep last N / keep last N + permanent automatic milestones like
+> publications+exports); the CTO's engineering recommendation is **option 3**. It does NOT block B's DR:
+> retention depth is a named parameter defaulting to **keep everything** (B makes retention costless for
+> the felt loop); the founder's answer fills the parameter and gates D's eventual shape.
+>
+> **WITHDRAWN (dated founder decision, recorded so no future session resurrects it):** the earlier-directed
+> **"Mark this step" manual milestone gesture** and the **reopening nudge**. Milestones are **automatic**
+> (publications/exports) only; neither the manual gesture nor the nudge is built — not in this interlude,
+> not in M3/M4. B's model supports milestone-flagged versions **exempt from pruning** (the automatic ones);
+> pruning of old unmarked versions is D's job (deferred, silent beyond the undo net); **nothing else.**
 
 ## Why it opened now (the trigger, not a new decision)
 
