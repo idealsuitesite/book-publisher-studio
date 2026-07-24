@@ -467,6 +467,27 @@ real use: (1) the single write path holds live, (2) the never-a-false-N honesty 
 *M3 ships composition (dead types filled) and the theme-as-a-page surfaces; the founder's visual
 taste-stops are taken on the living studio. Still a working studio with the old stations present.*
 
+#### M3 INPUTS — founder traversal, his first v2 session (2026-07-24, folded in by the CTO)
+
+The founder ran his first real session on the migrated v2 store (studio activated from `feat/author-experience`; the persistence flip served every gesture — attributed clean, `EDIT` versions written with metadata columns populated, `integrity_check: ok`). His traversal produced M3 inputs, prioritized. **These fold into M3; nothing is pulled forward from M4.**
+
+**P1-DEFECTS (fix within/before M3 — these are the "unable to return / wondering what it did" class):**
+1. **Raw `promoteToChapter` error surfaced to the author** — the OLD consigned defect (`EMPTY_CHAPTER_FROM_STRUCTURE_EDIT` neighbourhood), now **founder-hit** in the wild. Requirement: **typed, human errors only** — the author never sees a raw error string / stack; a failed gesture explains itself in his language.
+2. **The promote gesture needs a visible UNDO affordance in the workspace.** The mechanic exists and is now cheap (`restoreVersion` → `getVersion`, O(1) after the flip); the **affordance does not**. A gesture must be visibly returnable from where it was made.
+3. **A static, non-selectable "Conclusion" block** — **attribute first** (render artifact? an empty/blockless title? a Proof text-layer gap?) before any fix, per the real-fixture discipline.
+
+**M3 REQUIREMENTS (fold into the C6–C10 commits):**
+1. **The Proof FOLLOWS the edit** — on a re-ink, scroll to and briefly highlight the changed region (a D4/C5 refinement carried into M3's living studio, so the author's eye is taken to what changed).
+2. **The conversion menu FOLLOWS the selection** — the "Convert to…" gestures appear contextually at/near the selected object, not in a fixed panel. **Criterion B, literally** (contextual editing from the document).
+3. **The Front/Body/Back placement control is renamed/clarified with a VISIBLE effect** — the founder **misread it as a title-style control; the misreading IS the finding**. Additionally: **his exploratory placement clicks EACH created a version** — attribution confirms **7 `"before set part role"` versions** in one session, several seconds apart (21:25:02, 21:25:12 …), i.e. exploration taxed the version log. **Review whether a no-op `setPartRole` (same role re-applied) should version at all** — an exploratory click that changes nothing should not create an undo point.
+
+**FOUNDER RULINGS (recorded):**
+- **Light theme is the default; dark lives in settings.**
+- **New M3 acceptance criterion:** *"No gesture leaves the author wondering what it did, or unable to return."* This governs the P1-defects and requirement 1 above; it is a milestone gate, not a nicety.
+- **The old stations' clutter is answered by their M4 dissolution — confirmed, NO early action.** C12 is not pulled forward; the coexistence-until-proven discipline holds.
+
+*Store baseline after his session: **10 projects, 99 versions, 4 milestones**, `user_version=2` — the 10th is his new book-3 copy `1784927363074-6t6pypzon` "Rachat et expiation bibliques 2 (1)" (v8). The pre-migration backup was released (retention rule discharged: successful v2 session confirmed).*
+
 ### Milestone 4 — The old world dissolves; one studio (removals last, felt-A stop at the end)
 | # | Commit | Judge / verification | Taste-stop |
 |---|---|---|---|
