@@ -526,3 +526,15 @@ a forced failure. The MCP browser pane fought coordinate/React-synthetic-event c
 the MCP pane doesn't composite while Playwright headless does), so these three interaction paths get a
 real-Chromium **Playwright** pass at the M3 boundary — where the milestone's real-browser judge already
 lives — not a per-commit re-litigation of C7.
+
+**Added to that same boundary Playwright pass (CTO, 2026-07-25) — a VIEWPORT SWEEP (founder-attributed).**
+During the C7 browser-piloted verification the founder observed the workspace rendering **doubled** in the
+driven window — two skeletons, two PREFACE forms, two title bars side by side — which **self-corrected when
+he resized**. Likely an automated-browser-context artifact (the MCP pane re-mounting during rapid
+resize/navigate; note CSS reflow cannot *create* DOM nodes, so a pure width defect cannot produce a second
+skeleton) — **but it is ruled out, not assumed away.** The sweep: render the workspace at several widths
+(narrow → ultra-wide) and assert **exactly ONE `nav[aria-label="Editorial skeleton"]`, ONE
+`article[aria-label="Document"]`, ONE `region[aria-label="Proof"]`** in the DOM at each. The assertion is
+**structural (count the panels), not visual.** **If clean at every width → record as an automated-browser
+artifact, closed. If any width doubles the DOM → a real defect: attribute and fix BEFORE the taste-stops**
+(the founder judges surfaces; a surface that can double is not ready for judgment).
