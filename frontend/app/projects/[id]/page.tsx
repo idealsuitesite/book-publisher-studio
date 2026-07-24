@@ -261,6 +261,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
         {view === 'workspace' && (
           <EditorialWorkspace
             project={project}
+            onEdited={setProject}
             proof={{
               exporter: async () => {
                 const started = performance.now();

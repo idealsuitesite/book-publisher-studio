@@ -1,8 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EditorialWorkspace } from './EditorialWorkspace';
+import { editStructure } from '@/lib/api-client';
 import type { ProjectDTO, ContentDTO, EditorialObjectDTO } from 'shared-types';
+
+// The single write path is `editStructure` → EditBookUseCase; mock it to assert the workspace
+// dispatches an OP and re-renders from the returned project (never a local mutation).
+vi.mock('@/lib/api-client', () => ({
+  editStructure: vi.fn(),
+  ApiError: class ApiError extends Error {},
+}));
+const editStructureMock = vi.mocked(editStructure);
 
 /**
  * M1-C2 (AUTHOR_EXPERIENCE_DR §8): the read studio renders the D1 skeleton (left) and the selected
@@ -109,5 +118,44 @@ describe('EditorialWorkspace — the read studio (M1-C2)', () => {
     // The chapter number is present as rendered text, not an editable control.
     const doc = screen.getByRole('article', { name: 'Document' });
     expect(within(doc).getByText('Chapter 1')).toBeInTheDocument();
+  });
+
+  // ── M2-C4: contextual editing (D3) ─────────────────────────────────────────────────────────────
+
+  describe('contextual editing (M2-C4)', () => {
+    beforeEach(() => {
+      editStructureMock.mockReset();
+      editStructureMock.mockResolvedValue(makeProject());
+    });
+
+    it('dispatches a block op through editStructure and re-renders from the returned project (single write path)', async () => {
+      const user = userEvent.setup();
+      const onEdited = vi.fn();
+      render(<EditorialWorkspace project={makeProject()} onEdited={onEdited} />);
+      // Select a paragraph in the open chapter, then convert it.
+      await user.click(screen.getByRole('button', { name: 'Faith is not a leap in the dark.' }));
+      await user.click(screen.getByRole('button', { name: 'Chapter' }));
+      expect(editStructureMock).toHaveBeenCalledWith('p1', { type: 'promoteToChapter', blockId: 'c1-p1' });
+      // The panel re-renders from the RETURNED project — never a local mutation.
+      expect(onEdited).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }));
+    });
+
+    it('dispatches an object placement op (setPartRole) from the placement control', async () => {
+      const user = userEvent.setup();
+      render(<EditorialWorkspace project={makeProject()} onEdited={vi.fn()} />);
+      // The open chapter is body; tag it Back.
+      await user.click(screen.getByRole('button', { name: 'Back' }));
+      expect(editStructureMock).toHaveBeenCalledWith('p1', { type: 'setPartRole', id: 'c1', role: 'back' });
+    });
+
+    it('keeps the D8 grammar in the EDITING studio too: editing is menu-driven, still no textbox/number field', async () => {
+      const user = userEvent.setup();
+      render(<EditorialWorkspace project={makeProject()} onEdited={vi.fn()} />);
+      await user.click(screen.getByRole('button', { name: 'Faith is not a leap in the dark.' }));
+      // The convert menu is open, yet no free-text or number-spinner control exists — the ops are
+      // menu gestures, and the number stays a datum (title editing is D6's own surface, M3).
+      expect(screen.queryByRole('textbox')).toBeNull();
+      expect(screen.queryByRole('spinbutton')).toBeNull();
+    });
   });
 });

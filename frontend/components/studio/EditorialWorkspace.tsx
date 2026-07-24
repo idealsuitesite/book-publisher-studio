@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode, type ReactElement } from 'react';
 import type {
   ProjectDTO,
   EditorialObjectDTO,
@@ -8,24 +8,31 @@ import type {
   ContentDTO,
   SectionDTO,
   BlockDTO,
+  StructureMutation,
 } from 'shared-types';
 import { cx } from '@/components/ui';
 import { PreviewPanel } from '@/components/PreviewPanel';
+import { editStructure, ApiError } from '@/lib/api-client';
 
 /**
- * The editorial workspace (AUTHOR_EXPERIENCE_DR §8 M1) — the new primary surface, built beside the
- * old stations (the safety net) until it fully carries them (M4). The READ studio: the typed
- * editorial skeleton on the LEFT (`project.skeleton`, the D1 projection), the selected object's
- * document in the CENTRE (read-only), and the living Proof PERMANENT on the RIGHT (C3, Principle 3 —
- * the Proof leaves the stack and never has to be summoned). Editing (D3) and the live region loop
- * (D4) arrive in M2; here the Proof reuses the existing FULL render (region wiring is C5).
- * Navigation only — no mutation reaches the book here.
+ * The editorial workspace (AUTHOR_EXPERIENCE_DR §8 M1–M2) — the new primary surface, built beside the
+ * old stations (the safety net) until it fully carries them (M4). Three panels: the typed editorial
+ * skeleton on the LEFT (`project.skeleton`, the D1 projection), the selected object's document in the
+ * CENTRE, and the living Proof PERMANENT on the RIGHT (C3, Principle 3).
  *
- * The D8 grammar, designed in from the start (CTO Divergence-2 condition, locked by C2's judge): the
- * skeleton exposes NO title-retype path (titles are static text, never inputs) and NO authorable
- * number (the chapter number is a rendered datum — `CHAPTER_TITLE_PRESENTATION` — never an editable
- * field). Confirm-not-retype and computed numbers are properties of the skeleton's grammar; they are
- * built here, before M2's editing wiring, so nothing can later introduce a retype path unnoticed.
+ * M2-C4 adds CONTEXTUAL EDITING (D3, criterion B): a "Convert to…" menu on the selected block/object
+ * dispatches the EXISTING ops — no new conversion is invented (Insert is out). Every gesture goes
+ * through `editStructure` → `EditBookUseCase` and the panel re-renders from the returned project (the
+ * fresh `ProjectDTO.skeleton` included). This is the SINGLE WRITE PATH held under real use (CTO graven
+ * gate point 1): the UI NEVER mutates the projection or the book directly — it dispatches an op and
+ * reads the result. Editing is enabled only when `onEdited` is provided.
+ *
+ * The D8 grammar (CTO Divergence-2, locked by C2's judge and preserved through M2): the skeleton
+ * exposes NO title-retype path (titles are static text, never inputs) and NO authorable number (the
+ * number is a rendered datum — `CHAPTER_TITLE_PRESENTATION`). C4's editing is entirely menu-driven —
+ * no text entry — so no textbox exists even in the editing studio; title editing is D6's own surface
+ * (M3). The founder's real book 3 proved WHY the number is computed: his titles say "CHAPTER 1/3/8"
+ * while the skeleton counts a clean 1..n beneath them (DR D8, terrain validation).
  */
 
 function refKey(ref: EditorialSourceRefDTO): string {
@@ -45,10 +52,8 @@ function findTopLevelContent(project: ProjectDTO, id: string): ContentDTO | unde
 const PLACE_BADGE: Record<'front' | 'back', string> = { front: 'Front', back: 'Back' };
 
 /**
- * The living-Proof wiring, injected by the page (which owns the exporter + settings labels). Optional:
- * the read tests exercise skeleton+document without mounting the Proof pipeline. When present, the
- * Proof is the permanent third panel (C3). The region-fetch loop (D4/C5) will replace this full-render
- * exporter in M2 — the panel placement here is what C3 delivers.
+ * The living-Proof wiring, injected by the page. Optional: the read tests exercise skeleton+document
+ * without mounting the Proof pipeline. When present, the Proof is the permanent third panel (C3).
  */
 export interface WorkspaceProof {
   exporter: () => Promise<Blob>;
@@ -58,34 +63,69 @@ export interface WorkspaceProof {
   onPageCount?: (pages: number | null) => void;
 }
 
-export function EditorialWorkspace({ project, proof }: { project: ProjectDTO; proof?: WorkspaceProof }) {
+export function EditorialWorkspace({
+  project,
+  proof,
+  onEdited,
+}: {
+  project: ProjectDTO;
+  proof?: WorkspaceProof;
+  /** Enables editing (D3). Given the returned project after an op, so the parent re-renders. */
+  onEdited?: (updated: ProjectDTO) => void;
+}) {
   const objects = project.skeleton.objects;
   const [selectedKey, setSelectedKey] = useState<string | undefined>(() => firstSelectableKey(objects));
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const selected = useMemo(
-    () => objects.find((o) => refKey(o.sourceRef) === selectedKey),
-    [objects, selectedKey]
+  // Resolve the open object; if a prior selection was edited away (merged/collapsed), fall back to the
+  // first object rather than an empty centre.
+  const resolved = useMemo(() => {
+    const match = objects.find((o) => refKey(o.sourceRef) === selectedKey);
+    return match ?? objects.find((o) => refKey(o.sourceRef) === firstSelectableKey(objects));
+  }, [objects, selectedKey]);
+
+  const dispatch = useCallback(
+    async (mutation: StructureMutation) => {
+      if (!onEdited || busy) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const updated = await editStructure(project.id, mutation);
+        onEdited(updated); // the single write path: read the result, never mutate locally
+        setSelectedBlockId(null);
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'The edit could not be applied.');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onEdited, busy, project.id]
   );
+
+  const editing = Boolean(onEdited);
 
   return (
     <div className="flex w-full flex-1 gap-6">
-      {/* LEFT — the typed editorial skeleton */}
+      {/* LEFT — the typed editorial skeleton (static rows; the grammar lock) */}
       <nav
         aria-label="Editorial skeleton"
         className="w-64 shrink-0 overflow-y-auto rounded-lg border border-app-border bg-app-surface-1 p-3"
       >
-        <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-app-text-muted">
-          Editorial skeleton
-        </p>
+        <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-app-text-muted">Editorial skeleton</p>
         <ul className="flex flex-col gap-0.5">
           {objects.map((object) => {
             const key = refKey(object.sourceRef);
-            const active = key === selectedKey;
+            const active = key === (resolved ? refKey(resolved.sourceRef) : undefined);
             return (
               <li key={key}>
                 <button
                   type="button"
-                  onClick={() => setSelectedKey(key)}
+                  onClick={() => {
+                    setSelectedKey(key);
+                    setSelectedBlockId(null);
+                  }}
                   aria-current={active ? 'true' : undefined}
                   className={cx(
                     'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm',
@@ -105,13 +145,22 @@ export function EditorialWorkspace({ project, proof }: { project: ProjectDTO; pr
         </ul>
       </nav>
 
-      {/* CENTRE — the selected object's document, read-only */}
+      {/* CENTRE — the selected object's document */}
       <article
         aria-label="Document"
         className="flex-1 overflow-y-auto rounded-lg border border-app-border bg-app-surface-1 px-8 py-7"
       >
-        {selected ? (
-          <DocumentView project={project} object={selected} />
+        {resolved ? (
+          <DocumentView
+            project={project}
+            object={resolved}
+            editing={editing}
+            busy={busy}
+            error={error}
+            selectedBlockId={selectedBlockId}
+            onSelectBlock={setSelectedBlockId}
+            onDispatch={dispatch}
+          />
         ) : (
           <p className="text-sm text-app-text-muted">This book has no editorial objects yet.</p>
         )}
@@ -152,22 +201,45 @@ function SkeletonLead({ object }: { object: EditorialObjectDTO }) {
   return <span className="w-5 shrink-0" aria-hidden="true" />;
 }
 
-function DocumentView({ project, object }: { project: ProjectDTO; object: EditorialObjectDTO }) {
-  // The number header — a rendered datum, NOT an editable field (CHAPTER_TITLE_PRESENTATION).
+interface DocumentViewProps {
+  project: ProjectDTO;
+  object: EditorialObjectDTO;
+  editing: boolean;
+  busy: boolean;
+  error: string | null;
+  selectedBlockId: string | null;
+  onSelectBlock: (id: string | null) => void;
+  onDispatch: (mutation: StructureMutation) => void;
+}
+
+function DocumentView({ project, object, editing, busy, error, selectedBlockId, onSelectBlock, onDispatch }: DocumentViewProps) {
   const header =
     object.type === 'chapter' && object.number !== undefined ? `Chapter ${object.number}` : placeLabel(object);
-
   const content = object.sourceRef.kind === 'content' ? findTopLevelContent(project, object.sourceRef.id) : undefined;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-app-text-muted">{header}</p>
-      {/* The document title — static text, never an input in the read studio (D8). */}
+      {/* The document title — static text in M2 (the editable title-field is D6's surface, M3). */}
       <h2 className="text-2xl font-semibold text-app-text" style={{ fontFamily: 'var(--font-book), Georgia, serif' }}>
         {object.title}
       </h2>
+
+      {editing && <ObjectActions project={project} object={object} busy={busy} onDispatch={onDispatch} />}
+      {editing && selectedBlockId && <BlockActions busy={busy} onDispatch={onDispatch} blockId={selectedBlockId} />}
+      {error && (
+        <p role="alert" className="rounded-md border border-app-error/40 bg-app-error/10 px-3 py-2 text-sm text-app-error">
+          {error}
+        </p>
+      )}
+
       {content ? (
-        <ContentBody content={content} />
+        <ContentBody
+          content={content}
+          editing={editing}
+          selectedBlockId={selectedBlockId}
+          onSelectBlock={onSelectBlock}
+        />
       ) : (
         <p className="text-sm text-app-text-muted">
           {object.sourceRef.kind === 'front-matter'
@@ -179,6 +251,106 @@ function DocumentView({ project, object }: { project: ProjectDTO; object: Editor
   );
 }
 
+/** Object-level ops on the OPEN top-level object: placement (setPartRole), merge, remove-divider. */
+function ObjectActions({
+  project,
+  object,
+  busy,
+  onDispatch,
+}: {
+  project: ProjectDTO;
+  object: EditorialObjectDTO;
+  busy: boolean;
+  onDispatch: (mutation: StructureMutation) => void;
+}) {
+  if (object.sourceRef.kind !== 'content') return null;
+  const id = object.sourceRef.id;
+
+  if (object.type === 'part-opener') {
+    return (
+      <ActionBar label="Divider">
+        <ActionButton busy={busy} onClick={() => onDispatch({ type: 'removePartOpener', id })}>
+          Remove divider
+        </ActionButton>
+      </ActionBar>
+    );
+  }
+
+  const index = project.book.mainContent.findIndex((c) => c.id === id);
+  const canMerge = object.type === 'chapter' && index > 0;
+  const roleOptions: { label: string; role: 'front' | 'main' | 'back'; active: boolean }[] = [
+    { label: 'Front', role: 'front', active: object.place === 'front' },
+    { label: 'Body', role: 'main', active: object.place === 'body' },
+    { label: 'Back', role: 'back', active: object.place === 'back' },
+  ];
+
+  return (
+    <ActionBar label="This object">
+      <span className="text-xs text-app-text-muted">Placement</span>
+      <div className="flex overflow-hidden rounded-md border border-app-border">
+        {roleOptions.map((option) => (
+          <button
+            key={option.role}
+            type="button"
+            disabled={busy || option.active}
+            onClick={() => onDispatch({ type: 'setPartRole', id, role: option.role })}
+            className={cx(
+              'px-2 py-1 text-xs',
+              option.active ? 'bg-app-surface-2 font-medium text-app-text' : 'text-app-text-muted hover:bg-app-surface-2'
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      {canMerge && (
+        <ActionButton busy={busy} onClick={() => onDispatch({ type: 'mergeChapterIntoPrevious', chapterId: id })}>
+          Merge into previous
+        </ActionButton>
+      )}
+    </ActionBar>
+  );
+}
+
+/** Block-level "Convert to…" ops on the SELECTED line — the existing create ops, no new conversion. */
+function BlockActions({ blockId, busy, onDispatch }: { blockId: string; busy: boolean; onDispatch: (m: StructureMutation) => void }) {
+  return (
+    <ActionBar label="Convert selection to">
+      <ActionButton busy={busy} onClick={() => onDispatch({ type: 'promoteToChapter', blockId })}>
+        Chapter
+      </ActionButton>
+      <ActionButton busy={busy} onClick={() => onDispatch({ type: 'promoteToSubsection', blockId })}>
+        Section of this chapter
+      </ActionButton>
+      <ActionButton busy={busy} onClick={() => onDispatch({ type: 'markAsSubtitle', blockId })}>
+        Subtitle
+      </ActionButton>
+    </ActionBar>
+  );
+}
+
+function ActionBar({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-app-border bg-app-surface-2/40 px-3 py-2">
+      <span className="text-xs font-semibold uppercase tracking-wide text-app-text-muted">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function ActionButton({ busy, onClick, children }: { busy: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={onClick}
+      className="rounded-md border border-app-border px-2.5 py-1 text-xs font-medium text-app-text hover:bg-app-surface-2 disabled:opacity-50"
+    >
+      {children}
+    </button>
+  );
+}
+
 function placeLabel(object: EditorialObjectDTO): string {
   if (object.type === 'part-opener') return 'Part divider';
   if (object.place === 'front') return 'Front matter';
@@ -186,39 +358,81 @@ function placeLabel(object: EditorialObjectDTO): string {
   return 'Section';
 }
 
-/** Read-only render of a chapter/section's blocks, then its nested sections. */
-function ContentBody({ content }: { content: ContentDTO }) {
+/** Read-only render of a chapter/section's blocks, then its nested sections. When editing, paragraph
+ *  and heading blocks are selectable (the "Convert to…" targets) — no other block type is a target. */
+function ContentBody({
+  content,
+  editing,
+  selectedBlockId,
+  onSelectBlock,
+}: {
+  content: ContentDTO;
+  editing: boolean;
+  selectedBlockId: string | null;
+  onSelectBlock: (id: string | null) => void;
+}) {
   const children: SectionDTO[] = (content.type === 'chapter' ? content.sections : content.subsections) ?? [];
   return (
     <div className="flex flex-col gap-3 text-app-text">
       {(content.content ?? []).map((block) => (
-        <BlockView key={block.id} block={block} />
+        <BlockView
+          key={block.id}
+          block={block}
+          editing={editing}
+          selected={block.id === selectedBlockId}
+          onSelect={onSelectBlock}
+        />
       ))}
       {children.map((section) => (
         <section key={section.id} className="mt-3 flex flex-col gap-3">
           <h3 className="text-lg font-semibold text-app-text">{section.title}</h3>
-          <ContentBody content={section} />
+          <ContentBody content={section} editing={editing} selectedBlockId={selectedBlockId} onSelectBlock={onSelectBlock} />
         </section>
       ))}
     </div>
   );
 }
 
-function BlockView({ block }: { block: BlockDTO }) {
+function BlockView({
+  block,
+  editing,
+  selected,
+  onSelect,
+}: {
+  block: BlockDTO;
+  editing: boolean;
+  selected: boolean;
+  onSelect: (id: string | null) => void;
+}) {
+  const selectable = editing && (block.type === 'paragraph' || block.type === 'heading');
+  const inner = renderBlock(block);
+  if (!selectable) return inner;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(selected ? null : block.id)}
+      aria-pressed={selected}
+      className={cx(
+        'rounded-md px-2 py-1 text-left transition-colors duration-[var(--motion-micro)]',
+        selected ? 'bg-app-accent/10 ring-1 ring-app-accent' : 'hover:bg-app-surface-2'
+      )}
+    >
+      {inner}
+    </button>
+  );
+}
+
+function renderBlock(block: BlockDTO): ReactElement | null {
   switch (block.type) {
     case 'heading':
       return <p className="font-semibold text-app-text">{block.text}</p>;
     case 'paragraph':
       return (
-        <p className={cx('leading-relaxed', block.callout && 'border-l-2 border-app-border pl-3 italic')}>
-          {block.text}
-        </p>
+        <p className={cx('leading-relaxed', block.callout && 'border-l-2 border-app-border pl-3 italic')}>{block.text}</p>
       );
     case 'quote':
     case 'scripture':
-      return (
-        <blockquote className="border-l-2 border-app-border pl-3 italic text-app-text-muted">{block.text}</blockquote>
-      );
+      return <blockquote className="border-l-2 border-app-border pl-3 italic text-app-text-muted">{block.text}</blockquote>;
     case 'list':
       return block.ordered ? (
         <ol className="ml-5 list-decimal leading-relaxed">
