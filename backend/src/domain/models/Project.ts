@@ -157,6 +157,14 @@ export interface BookVersion {
   label?: string;
 
   /**
+   * A MILESTONE version is exempt from any future pruning (APPEND_ONLY_PERSISTENCE, option 3). Set
+   * AUTOMATICALLY when a publication or export produces the version — the events the system already
+   * records; there is no manual "mark this step" gesture (withdrawn, founder decision 2026-07-24).
+   * Model support only in B; pruning of non-milestone versions is D (deferred). Absent = ordinary.
+   */
+  milestone?: true;
+
+  /**
    * The source upload this snapshot was built from, if any — same reasoning as
    * `Project.sourceAssetId`. Referenced, so several versions imported from one file share it
    * rather than each carrying a copy.

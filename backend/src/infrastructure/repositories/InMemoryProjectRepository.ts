@@ -1,5 +1,5 @@
 import type { ProjectRepository, ListProjectsOptions } from '../../domain/ports/ProjectRepository';
-import type { Project, ProjectSummary } from '../../domain/models/Project';
+import type { Project, ProjectSummary, BookVersion } from '../../domain/models/Project';
 import { toProjectSummary } from '../../domain/models/Project';
 
 /**
@@ -26,6 +26,23 @@ export class InMemoryProjectRepository implements ProjectRepository {
   async findById(id: string): Promise<Project | undefined> {
     const stored = this.projects.get(id);
     return stored ? cloneProject(stored) : undefined;
+  }
+
+  async getVersion(projectId: string, versionId: string): Promise<BookVersion | undefined> {
+    const stored = this.projects.get(projectId);
+    const version = stored?.versions.find((v) => v.id === versionId);
+    // Clone so a caller cannot mutate stored state through the returned version (the same isolation
+    // findById gives). structuredClone revives Dates; version books carry no Buffers.
+    return version ? structuredClone(version) : undefined;
+  }
+
+  async appendVersion(project: Project, version: BookVersion): Promise<void> {
+    // Persist the head, and ensure `version` is in the log idempotently (by id) — the append seam.
+    const stored = cloneProject(project);
+    if (!stored.versions.some((v) => v.id === version.id)) {
+      stored.versions = [...stored.versions, structuredClone(version)];
+    }
+    this.projects.set(project.id, stored);
   }
 
   async list(options?: ListProjectsOptions): Promise<ProjectSummary[]> {

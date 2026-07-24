@@ -28,6 +28,21 @@ function hydrate<T>(json: string): T {
   ) as T;
 }
 
+/** The aggregate column shape: no version payloads, no asset bytes (PERSISTENCE.md §3). Shared by
+ *  `save` and `appendVersion` so the head serialisation is one truth. */
+function stripAggregate(project: Project): Project {
+  return {
+    ...project,
+    versions: [],
+    assets: project.assets.map((asset) => {
+      if (!asset.data) return asset;
+      const rest = { ...asset };
+      delete rest.data;
+      return rest;
+    }),
+  };
+}
+
 export class SqliteProjectRepository implements ProjectRepository {
   private readonly db: DatabaseSync;
 
@@ -105,6 +120,55 @@ export class SqliteProjectRepository implements ProjectRepository {
     };
   }
 
+  async getVersion(projectId: string, versionId: string): Promise<BookVersion | undefined> {
+    const row = this.db
+      .prepare('SELECT payload FROM versions WHERE project_id = ? AND id = ?')
+      .get(projectId, versionId) as { payload: string } | undefined;
+    return row ? hydrate<BookVersion>(row.payload) : undefined;
+  }
+
+  async appendVersion(project: Project, version: BookVersion): Promise<void> {
+    // The explicit append seam (APPEND_ONLY_PERSISTENCE B): update the head aggregate AND append this
+    // ONE version, in ONE transaction — atomic (torn-aggregate = no aggregate). Idempotent on the
+    // stable (project_id, id): a retry after a partial failure yields exactly one version.
+    const summary = toProjectSummary(project);
+    const stripped = stripAggregate(project);
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db
+        .prepare(
+          `INSERT OR REPLACE INTO projects
+           (id, aggregate, name, book_title, author, version_count, published_targets,
+            cover_asset_id, archived_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          project.id,
+          JSON.stringify(stripped),
+          summary.name,
+          summary.bookTitle,
+          summary.author ?? '',
+          summary.versionCount,
+          JSON.stringify(summary.publishedTargets),
+          summary.coverAssetId ?? null,
+          summary.archivedAt?.toISOString() ?? null,
+          summary.updatedAt.toISOString()
+        );
+      // Append-only, idempotent: existing version rows are immutable and untouched; a re-append of
+      // the same id is a no-op (never a duplicate, never a rewrite of the whole log).
+      this.db
+        .prepare(
+          `INSERT INTO versions (project_id, id, number, payload) VALUES (?, ?, ?, ?)
+           ON CONFLICT (project_id, id) DO NOTHING`
+        )
+        .run(project.id, version.id, version.number, JSON.stringify(version));
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
   async list(options?: ListProjectsOptions): Promise<ProjectSummary[]> {
     const where = options?.includeArchived ? '' : 'WHERE archived_at IS NULL';
     const rows = this.db
@@ -144,17 +208,7 @@ export class SqliteProjectRepository implements ProjectRepository {
 
   async save(project: Project): Promise<void> {
     const summary = toProjectSummary(project);
-    // The aggregate column: no version payloads, no asset bytes (PERSISTENCE.md §3).
-    const stripped = {
-      ...project,
-      versions: [],
-      assets: project.assets.map((asset) => {
-        if (!asset.data) return asset;
-        const rest = { ...asset };
-        delete rest.data;
-        return rest;
-      }),
-    };
+    const stripped = stripAggregate(project);
 
     this.db.exec('BEGIN IMMEDIATE');
     try {

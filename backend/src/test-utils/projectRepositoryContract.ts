@@ -123,6 +123,60 @@ export function describeProjectRepositoryContract(
     });
   });
 
+  // APPEND_ONLY_PERSISTENCE (option B) — the on-demand read companion and the explicit append seam.
+  describe(`${label} — getVersion + appendVersion (APPEND_ONLY_PERSISTENCE)`, () => {
+    let repo: ReturnType<typeof makeRepository>;
+    let service: ProjectService;
+
+    beforeEach(() => {
+      repo = makeRepository();
+      let n = 0;
+      service = new ProjectService(() => `id-${++n}`);
+    });
+
+    it('getVersion returns ONE version\'s full payload (book + settings), undefined for an unknown id', async () => {
+      let project = service.create(book('Le Guide'), settings);
+      project = service.snapshot(project, 'first draft');
+      await repo.save(project);
+      const [v1] = (await repo.findById(project.id))!.versions;
+
+      const fetched = await repo.getVersion(project.id, v1.id);
+      expect(fetched?.label).toBe('first draft');
+      expect(fetched?.book.metadata.title).toBe('Le Guide');
+      expect(fetched?.settings.layoutName).toBe('kdp-6x9');
+      expect(await repo.getVersion(project.id, 'no-such-version')).toBeUndefined();
+    });
+
+    it('appendVersion adds ONE new version and updates the head, without rewriting existing versions', async () => {
+      let project = service.create(book('Le Guide'), settings);
+      project = service.snapshot(project, 'v1');
+      await repo.save(project);
+
+      project = service.snapshot(service.rename(project, 'Renamed'), 'v2');
+      const v2 = project.versions[project.versions.length - 1];
+      await repo.appendVersion(project, v2);
+
+      const loaded = (await repo.findById(project.id))!;
+      expect(loaded.name).toBe('Renamed'); // head updated
+      expect(loaded.versions.map((v) => v.label)).toEqual(['v1', 'v2']); // append, not rewrite
+    });
+
+    it('appendVersion is IDEMPOTENT on the version id — a retry yields exactly one version (CTO amendment 1)', async () => {
+      let project = service.create(book('Le Guide'), settings);
+      project = service.snapshot(project, 'v1');
+      await repo.save(project);
+      const v1 = project.versions[0];
+
+      // Re-appending the same version (the retry-after-lost-ack path) must not duplicate it.
+      await repo.appendVersion(project, v1);
+      await repo.appendVersion(project, v1);
+
+      const loaded = (await repo.findById(project.id))!;
+      expect(loaded.versions.filter((v) => v.id === v1.id)).toHaveLength(1);
+      expect(loaded.versions).toHaveLength(1);
+    });
+  });
+
   describe(`${label} — stored state is isolated from callers`, () => {
     it('a caller mutating what it saved or loaded does not corrupt the store', async () => {
       const repo = makeRepository();
