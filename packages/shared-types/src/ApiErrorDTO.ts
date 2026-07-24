@@ -19,6 +19,22 @@ export type ApiErrorCode =
   | 'UPLOAD_REJECTED'
   /** A theme/layout name the registries do not know. */
   | 'UNKNOWN_OPTION'
+  // Structure-edit transport codes (the `POST /:id/structure` route). Added to the union so the
+  // workspace maps them to author-language messages — the raw server string had bitten the founder
+  // twice (AUTHOR_EXPERIENCE M3 P1-defect). The union had drifted: the route emitted these before they
+  // were declared here, against this file's own "new codes are added here first" rule.
+  /** A malformed structure command the route could not validate into a known mutation shape. */
+  | 'INVALID_MUTATION'
+  /** The target of an edit (a block / chapter / section id) does not exist in the book. */
+  | 'CONTENT_NOT_FOUND'
+  /** Undo referenced a version id that is not in the project's log. */
+  | 'VERSION_NOT_FOUND'
+  /** A settings patch (accent/typography/theme/layout) carried an invalid value. */
+  | 'INVALID_SETTINGS'
+  /** A region render was asked for an out-of-bounds page range. */
+  | 'INVALID_RANGE'
+  /** A region render carried a non-positive total. */
+  | 'INVALID_TOTAL'
   /** Unclassified server failure — the fallback, never a hiding place for a nameable cause. */
   | 'INTERNAL';
 

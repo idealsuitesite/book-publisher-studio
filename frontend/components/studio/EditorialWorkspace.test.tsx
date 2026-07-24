@@ -2,15 +2,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EditorialWorkspace } from './EditorialWorkspace';
-import { editStructure } from '@/lib/api-client';
+import { editStructure, ApiError } from '@/lib/api-client';
 import type { ProjectDTO, ContentDTO, EditorialObjectDTO } from 'shared-types';
 
 // The single write path is `editStructure` → EditBookUseCase; mock it to assert the workspace
-// dispatches an OP and re-renders from the returned project (never a local mutation).
+// dispatches an OP and re-renders from the returned project (never a local mutation). The error
+// classes are exported too — `structure-errors` (M3-C7) branches on them for author-language messages.
 vi.mock('@/lib/api-client', () => ({
   editStructure: vi.fn(),
   renderRegion: vi.fn(),
-  ApiError: class ApiError extends Error {},
+  ApiError: class ApiError extends Error {
+    status: number;
+    code?: string;
+    constructor(message: string, status = 400, code?: string) {
+      super(message);
+      this.status = status;
+      this.code = code;
+    }
+  },
+  RequestTimeoutError: class RequestTimeoutError extends Error {},
+  NetworkError: class NetworkError extends Error {},
 }));
 const editStructureMock = vi.mocked(editStructure);
 
@@ -154,9 +165,85 @@ describe('EditorialWorkspace — the read studio (M1-C2)', () => {
       render(<EditorialWorkspace project={makeProject()} onEdited={vi.fn()} />);
       await user.click(screen.getByRole('button', { name: 'Faith is not a leap in the dark.' }));
       // The convert menu is open, yet no free-text or number-spinner control exists — the ops are
-      // menu gestures, and the number stays a datum (title editing is D6's own surface, M3).
+      // menu gestures, and the number stays a datum (title editing is D6's own surface, M3). (The D2
+      // add-front-matter composer DOES take text, but it is collapsed until opened — composition, not
+      // structural retype.)
       expect(screen.queryByRole('textbox')).toBeNull();
       expect(screen.queryByRole('spinbutton')).toBeNull();
+    });
+  });
+
+  // ── M3-C7: typed errors, the visible undo, and the add-front-matter affordance ──────────────────
+  describe('M3-C7 — the acceptance criterion (no gesture leaves the author wondering, or unable to return)', () => {
+    beforeEach(() => {
+      editStructureMock.mockReset();
+    });
+
+    it('shows an AUTHOR-language message on a failed gesture — never the raw server string (P1-defect)', async () => {
+      const user = userEvent.setup();
+      const raw = 'promoteToChapter: no block with id c1-p1';
+      editStructureMock.mockRejectedValueOnce(new ApiError(raw, 400, 'CONTENT_NOT_FOUND'));
+
+      render(<EditorialWorkspace project={makeProject()} onEdited={vi.fn()} />);
+      await user.click(screen.getByRole('button', { name: 'Faith is not a leap in the dark.' }));
+      await user.click(screen.getByRole('button', { name: 'Chapter' }));
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(/Nothing was lost/i);
+      expect(alert.textContent).not.toContain(raw); // no raw server string
+      expect(alert.textContent).not.toContain('block'); // no developer vocabulary
+    });
+
+    it('offers a visible UNDO after a versioning edit, restoring the pre-edit snapshot', async () => {
+      const user = userEvent.setup();
+      const edited: ProjectDTO = {
+        ...makeProject(),
+        versions: [{ id: 'v9', number: 9, label: 'before promote to chapter', createdAt: '2026-07-25T00:00:00.000Z' }],
+      };
+      editStructureMock.mockResolvedValue(edited);
+
+      render(<EditorialWorkspace project={makeProject()} onEdited={vi.fn()} />);
+      await user.click(screen.getByRole('button', { name: 'Faith is not a leap in the dark.' }));
+      await user.click(screen.getByRole('button', { name: 'Chapter' }));
+
+      const undo = await screen.findByRole('button', { name: 'Undo' });
+      editStructureMock.mockClear();
+      await user.click(undo);
+      expect(editStructureMock).toHaveBeenCalledWith('p1', { type: 'restoreVersion', versionId: 'v9' });
+    });
+
+    it('composes a preface through the "＋ Add front-matter…" affordance (D2, the C6 backend wired to a gesture)', async () => {
+      const user = userEvent.setup();
+      editStructureMock.mockResolvedValue(makeProject());
+
+      render(<EditorialWorkspace project={makeProject()} onEdited={vi.fn()} />);
+      await user.click(screen.getByRole('button', { name: /Add front-matter/ }));
+      await user.click(screen.getByRole('button', { name: 'Preface' }));
+      await user.type(screen.getByLabelText('Preface title'), 'A Word Before');
+      await user.type(screen.getByLabelText('Preface text'), 'This book began as a question.');
+      await user.click(screen.getByRole('button', { name: 'Add' }));
+
+      expect(editStructureMock).toHaveBeenCalledWith('p1', {
+        type: 'addFrontMatterSection',
+        section: 'preface',
+        title: 'A Word Before',
+        text: 'This book began as a question.',
+      });
+    });
+
+    it('keeps the author’s composed text on failure — the words are never lost', async () => {
+      const user = userEvent.setup();
+      editStructureMock.mockRejectedValueOnce(new ApiError('nope', 400, 'INVALID_MUTATION'));
+
+      render(<EditorialWorkspace project={makeProject()} onEdited={vi.fn()} />);
+      await user.click(screen.getByRole('button', { name: /Add front-matter/ }));
+      await user.click(screen.getByRole('button', { name: 'Dedication' }));
+      await user.type(screen.getByLabelText('Dedication text'), 'For my family.');
+      await user.click(screen.getByRole('button', { name: 'Add' }));
+
+      expect(editStructureMock).toHaveBeenCalledWith('p1', { type: 'addFrontMatterSection', section: 'dedication', text: 'For my family.' });
+      // the form did not close — the words remain for another try (acceptance criterion)
+      expect(screen.getByLabelText('Dedication text')).toHaveValue('For my family.');
     });
   });
 });

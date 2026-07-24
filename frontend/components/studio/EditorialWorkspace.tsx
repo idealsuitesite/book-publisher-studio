@@ -12,7 +12,8 @@ import type {
 } from 'shared-types';
 import { cx } from '@/components/ui';
 import { LiveProof } from '@/components/studio/LiveProof';
-import { editStructure, ApiError } from '@/lib/api-client';
+import { editStructure } from '@/lib/api-client';
+import { describeStructureError } from '@/lib/structure-errors';
 
 /**
  * The editorial workspace (AUTHOR_EXPERIENCE_DR §8 M1–M2) — the new primary surface, built beside the
@@ -83,6 +84,10 @@ export function EditorialWorkspace({
   const [error, setError] = useState<string | null>(null);
   // Bumped after each successful CONTENT edit — the live Proof region-re-inks the visible window (D4).
   const [editNonce, setEditNonce] = useState(0);
+  // The last returnable change (AUTHOR_EXPERIENCE M3 P1-defect: the promote gesture needed a visible
+  // undo). Set after any versioning edit; the newest version is the pre-edit snapshot, so restoring it
+  // returns the author to exactly where they were. Cleared once they return, or when they navigate away.
+  const [lastChange, setLastChange] = useState<{ versionId: string; label: string } | null>(null);
 
   // Resolve the open object; if a prior selection was edited away (merged/collapsed), fall back to the
   // first object rather than an empty centre.
@@ -92,8 +97,8 @@ export function EditorialWorkspace({
   }, [objects, selectedKey]);
 
   const dispatch = useCallback(
-    async (mutation: StructureMutation) => {
-      if (!onEdited || busy) return;
+    async (mutation: StructureMutation): Promise<boolean> => {
+      if (!onEdited || busy) return false;
       setBusy(true);
       setError(null);
       try {
@@ -101,8 +106,17 @@ export function EditorialWorkspace({
         onEdited(updated); // the single write path: read the result, never mutate locally
         setSelectedBlockId(null);
         setEditNonce((n) => n + 1); // signal the live Proof to region-re-ink the visible window
+        if (mutation.type === 'restoreVersion') {
+          setLastChange(null); // the author just returned — no change to offer returning from
+        } else {
+          // The snapshot-before-edit is the newest version; restoring it returns the author here.
+          const newest = updated.versions[updated.versions.length - 1];
+          setLastChange(newest ? { versionId: newest.id, label: changeLabel(mutation) } : null);
+        }
+        return true;
       } catch (e) {
-        setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'The edit could not be applied.');
+        setError(describeStructureError(e)); // author-language, never a raw server string (P1-defect)
+        return false;
       } finally {
         setBusy(false);
       }
@@ -149,6 +163,9 @@ export function EditorialWorkspace({
             );
           })}
         </ul>
+
+        {/* D2 (M3-C7): compose a dead-but-typed front-matter section from the author's own words. */}
+        {editing && <AddFrontMatterAffordance busy={busy} onDispatch={dispatch} />}
       </nav>
 
       {/* CENTRE — the selected object's document */}
@@ -156,6 +173,16 @@ export function EditorialWorkspace({
         aria-label="Document"
         className="flex-1 overflow-y-auto rounded-lg border border-app-border bg-app-surface-1 px-8 py-7"
       >
+        {/* The visible way back from the last gesture (P1-defect): shown where the change was just made. */}
+        {editing && lastChange && (
+          <div className="mx-auto mb-4 w-full max-w-2xl">
+            <UndoBar
+              label={lastChange.label}
+              busy={busy}
+              onUndo={() => dispatch({ type: 'restoreVersion', versionId: lastChange.versionId })}
+            />
+          </div>
+        )}
         {resolved ? (
           <DocumentView
             project={project}
@@ -364,6 +391,179 @@ function placeLabel(object: EditorialObjectDTO): string {
   if (object.place === 'front') return 'Front matter';
   if (object.place === 'back') return 'Back matter';
   return 'Section';
+}
+
+/** A short editorial label for the just-made change — what the undo bar says the author can return from.
+ *  Exhaustive over the mutation union, so a new op must give itself a name here. */
+function changeLabel(m: StructureMutation): string {
+  switch (m.type) {
+    case 'promoteToChapter':
+      return 'New chapter';
+    case 'promoteToSubsection':
+      return 'New section';
+    case 'batchApply':
+      return m.op === 'promoteToChapter' ? 'Chapters created' : m.op === 'collapseMarker' ? 'Markers collapsed' : 'Sections created';
+    case 'mergeChapterIntoPrevious':
+      return 'Merged into previous';
+    case 'reorderChapters':
+      return 'Reordered';
+    case 'rename':
+      return 'Renamed';
+    case 'setPartRole':
+      return 'Placement changed';
+    case 'insertPartOpener':
+      return 'Divider added';
+    case 'removePartOpener':
+      return 'Divider removed';
+    case 'collapseMarker':
+      return 'Marker collapsed';
+    case 'setCallout':
+      return m.on ? 'Callout marked' : 'Callout cleared';
+    case 'markAsSubtitle':
+      return 'Subtitle set';
+    case 'clearSubtitle':
+      return 'Subtitle cleared';
+    case 'editFrontMatter':
+      return 'Front matter edited';
+    case 'addFrontMatterSection':
+      return m.section === 'dedication' ? 'Dedication added' : 'Preface added';
+    case 'restoreVersion':
+      return 'Returned';
+    default: {
+      const _exhaustive: never = m; // a new mutation type must name itself here
+      void _exhaustive;
+      return 'Changed';
+    }
+  }
+}
+
+/** The visible way back from the last gesture — surfaced at the gesture's result (P1-defect: the promote
+ *  gesture had the mechanic but no affordance). One undo point restores the pre-edit state exactly. */
+function UndoBar({ label, busy, onUndo }: { label: string; busy: boolean; onUndo: () => void }) {
+  return (
+    <div
+      role="status"
+      className="flex items-center justify-between gap-3 rounded-md border border-app-border bg-app-surface-2/60 px-3 py-2"
+    >
+      <span className="text-sm text-app-text-muted">
+        <span className="font-medium text-app-text">{label}.</span> You can undo this.
+      </span>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onUndo}
+        className="rounded-md border border-app-border px-2.5 py-1 text-xs font-medium text-app-text hover:bg-app-surface-2 disabled:opacity-50"
+      >
+        Undo
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Compose a dedication or preface from the author's own words (D2, M3-C7) — the add affordance the C6
+ * backend was waiting for. Text entry is legitimate here (this is COMPOSITION, not the D8 title-retype
+ * grammar the skeleton locks): the author writes the section. The typed text is NEVER lost on failure —
+ * the form closes only on success; a failed add leaves the words in place and the workspace error bar
+ * explains why (the acceptance criterion: no gesture leaves the author unable to return).
+ */
+function AddFrontMatterAffordance({
+  busy,
+  onDispatch,
+}: {
+  busy: boolean;
+  onDispatch: (m: StructureMutation) => Promise<boolean>;
+}) {
+  const [mode, setMode] = useState<'closed' | 'choose' | 'dedication' | 'preface'>('closed');
+  const [title, setTitle] = useState('');
+  const [text, setText] = useState('');
+
+  const reset = () => {
+    setMode('closed');
+    setTitle('');
+    setText('');
+  };
+
+  const submit = async () => {
+    const mutation: StructureMutation =
+      mode === 'preface'
+        ? { type: 'addFrontMatterSection', section: 'preface', title, text }
+        : { type: 'addFrontMatterSection', section: 'dedication', text };
+    const ok = await onDispatch(mutation);
+    if (ok) reset(); // keep the words on failure — never lose the author's text
+  };
+
+  const canSubmit = !busy && text.trim() !== '' && (mode !== 'preface' || title.trim() !== '');
+
+  if (mode === 'closed') {
+    return (
+      <button
+        type="button"
+        onClick={() => setMode('choose')}
+        className="mt-3 flex w-full items-center gap-2 rounded-md border border-dashed border-app-border px-2 py-1.5 text-left text-sm text-app-text-muted hover:border-app-text-muted hover:text-app-text"
+      >
+        <span aria-hidden="true">＋</span> Add front-matter…
+      </button>
+    );
+  }
+
+  if (mode === 'choose') {
+    return (
+      <div className="mt-3 flex flex-col gap-1.5 rounded-md border border-app-border p-2">
+        <p className="px-1 text-xs font-semibold uppercase tracking-wide text-app-text-muted">Add front-matter</p>
+        <button type="button" onClick={() => setMode('dedication')} className="rounded px-2 py-1 text-left text-sm text-app-text hover:bg-app-surface-2">
+          Dedication
+        </button>
+        <button type="button" onClick={() => setMode('preface')} className="rounded px-2 py-1 text-left text-sm text-app-text hover:bg-app-surface-2">
+          Preface
+        </button>
+        <button type="button" onClick={reset} className="rounded px-2 py-1 text-left text-xs text-app-text-muted hover:bg-app-surface-2">
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 rounded-md border border-app-border p-2">
+      <p className="px-1 text-xs font-semibold uppercase tracking-wide text-app-text-muted">
+        {mode === 'preface' ? 'Preface' : 'Dedication'}
+      </p>
+      {mode === 'preface' && (
+        <input
+          type="text"
+          aria-label="Preface title"
+          placeholder="Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          disabled={busy}
+          className="rounded border border-app-border bg-app-surface-1 px-2 py-1 text-sm text-app-text"
+        />
+      )}
+      <textarea
+        aria-label={mode === 'preface' ? 'Preface text' : 'Dedication text'}
+        placeholder={mode === 'preface' ? 'Write the preface…' : 'For…'}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        disabled={busy}
+        rows={mode === 'preface' ? 5 : 2}
+        className="rounded border border-app-border bg-app-surface-1 px-2 py-1 text-sm text-app-text"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!canSubmit}
+          onClick={submit}
+          className="rounded-md border border-app-border px-2.5 py-1 text-xs font-medium text-app-text hover:bg-app-surface-2 disabled:opacity-50"
+        >
+          Add
+        </button>
+        <button type="button" onClick={reset} disabled={busy} className="rounded px-2 py-1 text-xs text-app-text-muted hover:bg-app-surface-2">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /** Read-only render of a chapter/section's blocks, then its nested sections. When editing, paragraph
