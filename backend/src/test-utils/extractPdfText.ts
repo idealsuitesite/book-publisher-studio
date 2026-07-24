@@ -276,6 +276,45 @@ export function extractPdfPageText(buffer: Buffer, pageIndex: number): string {
   return (pages[pageIndex] ?? []).map((r) => r.text).join('');
 }
 
+/**
+ * A SUBSET-INVARIANT geometry+structure signature per visual page — the metric the INCREMENTAL_RENDER
+ * fidelity invariant needs. Two independent renders of the same page embed DIFFERENT font subsets, so
+ * the glyph CODES (and thus decoded text) differ between them — text is not comparable across renders.
+ * But the content stream's POSITIONING (Td/TD/Tm coordinates, TJ kerning) is subset-independent, and
+ * the same glyphs produce the same number of code bytes. This normalizes each page's content stream to
+ * exactly that invariant core: every glyph hex-string → its byte length (`#Ln`, so "same glyphs at the
+ * same widths" survives while the subset-specific codes drop out), font resource names → `/F` (subset
+ * ordering may assign different /Fn), whitespace collapsed. Identical page appearance ⇒ identical
+ * signature; different content or layout ⇒ different signature.
+ */
+export function extractPdfPageSignatures(buffer: Buffer): string[] {
+  const raw = buffer.toString('latin1');
+  const objects = parseObjects(raw);
+
+  let orderedBodies: string[] = [];
+  for (const [, body] of objects) {
+    if (!/\/Type\s*\/Pages\b/.test(body)) continue;
+    const kidsMatch = body.match(/\/Kids\s*\[([\s\S]*?)\]/);
+    if (!kidsMatch) continue;
+    orderedBodies = [...kidsMatch[1].matchAll(/(\d+)\s+0\s+R/g)]
+      .map((m) => objects.get(Number(m[1])))
+      .filter((b): b is string => !!b && /\/Type\s*\/Page\b/.test(b));
+    break;
+  }
+  if (orderedBodies.length === 0) {
+    orderedBodies = [...objects.values()].filter((b) => /\/Type\s*\/Page\b/.test(b));
+  }
+
+  return orderedBodies.map((body) =>
+    resolveContentStreams(objects, body)
+      .join('\n')
+      .replace(/<([0-9a-fA-F]*)>/g, (_m, hex: string) => `#L${hex.length}`) // glyph codes → glyph count
+      .replace(/\/F\d+/g, '/F') // subset-order-dependent font names → stable token
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
 /** Counts rendered pages by counting distinct page objects (`/MediaBox` appears once each). */
 export function countPdfPages(buffer: Buffer): number {
   const raw = buffer.toString('latin1');

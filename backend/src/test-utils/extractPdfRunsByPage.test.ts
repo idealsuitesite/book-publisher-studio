@@ -12,7 +12,7 @@ import { FrontMatterBuilder } from '../domain/services/FrontMatterBuilder';
 import { getTheme } from '../domain/themes/getTheme';
 import { KDP6x9PageLayout } from '../domain/layouts/KDP6x9PageLayout';
 import { PDFRenderer } from '../infrastructure/renderers/PDFRenderer';
-import { extractPdfRunsByPage, extractPdfText, countPdfPages } from './extractPdfText';
+import { extractPdfRunsByPage, extractPdfPageSignatures, extractPdfText, countPdfPages } from './extractPdfText';
 
 /**
  * POSITIVE CONTROL for extractPdfRunsByPage — the INCREMENTAL_RENDER fidelity invariant depends on
@@ -54,5 +54,19 @@ describe('extractPdfRunsByPage — positive control (licensed before the invaria
     // Grounding to reality: the per-page text, concatenated in page order, equals the whole-doc text
     // — so "page N" is genuinely page N in document order, not a scrambled index.
     expect(pages.map(textOf).join('')).toBe(extractPdfText(pdf));
+  });
+
+  it('the geometry SIGNATURE is per-page, self-identical, and page-distinct (the invariant instrument)', async () => {
+    const pdf = await renderFaithAlone();
+    const sigs = extractPdfPageSignatures(pdf);
+
+    expect(sigs.length).toBe(countPdfPages(pdf));
+    // self-identity: a second extraction is byte-identical (deterministic).
+    expect(extractPdfPageSignatures(pdf)).toEqual(sigs);
+    // page-distinct: two different body pages have different signatures (the vacuous-green guard —
+    // an invariant that passed on identical signatures for every page would be meaningless).
+    const mid = Math.floor(sigs.length / 2);
+    expect(sigs[mid]).not.toBe(sigs[mid + 1]);
+    expect(sigs[mid].length).toBeGreaterThan(0);
   });
 });
