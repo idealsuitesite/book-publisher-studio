@@ -204,7 +204,7 @@ nowhere is a loss, not a simplification (the burden of proof is on KEEPING, not 
 | **`Ready for Print` as a separate station** | → its **metadata inputs** (author, ISBN, language, description) move **beside the skeleton** (where the author composing the book needs them); its **validation findings** surface **in context** on the object they concern (a missing-author flag on the title-page object), not on a separate page | **moved** (split to two homes) |
 | **The large Layout blocks** (full-width theme/format panels) | → **compact menus** reachable from the workspace; the theme choice becomes the D5 real-page thumbnails | **moved** (compacted) |
 | **`Dismiss`** (the measured two-opposite-gestures defect — a mutating and a non-mutating gesture at equal weight) | → **made obvious or removed**: a suggestion the author does not want is declined by a clearly-labelled, non-mutating gesture distinct in weight from the confirming one; if it cannot be made unambiguous it goes | **clarified or removed** |
-| **`Overview` as a first-class landing** (re-judged, §4) | → **candidate removal**: does the workspace open directly? If Overview's facts (word count, progression, next action) find homes in the workspace, the landing goes; else it stays | **founder call** |
+| **`Overview` as a first-class landing** | → **REMOVED (founder ruling 2026-07-24)**: the studio opens directly into the workspace; every Overview fact is re-homed (the §4 table), none dropped | **removed, re-homed** |
 
 **No entry above is a pure loss** — each function is re-homed or consciously judged. **Every removal is a
 founder decision on the mockups** (Principle 1); the DR proposes this list, the screenshots settle it,
@@ -240,17 +240,37 @@ The station set today: Overview · Structure · Ready-for-Print · Layout · Pro
 - **Layout** shrinks to a compact theme/format chooser (D5's thumbnails) reachable from the workspace.
 - **Editions** stays its own destination (publish is a distinct object — precedent honoured).
 - **History** stays (versions/undo).
-- **Overview** is re-judged: does a first-class landing still earn its place, or does the workspace
-  open directly? A Principle-1 removal candidate for the founder.
-**Each page one object; each path legible.** The mockups prove "distributed but not scattered."
+- **Overview** is **REMOVED (founder ruling)**: the studio opens **directly into the workspace**.
+**Each page one object; each path legible.** The founder validated this map (2026-07-24): **7 stations → 4**
+(Workspace · Look · Editions · History).
+
+**The Overview re-homing table (founder ruling — nothing dropped, everything re-homed):**
+
+| Overview fact today | → New home |
+|---|---|
+| **Word count** ("45,816 words") | → the **workspace header** (a quiet running fact) |
+| **Next action** ("Book author is required →") | → the **skeleton's confirm-affordances + the in-context findings** (the workspace shows what to do next on the object it concerns) |
+| **Progression / quality score** ("/100") | → surfaced as the **in-context findings** themselves (the score *is* the open findings) + a compact header meter; no separate page |
+| **Last publication** ("None yet.") | → **Editions** (publish's own destination) |
+| **Title · source file · updated-at** (inspector facts) | → the **workspace header / a details affordance** |
+
+A removal is a simplification only if the function lands somewhere; each row above lands. **Opening
+straight into the work is itself the point** — Author B meets his book, not a dashboard about it.
 
 ## §5 The mockups to produce (the founder's gate) — what each must demonstrate against A–D
 
-**PRODUCED (2026-07-24): `mockups/author-experience-mockups.html`** — the six mockups below, built in the
-studio's own palette (both themes) with real corpus content (*Faith Alone*), each carrying the three CTO
-gate additions (finding-in-context on the Title-Page object; the provisional-total costume as founder
-options; the D8 empty-chapter case as its own image). Assembled for the founder's judgment via the CTO;
-**construction is not scoped until his validation on the captures.**
+**VALIDATED by the founder (2026-07-24): all six mockups.** `mockups/author-experience-mockups.html` —
+built in the studio's own palette (both themes) with real corpus content (*Faith Alone*), the three CTO
+gate additions carried. **The two delegated decisions are ruled by the founder:**
+- **Provisional-total costume = Option B, the "≈" form** ("Page 23 of ≈ 156"). Consigned-revisable like
+  the re-ink / re-sync debounces — a chosen default, movable later.
+- **`Overview` is REMOVED — the studio opens directly into the workspace.** Its facts are re-homed, none
+  dropped (the re-homing table is in §4). Word count → the workspace header; the "next action" → the
+  skeleton's confirm-affordances + the in-context findings; last publication → Editions; the rest → the
+  workspace header / a details affordance.
+
+With the gate passed, **the construction plan (§8) is produced for the CTO's gate**; the build branches
+at that gate.
 
 Nothing is built before the founder validates these on captures. **A note on honesty first: a still
 capture cannot prove criterion A (fluidity) — motion and milliseconds are not visible in an image.** So
@@ -295,13 +315,13 @@ judges the *frame*, not just the pixels — and criterion A is honestly split: m
 felt speed on the live studio.
 
 ## §6 Process and the gate
-1. **CTO gates the decisions (§3–§4) — this document.** Especially D1 (A vs B), D2's v1 scope, D7's
-   removal list, and D4's re-sync cadence.
-2. **Then the mockups (§5) are produced and the founder validates them on captures** — Principle 4's
-   screenshot loop, the same discipline every taste decision in this project has used. Removals need his
-   explicit yes (Principle 1).
-3. **Only then is construction scoped** (likely as its own sequence of gated commits, each with its
-   real-fixture verification and the founder taste-stops D5/D6 name). **Nothing before his images.**
+1. **CTO gated the decisions (§3–§4) — DONE (2026-07-24).** D1 Option B (+ the single-write-path invariant
+   and the projection-coherence test), D2–D8; the three gate additions folded in.
+2. **The mockups (§5) were produced and the founder VALIDATED them on captures — DONE (2026-07-24).** All
+   six; the two delegated decisions ruled (provisional costume = "≈"; Overview removed, re-homed).
+3. **Construction is now scoped (§8) for the CTO's gate** — a sequence of gated commits, each with its
+   judge and real-fixture verification, the founder taste-stops marked, milestoned so every increment is
+   a working studio. **The build branches at the CTO's gate on §8; nothing is coded before it.**
 
 **Standing rules carried in:** ADR-0001 (Book immutable — D1 honours it), `CHAPTER_TITLE_PRESENTATION`
 (the number is a datum — D6 inviolable), the non-encombrement law (burden on keeping, founder validates
@@ -319,5 +339,85 @@ self-stops, and the cadence directive (autonomy inside the approved sequence, ap
 - **Carried inputs discharged here:** criterion-B demand (D3), `EMPTY_CHAPTER_FROM_STRUCTURE_EDIT` (D8),
   the P1 live-wiring hand-off (D4), the CTO's seven axis verdicts (D1–D6, §4).
 
-**This DR stops at the decisions for the CTO's gate. No mockups, no code until the CTO gates §3–§4 and
-the founder validates §5 on captures.**
+**This DR's decisions are gated (§6) and the mockups are founder-validated. Construction is scoped in §8
+below, for the CTO's gate. The build branches at that gate.**
+
+## §8 Construction plan (for the CTO's gate — the largest build of the project)
+
+**The governing constraint: every commit leaves a WORKING studio — never a broken intermediate.** The new
+workspace is built **additively beside the existing stations**, which stay as a working fallback until the
+new surface fully carries their function; only then (M4) does the old world dissolve. Grouped into four
+**milestones, each of which is itself a shippable working studio.**
+
+**Order — dependency-true, with the divergences from the CTO's expected order named (he invited them):**
+the expected order (D1 → shell → D3/D4 → D2 → D5/D6 → D7/D8+nav) is dependency-sound and largely kept.
+Four refinements the dependencies (or the "never-broken" rule) demand:
+1. **The "workspace shell" is split** — skeleton+document (read) then the Proof panel — too large for one
+   coherent commit; each sub-commit is a working *read* studio.
+2. **D8 is designed in from the start, wired late** — "confirm-not-retype", computed numbers, and
+   "incomplete object surfaced" are properties of how the skeleton + confirm flow are built (M1–M2), not a
+   final bolt-on; only the *gentle-collapse wiring* is a late commit. D8 is not purely last.
+3. **D7's removals are staged, old stations last** (kept per the CTO's instinct, with the reason stated):
+   the function **re-homing** (metadata, findings) lands first (M4-C11); the old stations are **removed
+   only after** the new surface is proven (C12) — they are the working safety net until then.
+4. **D2's backend is dependency-independent** and *could* move to M0 to de-risk tri-format early; kept in
+   M3 adjacent to its UI for "one commit, one intent" unless the CTO prefers the early de-risk.
+
+**Every render / pagination / model touch verifies on a REAL manuscript** (corpus `faith-alone`; the
+founder books via read-only probe, never committed — `PRIVATE_MANUSCRIPT_FIXTURES`). Standing rules apply
+throughout: ADR-0001 (Book immutable), `CHAPTER_TITLE_PRESENTATION` (number is a datum), the
+non-encombrement law (removals already founder-validated on the mockups), the three self-stops, the
+cadence directive, gated commits pushed founder-idle.
+
+### Milestone 0 — Foundation (backend only; the studio is unchanged and working)
+| # | Commit | Judge / verification | Taste-stop |
+|---|---|---|---|
+| C1 | **D1 — `projectEditorialSkeleton(book)`** pure Domain read-model + its **two locked tests**: (i) **setter-lock** (the module exports no mutator, imports no mutation), (ii) **projection-coherence** (for every mutation type applied to a real `faith-alone` Book via `EditBookUseCase`, the projection reflects it). | Both tests green; the existing backend/frontend suites unchanged (nothing consumes it yet → studio untouched). Real fixture: `faith-alone`. | — |
+
+*M0 ships the foundation everything left-renders from, with the single-write-path guarantee locked, and
+changes no studio behaviour.*
+
+### Milestone 1 — The workspace reads (frontend; new workspace coexists with the old stations)
+| # | Commit | Judge / verification | Taste-stop |
+|---|---|---|---|
+| C2 | **The workspace shell + left skeleton + centre document (READ/navigate).** Renders `projectEditorialSkeleton` (left) and the selected object's content (centre), read-only. A new primary view; old stations intact. | Renders a real book's skeleton + document; frontend suite; axe (a11y); Visible-Increment (a human sees it). Live on `faith-alone`. | — |
+| C3 | **The right Proof panel, permanent** — reuse `PdfProof` + the existing FULL render (region wiring is C5). The Proof leaves the stack (Principle 3, placement half). | Proof renders in-panel; scroll/zoom (P1) intact; frontend suite. Live. | — |
+
+*M1 ships a working three-panel studio you can read and navigate; editing still available via the old
+Structure station (the safety net).*
+
+### Milestone 2 — The workspace edits, and comes alive
+| # | Commit | Judge / verification | Taste-stop |
+|---|---|---|---|
+| C4 | **D3 — contextual editing.** The "Convert to…" menu on the centre/skeleton selection dispatches the **existing 15 ops** via `EditBookUseCase` (D1 lets it target an editorial object). Criterion **B**. | An op from the workspace changes the STORED book and the export reflects it (the `projectExportReflectsEdit` precedent) — real fixture `faith-alone` through the route; route tests; frontend suite. | — |
+| C5 | **D4 — the live region-fetch loop.** `PdfProof` fetches `GET /:id/region` on a **content** edit (full render on **geometry** change), the **"≈" provisional total** (founder-ruled) shown until a **background full render on edit-pause** (debounce consigned-revisable) re-syncs it — never a false N. Criterion **A/C**. | Engine ≤ 300 ms on edited **book 3** (the P1 judge, now through the UI); scroll preserved across an edit under **Playwright**; the provisional total asserted never-confidently-wrong. Real fixture: book 3 probe. | (felt-A live stop deferred to M4, on the finished loop) |
+
+*M2 ships the fluid, editable workspace — criterion A wired end to end; the old stations still present.*
+
+### Milestone 3 — Compose and surfaces (the founder taste-stops land here)
+| # | Commit | Judge / verification | Taste-stop |
+|---|---|---|---|
+| C6 | **D2 backend — `addFrontMatterSection`** (whitelisted + route test, the `setPartRole` lesson) + `FrontMatterBuilder` **dedication + preface** + **tri-format render** (PDF/DOCX/EPUB). | Compose + render on a real book; `verify-real-export` re-run (the extraction-change lesson); tri-format asserted. | — |
+| C7 | **D2 UI — the "＋ Add front-matter…" affordance** in the skeleton → the composed section appears in the skeleton and the Proof. | Add via the workspace, it renders live; frontend suite. | — |
+| C8 | **D5 backend — separators + chapter-opening INTO the theme** (`Divider.style` → theme value; a chapter-opening theme field; renderers consume them). A model/renderer touch. | **Real-fixture render parity** (corpus byte-locks re-locked WITH attribution — the RENDER_DRIFT discipline); tri-format. | — |
+| C9 | **D5 UI — real-page thumbnails** (engine-rendered sample pages) for theme selection; Layout shrinks to this compact chooser. | Thumbnails render real pages; frontend suite. | **Founder: the graphic language, separator, opening.** |
+| C10 | **D6 — the document title surface** (non-editable number header + editable title below) + the **three-treatment chooser** (a theme value; the number stays a datum — `CHAPTER_TITLE_PRESENTATION` inviolable). | The three treatments render true tri-format; the number never enters the title text (the standing gate test). | **Founder: the title treatment.** |
+
+*M3 ships composition (dead types filled) and the theme-as-a-page surfaces; the founder's visual
+taste-stops are taken on the living studio. Still a working studio with the old stations present.*
+
+### Milestone 4 — The old world dissolves; one studio (removals last, felt-A stop at the end)
+| # | Commit | Judge / verification | Taste-stop |
+|---|---|---|---|
+| C11 | **D7 re-home — metadata beside the skeleton; findings IN CONTEXT** on their object (the `MISSING_AUTHOR`-on-Title-Page pattern), dissolving `Ready for Print`'s two jobs into the workspace. | A real finding appears on the right object; the metadata inputs edit the book; frontend suite. Real fixture. | — |
+| C12 | **D7 remove — the old Structure station + the Proof-in-the-stack** (now fully in the workspace); the workspace is the primary surface. | The studio works with the old stations gone; nothing a station did is unreachable (the §7/§4 re-homing realised). | — |
+| C13 | **D8 — the gentle-collapse wiring.** An empty editorial object is surfaced incomplete (built since M1) and offers **collapse via the existing cleanup suggester** — led away, never blocked. | The founder's empty-`INTRODUCTION` case (read-only probe) surfaces incomplete + offers collapse; a synthetic empty-chapter CI test. | — |
+| C14 | **Navigation — open directly into the workspace; Overview REMOVED, 7 → 4 stations**, its facts re-homed per the §4 table (word count → header, etc.). | A fresh open lands in the workspace; the re-homing table realised; frontend suite; axe. | — |
+| C15 | **The chantier judge + docs reconciliation.** Full suites, tsc, eslint, builds, `verify-real-*` on a throwaway server (zero trace, store restored). | All green; headers reconciled to CLOSED. | **Founder: the felt-A live taste-stop on the finished studio** — the whole edit→see loop, the criterion he can only judge alive (as P1). |
+
+*M4 ships the finished single studio; the felt-A founder stop is the closing gate before merge.*
+
+**Branch:** created at the CTO's gate on this §8 (the preventive rule — the branch point IS the gate).
+**Milestone re-verification:** at each milestone boundary the full gate runs (both suites, tsc, eslint,
+builds, `verify-real-*` zero-trace) so a milestone is never merged half-working. **~15 commits, 4
+milestones, each a working studio.** **Nothing is coded before the CTO gates §8.**
