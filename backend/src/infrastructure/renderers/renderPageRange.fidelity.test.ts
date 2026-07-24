@@ -13,7 +13,7 @@ import { getTheme } from '../../domain/themes/getTheme';
 import { KDP6x9PageLayout } from '../../domain/layouts/KDP6x9PageLayout';
 import { PDFRenderer } from './PDFRenderer';
 import { extractPdfRunsByPage, extractPdfPageText, extractPdfPageSignatures, countPdfPages } from '../../test-utils/extractPdfText';
-import type { PaginatedBook } from '../../domain/models/PaginatedBook';
+import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { Content, Block } from '../../domain/models/Book';
 
 /**
@@ -26,11 +26,11 @@ import type { Content, Block } from '../../domain/models/Book';
  */
 const FIXTURE = join(__dirname, '..', '..', '..', 'verification', 'corpus', 'faith-alone-styled.docx');
 
-async function paginateFaithAlone(): Promise<PaginatedBook> {
+async function paginateFaithAlone(themeName = 'classic'): Promise<PaginatedBook> {
   const raw = await new MammothParser().parse(readFileSync(FIXTURE));
   const built = new ASTBuilder().build(new HtmlNormalizer().normalize(raw.html, { fileName: 'faith.docx' }));
   const book = { ...built, frontMatter: new FrontMatterBuilder().build(built) };
-  const styled = new ThemeEngine().applyTheme(book, getTheme('classic'));
+  const styled = new ThemeEngine().applyTheme(book, getTheme(themeName));
   const typeset = new TypographyResolver().resolve(styled);
   return new LayoutEngine(new PdfKitTextMeasurer()).paginate(typeset, KDP6x9PageLayout);
 }
@@ -145,5 +145,96 @@ describe('renderPageRange — fidelity invariant: region page ≡ export page (m
     expect(regionSig).toHaveLength(2);
     expect(regionSig[0]).toBe(exportSig[exportPhysicalIndex(full, n, total)]);
     expect(regionSig[1]).toBe(exportSig[exportPhysicalIndex(full, n + 1, total)]);
+  });
+});
+
+/** The chapter-opening pages that light a drop cap, and the opening chapter's title, for the Novel
+ *  theme (the only shipped theme that lights drop caps — Classic's scope is 'none'). A clean opening
+ *  has no trailing split, no blank pages, no continuation, so its region [n, n] is exactly one page. */
+function chapterOpeners(paginated: PaginatedBook): Map<string, { page: Page; title: string | undefined }> {
+  const byFirstBlock = new Map<string, { page: Page; title: string | undefined }>();
+  const chapterFirstIds = new Map<string, string | undefined>();
+  const collect = (cs: Content[]) => cs.forEach((c) => {
+    if (c.type === 'chapter' && c.content[0]) chapterFirstIds.set(c.content[0].id, c.title);
+    if (c.type === 'chapter' && c.sections) collect(c.sections);
+    if (c.type === 'section' && c.subsections) collect(c.subsections);
+  });
+  collect(paginated.styledBook.book.mainContent as Content[]);
+  for (const page of paginated.pages) {
+    const first = page.blocks[0];
+    if (first && chapterFirstIds.has(first)) byFirstBlock.set(first, { page, title: chapterFirstIds.get(first) });
+  }
+  return byFirstBlock;
+}
+
+/**
+ * INCREMENTAL_RENDER 1c — the FIDELITY INVARIANT for a region whose LEADING page is a chapter opening.
+ * Runs on the Novel theme (the n=2 ruling, DR §5/§5bis: book 3's continuation split-tail AND a Novel
+ * drop-cap opening), the only shipped theme that lights the drop cap. Proves the region draws the true
+ * chrome — the title block and the drop cap — page-for-page identical to the full export, by the same
+ * construction as 1b (the full pagination's own Page objects, the same renderBlock walk). Both prior
+ * mid-content tests still run under Classic above, unchanged.
+ */
+describe('renderPageRange — fidelity invariant: region page ≡ export page (drop-cap chapter opening, Novel)', () => {
+  it('a drop-cap chapter-opening page renders byte-for-text identical to that page of the full export', async () => {
+    const paginated = await paginateFaithAlone('novel');
+    const renderer = new PDFRenderer({ compress: false });
+
+    const full = (await renderer.render(paginated, { language: 'en' })).output;
+    const total = countPdfPages(full);
+
+    const dropCap = paginated.styledBook.blockTypography ?? {};
+    const openers = chapterOpeners(paginated);
+    // A CLEAN drop-cap opening: its first block lights the drop cap, and the page has no trailing split,
+    // no blank pages, and does not itself start with a continuation — so [n, n] is exactly one page (the
+    // opening that ALSO splits its tail is the 1c+1d combination, out of this single-commit's scope).
+    const opening = [...openers.values()].find(({ page }) => {
+      const first = page.blocks[0];
+      return (
+        !!first &&
+        !!(dropCap[first] as { dropCap?: boolean } | undefined)?.dropCap &&
+        !page.splitAfterLines &&
+        !(page.blankPagesBefore ?? 0) &&
+        !page.startsWithContinuation
+      );
+    });
+    if (!opening) throw new Error('no clean drop-cap chapter-opening page found in faith-alone (Novel)');
+    const n = opening.page.number;
+
+    const region = (await renderer.renderPageRange(paginated, { language: 'en' }, n, n, total)).output;
+
+    // GUARDRAIL 1a: exactly the range width — no leaked blank/opening page pushed the opening off page 0.
+    expect(countPdfPages(region)).toBe(1);
+
+    // The invariant: the region's only page ≡ page n of the full export (title block + drop cap included,
+    // since both are in the geometry signature — a suppressed title could not match).
+    const exportSig = extractPdfPageSignatures(full);
+    const regionSig = extractPdfPageSignatures(region);
+    const idx = exportPhysicalIndex(full, n, total);
+    expect(regionSig).toHaveLength(1);
+    expect(regionSig[0]).toBe(exportSig[idx]);
+
+    // Not a neighbour (no wrong-page).
+    expect(regionSig[0]).not.toBe(exportSig[idx - 1]);
+    expect(regionSig[0]).not.toBe(exportSig[idx + 1]);
+
+    // CONTENT anchor to domain truth — the page NUMBER footer. It is Helvetica chrome and decodes in
+    // ANY font subset (unlike prose), so it is the anchor the instrument can be trusted for here. The
+    // region's footer reads the true "Page n of TOTAL", and `idx` was located in the export by that same
+    // footer — so a coincidental geometry collision on a DIFFERENT page is excluded: that page would have
+    // to carry both this signature AND the "Page n" footer.
+    const regionText = extractPdfPageText(region, 0);
+    expect(regionText).toContain(`Page ${n} of ${total}`);
+
+    // INSTRUMENT-LIAR RECORD (why no decoded-PROSE anchor here, unlike the Classic mid-content tests):
+    // the text extractor mangles the Novel theme's embedded-font subsets, and mangles the REGION and the
+    // FULL EXPORT DIFFERENTLY because each embeds a different glyph subset (the region only this page's
+    // glyphs). Measured on this very page: the full export decodes the body cleanly but scrambles the
+    // title ("Whactep Twrl…"); the region decodes the title cleanly but scrambles the body
+    // ("Justicaotin dsto hs…"). So a decoded-word match is not a trustworthy signal for Novel. The
+    // guarantee that does NOT depend on decoding is the subset-INVARIANT signature asserted above (it
+    // captures the drop-cap glyph's own geometry), plus the decode-reliable page-number footer. The prose
+    // text-identity anchor lives on the Classic pages, where the extractor is reliable. (No extractor fix
+    // is owed by this chantier; consign if a future chantier needs Novel prose extraction.)
   });
 });

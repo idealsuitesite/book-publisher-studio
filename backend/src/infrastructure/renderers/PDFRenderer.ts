@@ -316,9 +316,10 @@ export class PDFRenderer implements Renderer<Buffer> {
    * studio renders the whole book once, then region-renders on edit). It is the "of TOTAL" denominator,
    * so the footer reads "Page 171 of 156", not "of 2".
    *
-   * Scope (this commit): the leading page is mid-content and does NOT startWithContinuation — a chapter-
-   * opening (drop-cap) leading page and the continuation split-tail are the following commits. The
-   * invariant test and guardrails pin exactly what is in scope; nothing speculative is built (YAGNI).
+   * Scope: the leading page may be mid-content (1b) or a chapter/section OPENING (1c — its title block
+   * and, theme-permitting, its drop cap draw true, seeded on physical page 0). The continuation split-
+   * tail leading page is 1d. The invariant tests and guardrails pin exactly what is in scope; nothing
+   * speculative is built (YAGNI).
    */
   async renderPageRange(
     book: PaginatedBook,
@@ -573,14 +574,28 @@ export class PDFRenderer implements Renderer<Buffer> {
       // its blank pages, its opening break, its keep-with-next break, its title — is suppressed and
       // no page is added, so pageOwners stays aligned with the pages that are actually emitted. The
       // pageStarts entries are still consumed (deleted) above/below to keep the map's state consistent
-      // with the full walk. Chrome for the range's OWN chapter openings (drop-cap) is a later commit;
-      // a mid-content range never draws a title here (its title is on an earlier page).
+      // with the full walk. A mid-content range never draws a title here (its title is on an earlier page).
+      //
+      // INCREMENTAL_RENDER 1c — the region's LEADING page IS this content's opening. Its first block
+      // is `window.startId`, so activate the window HERE, before the chrome decisions, so the opening's
+      // TITLE (and, for a chapter, its subtitle) draws — page-for-page identical to the export's opening.
+      // The drop cap needs nothing special here: it is a property of the first paragraph and rides along
+      // through renderBlock (theme-conditional — Novel lights it, Classic doesn't). But the leading page
+      // is ALREADY seeded as physical page 0 in renderPageRange, so the blank pages and the opening/
+      // keep-with-next page BREAK are suppressed (drawing them would push the opening onto physical page
+      // 1+): the exact analogue of renderBlock consuming a mid-content leading block's page-start so no
+      // leading break fires. One walk, one path — chapter openings and section openings alike.
+      const isLeadingBoundary =
+        window !== undefined && !window.active && firstBlockId !== undefined && firstBlockId === window.startId;
+      if (isLeadingBoundary) window.active = true;
       const drawingChrome = !window || window.active;
+      // Every opening WITHIN the range adds its own page; the range's leading opening does not (seeded).
+      const addingLeadingPages = drawingChrome && !isLeadingBoundary;
 
       // Blank pages (Chapter.openingPageStyle) are genuinely empty physical pages - each
       // addPage() here is immediately followed by another with nothing drawn in between,
       // then the real content page below starts normally.
-      if (drawingChrome) {
+      if (addingLeadingPages) {
         for (let i = 0; i < (ownerPage?.blankPagesBefore ?? 0); i++) {
           this.plannedAddPage(doc);
           pageOwners.push('blank');
@@ -601,7 +616,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         const sectionStart = pageStarts.get(keepWithNextKey);
         if (sectionStart) {
           pageStarts.delete(keepWithNextKey);
-          if (drawingChrome) {
+          if (addingLeadingPages) {
             this.plannedAddPage(doc);
             pageOwners.push(sectionStart);
           }
