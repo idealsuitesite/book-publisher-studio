@@ -1,6 +1,8 @@
 # INCREMENTAL_RENDER — candidate 1 (visible-region render) Design Review
 
-**Status: DR — AWAITING CTO APPROVAL (gate 2 / non-negotiable #4). No branch, no code.** The branch is
+**Status: BUILT on `feat/incremental-render`, JUDGED GREEN, AWAITING THE FOUNDER TASTE-STOP → then CTO merge (2026-07-24).** The six-commit sequence (§6) is complete and pushed on `feat/incremental-render`; `main` is untouched. The judge (§3) is green on every mechanical point — engine **128 ms ≤ 300 ms** hot on the edited book 3 (region render 28 ms, paginate 99 ms the heavy term; full 529 ms → 4.1×), page-region ≡ page-export on the three pages (faith-alone Novel drop-cap + book-3 median/171 + book-3 continuation), scroll preserved across a re-ink (jsdom + real-Chromium Playwright), a11y text layer selectable (asserted), backend 917 / frontend 234 / tsc / eslint / builds, and verify-real-* 4/4·16/16·4/4 on a throwaway server. **Point 6, the founder taste-stop on the living studio, is the founder's and is PENDING** — nothing ships to `main` before it. **CANDIDATE 3 stays consigned second-order (D5): the whole engine is under budget hot, so pagination — the heavy 99 ms term — did NOT break the budget; the re-measure did not trip its trigger.** *(Original DR text below, unchanged; it was CTO-approved at gate 2 and the branch was created at that gate, as the preventive rule requires.)*
+
+**Prior status: DR — AWAITING CTO APPROVAL (gate 2 / non-negotiable #4). No branch, no code.** The branch is
 created at CTO validation of this DR (the preventive rule). P1 of the AUTHOR_EXPERIENCE Axis-7 sequence,
 after P2 (`BATCH_CONFIRM_LATENCY`, merged `712057e`).
 
