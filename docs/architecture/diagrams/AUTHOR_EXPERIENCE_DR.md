@@ -112,6 +112,13 @@ three models would be fragile and the author would feel it.
     mechanical, not a convention: the read-model type is exported without mutators, and the only writer of
     book state remains `EditBookUseCase` (guarded by a test that the projection module imports no mutation
     and exposes no setter).
+  - **The chantier judge for D1 (CTO gate addition, 2026-07-24) — two tests, complementary:** (i) the
+    **setter-lock** above forbids writing INTO the projection; (ii) a **projection-coherence** test proves
+    the read follows the write in both directions of the cycle — for **every mutation type** applied to a
+    real `Book` (gesture → op → `EditBookUseCase` → new `Book`), `projectEditorialSkeleton(book)` **reflects
+    the change** (a rename shows the new title, a reorder the new order, a promote the new object, a
+    `setPartRole` the new place). The single write path is only a unification if the projection always
+    mirrors the model it derives from; this test is that guarantee.
 
 **Recommendation: Option B.** It makes the editorial part a first-class *object the UI and the menu act
 on* — the founder's Axis-1 intent — with the single-write-path invariant guaranteeing it is one
@@ -153,8 +160,10 @@ still full-rendering. This DR wires it:
   screen show a frozen-but-dated total, or a false one?*
   - **Cadence.** A **geometry** change (theme/layout — `proofRefreshKey`'s non-`updatedAt` parts) does a
     full render (the total is authoritative). A **content** edit region-renders immediately for the felt
-    loop, and schedules a **background full render on edit-pause** (a longer debounce than the 500 ms
-    re-ink) to re-establish the exact total/TOC/thumbnails.
+    loop, and schedules a **background full render on edit-pause** to re-establish the exact
+    total/TOC/thumbnails. That pause debounce is a **consigned-revisable value** (CTO gate addition) — a
+    measured-reasonable default at the outset, adjustable at the founder taste-stop, exactly like the
+    500 ms re-ink debounce; it is not fixed here.
   - **The honest state — never a confidently-wrong N (ADR-0050/0051 doctrine).** Between a content edit
     and its background re-sync, the whole-book total is **shown as PROVISIONAL, not asserted as current**:
     the last full render's number, visibly marked (dimmed / "≈" / "updating…") until the background full
@@ -245,14 +254,20 @@ founder's **live** taste-stop on the running studio, not a screenshot. The DR co
 1. **The three-panel workspace (steady state, a real book).** — Criterion **D** (one legible surface,
    the disappearances of D7 realised) + **B** (the "Convert to…" menu open on a centre selection).
    Judgeable on a still: is it one calm surface, is the menu where the eye is? Capture: populated
-   skeleton left, a chapter open centre, the Proof right.
+   skeleton left, a chapter open centre, the Proof right. **It also shows a CONCRETE finding IN CONTEXT
+   (CTO gate addition — the Ready-for-Print split is D7's most structural move, so its result is SHOWN,
+   not asserted): the `MISSING_AUTHOR` flag sitting ON the Title-Page object in the skeleton, and the
+   metadata inputs beside the skeleton — the two homes the dissolved `Ready for Print` station splits
+   into, made visible exactly where a finding appears.**
 2. **The edit→re-ink loop — a before/after PAIR (criterion A's mechanism, and C).** Two frames of the
    **same page**: (a) before an edit, (b) after, with the right-panel region re-inked **in place** and
    the scroll/zoom position identical between the frames. What the still proves is the *mechanism* —
    in-place region repaint, gaze preserved — annotated with the **measured** engine figure (155 ms
    edit→visible on book 3, region render 31 ms). It also shows the **provisional whole-book total**
-   (D4): the "of N" dimmed/"≈"/"updating…" in frame (b) while the background full render is pending —
-   never a false N. *Felt fluidity itself is the founder's live stop, stated as such on the mockup.*
+   (D4) while the background full render is pending — never a false N. **The exact costume of the
+   provisional state (dimmed / "≈" / "updating…") is presented as OPTIONS for the founder to pick (CTO
+   gate addition), not pre-decided — the DR imposes the STATE, the founder chooses its dress.** *Felt
+   fluidity itself is the founder's live stop, stated as such on the mockup.*
 3. **The populated skeleton on import — the entry door AND the D8 image (a founder-real case).** A raw
    DOCX → the suggesters' filled skeleton, three-gesture scaling (the differentiator). **This is the D8
    capture, and it earns its own image because it is exactly what bit the founder:** it shows an empty
