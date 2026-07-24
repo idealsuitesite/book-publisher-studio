@@ -317,37 +317,50 @@ function ObjectActions({
 
   const index = project.book.mainContent.findIndex((c) => c.id === id);
   const canMerge = object.type === 'chapter' && index > 0;
+  // Author-language labels (M3-C9): the founder read the old "Front / Body / Back" as a title STYLE.
+  // These name the POSITION in the book — front matter before the chapters, back matter after them.
   const roleOptions: { label: string; role: 'front' | 'main' | 'back'; active: boolean }[] = [
-    { label: 'Front', role: 'front', active: object.place === 'front' },
-    { label: 'Body', role: 'main', active: object.place === 'body' },
-    { label: 'Back', role: 'back', active: object.place === 'back' },
+    { label: 'Front matter', role: 'front', active: object.place === 'front' },
+    { label: 'Main body', role: 'main', active: object.place === 'body' },
+    { label: 'Back matter', role: 'back', active: object.place === 'back' },
   ];
+  const activePlace = roleOptions.find((o) => o.active);
 
   return (
-    <ActionBar label="This object">
-      <span className="text-xs text-app-text-muted">Placement</span>
-      <div className="flex overflow-hidden rounded-md border border-app-border">
-        {roleOptions.map((option) => (
-          <button
-            key={option.role}
-            type="button"
-            disabled={busy || option.active}
-            onClick={() => onDispatch({ type: 'setPartRole', id, role: option.role })}
-            className={cx(
-              'px-2 py-1 text-xs',
-              option.active ? 'bg-app-surface-2 font-medium text-app-text' : 'text-app-text-muted hover:bg-app-surface-2'
-            )}
-          >
-            {option.label}
-          </button>
-        ))}
+    <div className="flex flex-col gap-1.5 rounded-md border border-app-border bg-app-surface-2/40 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-app-text-muted">Where it appears in the book</span>
+        <div className="flex overflow-hidden rounded-md border border-app-border">
+          {roleOptions.map((option) => (
+            <button
+              key={option.role}
+              type="button"
+              disabled={busy || option.active}
+              onClick={() => onDispatch({ type: 'setPartRole', id, role: option.role })}
+              className={cx(
+                'px-2 py-1 text-xs',
+                option.active ? 'bg-app-surface-2 font-medium text-app-text' : 'text-app-text-muted hover:bg-app-surface-2'
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {canMerge && (
+          <ActionButton busy={busy} onClick={() => onDispatch({ type: 'mergeChapterIntoPrevious', chapterId: id })}>
+            Merge into previous
+          </ActionButton>
+        )}
       </div>
-      {canMerge && (
-        <ActionButton busy={busy} onClick={() => onDispatch({ type: 'mergeChapterIntoPrevious', chapterId: id })}>
-          Merge into previous
-        </ActionButton>
-      )}
-    </ActionBar>
+      {/* The effect, in author language — and the current position, so a change reads as a change. */}
+      <p className="text-xs text-app-text-muted">
+        {activePlace?.role === 'front'
+          ? 'Now in the front matter — it exports before chapter 1.'
+          : activePlace?.role === 'back'
+            ? 'Now in the back matter — it exports after the last chapter.'
+            : 'In the main body, among the chapters. Front matter exports before chapter 1; back matter after the last chapter.'}
+      </p>
+    </div>
   );
 }
 

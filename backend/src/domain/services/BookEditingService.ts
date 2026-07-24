@@ -92,18 +92,24 @@ export class BookEditingService {
    * ONLY way a role is ever set; nothing infers it into the export.
    */
   setPartRole(book: Book, id: string, role: 'front' | 'back' | 'main', now: Date = new Date()): Book {
-    let found = false;
-    const mainContent = book.mainContent.map((content): Content => {
-      if (content.id !== id) return content;
-      found = true;
-      const updated: Content = { ...content, updatedAt: now };
-      if (role === 'main') delete updated.role;
-      else updated.role = role;
-      return updated;
-    });
-    if (!found) {
+    const target = book.mainContent.find((content) => content.id === id);
+    if (!target) {
       throw new ContentNotFoundError(`setPartRole: no top-level part with id "${id}"`);
     }
+    // A placement that changes nothing writes nothing (AUTHOR_EXPERIENCE M3-C9): the role is already
+    // what was asked, so return the SAME book — no `updatedAt` bump. `EditBookUseCase` reads the
+    // referential no-change and creates NO version, so exploratory re-placement never taxes the log
+    // (the founder's 7 exploratory placement versions were the finding). `'main'` maps to a cleared role.
+    const desired = role === 'main' ? undefined : role;
+    if (target.role === desired) return book;
+
+    const mainContent = book.mainContent.map((content): Content => {
+      if (content.id !== id) return content;
+      const updated: Content = { ...content, updatedAt: now };
+      if (desired === undefined) delete updated.role;
+      else updated.role = desired;
+      return updated;
+    });
     return { ...book, mainContent };
   }
 

@@ -270,6 +270,17 @@ describe('BookEditingService — setPartRole', () => {
     expect(() => service.setPartRole(book, 'nope', 'front', NOW)).toThrow(ContentNotFoundError);
     expect(book.mainContent.every((c) => c.role === undefined)).toBe(true); // input untouched
   });
+
+  it('is a NO-OP when the role is already the target — returns the SAME book (M3-C9: no change, no version)', () => {
+    const book = sampleBook();
+    // 'main' on an already-untagged part: the role is already cleared → same book back, no updatedAt bump.
+    expect(service.setPartRole(book, 'c1', 'main', NOW)).toBe(book);
+    // re-applying the SAME tag: front on an already-front part → same book back.
+    const front = service.setPartRole(book, 'c1', 'front', NOW);
+    expect(service.setPartRole(front, 'c1', 'front', NOW)).toBe(front);
+    // a genuine change still returns a NEW book (not the input).
+    expect(service.setPartRole(book, 'c1', 'front', NOW)).not.toBe(book);
+  });
 });
 
 // ── MINI_DR_CALLOUTS commit 1: setCallout ────────────────────────────────────────────────────────

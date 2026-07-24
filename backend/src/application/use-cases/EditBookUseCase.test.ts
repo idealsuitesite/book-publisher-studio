@@ -60,6 +60,18 @@ describe('EditBookUseCase — structure editing persists, snapshots, and undoes'
     expect((snapshot.book!.mainContent[0] as Chapter).role).toBeUndefined(); // pre-edit: untagged
   });
 
+  it('setPartRole NO-OP: re-applying the same placement creates NO version (M3-C9 — exploration does not tax the log)', async () => {
+    // First a real change → one version. Then the SAME placement again → still one version, not two.
+    await useCase.execute(id, { type: 'setPartRole', id: 'c1', role: 'front' });
+    expect((await repo.findById(id))!.versions).toHaveLength(1);
+
+    const ok = await useCase.execute(id, { type: 'setPartRole', id: 'c1', role: 'front' }); // no-op
+    expect(ok).toBe(true); // the gesture "succeeded" — the author is never told it failed
+    const saved = (await repo.findById(id))!;
+    expect((saved.book.mainContent[0] as Chapter).role).toBe('front'); // unchanged, still front
+    expect(saved.versions).toHaveLength(1); // NO second version — the no-op wrote nothing
+  });
+
   it('reorderChapters: applies, persists, renumbers, and snapshots before', async () => {
     await useCase.execute(id, { type: 'reorderChapters', fromIndex: 0, toIndex: 2 });
     const saved = (await repo.findById(id))!;

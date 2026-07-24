@@ -48,6 +48,10 @@ export class EditBookUseCase {
     // Every other mutation is snapshot-before-edit → ONE new version, appended atomically with the head
     // (DR D3). If `apply` throws on a bad target, appendVersion is never reached: nothing is persisted.
     const updated = this.apply(project, mutation);
+    // A NO-OP mutation returns the project unchanged (referentially) — it created no version and needs no
+    // save (M3-C9: a placement that changes nothing writes nothing; the acceptance criterion — exploration
+    // does not tax the log). Only ops that can be a true no-op return `project`; the rest always change it.
+    if (updated === project) return true;
     const newVersion = updated.versions[updated.versions.length - 1];
     await this.repository.appendVersion(updated, newVersion);
     return true;
@@ -76,8 +80,13 @@ export class EditBookUseCase {
         return this.projectService.replaceBook(snapped, book);
       }
       case 'setPartRole': {
+        // Apply BEFORE snapshotting so a no-op (same role) creates no version: setPartRole returns the
+        // SAME book when nothing changes, and we return the project unchanged (execute then skips the
+        // version). A real placement change proceeds to snapshot + replace as usual (M3-C9).
+        const before = this.projectService.currentBook(project);
+        const book = this.editingService.setPartRole(before, mutation.id, mutation.role);
+        if (book === before) return project;
         const snapped = this.projectService.snapshot(project, 'before set part role');
-        const book = this.editingService.setPartRole(this.projectService.currentBook(project), mutation.id, mutation.role);
         return this.projectService.replaceBook(snapped, book);
       }
       case 'insertPartOpener': {

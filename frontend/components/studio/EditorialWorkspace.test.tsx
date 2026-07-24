@@ -152,11 +152,13 @@ describe('EditorialWorkspace — the read studio (M1-C2)', () => {
       expect(onEdited).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }));
     });
 
-    it('dispatches an object placement op (setPartRole) from the placement control', async () => {
+    it('dispatches an object placement op (setPartRole) from the placement control, named in author language (M3-C9)', async () => {
       const user = userEvent.setup();
       render(<EditorialWorkspace project={makeProject()} onEdited={vi.fn()} />);
-      // The open chapter is body; tag it Back.
-      await user.click(screen.getByRole('button', { name: 'Back' }));
+      // The control names POSITION, not style — the founder read the old "Front/Body/Back" as a title style.
+      expect(screen.getByText(/Where it appears in the book/i)).toBeInTheDocument();
+      // The open chapter is body; move it to the back matter.
+      await user.click(screen.getByRole('button', { name: 'Back matter' }));
       expect(editStructureMock).toHaveBeenCalledWith('p1', { type: 'setPartRole', id: 'c1', role: 'back' });
     });
 
