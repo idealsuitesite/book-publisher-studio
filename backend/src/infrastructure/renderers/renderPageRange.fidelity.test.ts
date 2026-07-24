@@ -12,9 +12,9 @@ import { FrontMatterBuilder } from '../../domain/services/FrontMatterBuilder';
 import { getTheme } from '../../domain/themes/getTheme';
 import { KDP6x9PageLayout } from '../../domain/layouts/KDP6x9PageLayout';
 import { PDFRenderer } from './PDFRenderer';
-import { extractPdfRunsByPage, extractPdfPageSignatures, countPdfPages } from '../../test-utils/extractPdfText';
+import { extractPdfRunsByPage, extractPdfPageText, extractPdfPageSignatures, countPdfPages } from '../../test-utils/extractPdfText';
 import type { PaginatedBook } from '../../domain/models/PaginatedBook';
-import type { Content } from '../../domain/models/Book';
+import type { Content, Block } from '../../domain/models/Book';
 
 /**
  * INCREMENTAL_RENDER (P1) — the FIDELITY INVARIANT (INCREMENTAL_RENDER_DR §1, §3): a page rendered in a
@@ -56,6 +56,18 @@ function firstCleanMidContentPage(paginated: PaginatedBook): number {
   throw new Error('no clean mid-content page found in faith-alone');
 }
 
+/** Every block by id (top-level + nested) — to read the DOMAIN's own text for a page's blocks. */
+function indexBlocks(paginated: PaginatedBook): Map<string, Block> {
+  const map = new Map<string, Block>();
+  const walk = (cs: Content[]) => cs.forEach((c) => {
+    for (const b of c.content) map.set(b.id, b);
+    if (c.type === 'chapter' && c.sections) walk(c.sections);
+    if (c.type === 'section' && c.subsections) walk(c.subsections);
+  });
+  walk(paginated.styledBook.book.mainContent as Content[]);
+  return map;
+}
+
 /** The PHYSICAL index of the full export's page for DOMAIN page number `n`, located by its footer —
  *  robust to the front-matter physical offset and to reconciliation drift (the footer is ground
  *  truth; its digits are Helvetica chrome and decode cleanly in any subset). */
@@ -72,6 +84,11 @@ describe('renderPageRange — fidelity invariant: region page ≡ export page (m
     const renderer = new PDFRenderer({ compress: false });
 
     const full = (await renderer.render(paginated, { language: 'en' })).output;
+    // ATTRIBUTION (155 → 156): the P1 cadrage reported faith-alone at 155 pages — that is
+    // `paginated.pages.length`, LayoutEngine's DOMAIN/body page count. `countPdfPages` here is the
+    // PHYSICAL PDF count, which adds the one rendered front-matter page (FrontMatterBuilder emits a
+    // title page; no copyright/TOC for this fixture) → 156. Same book, two honest measures: body pages
+    // vs physical pages. The footer's "of 156" is the physical denominator, as the full export shows.
     const total = countPdfPages(full);
     const n = firstCleanMidContentPage(paginated);
 
@@ -89,11 +106,25 @@ describe('renderPageRange — fidelity invariant: region page ≡ export page (m
     expect(regionSig[0]).toBe(exportSig[idx]);
 
     // Numbering: the region's footer reads the true "Page n of TOTAL" (the digits decode cleanly).
-    expect(extractPdfRunsByPage(region)[0].map((r) => r.text).join('')).toContain(`Page ${n} of ${total}`);
+    const regionText = extractPdfPageText(region, 0);
+    expect(regionText).toContain(`Page ${n} of ${total}`);
 
     // GUARDRAIL 1b: the region's signature is NOT the signature of a neighbouring page (no wrong-page).
     expect(regionSig[0]).not.toBe(exportSig[idx - 1]);
     expect(regionSig[0]).not.toBe(exportSig[idx + 1]);
+
+    // COMPENSATING DOMAIN ANCHOR (CTO): geometry equality proves same LAYOUT; anchor CONTENT to domain
+    // truth so a coincidental geometry match on different words cannot pass silently. Cross-render text
+    // is dead (subsets), but a SINGLE render decodes self-consistently — so at least one distinctive
+    // word the model places on page n must appear verbatim in the region's own decoded text. (A page
+    // has many long words; the extractor mangles only a minority of glyphs, so ≥1 survives — and if
+    // none did, that itself would be a real signal, not a false negative.)
+    const blockIndex = indexBlocks(paginated);
+    const domainWords = paginated.pages[n - 1].blocks
+      .flatMap((id) => (blockIndex.get(id) as { text?: string } | undefined)?.text?.split(/\s+/) ?? [])
+      .filter((w) => /^[A-Za-z]{6,}$/.test(w));
+    expect(domainWords.length).toBeGreaterThan(0); // the page has real prose to anchor to
+    expect(domainWords.some((w) => regionText.includes(w))).toBe(true);
   });
 
   it('a 2-page mid-content window renders exactly those two pages, both identical to the export', async () => {
