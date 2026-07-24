@@ -4,6 +4,7 @@ import type { BookMetricsCalculator } from '../../domain/services/BookMetricsCal
 import type { BookMapper } from '../mappers/BookMapper';
 import type { ProjectDTO } from 'shared-types';
 import { buildImportReport } from '../mappers/ImportReportMapper';
+import { mapEditorialSkeleton } from '../mappers/EditorialSkeletonMapper';
 
 /**
  * Opens a project for the Workspace (HOME_WORKSPACE.md §0: `GET /api/projects/:id`).
@@ -39,6 +40,7 @@ export class GetProjectUseCase {
       id: project.id,
       name: project.name,
       book: this.bookMapper.map(project.book),
+      skeleton: mapEditorialSkeleton(project.book),
       settings: { ...project.settings },
       report: buildImportReport(project.book, validation, this.metrics),
       sourceFilename: source?.filename,

@@ -10,6 +10,9 @@ import { cx } from '@/components/ui';
  * became views; the technical menu died here.
  */
 export type StudioView =
+  // The new editorial workspace (AUTHOR_EXPERIENCE_DR M1) — the primary surface being built beside
+  // the existing stations, which stay as the working safety net until M4 dissolves them.
+  | 'workspace'
   | 'dashboard'
   | 'structure'
   | 'validation'
@@ -46,7 +49,11 @@ export function buildExplorer(
   return [
     {
       label: project.name,
-      nodes: [{ view: 'dashboard', label: 'Overview', status: `${project.report.score.overall}` }],
+      nodes: [
+        // The new surface leads; Overview stays beside it until M4 (D7 re-homes then removes it).
+        { view: 'workspace', label: 'Workspace', status: 'new' },
+        { view: 'dashboard', label: 'Overview', status: `${project.report.score.overall}` },
+      ],
     },
     {
       label: 'Book',

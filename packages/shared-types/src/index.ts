@@ -33,6 +33,14 @@ export type { ImportResponseDTO } from './ImportResponseDTO';
 export type { PublishingIssueDTO, PublishingResponseDTO } from './PublishingResponseDTO';
 export type { ProjectSummaryDTO, ProjectListResponseDTO } from './ProjectSummaryDTO';
 export type { ProjectDTO, ProjectVersionDTO, ProjectPublicationDTO, ProjectSettingsDTO, UpdateProjectSettingsDTO, TypographyOverrideDTO } from './ProjectDTO';
+export type {
+  EditorialSkeletonDTO,
+  EditorialObjectDTO,
+  EditorialPlaceDTO,
+  EditorialObjectTypeDTO,
+  EditorialSourceRefDTO,
+  FrontMatterSlotDTO,
+} from './EditorialSkeletonDTO';
 export type { ApiErrorCode, ApiErrorDTO } from './ApiErrorDTO';
 export type { StructureMutation } from './StructureMutation';
 export type { StructureSuggestionDTO, StructureSuggestionsResponseDTO } from './StructureSuggestionDTO';

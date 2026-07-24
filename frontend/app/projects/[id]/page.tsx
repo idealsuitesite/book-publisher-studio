@@ -19,6 +19,7 @@ import { BookDashboard } from '@/components/studio/BookDashboard';
 import { ReadyForPrint } from '@/components/studio/ReadyForPrint';
 import { CommandPalette, type PaletteCommand } from '@/components/studio/CommandPalette';
 import { StructureEditor } from '@/components/studio/StructureEditor';
+import { EditorialWorkspace } from '@/components/studio/EditorialWorkspace';
 import { FormatSelector } from '@/components/FormatSelector';
 import { PreviewPanel } from '@/components/PreviewPanel';
 import { EditorialPartsPanel } from '@/components/EditorialPartsPanel';
@@ -26,6 +27,7 @@ import { PublishDesk } from '@/components/studio/PublishDesk';
 import { Timeline } from '@/components/studio/Timeline';
 
 const VIEW_TITLES: Record<StudioView, string> = {
+  workspace: 'Workspace',
   dashboard: 'Overview',
   structure: 'Structure',
   validation: 'Ready for Print',
@@ -35,7 +37,9 @@ const VIEW_TITLES: Record<StudioView, string> = {
   history: 'History',
 };
 
-const VIEW_ORDER: StudioView[] = ['dashboard', 'structure', 'validation', 'layout', 'proof', 'editions', 'history'];
+// 'workspace' is appended (not prepended) so the existing 1..7 station shortcuts are unchanged while
+// the new surface coexists — the least-disruptive coexistence (M4 re-seats the ordering).
+const VIEW_ORDER: StudioView[] = ['dashboard', 'structure', 'validation', 'layout', 'proof', 'editions', 'history', 'workspace'];
 
 /** Resume-where-left (PRODUCT_EXPERIENCE §10.1): per-project UI state, client-side until S11. */
 const viewStorageKey = (id: string) => `bps.view.${id}`;
@@ -253,6 +257,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
       >
         <h1 className="sr-only">{project.name}</h1>
 
+        {view === 'workspace' && <EditorialWorkspace project={project} />}
         {view === 'dashboard' && (
           <BookDashboard
             project={project}

@@ -1,5 +1,6 @@
 import type { BookDTO } from './BookDTO';
 import type { ImportReportDTO } from './ImportReportDTO';
+import type { EditorialSkeletonDTO } from './EditorialSkeletonDTO';
 
 /**
  * One project, opened in the Workspace (HOME_WORKSPACE.md §0's journey: `GET /api/projects/:id`).
@@ -53,6 +54,11 @@ export interface ProjectDTO {
   id: string;
   name: string;
   book: BookDTO;
+  /**
+   * The editorial skeleton (AUTHOR_EXPERIENCE_DR §3 D1) — the projected read model of `book`,
+   * computed once in the Domain and carried here so the workspace renders one always-coherent spine.
+   */
+  skeleton: EditorialSkeletonDTO;
   settings: ProjectSettingsDTO;
   /**
    * Validation of the CURRENT stored book, computed on read — never stored, so it can never
