@@ -1,6 +1,6 @@
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
-import { join } from 'node:path';
+import { resolveDatabasePath } from '../infrastructure/config/resolveDatabasePath';
 import { MammothParser } from '../infrastructure/parsers/MammothParser';
 import { HtmlNormalizer } from '../infrastructure/normalizers/HtmlNormalizer';
 import { ASTBuilder } from '../domain/services/ASTBuilder';
@@ -56,9 +56,11 @@ export function createApp(): Express {
   // Durable since Sprint 11 (PERSISTENCE.md, ADR-0048): SQLite on disk, so a restart is no
   // longer an act of data loss. Route tests get a fresh `:memory:` database per createApp() —
   // the same isolation the in-memory store gave them, from the real implementation.
-  const databasePath =
-    process.env.DATABASE_PATH ??
-    (process.env.NODE_ENV === 'test' ? ':memory:' : join(process.cwd(), 'data', 'studio.db'));
+  // STORE_DEFAULT_SAFE (CTO Ruling 1): default to an in-memory DB; the REAL store (`data/studio.db`) is
+  // reached ONLY via an explicit DATABASE_PATH opt-in, which the dev/production entrypoint (src/index.ts)
+  // sets. So a spike/debug/test helper that builds the app without opting in can never touch the founder
+  // store by omission — the class that produced the P1 `region`-project trace is closed at the source.
+  const databasePath = resolveDatabasePath(process.env);
   const projectRepository = new SqliteProjectRepository(databasePath);
   const projectService = new ProjectService();
 
