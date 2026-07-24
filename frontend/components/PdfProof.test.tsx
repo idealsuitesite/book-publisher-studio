@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, fireEvent } from '@testing-library/react';
 
 /**
  * INCREMENTAL_RENDER (P1, commit 4) — the ACCESSIBILITY gate (DR §3 point 4, "a test, not a note"):
@@ -13,16 +13,19 @@ import { render, waitFor } from '@testing-library/react';
 
 const PAGE_TEXT = 'Justification stands at the very center of the gospel message.';
 
-// Mutable so a test can choose the page count (the window-policy test needs several pages).
-const mockState = { numPages: 1 };
+// Mutable so a test can choose the page count (the window-policy test needs several pages) and observe
+// the SCALE the text layer is built at (the zoom test asserts the text layer scales with the viewport).
+const mockState: { numPages: number; textLayerScales: number[] } = { numPages: 1, textLayerScales: [] };
 
 vi.mock('pdfjs-dist', () => {
   class FakeTextLayer {
     private container: HTMLElement;
     private source: { items: Array<{ str: string }> };
-    constructor({ container, textContentSource }: { container: HTMLElement; textContentSource: { items: Array<{ str: string }> } }) {
+    constructor({ container, textContentSource, viewport }: { container: HTMLElement; textContentSource: { items: Array<{ str: string }> }; viewport: { scale: number } }) {
       this.container = container;
       this.source = textContentSource;
+      // Record the scale the standard text layer is laid out at — it must track the viewport (and thus zoom).
+      mockState.textLayerScales.push(viewport.scale);
     }
     render(): Promise<void> {
       // The real TextLayer builds absolutely-positioned, user-selectable spans from the text items;
@@ -59,6 +62,7 @@ import { PdfProof } from './PdfProof';
 
 beforeEach(() => {
   mockState.numPages = 1;
+  mockState.textLayerScales = [];
   // A container width so the fit-to-width scale is well-defined (jsdom reports 0 otherwise).
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 600 });
 });
@@ -138,5 +142,55 @@ describe('PdfProof — the PDF.js canvas surface', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('re-paints at a new scale on zoom, and the text layer scales with the viewport (commit 7)', async () => {
+    const { container, getByLabelText } = render(<PdfProof bytes={new ArrayBuffer(16)} />);
+    await waitFor(() => expect(mockState.textLayerScales.length).toBeGreaterThan(0));
+
+    // Fit-width in this stub (clientWidth 600, page width 600) is scale 1 = 100%.
+    const initialScale = mockState.textLayerScales.at(-1)!;
+    expect(initialScale).toBe(1);
+    expect(container.querySelector('.pdfProofZoomLevel')?.textContent).toBe('100%');
+
+    mockState.textLayerScales = [];
+    fireEvent.click(getByLabelText('Zoom out')); // 1.0 → 0.75
+
+    await waitFor(() => expect(mockState.textLayerScales.length).toBeGreaterThan(0));
+    const zoomedScale = mockState.textLayerScales.at(-1)!;
+    // The page re-painted at a SMALLER scale, and the standard text layer was laid out at that same
+    // scale (so selection stays aligned over the canvas at any zoom).
+    expect(zoomedScale).toBeCloseTo(0.75, 5);
+    expect(container.querySelector('.pdfProofZoomLevel')?.textContent).toBe('75%');
+  });
+
+  it('reduces below fit-width for a capture view and clamps at the floor (commit 7)', async () => {
+    const { getByLabelText, container } = render(<PdfProof bytes={new ArrayBuffer(16)} />);
+    await waitFor(() => expect(container.querySelector('.textLayer')).not.toBeNull());
+    const zoomOut = getByLabelText('Zoom out') as HTMLButtonElement;
+    // Drive it down to the floor: 1.0 → 0.75 → 0.5 → 0.25, then it disables (a reduced, capture-friendly view).
+    for (let i = 0; i < 6; i++) fireEvent.click(zoomOut);
+    await waitFor(() => expect(container.querySelector('.pdfProofZoomLevel')?.textContent).toBe('25%'));
+    expect(zoomOut.disabled).toBe(true);
+  });
+
+  it('moves the scroll anchor PROPORTIONALLY across a zoom change (commit 7)', async () => {
+    const { container, getByLabelText } = render(<PdfProof bytes={new ArrayBuffer(16)} />);
+    const scrollEl = container.querySelector('.pdfProofScroll') as HTMLElement;
+    let scrollTopValue = 0;
+    Object.defineProperty(scrollEl, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTopValue,
+      set: (v: number) => { scrollTopValue = v; },
+    });
+    await waitFor(() => expect(mockState.textLayerScales.length).toBeGreaterThan(0));
+
+    scrollEl.scrollTop = 200; // the author is reading here at 100%
+    mockState.textLayerScales = [];
+    fireEvent.click(getByLabelText('Zoom out')); // 1.0 → 0.75
+
+    // The same content point stays under the eye: scrollTop scales by the same ratio (200 × 0.75 = 150).
+    await waitFor(() => expect(mockState.textLayerScales.at(-1)).toBeCloseTo(0.75, 5));
+    await waitFor(() => expect(scrollEl.scrollTop).toBeCloseTo(150, 5));
   });
 });

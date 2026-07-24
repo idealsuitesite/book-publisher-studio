@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './pdf-proof.css';
 
 /**
@@ -10,12 +10,17 @@ import './pdf-proof.css';
  * criterion A itself, not a cosmetic nicety. It is NOT a divergent preview artifact (the feared V3): it
  * paints the bytes of the real render, page-wise.
  *
- * Two design commitments the DR fixed here:
+ * Design commitments the DR fixed here:
  *  • The standard TEXT LAYER (pdfjs `TextLayer` + `setLayerDimensions`) is rendered over each canvas, so
  *    the page's text is SELECTABLE and exposed to screen readers — a canvas alone would render the book
- *    mute (the commit-4 accessibility gate, asserted by test).
+ *    mute (the commit-4 accessibility gate, asserted by test). It scales WITH the viewport, so it stays
+ *    aligned at any zoom.
  *  • Pages render LAZILY (an IntersectionObserver paints a page only as it nears the viewport), so a
  *    352-page book does not freeze the UI eagerly. Which pages to FETCH (the region window) is commit 5.
+ *  • ZOOM (commit 7 — the founder taste-stop regression: the native viewer's zoom was gone). Fit-width,
+ *    +/−, and a reduced view for screen captures. `scale` is already a PDF.js render parameter, so a zoom
+ *    change re-renders the window at the new scale and restores the scroll anchor PROPORTIONALLY (the
+ *    same content point stays under the eye). The 500 ms debounce and the window policy are untouched.
  */
 
 type Pdfjs = typeof import('pdfjs-dist');
@@ -26,6 +31,13 @@ type Pdfjs = typeof import('pdfjs-dist');
 const WINDOW_NEIGHBOURS = 1;
 // Must match the `gap` between pages in pdf-proof.css (.pdfProofPages) so the visible-window maths lines up.
 const PAGE_GAP_PX = 16;
+
+// Zoom (commit 7): a multiplier over fit-width (1 = fit-width = 100%). MIN low enough for a reduced,
+// capture-friendly view; MAX for reading fine detail; a plain additive step so the values are predictable.
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 3;
+const ZOOM_STEP = 0.25;
+const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
 
 // Load pdfjs and its worker once, lazily, on the client only (it touches DOM/canvas). The worker URL is
 // resolved through the bundler via `import.meta.url` — the standard bundler-friendly pdfjs pattern.
@@ -58,6 +70,10 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
   // A monotonic token so a render that finishes after a newer one started is discarded — the proof
   // never goes backwards (the same guard the panel's living loop uses).
   const tokenRef = useRef(0);
+  // The effective scale (fit-width × zoom) actually rendered last, so a zoom change can restore the
+  // scroll anchor proportionally rather than verbatim.
+  const renderedScaleRef = useRef<number | null>(null);
+  const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
     if (!bytes) return;
@@ -66,7 +82,7 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
     const pagesEl = pagesRef.current;
     if (!scrollEl || !pagesEl) return;
 
-    const previousScrollTop = scrollEl.scrollTop; // preserve the gaze across the re-ink
+    const previousScrollTop = scrollEl.scrollTop; // preserve the gaze across the re-ink / re-scale
     let cancelled = false;
     const cleanups: Array<() => void> = [];
     const isStale = () => cancelled || tokenRef.current !== token;
@@ -81,11 +97,12 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
       if (isStale()) return;
 
       // Fit to the container width, sizing every page from the first (a book's pages are uniform); each
-      // page still renders at its OWN viewport so a stray odd-sized page is correct once painted.
+      // page still renders at its OWN viewport so a stray odd-sized page is correct once painted. Zoom
+      // multiplies the fit-width scale (commit 7).
       const first = await doc.getPage(1);
       const unscaled = first.getViewport({ scale: 1 });
       const fitWidth = scrollEl.clientWidth || 600;
-      const scale = fitWidth / unscaled.width;
+      const scale = (fitWidth / unscaled.width) * zoom;
 
       const slots: HTMLDivElement[] = [];
       const frag = document.createDocumentFragment();
@@ -98,9 +115,14 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
         frag.append(slot);
         slots.push(slot);
       }
-      // One swap of the whole page list, then restore scroll — no intermediate blank state.
+      // One swap of the whole page list, then restore scroll — no intermediate blank state. On a re-ink
+      // at the same scale the anchor is verbatim; on a zoom change it moves PROPORTIONALLY so the same
+      // content point stays under the eye (ratio = new scale ÷ last rendered scale).
       pagesEl.replaceChildren(frag);
-      scrollEl.scrollTop = previousScrollTop;
+      const prevScale = renderedScaleRef.current;
+      const ratio = prevScale && prevScale > 0 ? scale / prevScale : 1;
+      scrollEl.scrollTop = previousScrollTop * ratio;
+      renderedScaleRef.current = scale;
 
       const renderPage = async (n: number, slot: HTMLDivElement): Promise<void> => {
         if (isStale() || slot.dataset.rendered) return;
@@ -129,6 +151,7 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
         }
 
         // The standard text layer, laid transparently over the canvas — selectable & screen-reader-exposed.
+        // It is built from the SAME viewport as the canvas, so it scales with zoom and stays aligned.
         const textLayerDiv = document.createElement('div');
         textLayerDiv.className = 'textLayer';
         pdfjs.setLayerDimensions(textLayerDiv, viewport);
@@ -147,9 +170,10 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
       // EAGERLY (so the first paint is instant and a short scroll is already drawn), then render-on-scroll
       // for everything beyond. The window is spent by decision, not drift — a fixed, revisable size.
       const pageStride = unscaled.height * scale + PAGE_GAP_PX;
+      const anchorScrollTop = scrollEl.scrollTop; // after the proportional restore above
       const viewportH = scrollEl.clientHeight || pageStride;
-      const firstVisible = Math.max(0, Math.floor(previousScrollTop / pageStride));
-      const lastVisible = Math.min(slots.length - 1, Math.ceil((previousScrollTop + viewportH) / pageStride));
+      const firstVisible = Math.max(0, Math.floor(anchorScrollTop / pageStride));
+      const lastVisible = Math.min(slots.length - 1, Math.ceil((anchorScrollTop + viewportH) / pageStride));
       const eagerStart = Math.max(0, firstVisible - WINDOW_NEIGHBOURS);
       const eagerEnd = Math.min(slots.length - 1, lastVisible + WINDOW_NEIGHBOURS);
       for (let i = eagerStart; i <= eagerEnd && !isStale(); i++) await renderPage(i + 1, slots[i]);
@@ -181,21 +205,48 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
       cancelled = true;
       cleanups.forEach((clean) => clean());
     };
-  }, [bytes]);
+  }, [bytes, zoom]);
 
   return (
-    <div
-      ref={scrollRef}
-      aria-label={ariaLabel}
-      role="document"
-      // Masked in the visual-baseline capture: the canvas paint is non-deterministic across runs
-      // (font hinting/antialiasing), the same reason the old <embed> carried this attribute.
-      data-baseline-mask
-      className={`pdfProofScroll transition-opacity duration-[var(--motion-view)] ${
-        refreshing ? 'opacity-40' : 'opacity-100'
-      } ${className}`}
-    >
-      <div ref={pagesRef} className="pdfProofPages" />
+    <div className={`pdfProofRoot ${className}`}>
+      {/* Zoom controls (commit 7) — minimal, not a toolbar: fit-width, out, in, and the current level. */}
+      <div className="pdfProofControls" role="toolbar" aria-label="Proof zoom">
+        <button type="button" aria-label="Fit width" onClick={() => setZoom(1)}>
+          Fit
+        </button>
+        <button
+          type="button"
+          aria-label="Zoom out"
+          disabled={zoom <= ZOOM_MIN}
+          onClick={() => setZoom((z) => clampZoom(z - ZOOM_STEP))}
+        >
+          −
+        </button>
+        <span className="pdfProofZoomLevel" aria-live="polite">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          type="button"
+          aria-label="Zoom in"
+          disabled={zoom >= ZOOM_MAX}
+          onClick={() => setZoom((z) => clampZoom(z + ZOOM_STEP))}
+        >
+          +
+        </button>
+      </div>
+      <div
+        ref={scrollRef}
+        aria-label={ariaLabel}
+        role="document"
+        // Masked in the visual-baseline capture: the canvas paint is non-deterministic across runs
+        // (font hinting/antialiasing), the same reason the old <embed> carried this attribute.
+        data-baseline-mask
+        className={`pdfProofScroll transition-opacity duration-[var(--motion-view)] ${
+          refreshing ? 'opacity-40' : 'opacity-100'
+        }`}
+      >
+        <div ref={pagesRef} className="pdfProofPages" />
+      </div>
     </div>
   );
 }

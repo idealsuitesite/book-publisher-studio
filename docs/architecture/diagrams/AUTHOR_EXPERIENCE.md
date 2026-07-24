@@ -6,6 +6,8 @@ future `AUTHOR_EXPERIENCE` Design Review.** This is the reserved `EDITOR_EXPERIE
 after the founder traversal. It is **not** the DR: it records the four principles the founder
 locked so a future session designs against a fixed frame rather than re-deriving it.
 
+**Founder-confirmed input (2026-07-24, INCREMENTAL_RENDER P1 taste-stop):** at the P1 taste-stop on the living studio, the founder validated the new PDF.js Proof surface (gaze continuity across a re-ink, selectable text, per-page paint) AND expressed, as a demand, **structure-editing FROM the Proof** — editing the book while looking at the living preview, not only from the Structure station. That is **criterion B (contextual editing)**, and it belongs HERE, not to P1 (whose mandate was criterion A / fluidity by the engine). Consigned as a founder-confirmed requirement the AUTHOR_EXPERIENCE DR must satisfy — it also motivates the live region-fetch wiring P1 deliberately left to this chantier (the Proof-as-its-own-page redesign is where "edit in place, see it re-ink in the region" is built end to end). *(The P1 zoom regression the founder also named was fixed on-branch in P1 commit 7 — NOT deferred here; only the contextual-editing demand is.)*
+
 ## §0 Whom it serves and when it opens
 
 `AUTHOR_EXPERIENCE` serves **Author B** (`VISION.md` — the unprepared manuscript, no formatting

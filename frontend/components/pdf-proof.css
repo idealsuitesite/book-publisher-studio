@@ -8,7 +8,49 @@
  * these rules make the spans transparent, absolutely positioned, and user-selectable.
  */
 
+.pdfProofRoot {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Zoom controls (commit 7): a slim bar above the surface — minimal, not a toolbar. */
+.pdfProofControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--app-border, rgb(0 0 0 / 0.1));
+  flex: 0 0 auto;
+}
+
+.pdfProofControls button {
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--app-border, rgb(0 0 0 / 0.15));
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.pdfProofControls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pdfProofZoomLevel {
+  min-width: 44px;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
 .pdfProofScroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   /* The app owns the scroll container, so an edit repaints canvases in place without the
      scroll/zoom reset the whole-<embed> reswap caused (DR §D2, continuity of the gaze). */
