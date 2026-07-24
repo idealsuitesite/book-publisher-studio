@@ -62,11 +62,40 @@ interface PdfProofProps {
   refreshing?: boolean;
   className?: string;
   ariaLabel?: string;
+  /**
+   * REGION MODE (AUTHOR_EXPERIENCE_DR D4 / M2-C5): when `bytes` are a REGION render — pages
+   * [pageOffset .. pageOffset + regionPageCount - 1] of a `totalPages`-page book, not the whole book —
+   * the surface still lays out ALL `totalPages` slots (so the scroll geometry stays full-book and the
+   * gaze is preserved), and paints ONLY the region's pages into their slots; the rest are placeholders
+   * until the background full re-sync repaints them (progressive loading, "the rest streams on scroll").
+   * Omitting both = full-book bytes (P1 behaviour, unchanged).
+   */
+  pageOffset?: number;
+  totalPages?: number;
+  /** Reports the 1-based physical page window currently in view — the loop fetches THAT region on edit. */
+  onVisibleRange?: (start: number, end: number) => void;
 }
 
-export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel = 'Book proof' }: PdfProofProps) {
+export function PdfProof({
+  bytes,
+  refreshing = false,
+  className = '',
+  ariaLabel = 'Book proof',
+  pageOffset,
+  totalPages,
+  onVisibleRange,
+}: PdfProofProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLDivElement>(null);
+  // The layout geometry the scroll→visible-range maths reads, set on each render.
+  const pageStrideRef = useRef<number>(0);
+  const totalSlotsRef = useRef<number>(0);
+  const onVisibleRangeRef = useRef(onVisibleRange);
+  // Keep the latest callback in a ref (updated after render, not during) so the render/scroll effects
+  // call the current one without depending on it.
+  useEffect(() => {
+    onVisibleRangeRef.current = onVisibleRange;
+  });
   // A monotonic token so a render that finishes after a newer one started is discarded — the proof
   // never goes backwards (the same guard the panel's living loop uses).
   const tokenRef = useRef(0);
@@ -107,14 +136,19 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
       const fitWidth = scrollEl.clientWidth || 600;
       const scale = (fitWidth / unscaled.width) * zoom;
 
+      // Region mode (C5): lay out ALL `total` slots for the full-book scroll geometry; the region doc
+      // covers full pages [offset .. offset + doc.numPages - 1]. In full-book mode offset=1, total=numPages.
+      const offset = pageOffset ?? 1;
+      const total = totalPages ?? doc.numPages;
+
       const slots: HTMLDivElement[] = [];
       const frag = document.createDocumentFragment();
-      for (let n = 1; n <= doc.numPages; n++) {
+      for (let fullPage = 1; fullPage <= total; fullPage++) {
         const slot = document.createElement('div');
         slot.className = 'pdfPage';
         slot.style.width = `${unscaled.width * scale}px`;
         slot.style.height = `${unscaled.height * scale}px`;
-        slot.dataset.page = String(n);
+        slot.dataset.page = String(fullPage); // 1-based FULL-book page number
         frag.append(slot);
         slots.push(slot);
       }
@@ -127,10 +161,14 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
       scrollEl.scrollTop = previousScrollTop * ratio;
       renderedScaleRef.current = scale;
 
-      const renderPage = async (n: number, slot: HTMLDivElement): Promise<void> => {
+      const renderPage = async (fullPage: number, slot: HTMLDivElement): Promise<void> => {
         if (isStale() || slot.dataset.rendered) return;
+        // Map the full-book page to this doc's page; a slot outside the region stays a placeholder
+        // (painted later by the background full re-sync, or on scroll if that window is fetched).
+        const docPage = fullPage - (offset - 1);
+        if (docPage < 1 || docPage > doc.numPages) return;
         slot.dataset.rendered = '1';
-        const page = await doc.getPage(n);
+        const page = await doc.getPage(docPage);
         if (isStale()) return;
         const viewport = page.getViewport({ scale });
         const outputScale = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
@@ -173,6 +211,9 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
       // EAGERLY (so the first paint is instant and a short scroll is already drawn), then render-on-scroll
       // for everything beyond. The window is spent by decision, not drift — a fixed, revisable size.
       const pageStride = unscaled.height * scale + PAGE_GAP_PX;
+      // Record the layout geometry so the scroll listener can report the visible window (C5 loop input).
+      pageStrideRef.current = pageStride;
+      totalSlotsRef.current = slots.length;
       const anchorScrollTop = scrollEl.scrollTop; // after the proportional restore above
       const viewportH = scrollEl.clientHeight || pageStride;
       const firstVisible = Math.max(0, Math.floor(anchorScrollTop / pageStride));
@@ -180,6 +221,8 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
       const eagerStart = Math.max(0, firstVisible - WINDOW_NEIGHBOURS);
       const eagerEnd = Math.min(slots.length - 1, lastVisible + WINDOW_NEIGHBOURS);
       for (let i = eagerStart; i <= eagerEnd && !isStale(); i++) await renderPage(i + 1, slots[i]);
+      // The loop needs to know which pages are in view (1-based full-book) to fetch that region on edit.
+      onVisibleRangeRef.current?.(firstVisible + 1, lastVisible + 1);
 
       // Render-on-scroll for the rest: a page paints as it nears view (rootMargin one screen of
       // look-ahead so scrolling stays ahead of the paint). Without IntersectionObserver (jsdom in
@@ -208,7 +251,32 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
       cancelled = true;
       cleanups.forEach((clean) => clean());
     };
-  }, [bytes, zoom, fitNonce]);
+  }, [bytes, zoom, fitNonce, pageOffset, totalPages]);
+
+  // Report the visible page window as the author scrolls (C5 loop input) — rAF-throttled so a fast
+  // scroll reports once per frame, not per event. Reads the geometry the render effect recorded.
+  useEffect(() => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+    let frame = 0;
+    const report = () => {
+      frame = 0;
+      const stride = pageStrideRef.current;
+      const totalSlots = totalSlotsRef.current;
+      if (!stride || !totalSlots) return;
+      const firstVisible = Math.max(0, Math.floor(scrollEl.scrollTop / stride));
+      const lastVisible = Math.min(totalSlots - 1, Math.ceil((scrollEl.scrollTop + (scrollEl.clientHeight || stride)) / stride));
+      onVisibleRangeRef.current?.(firstVisible + 1, lastVisible + 1);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(report);
+    };
+    scrollEl.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      scrollEl.removeEventListener('scroll', onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
 
   return (
     <div className={`pdfProofRoot ${className}`}>

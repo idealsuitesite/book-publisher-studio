@@ -9,6 +9,7 @@ import type { ProjectDTO, ContentDTO, EditorialObjectDTO } from 'shared-types';
 // dispatches an OP and re-renders from the returned project (never a local mutation).
 vi.mock('@/lib/api-client', () => ({
   editStructure: vi.fn(),
+  renderRegion: vi.fn(),
   ApiError: class ApiError extends Error {},
 }));
 const editStructureMock = vi.mocked(editStructure);

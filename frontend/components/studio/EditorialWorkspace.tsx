@@ -11,7 +11,7 @@ import type {
   StructureMutation,
 } from 'shared-types';
 import { cx } from '@/components/ui';
-import { PreviewPanel } from '@/components/PreviewPanel';
+import { LiveProof } from '@/components/studio/LiveProof';
 import { editStructure, ApiError } from '@/lib/api-client';
 
 /**
@@ -57,6 +57,9 @@ const PLACE_BADGE: Record<'front' | 'back', string> = { front: 'Front', back: 'B
  */
 export interface WorkspaceProof {
   exporter: () => Promise<Blob>;
+  /** A GEOMETRY-only key (theme/layout/accent/typography — NOT `updatedAt`): a change forces a full
+   *  render. Content edits go through `editNonce` (the region loop), so this must exclude `updatedAt`,
+   *  else every edit would trigger a full render and defeat the loop. */
   settingsKey: string;
   layoutLabel: string;
   themeLabel: string;
@@ -78,6 +81,8 @@ export function EditorialWorkspace({
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped after each successful CONTENT edit — the live Proof region-re-inks the visible window (D4).
+  const [editNonce, setEditNonce] = useState(0);
 
   // Resolve the open object; if a prior selection was edited away (merged/collapsed), fall back to the
   // first object rather than an empty centre.
@@ -95,6 +100,7 @@ export function EditorialWorkspace({
         const updated = await editStructure(project.id, mutation);
         onEdited(updated); // the single write path: read the result, never mutate locally
         setSelectedBlockId(null);
+        setEditNonce((n) => n + 1); // signal the live Proof to region-re-ink the visible window
       } catch (e) {
         setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'The edit could not be applied.');
       } finally {
@@ -166,14 +172,16 @@ export function EditorialWorkspace({
         )}
       </article>
 
-      {/* RIGHT — the living Proof, permanent (Principle 3). Reuses P1's PdfProof surface via PreviewPanel. */}
+      {/* RIGHT — the living Proof, permanent (Principle 3), with the D4 region-fetch loop (C5). */}
       {proof && (
         <div aria-label="Proof" className="w-[26rem] shrink-0 overflow-y-auto" role="region">
-          <PreviewPanel
+          <LiveProof
+            projectId={project.id}
             exporter={proof.exporter}
             settingsKey={proof.settingsKey}
             layoutLabel={proof.layoutLabel}
             themeLabel={proof.themeLabel}
+            editNonce={editNonce}
             onPageCount={proof.onPageCount}
           />
         </div>

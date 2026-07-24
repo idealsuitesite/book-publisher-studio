@@ -214,6 +214,12 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
   // The living Proof re-inks whenever this key changes — layout, theme, or a structure edit
   // (STRUCTURE_EDITING_PHASE3.md D5, keyed on updatedAt so undo re-inks too). See proofRefreshKey.
   const settingsKey = proofRefreshKey(project);
+  // The workspace's live Proof (D4) separates GEOMETRY (theme/layout — a full render) from CONTENT
+  // (an edit — the region loop), so its key must EXCLUDE updatedAt (unlike proofRefreshKey, which
+  // re-inks the old station on any change). A content edit thus never trips a full render here.
+  const geometryKey = `${project.settings.layoutName}/${project.settings.themeName}/${project.settings.accentOverride ?? ''}/${
+    project.settings.typographyOverride ? JSON.stringify(project.settings.typographyOverride) : ''
+  }`;
 
   const commands: PaletteCommand[] = [
     ...VIEW_ORDER.map((v, index) => ({
@@ -269,7 +275,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
                 setStudioFacts({ lastRenderMs: Math.round(performance.now() - started) });
                 return blob;
               },
-              settingsKey,
+              settingsKey: geometryKey,
               layoutLabel,
               themeLabel,
               onPageCount: (pages) => setMeasuredPages(pages ?? undefined),

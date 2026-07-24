@@ -299,6 +299,47 @@ export async function editStructure(id: string, mutation: StructureMutation): Pr
   return response.json() as Promise<ProjectDTO>;
 }
 
+/** A region render (AUTHOR_EXPERIENCE_DR D4, the P1 engine wired live): the bytes of only pages
+ *  [start..end] of the stored book, plus the real domain range the server clamped to. */
+export interface RegionRender {
+  bytes: ArrayBuffer;
+  /** The full book's real page count (the caller's authoritative denominator when it re-syncs). */
+  totalDomainPages: number;
+  /** The clamped range actually rendered (the window may run past the ends near page 1 / the last page). */
+  start: number;
+  end: number;
+}
+
+/**
+ * INCREMENTAL_RENDER P1 endpoint, wired into the live loop here (AUTHOR_EXPERIENCE D4): render only the
+ * visible page window of the stored book — the fast path (region ~31 ms vs a full render) that makes a
+ * content edit re-ink under the eye. `total` is the caller's held physical page count from its last full
+ * render; the server clamps the window to the book's real page count and returns the true range/total in
+ * headers (page-region ≡ page-export by construction, P1).
+ */
+export async function renderRegion(id: string, start: number, end: number, total: number): Promise<RegionRender> {
+  const response = await request(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(id)}/region?start=${start}&end=${end}&total=${total}`,
+    { method: 'GET' },
+    'Region render',
+    EXPORT_TIMEOUT_MS
+  );
+  if (!response.ok) {
+    throw await apiErrorFrom(response, 'Region render');
+  }
+  const bytes = await response.arrayBuffer();
+  const header = (name: string, fallback: number) => {
+    const raw = Number(response.headers.get(name));
+    return Number.isFinite(raw) && raw >= 1 ? raw : fallback;
+  };
+  return {
+    bytes,
+    totalDomainPages: header('X-Total-Domain-Pages', total),
+    start: header('X-Region-Start', start),
+    end: header('X-Region-End', end),
+  };
+}
+
 export async function publishProject(id: string): Promise<PublishingResponseDTO> {
   const response = await request(
     `${API_BASE_URL}/api/projects/${encodeURIComponent(id)}/publish`,
