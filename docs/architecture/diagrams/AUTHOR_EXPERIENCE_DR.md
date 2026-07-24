@@ -456,9 +456,12 @@ real use: (1) the single write path holds live, (2) the never-a-false-N honesty 
 > contract is.
 
 ### Milestone 3 — Compose and surfaces (the founder taste-stops land here)
+
+**PROGRESS (2026-07-25): C6 DONE + gated green (`c4b4318`).** C7–C10 remain; the M3 INPUTS below fold into them. Resume at C7.
+
 | # | Commit | Judge / verification | Taste-stop |
 |---|---|---|---|
-| C6 | **D2 backend — `addFrontMatterSection`** (whitelisted + route test, the `setPartRole` lesson) + `FrontMatterBuilder` **dedication + preface** + **tri-format render** (PDF/DOCX/EPUB). | Compose + render on a real book; `verify-real-export` re-run (the extraction-change lesson); tri-format asserted. | — |
+| C6 ✅ | **D2 backend — `addFrontMatterSection`** (whitelisted + route test, the `setPartRole` lesson) + `FrontMatterBuilder` **dedication + preface** + **tri-format render** (PDF/DOCX/EPUB). **DONE `c4b4318`:** the mutation routes through the flipped `appendVersion`; `composeDedication`/`composePreface` own the shape; canonical order title→copyright→dedication→toc→preface→body matches the skeleton's `FRONT_MATTER_SLOTS` (composed sections surface in the read-model for free). | ✅ backend 958/958, tsc + eslint clean both sides, `verify-real-export` 16/16 (throwaway, zero trace); tri-format render on real bytes (both appear ahead of the body; preface reaches the EPUB nav); coherence presence + route 200/400 asserted. | — |
 | C7 | **D2 UI — the "＋ Add front-matter…" affordance** in the skeleton → the composed section appears in the skeleton and the Proof. | Add via the workspace, it renders live; frontend suite. | — |
 | C8 | **D5 backend — separators + chapter-opening INTO the theme** (`Divider.style` → theme value; a chapter-opening theme field; renderers consume them). A model/renderer touch. | **Real-fixture render parity** (corpus byte-locks re-locked WITH attribution — the RENDER_DRIFT discipline); tri-format. | — |
 | C9 | **D5 UI — real-page thumbnails** (engine-rendered sample pages) for theme selection; Layout shrinks to this compact chooser. | Thumbnails render real pages; frontend suite. | **Founder: the graphic language, separator, opening.** |
