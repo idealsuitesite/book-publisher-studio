@@ -20,6 +20,7 @@ import { ReadyForPrint } from '@/components/studio/ReadyForPrint';
 import { CommandPalette, type PaletteCommand } from '@/components/studio/CommandPalette';
 import { StructureEditor } from '@/components/studio/StructureEditor';
 import { EditorialWorkspace } from '@/components/studio/EditorialWorkspace';
+import { cx } from '@/components/ui';
 import { FormatSelector } from '@/components/FormatSelector';
 import { PreviewPanel } from '@/components/PreviewPanel';
 import { EditorialPartsPanel } from '@/components/EditorialPartsPanel';
@@ -257,7 +258,23 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
       >
         <h1 className="sr-only">{project.name}</h1>
 
-        {view === 'workspace' && <EditorialWorkspace project={project} />}
+        {view === 'workspace' && (
+          <EditorialWorkspace
+            project={project}
+            proof={{
+              exporter: async () => {
+                const started = performance.now();
+                const blob = await exportProject(id, 'pdf');
+                setStudioFacts({ lastRenderMs: Math.round(performance.now() - started) });
+                return blob;
+              },
+              settingsKey,
+              layoutLabel,
+              themeLabel,
+              onPageCount: (pages) => setMeasuredPages(pages ?? undefined),
+            }}
+          />
+        )}
         {view === 'dashboard' && (
           <BookDashboard
             project={project}
@@ -317,9 +334,15 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
         {view === 'history' && <Timeline project={project} />}
       </section>
 
+      {/* The old Inspector is hidden while the new workspace is active — the three-panel surface
+          carries its own right column (the permanent Proof). Coexistence, not removal: it returns
+          for every station view, and C12 removes it only once the workspace fully supersedes it. */}
       <aside
         aria-label="Inspector"
-        className="hidden w-64 shrink-0 overflow-y-auto border-l border-app-border bg-app-surface-1 px-4 py-5 xl:block"
+        className={cx(
+          'w-64 shrink-0 overflow-y-auto border-l border-app-border bg-app-surface-1 px-4 py-5',
+          view === 'workspace' ? 'hidden' : 'hidden xl:block'
+        )}
       >
         <Inspector
           title={VIEW_TITLES[view]}

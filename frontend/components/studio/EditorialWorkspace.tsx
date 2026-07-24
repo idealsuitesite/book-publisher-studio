@@ -10,13 +10,16 @@ import type {
   BlockDTO,
 } from 'shared-types';
 import { cx } from '@/components/ui';
+import { PreviewPanel } from '@/components/PreviewPanel';
 
 /**
- * The editorial workspace (AUTHOR_EXPERIENCE_DR §8 M1-C2) — the new primary surface, built beside
- * the old stations (the safety net) until it fully carries them (M4). This commit is the READ studio:
- * the typed editorial skeleton on the LEFT (`project.skeleton`, the D1 projection) and the selected
- * object's document in the CENTRE, read-only. C3 adds the permanent Proof as the third panel; editing
- * (D3) and the live loop (D4) arrive in M2. Navigation only — no mutation reaches the book here.
+ * The editorial workspace (AUTHOR_EXPERIENCE_DR §8 M1) — the new primary surface, built beside the
+ * old stations (the safety net) until it fully carries them (M4). The READ studio: the typed
+ * editorial skeleton on the LEFT (`project.skeleton`, the D1 projection), the selected object's
+ * document in the CENTRE (read-only), and the living Proof PERMANENT on the RIGHT (C3, Principle 3 —
+ * the Proof leaves the stack and never has to be summoned). Editing (D3) and the live region loop
+ * (D4) arrive in M2; here the Proof reuses the existing FULL render (region wiring is C5).
+ * Navigation only — no mutation reaches the book here.
  *
  * The D8 grammar, designed in from the start (CTO Divergence-2 condition, locked by C2's judge): the
  * skeleton exposes NO title-retype path (titles are static text, never inputs) and NO authorable
@@ -41,7 +44,21 @@ function findTopLevelContent(project: ProjectDTO, id: string): ContentDTO | unde
 
 const PLACE_BADGE: Record<'front' | 'back', string> = { front: 'Front', back: 'Back' };
 
-export function EditorialWorkspace({ project }: { project: ProjectDTO }) {
+/**
+ * The living-Proof wiring, injected by the page (which owns the exporter + settings labels). Optional:
+ * the read tests exercise skeleton+document without mounting the Proof pipeline. When present, the
+ * Proof is the permanent third panel (C3). The region-fetch loop (D4/C5) will replace this full-render
+ * exporter in M2 — the panel placement here is what C3 delivers.
+ */
+export interface WorkspaceProof {
+  exporter: () => Promise<Blob>;
+  settingsKey: string;
+  layoutLabel: string;
+  themeLabel: string;
+  onPageCount?: (pages: number | null) => void;
+}
+
+export function EditorialWorkspace({ project, proof }: { project: ProjectDTO; proof?: WorkspaceProof }) {
   const objects = project.skeleton.objects;
   const [selectedKey, setSelectedKey] = useState<string | undefined>(() => firstSelectableKey(objects));
 
@@ -99,6 +116,19 @@ export function EditorialWorkspace({ project }: { project: ProjectDTO }) {
           <p className="text-sm text-app-text-muted">This book has no editorial objects yet.</p>
         )}
       </article>
+
+      {/* RIGHT — the living Proof, permanent (Principle 3). Reuses P1's PdfProof surface via PreviewPanel. */}
+      {proof && (
+        <div aria-label="Proof" className="w-[26rem] shrink-0 overflow-y-auto" role="region">
+          <PreviewPanel
+            exporter={proof.exporter}
+            settingsKey={proof.settingsKey}
+            layoutLabel={proof.layoutLabel}
+            themeLabel={proof.themeLabel}
+            onPageCount={proof.onPageCount}
+          />
+        </div>
+      )}
     </div>
   );
 }

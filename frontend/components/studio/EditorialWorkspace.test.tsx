@@ -81,6 +81,25 @@ describe('EditorialWorkspace — the read studio (M1-C2)', () => {
     expect(within(doc).getByText('The just shall live by faith.')).toBeInTheDocument();
   });
 
+  it('mounts the permanent Proof panel as the third column when the proof wiring is provided (C3)', () => {
+    // A pending exporter — the panel mounts and shows its heading before the 500ms re-ink timer runs;
+    // the full PdfProof pipeline is PreviewPanel's own tested concern, not this layout assertion.
+    const proof = {
+      exporter: () => new Promise<Blob>(() => {}),
+      settingsKey: 'letter/classic//',
+      layoutLabel: 'Letter',
+      themeLabel: 'Classic',
+    };
+    render(<EditorialWorkspace project={makeProject()} proof={proof} />);
+    const proofRegion = screen.getByRole('region', { name: 'Proof' });
+    expect(within(proofRegion).getByRole('heading', { name: 'Proof' })).toBeInTheDocument();
+  });
+
+  it('omits the Proof panel when no proof wiring is passed (the read-only case)', () => {
+    render(<EditorialWorkspace project={makeProject()} />);
+    expect(screen.queryByRole('region', { name: 'Proof' })).toBeNull();
+  });
+
   it('LOCKS the D8 grammar: no title-retype path and no authorable number anywhere (CTO Divergence-2)', () => {
     render(<EditorialWorkspace project={makeProject()} />);
     // No free-text input (a title-retype path) and no number spinner (an authorable number) exist in
