@@ -38,7 +38,9 @@ import type { PageLayout } from '../src/domain/models/PageLayout';
 import type { TypographyOverride } from '../src/domain/models/Project';
 import type { PaginatedBook } from '../src/domain/models/PaginatedBook';
 
-const BOOK3 = '1784812181217-cy7m12l0w';
+// The FOUNDER'S EDITED copy of book 3 (v34, 32 chapters), rendered with HIS settings — the real book.
+// (Not the original re-import `…cy7m12l0w` v22; the invariant holds on any book, but attribution is his.)
+const BOOK3 = '1784830746689-d7bticjiw';
 
 const themeEngine = new ThemeEngine();
 const typo = new TypographyResolver();

@@ -28,7 +28,10 @@ import type { Book } from '../src/domain/models/Book';
 import type { PageLayout } from '../src/domain/models/PageLayout';
 import type { PaginatedBook } from '../src/domain/models/PaginatedBook';
 
-const BOOK3 = '1784812181217-cy7m12l0w';
+// The FOUNDER'S EDITED copy of book 3 (v34, 32 chapters — his two edits last night), the REAL gesture
+// the ≤300 ms threshold is about. NOT the original re-import `…cy7m12l0w` (v22, 22 chapters) the cadrage
+// /DR measured — the invariant holds on any book, but the "edited book 3" figure must be his copy.
+const BOOK3 = '1784830746689-d7bticjiw';
 const THRESHOLD_MS = 300;
 const ms = (t: bigint) => Number(t) / 1e6;
 const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
