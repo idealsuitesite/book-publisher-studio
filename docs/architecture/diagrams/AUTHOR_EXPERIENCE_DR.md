@@ -429,6 +429,32 @@ Its three graven gate points (CTO, 2026-07-24) are no new scope — the M0/M1 in
 real use: (1) the single write path holds live, (2) the never-a-false-N honesty is test-affirmed, (3) the
 155 ms is re-measured in the final habitat, not presumed transferred.*
 
+> **M2 CLOSED — graven gate point 3 SETTLED by the A/B attribution (CTO ruling 2026-07-24).** A raw
+> end-to-end reading first showed the post-edit region GET at **~529 ms** on the `tsx` dev server — over
+> the 300 ms bar. Per the doctrine (self-stop case a: *attribute the measurement before optimizing*), the
+> ENGINE was decomposed and A/B'd, tsx vs compiled, on real `faith-alone` (engine-only, comparable to
+> P1's 155 ms baseline; `spikes/region-ab-timing.ts`):
+> - **ENGINE (paginate + region render): tsx 87 ms · compiled 96 ms** — both **≤ 300 ms and ≤ P1's
+>   155 ms** (faith-alone 155 pg < book-3 445 pg). The engine TRANSFERRED to the final habitat, on both
+>   runtimes; the interpreter tax on the engine is negligible (tsx pre-compiles via esbuild). Full render
+>   ~350–375 ms → region **~10× faster**. **Graven gate point 3 is met.**
+> - **The 529 ms was NEVER the engine.** The region GET HTTP latency GROWS with the version-log count —
+>   measured **81 ms @ 0 versions → 153 @ 5 → 250 @ 10 → 541 @ 15** — because `RenderProjectRegionUseCase`
+>   (like every render path) calls `repository.findById`, which deserialises the whole version-accumulating
+>   aggregate (ADR-0046: 45 MB @ 50 versions). This is **runtime-independent** (compiled or tsx, the load is
+>   the same) and is the already-consigned **`APPEND_ONLY_PERSISTENCE`** / version-log-cap cost, not a render
+>   regression and not specific to the region loop.
+>
+> **Both numbers recorded (CTO requirement 2).** The **compiled engine (96 ms)** is the shipping-truth basis
+> for the ≤ 300 ms threshold — cleared. The **dev-mode engine (87 ms)** is what the founder's `tsx` sessions
+> run today — also cleared. **The felt-A caveat for the M4 stop, stated plainly:** the founder's *felt*
+> edit-loop latency degrades with his session's edit count (the `findById` version-load tax, 81 → 541 ms over
+> 15 edits) — **build-independent**, so a production build does NOT fix it; only `APPEND_ONLY_PERSISTENCE`
+> (append-only save / a version-log cap) does. **Recommendation flagged to the CTO: consider pulling
+> `APPEND_ONLY_PERSISTENCE` forward before the M4 felt-A stop**, since a long editing session is exactly
+> when the founder judges criterion A. The render engine itself is not the bottleneck; the persistence
+> contract is.
+
 ### Milestone 3 — Compose and surfaces (the founder taste-stops land here)
 | # | Commit | Judge / verification | Taste-stop |
 |---|---|---|---|
