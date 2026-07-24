@@ -225,6 +225,16 @@ sentence-as-title chapter, and chapter-number gaps — **without friction**. The
 This is a **design constraint on the mockups**, not new blocking logic: the gentle path is the default,
 the friction path is discreet.
 
+> **TERRAIN VALIDATION of the datum law (D6/D8) — recorded 2026-07-24, M1-C2, CTO-directed.** The read
+> studio was verified live (read-only) on the founder's real 30-chapter book 3. His manuscript's chapter
+> *titles* are literally **"CHAPTER 1", "CHAPTER 3", "CHAPTER 8" (twice), "CHAPTER 10"…** — a numbering
+> his own text got wrong — while the skeleton's **computed numbers ran a clean 1..30 underneath them**.
+> This is the on-real-data demonstration of the law **"the number is a datum, never the author's text"**
+> (`CHAPTER_TITLE_PRESENTATION`): the day the read studio first lit up, real founder data proved *why* the
+> number must be computed and never echoed from the title. No synthetic fixture manufactures this — it is
+> the founding-proof answer for anyone who later questions the datum/title separation. (Verified on
+> `…d7bticjiw` v34; the projection is `projectEditorialSkeleton`, the surface `EditorialWorkspace`.)
+
 **Explicitly OUT of this chantier** (consigned, not forgotten): **`INSERT_ELEMENTS`** (insert a Part /
 split at a cursor / a new imported-absent element — content creation, its own chantier; D2's
 `addFrontMatterSection` is the one narrow composition exception); **Axis 6 justification + hyphenation**
@@ -411,10 +421,13 @@ Structure station (the safety net).*
 ### Milestone 2 — The workspace edits, and comes alive
 | # | Commit | Judge / verification | Taste-stop |
 |---|---|---|---|
-| C4 | **D3 — contextual editing.** The "Convert to…" menu on the centre/skeleton selection dispatches the **existing 15 ops** via `EditBookUseCase` (D1 lets it target an editorial object). Criterion **B**. | An op from the workspace changes the STORED book and the export reflects it (the `projectExportReflectsEdit` precedent) — real fixture `faith-alone` through the route; route tests; frontend suite. | — |
-| C5 | **D4 — the live region-fetch loop.** `PdfProof` fetches `GET /:id/region` on a **content** edit (full render on **geometry** change), the **"≈" provisional total** (founder-ruled) shown until a **background full render on edit-pause** (debounce consigned-revisable) re-syncs it — never a false N. Criterion **A/C**. | Engine ≤ 300 ms on edited **book 3** (the P1 judge, now through the UI); scroll preserved across an edit under **Playwright**; the provisional total asserted never-confidently-wrong. Real fixture: book 3 probe. | (felt-A live stop deferred to M4, on the finished loop) |
+| C4 | **D3 — contextual editing.** The "Convert to…" menu on the centre/skeleton selection dispatches the **existing 15 ops** via `EditBookUseCase` (D1 lets it target an editorial object). Criterion **B**. | An op from the workspace changes the STORED book and the export reflects it (the `projectExportReflectsEdit` precedent) — real fixture `faith-alone` through the route; route tests; frontend suite. **Graven gate point 1 (CTO, M2): the single write path holds under real usage** — every skeleton/centre gesture dispatches an op through `EditBookUseCase`; the UI never mutates the projection or the book directly (M0's coherence test asserts the property; M2 must not build a bypass). | — |
+| C5 | **D4 — the live region-fetch loop.** `PdfProof` fetches `GET /:id/region` on a **content** edit (full render on **geometry** change), the **"≈" provisional total** (founder-ruled) shown until a **background full render on edit-pause** (debounce consigned-revisable) re-syncs it — never a false N. Criterion **A/C**. | Scroll preserved across an edit under **Playwright**. **Graven gate point 2 (CTO, M2): "never a falsely-confident N" affirmed BY TEST** — a frontend test proves that between the edit and the background re-sync the whole-book denominator carries the "≈" provisional mark (never a stale N dressed as final), and this test exists before the milestone gate closes. **Graven gate point 3 (CTO, M2): the M2 judge RE-MEASURES the real end-to-end gesture in the new studio** — edit → region re-inked, gaze kept — so P1's 155 ms is re-confirmed **in its final habitat** (through this UI on edited book 3), not assumed to transfer. Real fixture: book 3 probe. | (felt-A live stop deferred to M4, on the finished loop) |
 
-*M2 ships the fluid, editable workspace — criterion A wired end to end; the old stations still present.*
+*M2 ships the fluid, editable workspace — criterion A wired end to end; the old stations still present.
+Its three graven gate points (CTO, 2026-07-24) are no new scope — the M0/M1 invariants now applying under
+real use: (1) the single write path holds live, (2) the never-a-false-N honesty is test-affirmed, (3) the
+155 ms is re-measured in the final habitat, not presumed transferred.*
 
 ### Milestone 3 — Compose and surfaces (the founder taste-stops land here)
 | # | Commit | Judge / verification | Taste-stop |
