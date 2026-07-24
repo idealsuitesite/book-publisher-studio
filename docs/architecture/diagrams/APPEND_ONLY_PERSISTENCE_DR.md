@@ -196,8 +196,11 @@ the real store's behaviour — the whole reason the shared suite exists (ADR-004
 1. **The model + port** — `BookVersion.book?`/`.settings?` optional + `milestone?`; `ProjectRepository.getVersion`
    and `appendVersion`; the `projectRepositoryContract` evolution written FIRST (the contract is the spec),
    **including the idempotency-under-retry test** (D3) and the atomicity test (§4). Both repos made green.
-2. **Sqlite read/write** — findById head+index; `getVersion`; `save` narrowed to head-only; append-only
-   atomic idempotent `appendVersion` (§3/§4).
+   **✅ DONE + green — `feat/append-only-persistence` `524fe12`** (the additive port; findById/save still
+   eager, unchanged; backend 944/944). `BookVersion.book?`/`.settings?` stay REQUIRED for now — they become
+   optional at the flip (step 2), where a findById-loaded version carries no book.
+2. **Sqlite read/write (the FLIP)** — findById head+index; `getVersion`; `save` narrowed to head-only;
+   version creation routed through `appendVersion` (§3/§4).
 3. **The migration** (§5) — schema v2 (incl. `milestone`) + metadata backfill + **historical-milestone
    backfill** (amendment 2) + backup/verify + the **read-path positive control** (amendment 3, sample
    captured pre-migration); dry-run on a copy, the migration test.
@@ -207,4 +210,14 @@ the real store's behaviour — the whole reason the shared suite exists (ADR-004
 5. **The judge** (§6) — the flat-curve re-measure on the migrated real store (backup-protected), the sub-second
    gesture, the undo round-trip, full harnesses.
 
-**NEXT: the CTO's gate on this DR → branch at the gate → build §9 → judge → M3 resumes. No code before the gate.**
+> **RESUME ORDER — the fresh session's FIRST move (CTO sequencing note, 2026-07-24):** run the **migration
+> dry-run on a COPY of the founder store BEFORE writing the flip (step 2)**, and **capture amendment 3's
+> pre-migration sample from the v1 eager `findById` path at the same time**. The dry-run costs little,
+> licenses the migration mechanics early, and — if the 93 MB store holds any surprise (a malformed historical
+> version, an encoding oddity in his oldest projects) — you meet it **while `findById` still works the old
+> way**, not after the flip has changed what "loading a project" means. Discover on the copy, then flip with
+> knowledge. So the effective order is: **step 1 (done) → the step-3 dry-run + amendment-3 capture on a copy →
+> step 2 (the flip) → step 3 (the migration proper) → step 4 → step 5 (judge).**
+
+**NEXT (fresh session): the dry-run-on-copy + amendment-3 capture → the flip → the migration → the wiring →
+the judge → M3 resumes.** Step 1 is done; the additive foundation de-risks the rest.
