@@ -47,6 +47,13 @@ export type StructureMutation =
   // untouched, null = cleared (a book with no copyright page is a legitimate author choice),
   // object = replaced whole.
   | { type: 'editFrontMatter'; titlePage?: TitlePageDTO | null; copyrightPage?: CopyrightPageDTO | null }
+  // AUTHOR_EXPERIENCE D2 (M3-C6): ADD a dead-but-typed front-matter section by composing it from the
+  // author's own words — v1 = dedication + preface. The first Insert-shaped op admitted (narrowly): a
+  // preface with no path is the most visible author-side hole, and this is composition, not the
+  // arbitrary content-creation `INSERT_ELEMENTS` defers. A dedication is a centered Block; a preface is
+  // a titled Section. Author action only; nothing in the import path writes these.
+  | { type: 'addFrontMatterSection'; section: 'dedication'; text: string }
+  | { type: 'addFrontMatterSection'; section: 'preface'; title: string; text: string }
   // BATCH_CONFIRM_LATENCY correctif A: apply a suggester's "…all" gesture as ONE command — one
   // snapshot, one save (BATCH_CONFIRM_LATENCY_SCOPE.md §4 Option A). The single `op` field makes a
   // MIXED batch impossible to express (one op per batch, structurally). `ids` are blockIds for the

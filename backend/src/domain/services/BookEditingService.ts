@@ -1,6 +1,7 @@
 import type { Book, Content, Section, Chapter, Paragraph, Block, TitlePage, CopyrightPage } from '../models/Book';
 import { ContentNotFoundError } from '../../shared/errors/ContentNotFoundError';
 import { classifyMarker } from './structureAssist/structureTaxonomy';
+import { FrontMatterBuilder } from './FrontMatterBuilder';
 
 /**
  * A partial front-matter edit (MINI_DR_EDIT_FRONT_MATTER §2.2): `undefined` leaves a section
@@ -29,7 +30,12 @@ export interface FrontMatterPatch {
 export class BookEditingService {
   // An id generator so create ops can mint stable ids; injectable for deterministic tests (the
   // ProjectService precedent). Defaulted so `new BookEditingService()` keeps working everywhere.
-  constructor(private readonly idGenerator: () => string = defaultIdGenerator) {}
+  constructor(
+    private readonly idGenerator: () => string = defaultIdGenerator,
+    // The front-matter composition service (AUTHOR_EXPERIENCE D2) — owns the SHAPE of a dedication /
+    // preface. Injected (DI, non-negotiable #3), default-constructed so existing callers are untouched.
+    private readonly frontMatterBuilder: FrontMatterBuilder = new FrontMatterBuilder()
+  ) {}
 
   /**
    * Move a top-level chapter/section from `fromIndex` to `toIndex`, renumbering chapters to match
@@ -615,6 +621,36 @@ export class BookEditingService {
     }
 
     return { ...book, metadata, frontMatter, updatedAt: now };
+  }
+
+  /**
+   * ADD a composed front-matter section (AUTHOR_EXPERIENCE D2, M3-C6): fill a dead-but-typed field —
+   * v1 dedication or preface — from the author's own words. Pure (ADR-0001): a new `Book` is returned.
+   * The SHAPE lives in `FrontMatterBuilder` (`composeDedication` / `composePreface`); the ids come from
+   * this service's one generator. Validation mirrors the "a blank sheet is worse than none" rule the
+   * edit path already holds (`editFrontMatter`): a dedication needs text, a preface needs a title AND
+   * text — throw, and the route maps it to 400 (the throw stays defense-in-depth, never a 500).
+   */
+  addFrontMatterSection(
+    book: Book,
+    input: { section: 'dedication'; text: string } | { section: 'preface'; title: string; text: string },
+    now: Date = new Date()
+  ): Book {
+    const frontMatter = { ...book.frontMatter };
+    if (input.section === 'dedication') {
+      if (!input.text.trim()) throw new Error('A dedication needs its text');
+      frontMatter.dedication = this.frontMatterBuilder.composeDedication(this.idGenerator(), input.text);
+    } else {
+      if (!input.title.trim() || !input.text.trim()) throw new Error('A preface needs a title and its text');
+      frontMatter.preface = this.frontMatterBuilder.composePreface(
+        this.idGenerator(),
+        this.idGenerator,
+        input.title,
+        input.text,
+        now
+      );
+    }
+    return { ...book, frontMatter, updatedAt: now };
   }
 
   /** Renumber top-level chapters 1..N in reading order; a chapter whose number changed advances its

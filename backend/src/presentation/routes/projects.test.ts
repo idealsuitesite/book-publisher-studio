@@ -285,6 +285,51 @@ describe('POST /api/projects/:id/structure — manual structure editing (STRUCTU
     expect(res.body.code).toBe('CONTENT_NOT_FOUND');
   });
 
+  // AUTHOR_EXPERIENCE D2 (M3-C6) — addFrontMatterSection carried end to end by the generic route.
+  it('addFrontMatterSection: composes a dedication, 200 + snapshot, and it reaches the read-model skeleton', async () => {
+    const { app, id } = await seedProject();
+    const res = await request(app)
+      .post(`/api/projects/${id}/structure`)
+      .send({ type: 'addFrontMatterSection', section: 'dedication', text: 'For my family.' });
+    expect(res.status).toBe(200);
+    expect(res.body.versions).toHaveLength(1); // snapshot-before-edit
+
+    const got = await request(app).get(`/api/projects/${id}`);
+    const ded = got.body.skeleton.objects.find(
+      (o: { sourceRef: { kind: string; slot?: string } }) => o.sourceRef.kind === 'front-matter' && o.sourceRef.slot === 'dedication'
+    );
+    expect(ded).toBeDefined();
+  });
+
+  it('addFrontMatterSection: composes a preface (title + text), 200, and it reaches the skeleton', async () => {
+    const { app, id } = await seedProject();
+    const res = await request(app)
+      .post(`/api/projects/${id}/structure`)
+      .send({ type: 'addFrontMatterSection', section: 'preface', title: 'Preface', text: 'Why I wrote this.' });
+    expect(res.status).toBe(200);
+
+    const got = await request(app).get(`/api/projects/${id}`);
+    const pre = got.body.skeleton.objects.find(
+      (o: { sourceRef: { kind: string; slot?: string } }) => o.sourceRef.kind === 'front-matter' && o.sourceRef.slot === 'preface'
+    );
+    expect(pre).toBeDefined();
+  });
+
+  it('400 INVALID_MUTATION on addFrontMatterSection with empty text, or a preface missing its title', async () => {
+    const { app, id } = await seedProject();
+    const noText = await request(app)
+      .post(`/api/projects/${id}/structure`)
+      .send({ type: 'addFrontMatterSection', section: 'dedication', text: '   ' });
+    expect(noText.status).toBe(400);
+    expect(noText.body.code).toBe('INVALID_MUTATION');
+
+    const noTitle = await request(app)
+      .post(`/api/projects/${id}/structure`)
+      .send({ type: 'addFrontMatterSection', section: 'preface', title: '', text: 'x' });
+    expect(noTitle.status).toBe(400);
+    expect(noTitle.body.code).toBe('INVALID_MUTATION');
+  });
+
   // BATCH_CONFIRM_LATENCY correctif A — the batch mutation carried end to end by the generic route.
   async function seedTwoPromotable(): Promise<{ app: ReturnType<typeof createApp>; id: string; ids: string[] }> {
     const app = createApp();

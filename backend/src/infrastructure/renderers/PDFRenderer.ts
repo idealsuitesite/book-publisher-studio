@@ -236,8 +236,23 @@ export class PDFRenderer implements Renderer<Buffer>, PageRangeRenderer {
         this.plannedAddPage(doc);
       }
 
+      // Front-matter order (AUTHOR_EXPERIENCE D2): the dedication page sits after the copyright, before
+      // the contents, as printed books set it.
+      if (frontMatter.dedication) {
+        this.renderDedication(doc, frontMatter.dedication, book.styledBook.theme);
+        pageOwners.push('blank');
+        this.plannedAddPage(doc);
+      }
+
       if (book.tableOfContents && book.tableOfContents.length > 0) {
         this.renderTableOfContents(doc, book.tableOfContents, book.styledBook.theme);
+        pageOwners.push('blank');
+        this.plannedAddPage(doc);
+      }
+
+      // The preface follows the contents, ahead of the body (AUTHOR_EXPERIENCE D2).
+      if (frontMatter.preface) {
+        this.renderPreface(doc, frontMatter.preface, book.styledBook.theme);
         pageOwners.push('blank');
         this.plannedAddPage(doc);
       }
@@ -710,6 +725,31 @@ export class PDFRenderer implements Renderer<Buffer>, PageRangeRenderer {
     for (const line of lines) {
       doc.text(line, doc.page.margins.left, y, { width: usableWidth, align: 'left' });
       y = doc.y + 2;
+    }
+  }
+
+  /** A dedication (AUTHOR_EXPERIENCE D2): the author's own words, centered and set high on an otherwise
+   *  empty page, italic — the near-universal dedication treatment. */
+  private renderDedication(doc: PDFKit.PDFDocument, block: Block, theme: Theme): void {
+    const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const top = doc.page.margins.top + (doc.page.height - doc.page.margins.top - doc.page.margins.bottom) * 0.3;
+    const text = block.type === 'paragraph' ? block.text : '';
+    doc.font(this.fonts.resolveBody(theme, false, true)).fontSize(13).fillColor('#333');
+    doc.text(text, doc.page.margins.left, top, { width: usableWidth, align: 'center' });
+  }
+
+  /** A preface (AUTHOR_EXPERIENCE D2): a titled front-matter section — its heading, then its
+   *  paragraphs — set on its own page, ahead of the body. v1 content is paragraphs only. */
+  private renderPreface(doc: PDFKit.PDFDocument, section: Section, theme: Theme): void {
+    const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    doc.font(this.fonts.resolveHeading(1, theme, true, false)).fontSize(22).fillColor('#000');
+    doc.text(section.title, doc.page.margins.left, doc.page.margins.top, { width: usableWidth, align: 'center' });
+    doc.moveDown(1.5);
+    doc.font(this.fonts.resolveBody(theme, false, false)).fontSize(11).fillColor('#000');
+    for (const child of section.content) {
+      if (child.type !== 'paragraph') continue;
+      doc.text(child.text, doc.page.margins.left, doc.y, { width: usableWidth, align: 'left' });
+      doc.moveDown(0.7);
     }
   }
 

@@ -222,6 +222,22 @@ export class EPUBRenderer implements Renderer<Buffer> {
       chapters.push({ title: 'Copyright', content: parts.join('\n'), excludeFromToc: true });
     }
 
+    // The dedication (AUTHOR_EXPERIENCE D2): centered, italic; excluded from the nav, as a dedication is.
+    if (front.dedication && front.dedication.type === 'paragraph') {
+      const content = `<div style="text-align:center;font-style:italic;margin-top:20%">${escapeHtml(front.dedication.text)}</div>`;
+      chapters.push({ title: 'Dedication', content, excludeFromToc: true });
+    }
+
+    // The preface (AUTHOR_EXPERIENCE D2): a titled section — a REAL nav entry, unlike title/copyright/
+    // dedication — with its paragraphs. v1 content is paragraphs only.
+    if (front.preface) {
+      const paras = front.preface.content
+        .filter((b): b is Extract<typeof b, { type: 'paragraph' }> => b.type === 'paragraph')
+        .map((p) => `<p>${escapeHtml(p.text)}</p>`);
+      const content = [`<h1>${escapeHtml(front.preface.title)}</h1>`, ...paras].join('\n');
+      chapters.push({ title: front.preface.title, content });
+    }
+
     return chapters;
   }
 

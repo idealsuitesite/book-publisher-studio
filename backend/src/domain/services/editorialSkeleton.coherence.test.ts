@@ -24,7 +24,7 @@ import type { StructureMutation } from 'shared-types';
  *  - GRAIN ops (title/order/place/presence of a top-level object) → the projection reflects them;
  *  - BELOW-GRAIN ops (a subsection, a subtitle, a callout, a front-matter CONTENT edit) → the
  *    top-level projection is correctly UNCHANGED — itself a coherence property, asserted here.
- * All 15 `StructureMutation` variants are exercised, none skipped.
+ * All `StructureMutation` variants are exercised, none skipped (incl. D2's `addFrontMatterSection`).
  */
 
 const CORPUS = (file: string): string => join(__dirname, '..', '..', '..', 'verification', 'corpus', file);
@@ -174,6 +174,29 @@ describe('editorialSkeleton — projection-coherence: the read follows the write
     const titlePage = skeleton.objects.find((o) => o.sourceRef.kind === 'front-matter' && o.sourceRef.slot === 'titlePage');
     expect(titlePage).toBeDefined();
     expect(titlePage!.place).toBe('front');
+  }, 30_000);
+
+  it('addFrontMatterSection (preface) → a Preface front object appears (presence reflected, AUTHOR_EXPERIENCE D2)', async () => {
+    expect(titles(baseline)).not.toContain('Preface'); // faith-alone imports with an empty frontMatter
+    const { skeleton } = await applyAndProject(faithAlone, {
+      type: 'addFrontMatterSection',
+      section: 'preface',
+      title: 'Preface',
+      text: 'Why I wrote this.',
+    });
+    const preface = skeleton.objects.find((o) => o.sourceRef.kind === 'front-matter' && o.sourceRef.slot === 'preface');
+    expect(preface).toBeDefined();
+    expect(preface!.place).toBe('front');
+  }, 30_000);
+
+  it('addFrontMatterSection (dedication) → a Dedication front object appears (presence reflected)', async () => {
+    const { skeleton } = await applyAndProject(faithAlone, {
+      type: 'addFrontMatterSection',
+      section: 'dedication',
+      text: 'For my family.',
+    });
+    const dedication = skeleton.objects.find((o) => o.sourceRef.kind === 'front-matter' && o.sourceRef.slot === 'dedication');
+    expect(dedication).toBeDefined();
   }, 30_000);
 
   it('restoreVersion → the projection reverts to the pre-edit spine', async () => {

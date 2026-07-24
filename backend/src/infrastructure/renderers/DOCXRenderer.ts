@@ -274,7 +274,31 @@ function buildFrontMatterParagraphs(front: FrontMatter, theme: Theme): Paragraph
     paragraphs.push(new Paragraph({ children: [new PageBreak()] }));
   }
 
+  // The dedication page (AUTHOR_EXPERIENCE D2): centered, italic, set high, its own page — after the
+  // copyright, before the contents.
+  if (front.dedication && front.dedication.type === 'paragraph') {
+    paragraphs.push(new Paragraph({ spacing: { before: 3000, after: 240 }, alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: front.dedication.text, font: theme.fonts.body, size: 26, italics: true })] }));
+    paragraphs.push(new Paragraph({ children: [new PageBreak()] }));
+  }
+
   return paragraphs;
+}
+
+/** The preface (AUTHOR_EXPERIENCE D2): a titled front-matter section — heading then paragraphs — placed
+ *  after the contents, ahead of the body. v1 content is paragraphs only. */
+function buildPrefaceParagraphs(section: Section, theme: Theme): Paragraph[] {
+  const out: Paragraph[] = [
+    new Paragraph({ heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: section.title, font: theme.fonts.heading, size: 40, bold: true })] }),
+  ];
+  for (const child of section.content) {
+    if (child.type !== 'paragraph') continue;
+    out.push(new Paragraph({ spacing: { after: 120 },
+      children: [new TextRun({ text: child.text, font: theme.fonts.body, size: 22 })] }));
+  }
+  out.push(new Paragraph({ children: [new PageBreak()] }));
+  return out;
 }
 
 function buildTableOfContentsParagraphs(entries: TOCEntry[], theme: Theme): Paragraph[] {
@@ -318,9 +342,11 @@ export class DOCXRenderer implements Renderer<Buffer> {
 
     const tocEntries = book.tableOfContents ?? [];
     // Front matter first, then the TOC, then the body - real print order.
+    const frontMatter = book.styledBook.book.frontMatter;
     const children: (Paragraph | Table)[] = [
-      ...buildFrontMatterParagraphs(book.styledBook.book.frontMatter, book.styledBook.theme),
+      ...buildFrontMatterParagraphs(frontMatter, book.styledBook.theme),
       ...(tocEntries.length > 0 ? buildTableOfContentsParagraphs(tocEntries, book.styledBook.theme) : []),
+      ...(frontMatter.preface ? buildPrefaceParagraphs(frontMatter.preface, book.styledBook.theme) : []),
     ];
     this.renderContent(
       book.styledBook.book.mainContent,

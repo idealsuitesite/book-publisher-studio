@@ -1,4 +1,4 @@
-import type { Book, FrontMatter, TitlePage, CopyrightPage } from '../models/Book';
+import type { Book, FrontMatter, TitlePage, CopyrightPage, Paragraph, Section } from '../models/Book';
 
 /**
  * Builds the front matter a professional book requires — a title page and a copyright page —
@@ -34,6 +34,34 @@ export class FrontMatterBuilder {
       titlePage: existing.titlePage ?? this.buildTitlePage(book),
       copyrightPage: existing.copyrightPage ?? this.buildCopyrightPage(book),
     };
+  }
+
+  /**
+   * Compose an AUTHORED dedication into its Block (AUTHOR_EXPERIENCE D2). Unlike `build`, this is not
+   * derived from metadata — the author supplies the words, this owns their SHAPE: a single centered
+   * paragraph, the near-universal dedication form. Ids are passed in so the node shares the book's one
+   * id source (`BookEditingService.idGenerator`) rather than this builder growing its own.
+   */
+  composeDedication(id: string, text: string): Paragraph {
+    return { type: 'paragraph', id, text: text.trim(), align: 'center' };
+  }
+
+  /**
+   * Compose an AUTHORED preface into its titled Section (AUTHOR_EXPERIENCE D2). Blank-line-separated
+   * input becomes separate paragraphs (an author pastes prose, not one run-on line); a body with no
+   * blank lines is one paragraph. `nextId` supplies each paragraph's id from the book's own generator.
+   */
+  composePreface(sectionId: string, nextId: () => string, title: string, text: string, now: Date): Section {
+    const paras = text
+      .split(/\n{2,}/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const content: Paragraph[] = (paras.length ? paras : [text.trim()]).map((t) => ({
+      type: 'paragraph',
+      id: nextId(),
+      text: t,
+    }));
+    return { type: 'section', id: sectionId, title: title.trim(), level: 1, content, createdAt: now, updatedAt: now };
   }
 
   private buildTitlePage(book: Book): TitlePage | undefined {

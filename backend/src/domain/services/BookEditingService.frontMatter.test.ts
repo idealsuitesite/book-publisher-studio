@@ -98,3 +98,72 @@ describe('editFrontMatter (MINI_DR_EDIT_FRONT_MATTER)', () => {
     expect(JSON.stringify(edited.frontMatter)).toBe(before);
   });
 });
+
+describe('addFrontMatterSection (AUTHOR_EXPERIENCE D2, M3-C6)', () => {
+  // Deterministic ids so the composed nodes assert exactly.
+  const seq = () => {
+    let n = 0;
+    return new BookEditingService(() => `id-${++n}`);
+  };
+
+  it('composes a dedication into a centered Block set on frontMatter.dedication', () => {
+    const edited = seq().addFrontMatterSection(bookWithFrontMatter(), {
+      section: 'dedication',
+      text: '  For my family.  ',
+    });
+    expect(edited.frontMatter.dedication).toEqual({
+      type: 'paragraph',
+      id: 'id-1',
+      text: 'For my family.', // trimmed
+      align: 'center',
+    });
+    // the existing sections are untouched
+    expect(edited.frontMatter.titlePage?.title).toBe('Faith Alone');
+  });
+
+  it('composes a preface into a titled Section, blank-line-separated input becoming paragraphs', () => {
+    const now = new Date('2026-07-25T00:00:00Z');
+    const edited = seq().addFrontMatterSection(
+      bookWithFrontMatter(),
+      { section: 'preface', title: '  Preface  ', text: 'First thought.\n\nSecond thought.' },
+      now
+    );
+    const preface = edited.frontMatter.preface!;
+    expect(preface.type).toBe('section');
+    expect(preface.title).toBe('Preface'); // trimmed
+    expect(preface.level).toBe(1);
+    expect(preface.content.map((b) => (b.type === 'paragraph' ? b.text : ''))).toEqual([
+      'First thought.',
+      'Second thought.',
+    ]);
+    expect(preface.createdAt).toEqual(now);
+  });
+
+  it('a preface body with no blank line is a single paragraph', () => {
+    const edited = seq().addFrontMatterSection(bookWithFrontMatter(), {
+      section: 'preface',
+      title: 'Preface',
+      text: 'One continuous thought, no breaks.',
+    });
+    expect(edited.frontMatter.preface!.content).toHaveLength(1);
+  });
+
+  it('rejects a dedication with no text, and a preface missing its title or text (route maps to 400)', () => {
+    expect(() => service.addFrontMatterSection(bookWithFrontMatter(), { section: 'dedication', text: '   ' })).toThrow(
+      /dedication needs/
+    );
+    expect(() =>
+      service.addFrontMatterSection(bookWithFrontMatter(), { section: 'preface', title: '  ', text: 'x' })
+    ).toThrow(/preface needs/);
+    expect(() =>
+      service.addFrontMatterSection(bookWithFrontMatter(), { section: 'preface', title: 'P', text: '  ' })
+    ).toThrow(/preface needs/);
+  });
+
+  it('never mutates its input (ADR-0001)', () => {
+    const original = bookWithFrontMatter();
+    const before = JSON.stringify(original.frontMatter);
+    service.addFrontMatterSection(original, { section: 'dedication', text: 'For X.' });
+    expect(JSON.stringify(original.frontMatter)).toBe(before);
+  });
+});

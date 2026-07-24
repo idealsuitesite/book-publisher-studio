@@ -109,6 +109,19 @@ function parseMutation(body: unknown): StructureMutation | null {
     }
     return null;
   }
+  // AUTHOR_EXPERIENCE D2 (M3-C6): ADD a composed front-matter section. Whitelisted with route tests in
+  // the same commit (the setPartRole lesson). The route enforces the SHAPE and the non-emptiness the
+  // pure op also requires, so the op's throw stays defense-in-depth, never a 500 path.
+  if (m.type === 'addFrontMatterSection') {
+    const nonEmpty = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
+    if (m.section === 'dedication' && nonEmpty(m.text)) {
+      return { type: 'addFrontMatterSection', section: 'dedication', text: m.text };
+    }
+    if (m.section === 'preface' && nonEmpty(m.title) && nonEmpty(m.text)) {
+      return { type: 'addFrontMatterSection', section: 'preface', title: m.title, text: m.text };
+    }
+    return null;
+  }
   return null;
 }
 

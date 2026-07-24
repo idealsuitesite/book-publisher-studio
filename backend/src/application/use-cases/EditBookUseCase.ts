@@ -123,6 +123,15 @@ export class EditBookUseCase {
         });
         return this.projectService.replaceBook(snapped, book);
       }
+      case 'addFrontMatterSection': {
+        const snapped = this.projectService.snapshot(project, `before add ${mutation.section}`);
+        const input =
+          mutation.section === 'dedication'
+            ? ({ section: 'dedication', text: mutation.text } as const)
+            : ({ section: 'preface', title: mutation.title, text: mutation.text } as const);
+        const book = this.editingService.addFrontMatterSection(this.projectService.currentBook(project), input);
+        return this.projectService.replaceBook(snapped, book);
+      }
       case 'batchApply': {
         // BATCH_CONFIRM_LATENCY correctif A: ONE gesture → ONE snapshot → ONE save (execute() saves
         // once). This is the whole win over the old N-round-trip loop. The label is DESCRIPTIVE (CTO
