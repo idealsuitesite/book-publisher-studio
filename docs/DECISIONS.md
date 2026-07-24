@@ -1326,6 +1326,18 @@ The two renderers that return `pageCount: undefined` are not gaps - they are the
 
 **Related:** `PERSISTENCE.md` (the review), ADR-0041 (the gate), ADR-0046 (the spike), ADR-0047 (the in-code precursor + the Buffer scar), ADR-0044 (`archived_at` indexed), Sprint 7 Decision 2 (the decision honourably retired).
 
+**AMENDMENT (2026-07-24, `APPEND_ONLY_PERSISTENCE` option B — the whole-aggregate read/write becomes append-only).** The original contract had `findById` return the **whole** aggregate — every version's `Book` payload eagerly — and `save` rewrite the entire version table (DELETE-all-then-reinsert). Correct when versions were few; **measured on the founder's real store it was an O(v) tax in BOTH directions** — `findById` ≈ 50 ms/version (1736 ms at v34), `save` O(N²) for a batch — paid on every render/edit gesture. This amendment, reasoned and recorded (DR `APPEND_ONLY_PERSISTENCE_DR.md`, gated by the CTO):
+
+- **`findById` returns the head aggregate + a lightweight version INDEX** (`{ id, number, label, createdAt, sourceAssetId, milestone }` per version) read from **metadata columns — no payload.** The head book — what every render/edit actually needs — is unchanged and still whole. Read cost becomes O(1) in version weight (measured post-flip: **58 ms @ v34, down from 1736 ms**; the residual spread tracks head-book *size*, not version count).
+- **A version's book is loaded on demand** via a new port method `getVersion(projectId, versionId)`. Undo (`restoreVersion`) pays one version's load, not N; it moved from a pure `ProjectService` function to an Application step in `EditBookUseCase`.
+- **Writing is append-only and atomic** via an EXPLICIT seam `appendVersion(project, version)` (head + one appended version in one `BEGIN IMMEDIATE … COMMIT`; idempotent on the version id — CTO amendment 1, retry yields exactly one). **`save` is narrowed to head-only and never touches version rows** — a version-writing save would persist the book-less index over the real payloads (corruption; the reason the narrowing is absolute).
+- **Milestone MODEL support** (option 3): a version is an automatic milestone (`AUTOMATIC_MILESTONE_LABELS`, today `{'publication'}` — export creates no version, see `EXPORT_MILESTONE_VERSION`) exempt from any future pruning. **Pruning itself is D, deferred**; effective behavior after B is keep-everything.
+- **Schema v2 migration**, first-class and dry-run-verified on a copy of the founder's 93 MB store, then run backup-first against the real store: `ALTER` adds the four metadata columns, backfills each row from its payload, flags historical publications (his `v32 "publication"` → `milestone=1`); one transaction, additive, reversible (payload column untouched); byte-verified (data hash unchanged), read-path positive control (getVersion post ≡ v1-eager pre). **The `projectRepositoryContract` and the in-memory twin evolve in lock-step** — the "whole-aggregate" assertions became head+index / getVersion-payload, asserted against both stores. The store's `user_version` is now **2**.
+
+The whole-aggregate promise was a *simplicity* choice; this trades it for the head-whole/history-lazy split that the founder's real scale demanded. Confinement (statefulness behind one port) is unchanged, so the amendment still costs no architectural rework.
+
+**Related (amendment):** `APPEND_ONLY_PERSISTENCE_DR.md` (the Level-2 DR), `TODO.md` → `EXPORT_MILESTONE_VERSION` (the milestone-vocabulary gap), the `BATCH_CONFIRM_LATENCY` correctif (the write half A already shipped; B fixes the read half + the per-edit write cost).
+
 ---
 
 ## ADR-0049: An Importer That Finds No Structure Must Say So — Explorable Errors and Normalization Diagnostics

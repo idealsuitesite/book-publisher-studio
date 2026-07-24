@@ -31,7 +31,7 @@ export function describeProjectRepositoryContract(
     summary: `${status} - 0 errors, 0 warnings`,
   });
 
-  describe(`${label} — whole-aggregate round trip`, () => {
+  describe(`${label} — head + version-index round trip (ADR-0048 amendment)`, () => {
     let repo: ReturnType<typeof makeRepository>;
     let service: ProjectService;
 
@@ -51,9 +51,13 @@ export function describeProjectRepositoryContract(
       expect((await repo.findById(project.id))?.name).toBe('Le Guide de Jean');
     });
 
-    it('returns the WHOLE aggregate — versions, assets and publications all present', async () => {
+    it('returns the head + a version INDEX — assets and publications whole, versions carry metadata not payloads', async () => {
       let project = service.create(book('Le Guide'), settings);
+      await repo.save(project);
+      // the version is written via the append-only seam, not save (DR D3)
       project = service.snapshot(project, 'first draft');
+      await repo.appendVersion(project, project.versions[project.versions.length - 1]);
+      // then head-only changes: a cover and a publication event
       project = service.addAsset(project, {
         kind: 'cover',
         filename: 'couverture.png',
@@ -61,22 +65,27 @@ export function describeProjectRepositoryContract(
         byteSize: 2_400_000,
       });
       project = service.recordPublication(project, report('kdp', 'PASS'));
-
       await repo.save(project);
+
       const loaded = await repo.findById(project.id);
 
       expect(loaded?.versions).toHaveLength(1);
       expect(loaded?.versions[0].label).toBe('first draft');
-      expect(loaded?.versions[0].book.metadata.title).toBe('Le Guide');
+      // the INDEX carries no book payload — that is the O(v) tax this amendment removes
+      expect(loaded?.versions[0].book).toBeUndefined();
       expect(loaded?.assets).toHaveLength(1);
       expect(loaded?.publications).toHaveLength(1);
+      // and the book is reachable ON DEMAND
+      const full = await repo.getVersion(project.id, loaded!.versions[0].id);
+      expect(full?.book?.metadata.title).toBe('Le Guide');
     });
 
     it('preserves Date types through the round trip, not ISO strings', async () => {
       let project = service.create(book('Le Guide'), settings);
-      project = service.snapshot(project);
-
       await repo.save(project);
+      project = service.snapshot(project);
+      await repo.appendVersion(project, project.versions[project.versions.length - 1]);
+
       const loaded = await repo.findById(project.id);
 
       expect(loaded?.createdAt).toBeInstanceOf(Date);
@@ -123,6 +132,63 @@ export function describeProjectRepositoryContract(
     });
   });
 
+  // APPEND_ONLY_PERSISTENCE (option B) — the on-demand read companion and the explicit append seam.
+  describe(`${label} — getVersion + appendVersion (APPEND_ONLY_PERSISTENCE)`, () => {
+    let repo: ReturnType<typeof makeRepository>;
+    let service: ProjectService;
+
+    beforeEach(() => {
+      repo = makeRepository();
+      let n = 0;
+      service = new ProjectService(() => `id-${++n}`);
+    });
+
+    it('getVersion returns ONE version\'s full payload (book + settings), undefined for an unknown id', async () => {
+      let project = service.create(book('Le Guide'), settings);
+      await repo.save(project);
+      project = service.snapshot(project, 'first draft');
+      await repo.appendVersion(project, project.versions[project.versions.length - 1]);
+      const [v1] = (await repo.findById(project.id))!.versions;
+
+      const fetched = await repo.getVersion(project.id, v1.id);
+      expect(fetched?.label).toBe('first draft');
+      expect(fetched?.book?.metadata.title).toBe('Le Guide');
+      expect(fetched?.settings?.layoutName).toBe('kdp-6x9');
+      expect(await repo.getVersion(project.id, 'no-such-version')).toBeUndefined();
+    });
+
+    it('appendVersion adds ONE new version and updates the head, without rewriting existing versions', async () => {
+      let project = service.create(book('Le Guide'), settings);
+      await repo.save(project);
+      project = service.snapshot(project, 'v1');
+      await repo.appendVersion(project, project.versions[project.versions.length - 1]);
+
+      project = service.snapshot(service.rename(project, 'Renamed'), 'v2');
+      const v2 = project.versions[project.versions.length - 1];
+      await repo.appendVersion(project, v2);
+
+      const loaded = (await repo.findById(project.id))!;
+      expect(loaded.name).toBe('Renamed'); // head updated
+      expect(loaded.versions.map((v) => v.label)).toEqual(['v1', 'v2']); // append, not rewrite
+    });
+
+    it('appendVersion is IDEMPOTENT on the version id — a retry yields exactly one version (CTO amendment 1)', async () => {
+      let project = service.create(book('Le Guide'), settings);
+      await repo.save(project);
+      project = service.snapshot(project, 'v1');
+      const v1 = project.versions[0];
+      await repo.appendVersion(project, v1);
+
+      // Re-appending the same version (the retry-after-lost-ack path) must not duplicate it.
+      await repo.appendVersion(project, v1);
+      await repo.appendVersion(project, v1);
+
+      const loaded = (await repo.findById(project.id))!;
+      expect(loaded.versions.filter((v) => v.id === v1.id)).toHaveLength(1);
+      expect(loaded.versions).toHaveLength(1);
+    });
+  });
+
   describe(`${label} — stored state is isolated from callers`, () => {
     it('a caller mutating what it saved or loaded does not corrupt the store', async () => {
       const repo = makeRepository();
@@ -151,8 +217,9 @@ export function describeProjectRepositoryContract(
 
     it('returns summaries, never aggregates', async () => {
       let project = service.create(book('Le Guide'), settings);
-      project = service.snapshot(project);
       await repo.save(project);
+      project = service.snapshot(project);
+      await repo.appendVersion(project, project.versions[project.versions.length - 1]);
 
       const [summary] = await repo.list();
 

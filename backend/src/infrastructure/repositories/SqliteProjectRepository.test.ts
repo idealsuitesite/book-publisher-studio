@@ -29,10 +29,12 @@ describe('SqliteProjectRepository — durability', () => {
         'application/octet-stream',
         Buffer.from('the retained source survives too')
       );
-      project = service.snapshot(project, 'avant redémarrage');
 
       const first = new SqliteProjectRepository(path);
-      await first.save(project);
+      await first.save(project); // head + the source blob
+      // the version is written via the append-only seam (DR D3), not save
+      project = service.snapshot(project, 'avant redémarrage');
+      await first.appendVersion(project, project.versions[project.versions.length - 1]);
       first.close(); // the "restart": the process that wrote is gone
 
       const second = new SqliteProjectRepository(path);
@@ -68,17 +70,23 @@ describe('SqliteProjectRepository — durability', () => {
       createBook({ title: 'Sharded', author: 'A', language: 'en' }),
       settings
     );
-    project = service.snapshot(project, 'v1');
     await repo.save(project);
+    project = service.snapshot(project, 'v1');
+    await repo.appendVersion(project, project.versions[project.versions.length - 1]);
 
     // Reach past the port on purpose: this asserts STORAGE SHAPE, which the contract suite
     // deliberately cannot see.
     const db = (repo as unknown as { db: { prepare(sql: string): { get(...a: unknown[]): unknown } } }).db;
     const row = db.prepare('SELECT aggregate FROM projects WHERE id = ?').get('id-1') as { aggregate: string };
     expect(JSON.parse(row.aggregate).versions).toEqual([]);
-    const versionRow = db.prepare('SELECT number FROM versions WHERE project_id = ?').get('id-1') as {
+    // the version lives in its own row, WITH the metadata columns the index reads (no payload deser)
+    const versionRow = db.prepare('SELECT number, label, milestone FROM versions WHERE project_id = ?').get('id-1') as {
       number: number;
+      label: string;
+      milestone: number;
     };
     expect(versionRow.number).toBe(1);
+    expect(versionRow.label).toBe('v1');
+    expect(versionRow.milestone).toBe(0);
   });
 });

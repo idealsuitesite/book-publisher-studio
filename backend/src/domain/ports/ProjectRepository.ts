@@ -1,4 +1,4 @@
-import type { Project, ProjectSummary } from '../models/Project';
+import type { Project, ProjectSummary, BookVersion } from '../models/Project';
 
 export interface ListProjectsOptions {
   /** Include archived projects. Defaults to false — see `ProjectRepository.list()`. */
@@ -28,13 +28,27 @@ export interface ListProjectsOptions {
  */
 export interface ProjectRepository {
   /**
-   * Loads a whole aggregate, or undefined if there is none.
+   * Loads the head aggregate + a lightweight version INDEX, or undefined if there is none.
    *
-   * "Whole" is the contract: a caller that receives a Project may rely on its versions,
-   * assets and publications being present and mutually consistent. An implementation that
-   * lazily omits them would break every invariant `ProjectService` enforces.
+   * **ADR-0048 amendment (APPEND_ONLY_PERSISTENCE option B):** the head — `book` (current), settings,
+   * assets, publications — is whole and mutually consistent, as before. The version log, however, comes
+   * back as an INDEX: each `BookVersion` carries `{ id, number, label, createdAt, sourceAssetId,
+   * milestone }` but **no `book`/`settings` payload**. Deserialising every version's book eagerly was an
+   * O(v) tax on every read (measured ~50 ms/version on the founder's store); the head is what every
+   * render/edit needs and is unchanged. A version's book is loaded on demand via `getVersion`. The
+   * whole-aggregate promise was a simplicity choice, correct when versions were few; this amendment is
+   * recorded in DECISIONS.md and the shared `projectRepositoryContract` asserts it against every store.
    */
   findById(id: string): Promise<Project | undefined>;
+
+  /**
+   * Loads ONE version's full payload (its `Book` snapshot + settings), or undefined if there is no
+   * such version. APPEND_ONLY_PERSISTENCE (option B): the on-demand read companion to the version
+   * INDEX — undo (`restoreVersion`) loads exactly the version it restores, not all N. The B `findById`
+   * flip stops eagerly loading every version's book (an O(v) tax measured at 50 ms/version on the
+   * founder's store); this method is where a version's book is fetched when it is actually needed.
+   */
+  getVersion(projectId: string, versionId: string): Promise<BookVersion | undefined>;
 
   /**
    * Lists projects for the library view.
@@ -52,13 +66,25 @@ export interface ProjectRepository {
   list(options?: ListProjectsOptions): Promise<ProjectSummary[]>;
 
   /**
-   * Saves a whole aggregate, creating or replacing it.
-   *
-   * Whole-aggregate save is the deliberate choice: `ProjectService` already returns complete
-   * new instances (immutability, ADR-0001), so there is no partial state to reconcile, and a
-   * save that could persist half a restore is corruption rather than a saving of effort.
+   * Saves the HEAD — aggregate + assets — creating or replacing it, and **never touches version rows**
+   * (APPEND_ONLY_PERSISTENCE option B, DR D3). Version creation flows exclusively through the
+   * append-only `appendVersion`; a version-writing `save` would persist the index (books absent) over
+   * the real payloads — corruption, which the whole aggregate's consistency exists to prevent. Used for
+   * head-only changes: import, a settings edit, an undo (`restoreVersion`) that moves the head without
+   * adding a version.
    */
   save(project: Project): Promise<void>;
+
+  /**
+   * Appends ONE new version and updates the head aggregate, ATOMICALLY and IDEMPOTENTLY
+   * (APPEND_ONLY_PERSISTENCE option B, the explicit append seam — CTO amendment 1). The repository is
+   * TOLD the new version, never left to diff (which invites double-appends on retry). Both writes are
+   * one transaction: on failure the store is byte-identical (torn-aggregate = no aggregate). Idempotent
+   * on the stable version id — a retry after a partial failure yields exactly ONE version, never two.
+   * Version creation flows exclusively through here; `save` is head-only and never rewrites version
+   * rows. (In B this replaces `save`'s O(v) DELETE-all-then-reinsert with an O(1) append.)
+   */
+  appendVersion(project: Project, version: BookVersion): Promise<void>;
 
   /**
    * Deletes a project and everything inside its boundary — versions, publications, assets, and

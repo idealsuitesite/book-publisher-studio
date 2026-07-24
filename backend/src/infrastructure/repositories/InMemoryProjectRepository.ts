@@ -1,5 +1,5 @@
 import type { ProjectRepository, ListProjectsOptions } from '../../domain/ports/ProjectRepository';
-import type { Project, ProjectSummary } from '../../domain/models/Project';
+import type { Project, ProjectSummary, BookVersion } from '../../domain/models/Project';
 import { toProjectSummary } from '../../domain/models/Project';
 
 /**
@@ -21,11 +21,37 @@ import { toProjectSummary } from '../../domain/models/Project';
  * the immutability every version snapshot depends on.
  */
 export class InMemoryProjectRepository implements ProjectRepository {
+  // The stored aggregate keeps FULL versions (with book+settings) as the truth; findById returns
+  // the stripped INDEX from them, so this test double behaves exactly like the durable store
+  // (APPEND_ONLY_PERSISTENCE B) rather than drifting from it.
   private readonly projects = new Map<string, Project>();
 
   async findById(id: string): Promise<Project | undefined> {
     const stored = this.projects.get(id);
-    return stored ? cloneProject(stored) : undefined;
+    if (!stored) return undefined;
+    // Return the head + the version INDEX: metadata only, NO book/settings payload (DR D1). A version's
+    // book is loaded on demand via getVersion — mirroring Sqlite so a caller can never lean on a
+    // payload findById did not promise.
+    return { ...cloneProject(stored), versions: stored.versions.map(toIndexEntry) };
+  }
+
+  async getVersion(projectId: string, versionId: string): Promise<BookVersion | undefined> {
+    const stored = this.projects.get(projectId);
+    const version = stored?.versions.find((v) => v.id === versionId);
+    // Clone so a caller cannot mutate stored state through the returned version (the same isolation
+    // findById gives). structuredClone revives Dates; version books carry no Buffers.
+    return version ? structuredClone(version) : undefined;
+  }
+
+  async appendVersion(project: Project, version: BookVersion): Promise<void> {
+    // The append seam (DR D3): update the head, and append this ONE FULL version idempotently (by id).
+    // The stored versions are the truth — take them from the store, not from `project.versions` (which
+    // is the index findById handed the caller), so a re-append never duplicates and never rewrites.
+    const existing = this.projects.get(project.id);
+    const base = existing ? existing.versions : [];
+    const head = cloneProject(project);
+    head.versions = base.some((v) => v.id === version.id) ? base : [...base, structuredClone(version)];
+    this.projects.set(project.id, head);
   }
 
   async list(options?: ListProjectsOptions): Promise<ProjectSummary[]> {
@@ -39,7 +65,14 @@ export class InMemoryProjectRepository implements ProjectRepository {
   }
 
   async save(project: Project): Promise<void> {
-    this.projects.set(project.id, cloneProject(project));
+    // HEAD-ONLY (DR D3): persist the head, but NEVER the version rows — version creation is
+    // appendVersion's alone. The stored full versions are preserved; `project.versions` (the index the
+    // caller holds) is deliberately not written, or the payloads would be clobbered with book-less
+    // index entries. A first save of a fresh project carries no versions, so nothing is lost.
+    const existing = this.projects.get(project.id);
+    const head = cloneProject(project);
+    head.versions = existing ? existing.versions : head.versions;
+    this.projects.set(project.id, head);
   }
 
   async delete(id: string): Promise<void> {
@@ -59,6 +92,22 @@ export class InMemoryProjectRepository implements ProjectRepository {
  * round-tripped a real source asset (ADR-0047), not by the sixteen tests that came before it.
  * The clone is still a real deep copy; this only restores the prototype the port's types promise.
  */
+/**
+ * The version INDEX entry (APPEND_ONLY_PERSISTENCE B): metadata only, book/settings dropped — exactly
+ * what Sqlite's findById reconstructs from its metadata columns. Dates are cloned so the returned index
+ * cannot be mutated back into stored state.
+ */
+function toIndexEntry(version: BookVersion): BookVersion {
+  return {
+    id: version.id,
+    number: version.number,
+    createdAt: new Date(version.createdAt),
+    ...(version.label !== undefined ? { label: version.label } : {}),
+    ...(version.sourceAssetId !== undefined ? { sourceAssetId: version.sourceAssetId } : {}),
+    ...(version.milestone ? { milestone: true as const } : {}),
+  };
+}
+
 function cloneProject(project: Project): Project {
   const cloned = structuredClone(project);
   return {

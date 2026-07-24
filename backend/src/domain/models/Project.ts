@@ -147,14 +147,28 @@ export interface BookVersion {
    */
   number: number;
 
-  /** The manuscript exactly as it was. */
-  book: Book;
+  /**
+   * The manuscript exactly as it was. **Lazy (APPEND_ONLY_PERSISTENCE option B):** present on a
+   * version you deliberately load via `ProjectRepository.getVersion`; ABSENT on the lightweight
+   * version index `findById` returns (id/number/label/createdAt/milestone/sourceAssetId only — no
+   * payload). The O(v) read tax was deserialising every version's book eagerly; the index carries
+   * none. Set on every version `ProjectService.snapshot` produces, so the Domain always writes it.
+   */
+  book?: Book;
 
-  /** The settings in force when this snapshot was taken — see the type doc above. */
-  settings: ProjectSettings;
+  /** The settings in force when this snapshot was taken — lazy, exactly as `book` above. */
+  settings?: ProjectSettings;
 
   /** Optional author note: "before the editor's cuts". */
   label?: string;
+
+  /**
+   * A MILESTONE version is exempt from any future pruning (APPEND_ONLY_PERSISTENCE, option 3). Set
+   * AUTOMATICALLY when a publication or export produces the version — the events the system already
+   * records; there is no manual "mark this step" gesture (withdrawn, founder decision 2026-07-24).
+   * Model support only in B; pruning of non-milestone versions is D (deferred). Absent = ordinary.
+   */
+  milestone?: true;
 
   /**
    * The source upload this snapshot was built from, if any — same reasoning as
@@ -165,6 +179,20 @@ export interface BookVersion {
 
   createdAt: Date;
 }
+
+/**
+ * The version labels that make a version an AUTOMATIC milestone (APPEND_ONLY_PERSISTENCE option 3 /
+ * DR D5): the events the system already records and keeps forever, exempt from any future pruning (D).
+ *
+ * **Re-measured 2026-07-24 (dry-run #7):** in current code only the publish path snapshots a version
+ * (`PublishProjectUseCase`, label `'publication'`); the export path creates NO version. So the ruled
+ * "publications/exports kept forever" is, today, publications only — see the consigned
+ * `EXPORT_MILESTONE_VERSION` follow-up (whether an export should become a version-creating event is an
+ * M3/M4 product question, not this interlude's). This one set is used in TWO places so they can never
+ * drift: the v1→v2 migration backfill of historical rows, and the flag on newly created publication
+ * versions.
+ */
+export const AUTOMATIC_MILESTONE_LABELS: ReadonlySet<string> = new Set(['publication']);
 
 /**
  * What the library view needs, and nothing more.

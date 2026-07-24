@@ -147,15 +147,19 @@ export class ProjectService {
   }
 
   /**
-   * Restores a past snapshot as the working manuscript.
+   * Restores an ALREADY-LOADED past snapshot as the working manuscript.
    *
-   * Restoring does **not** delete the versions that came after it. Losing history as a side
-   * effect of looking at it is how authors lose work, and the log is append-only by design.
+   * **APPEND_ONLY_PERSISTENCE option B (DR D2):** the version index `findById` returns carries no
+   * `book`/`settings` payload, so the caller loads the target version on demand
+   * (`ProjectRepository.getVersion`) and hands it here — undo pays one version's load, not N. The
+   * id-lookup-and-throw that used to live here now lives in the Application step that does the load
+   * (`EditBookUseCase`). Restoring still does **not** delete the versions that came after it: losing
+   * history as a side effect of looking at it is how authors lose work, and the log is append-only.
    */
-  restoreVersion(project: Project, versionId: string): Project {
-    const version = project.versions.find((candidate) => candidate.id === versionId);
-    if (!version) throw new Error(`No such version: ${versionId}`);
-
+  restoreToVersion(project: Project, version: BookVersion): Project {
+    if (!version.book || !version.settings) {
+      throw new Error(`Version ${version.id} has no loaded payload to restore`);
+    }
     return {
       ...project,
       book: version.book,
