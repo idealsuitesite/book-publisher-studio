@@ -12,6 +12,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* min-width:0 so a flex parent cannot let this grow to its widest page — see .pdfProofScroll. */
+  min-width: 0;
 }
 
 /* Zoom controls (commit 7): a slim bar above the surface — minimal, not a toolbar. */
@@ -51,6 +53,19 @@
 .pdfProofScroll {
   flex: 1 1 auto;
   min-height: 0;
+  /* CRITICAL (commit 7 fit-width regression). A zoomed page is wider than the box; without breaking
+     the sizing feedback loop, that width propagates as min-content UP the studio's flex chain (the
+     max-w-2xl Card, the items-start centre column — neither clips), inflating THIS box's clientWidth,
+     and fit-width then recomputes from that stale, inflated width ("static"/broken fit). Measured on
+     the real studio: clientWidth crept 342 → 446 → 587 as the page was zoomed, and fit-width fit to
+     587 instead of 342. `contain: inline-size` is the decisive cut: this box's width is computed from
+     its PARENT, never its content, so a wide page scrolls horizontally inside a STABLE box and
+     fit-width always sees the true available width (verified live: clientWidth holds at 342 across
+     every zoom). `width:100%`/`min-width:0` keep it filling the parent. (min-width:0 alone did NOT
+     suffice — the min-content still propagated up the ancestor chain.) */
+  width: 100%;
+  min-width: 0;
+  contain: inline-size;
   overflow: auto;
   /* The app owns the scroll container, so an edit repaints canvases in place without the
      scroll/zoom reset the whole-<embed> reswap caused (DR §D2, continuity of the gaze). */

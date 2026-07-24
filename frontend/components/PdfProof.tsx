@@ -74,6 +74,9 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
   // scroll anchor proportionally rather than verbatim.
   const renderedScaleRef = useRef<number | null>(null);
   const [zoom, setZoom] = useState(1);
+  // Bumped by "Fit width" so it FORCES a re-measure + re-render even when zoom is already 1 — otherwise
+  // setZoom(1) is a no-op React bails on, and the page could not be re-fit after the container resized.
+  const [fitNonce, setFitNonce] = useState(0);
 
   useEffect(() => {
     if (!bytes) return;
@@ -205,13 +208,20 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
       cancelled = true;
       cleanups.forEach((clean) => clean());
     };
-  }, [bytes, zoom]);
+  }, [bytes, zoom, fitNonce]);
 
   return (
     <div className={`pdfProofRoot ${className}`}>
       {/* Zoom controls (commit 7) — minimal, not a toolbar: fit-width, out, in, and the current level. */}
       <div className="pdfProofControls" role="toolbar" aria-label="Proof zoom">
-        <button type="button" aria-label="Fit width" onClick={() => setZoom(1)}>
+        <button
+          type="button"
+          aria-label="Fit width"
+          onClick={() => {
+            setZoom(1);
+            setFitNonce((n) => n + 1); // force a re-measure + re-fit even if already at 100%
+          }}
+        >
           Fit
         </button>
         <button

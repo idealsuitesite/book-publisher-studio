@@ -174,6 +174,24 @@ describe('PdfProof — the PDF.js canvas surface', () => {
     expect(zoomOut.disabled).toBe(true);
   });
 
+  it('Fit width RE-MEASURES and re-fits even at 100% — e.g. after the container resized (commit 7)', async () => {
+    // A mutable container width: the fit scale is clientWidth / page-width (600) × zoom.
+    let clientWidthValue = 600;
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => clientWidthValue });
+    const { getByLabelText } = render(<PdfProof bytes={new ArrayBuffer(16)} />);
+    await waitFor(() => expect(mockState.textLayerScales.length).toBeGreaterThan(0));
+    expect(mockState.textLayerScales.at(-1)).toBeCloseTo(1, 5); // 600/600 × 1
+
+    // The container grows (a window/panel resize). Zoom is already 100%, so a plain setZoom(1) would be
+    // a no-op and the page would stay at the OLD fit ("static"). Fit width must force a re-measure.
+    clientWidthValue = 900;
+    mockState.textLayerScales = [];
+    fireEvent.click(getByLabelText('Fit width'));
+
+    await waitFor(() => expect(mockState.textLayerScales.length).toBeGreaterThan(0));
+    expect(mockState.textLayerScales.at(-1)).toBeCloseTo(1.5, 5); // re-fit to 900/600 — NOT stuck at 1
+  });
+
   it('moves the scroll anchor PROPORTIONALLY across a zoom change (commit 7)', async () => {
     const { container, getByLabelText } = render(<PdfProof bytes={new ArrayBuffer(16)} />);
     const scrollEl = container.querySelector('.pdfProofScroll') as HTMLElement;
