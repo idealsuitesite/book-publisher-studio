@@ -86,6 +86,28 @@ describe('PdfProof — the PDF.js canvas surface', () => {
     expect(container.querySelector('.textLayer')).toBeNull();
   });
 
+  it('preserves the scroll position across a re-ink (continuity of the gaze, D2)', async () => {
+    mockState.numPages = 6;
+    const { container, rerender } = render(<PdfProof bytes={new ArrayBuffer(16)} />);
+    const scrollEl = container.querySelector('.pdfProofScroll') as HTMLElement;
+    // jsdom does not lay out, so give the container a real, settable scrollTop to stand in for scroll.
+    let scrollTopValue = 0;
+    Object.defineProperty(scrollEl, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTopValue,
+      set: (v: number) => { scrollTopValue = v; },
+    });
+    await waitFor(() => expect(container.querySelectorAll('.pdfPage').length).toBe(6));
+
+    // The author scrolls, then an edit re-inks with fresh bytes.
+    scrollEl.scrollTop = 240;
+    rerender(<PdfProof bytes={new ArrayBuffer(24)} />);
+
+    // After the re-ink the gaze is where it was — the surface did not jump to the top (the whole-<embed>
+    // reswap's defect this chantier removes).
+    await waitFor(() => expect(scrollEl.scrollTop).toBe(240));
+  });
+
   it('renders only the visible window eagerly and defers the rest to scroll (window policy, D3)', async () => {
     mockState.numPages = 8;
     // A stub IntersectionObserver that RECORDS what is observed but never fires — so only the eager
