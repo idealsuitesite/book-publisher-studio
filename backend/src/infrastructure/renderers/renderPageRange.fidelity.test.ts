@@ -238,3 +238,104 @@ describe('renderPageRange — fidelity invariant: region page ≡ export page (d
     // is owed by this chantier; consign if a future chantier needs Novel prose extraction.)
   });
 });
+
+/** The chapter-start block ids (top-level + nested) — a page opening one is a chapter opening, out of the
+ *  split-tail scope below. */
+function chapterStartIdSet(paginated: PaginatedBook): Set<string> {
+  const ids = new Set<string>();
+  const collect = (cs: Content[]) => cs.forEach((c) => {
+    if (c.type === 'chapter' && c.content[0]) ids.add(c.content[0].id);
+    if (c.type === 'chapter' && c.sections) collect(c.sections);
+    if (c.type === 'section' && c.subsections) collect(c.subsections);
+  });
+  collect(paginated.styledBook.book.mainContent as Content[]);
+  return ids;
+}
+
+/**
+ * INCREMENTAL_RENDER 1d — the FIDELITY INVARIANT for the split-tail seam (the most fidelity-critical of
+ * the sequence, DR §D1). renderSplitRuns advances silently through the SAME cut implementation to the
+ * region's leading boundary, then draws from there. Two boundaries:
+ *   • LEADING — the region's leading page starts with a CONTINUATION (its first block is the tail of a
+ *     paragraph split on a previous page). This is the directive's required case; verified on a real
+ *     corpus continuation page whose split COMPLETES on it (a 2-page split's final page → region = 1 page).
+ *   • TRAILING — the region's last page ends mid-split (its last block spills to the next page). The
+ *     region must show only the lines the export shows there; verified on a page whose last block splits.
+ * Both run under Classic (the extractor decodes Classic subsets reliably, so the prose anchor is trusted).
+ */
+describe('renderPageRange — fidelity invariant: region page ≡ export page (split-tail, Classic)', () => {
+  it('a continuation page whose split completes on it renders identical to that page of the full export', async () => {
+    const paginated = await paginateFaithAlone('classic');
+    const renderer = new PDFRenderer({ compress: false });
+    const full = (await renderer.render(paginated, { language: 'en' })).output;
+    const total = countPdfPages(full);
+
+    // A continuation page whose split completes here: startsWithContinuation (the leading boundary is a
+    // split tail) AND no splitAfterLines (the block does not continue past this page → the tail's final
+    // remainder lands here → region [n, n] is exactly one page). Skip any page that also opens a chapter.
+    const chapters = chapterStartIdSet(paginated);
+    const page = paginated.pages.find(
+      (p) => p.startsWithContinuation && !p.splitAfterLines && p.blocks.length > 0 && !chapters.has(p.blocks[0]!)
+    );
+    if (!page) throw new Error('no clean split-completing continuation page found in faith-alone (Classic)');
+    const n = page.number;
+
+    const region = (await renderer.renderPageRange(paginated, { language: 'en' }, n, n, total)).output;
+
+    // GUARDRAIL 1a: exactly one page — the leading split-tail did not spill the pre-region head onto page 0.
+    expect(countPdfPages(region)).toBe(1);
+
+    const exportSig = extractPdfPageSignatures(full);
+    const regionSig = extractPdfPageSignatures(region);
+    const idx = exportPhysicalIndex(full, n, total);
+    expect(regionSig).toHaveLength(1);
+    expect(regionSig[0]).toBe(exportSig[idx]); // the split-tail resumed at the identical y-origin & cut
+    expect(regionSig[0]).not.toBe(exportSig[idx - 1]);
+    expect(regionSig[0]).not.toBe(exportSig[idx + 1]);
+
+    const regionText = extractPdfPageText(region, 0);
+    expect(regionText).toContain(`Page ${n} of ${total}`);
+
+    // CONTENT anchor (Classic decodes reliably): a distinctive word of the split block's own text appears
+    // in the region — proving the TAIL (not some other text) was resumed and drawn here.
+    const blockIndex = indexBlocks(paginated);
+    const tailWords = ((blockIndex.get(page.blocks[0]!) as { text?: string } | undefined)?.text ?? '')
+      .split(/\s+/)
+      .filter((w) => /^[A-Za-z]{6,}$/.test(w));
+    expect(tailWords.length).toBeGreaterThan(0);
+    expect(tailWords.some((w) => regionText.includes(w))).toBe(true);
+  });
+
+  it('a page whose last block spills to the next page shows only its own lines (trailing boundary)', async () => {
+    const paginated = await paginateFaithAlone('classic');
+    const renderer = new PDFRenderer({ compress: false });
+    const full = (await renderer.render(paginated, { language: 'en' })).output;
+    const total = countPdfPages(full);
+
+    // A page that ENDS mid-split: its last block splits to the next page (splitAfterLines set), and it is
+    // not itself a continuation or a chapter opening. Region [m, m] must draw only this page's own lines of
+    // that block (the head cut) and emit no break to m+1.
+    const chapters = chapterStartIdSet(paginated);
+    const page = paginated.pages.find(
+      (p) => !!p.splitAfterLines && !p.startsWithContinuation && p.blocks.length > 0 && !chapters.has(p.blocks[0]!)
+    );
+    if (!page) throw new Error('no clean split-starting page found in faith-alone (Classic)');
+    const m = page.number;
+
+    const region = (await renderer.renderPageRange(paginated, { language: 'en' }, m, m, total)).output;
+
+    // GUARDRAIL: exactly one page — the split did NOT spill past endPage into a second physical page.
+    expect(countPdfPages(region)).toBe(1);
+
+    const exportSig = extractPdfPageSignatures(full);
+    const regionSig = extractPdfPageSignatures(region);
+    const idx = exportPhysicalIndex(full, m, total);
+    expect(regionSig).toHaveLength(1);
+    expect(regionSig[0]).toBe(exportSig[idx]); // the head cut is identical to the export's page-m lines
+    expect(regionSig[0]).not.toBe(exportSig[idx - 1]);
+    expect(regionSig[0]).not.toBe(exportSig[idx + 1]);
+
+    const regionText = extractPdfPageText(region, 0);
+    expect(regionText).toContain(`Page ${m} of ${total}`);
+  });
+});

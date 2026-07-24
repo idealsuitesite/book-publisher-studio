@@ -101,6 +101,12 @@ interface SplitPlan {
 interface RenderWindow {
   startId: string;
   endId: string;
+  // The region's 1-based domain page bounds. renderSplitRuns (INCREMENTAL_RENDER 1d) needs the numeric
+  // bounds — not just the boundary block ids — to know which pieces of a split paragraph fall inside the
+  // region: a split's continuations are consecutive pages, so a piece's page is read off `continuations`
+  // and compared to these. `startId`/`endId` gate the block walk; `startPage`/`endPage` gate a split.
+  startPage: number;
+  endPage: number;
   active: boolean;
   done: boolean;
 }
@@ -316,10 +322,11 @@ export class PDFRenderer implements Renderer<Buffer> {
    * studio renders the whole book once, then region-renders on edit). It is the "of TOTAL" denominator,
    * so the footer reads "Page 171 of 156", not "of 2".
    *
-   * Scope: the leading page may be mid-content (1b) or a chapter/section OPENING (1c — its title block
-   * and, theme-permitting, its drop cap draw true, seeded on physical page 0). The continuation split-
-   * tail leading page is 1d. The invariant tests and guardrails pin exactly what is in scope; nothing
-   * speculative is built (YAGNI).
+   * Scope: the leading page may be mid-content (1b), a chapter/section OPENING (1c — its title block and,
+   * theme-permitting, its drop cap draw true, seeded on physical page 0), or a CONTINUATION split-tail
+   * (1d — renderSplitRuns advances silently through the shared cut implementation to the region's leading
+   * boundary and draws from there; a region that ends mid-split shows only its own lines). The invariant
+   * tests and guardrails pin exactly what is in scope; nothing speculative is built (YAGNI).
    */
   async renderPageRange(
     book: PaginatedBook,
@@ -384,6 +391,8 @@ export class PDFRenderer implements Renderer<Buffer> {
       const window: RenderWindow = {
         startId: startBlocks[0] ?? '',
         endId: endBlocks[endBlocks.length - 1] ?? '',
+        startPage,
+        endPage,
         active: false,
         done: false,
       };
@@ -820,7 +829,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         }
         const segments = splits.segments.get(block.id);
         if (segments && !dropCap) {
-          this.renderSplitRuns(doc, runs, resolveBody, fontSize, color, options, segments, splits.continuations.get(block.id) ?? [], pageOwners);
+          this.renderSplitRuns(doc, runs, resolveBody, fontSize, color, options, segments, splits.continuations.get(block.id) ?? [], pageOwners, window);
           this.spendSpaceAfter(doc, spaceAfter);
           return;
         }
@@ -986,32 +995,69 @@ export class PDFRenderer implements Renderer<Buffer> {
     paragraphOptions: PDFKit.Mixins.TextOptions,
     segments: number[],
     continuations: Page[],
-    pageOwners: PageOwner[]
+    pageOwners: PageOwner[],
+    window?: RenderWindow
   ): void {
     const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     doc.font(resolveFont(false, false)).fontSize(fontSize);
     const lineHeight = doc.heightOfString('x', { width: 10_000 });
 
+    // INCREMENTAL_RENDER 1d — the split-tail factor. A split paragraph's continuations are always
+    // CONSECUTIVE pages (a paragraph cannot skip a page), so each drawn piece's page is read off
+    // `continuations`: piece 0 (the head on the block's own start page) sits on continuations[0].number-1,
+    // piece k≥1 on continuations[k-1].number, and the final remainder on continuations[last].number. When
+    // a region window is present, only the pieces whose page lies within [startPage, endPage] are drawn:
+    //   • a piece BEFORE the region is advanced SILENTLY through the SAME cut implementation below
+    //     (charsFittingBudget/splitRunsAt) — never a second resume logic — so `remaining` arrives at the
+    //     region's leading boundary exactly as the full render leaves it (the leading split-tail);
+    //   • a piece AFTER the region is not drawn and its leading break is not emitted — required for
+    //     page-region ≡ page-export, since the region's last page must show only the lines the export
+    //     shows there (the trailing boundary — correctness demands it, so it is handled, not deferred).
+    // No window ⇒ every piece is in range ⇒ byte-identical to the full render (the parity locks guard it).
+    const startPage = window?.startPage ?? Number.NEGATIVE_INFINITY;
+    const endPage = window?.endPage ?? Number.POSITIVE_INFINITY;
+    const piece0Page = continuations.length > 0 ? continuations[0].number - 1 : Number.NEGATIVE_INFINITY;
+
     let remaining = runs;
-    let continuationIndex = 0;
-    for (const lines of segments) {
+    for (let i = 0; i < segments.length; i++) {
       const plain = remaining.map((run) => run.text).join('');
       // Float-noise epsilon only. The previous half-line slack let a segment render up to
       // half a line taller than the model charged for it — at 149 splits per book, a steady
       // source of end-of-page overflows PDFKit resolved on its own (ADR-0051 census).
-      const budget = lines * lineHeight + 0.5;
+      const budget = segments[i] * lineHeight + 0.5;
       const cutAt = this.charsFittingBudget(doc, plain, budget, usableWidth);
-      if (cutAt <= 0 || cutAt >= plain.length) break; // drift guard: render the rest whole
+      const piecePage = i === 0 ? piece0Page : continuations[i - 1].number;
+
+      if (cutAt <= 0 || cutAt >= plain.length) {
+        // drift guard: the cut failed; the full render draws the rest whole at THIS piece's page.
+        // In a region, draw it only if that page is inside the region (else it belongs before/after).
+        if (piecePage >= startPage && piecePage <= endPage) {
+          this.renderRuns(doc, remaining, resolveFont, fontSize, color, paragraphOptions);
+        }
+        return;
+      }
 
       const [head, tail] = splitRunsAt(remaining, cutAt);
-      this.renderRuns(doc, head, resolveFont, fontSize, color, paragraphOptions);
-      this.plannedAddPage(doc);
-      pageOwners.push(continuations[continuationIndex]);
-      continuationIndex += 1;
+      const nextPage = continuations[i].number; // the page this piece would break TO (piece i+1)
+
+      if (piecePage >= startPage && piecePage <= endPage) {
+        this.renderRuns(doc, head, resolveFont, fontSize, color, paragraphOptions);
+        if (nextPage <= endPage) {
+          this.plannedAddPage(doc);
+          pageOwners.push(continuations[i]);
+        } else {
+          return; // the region ends on this page, mid-split: emit no break past endPage
+        }
+      }
+      // (a piece before the region: advance silently — no draw, no break)
       doc.font(resolveFont(false, false)).fontSize(fontSize);
       remaining = tail;
     }
-    this.renderRuns(doc, remaining, resolveFont, fontSize, color, paragraphOptions);
+    // The final remainder — drawn only if its page is within the region.
+    const finalPage = continuations.length > 0 ? continuations[continuations.length - 1].number : piece0Page;
+    if (finalPage >= startPage && finalPage <= endPage) {
+      this.renderRuns(doc, remaining, resolveFont, fontSize, color, paragraphOptions);
+    }
   }
 
   /**
