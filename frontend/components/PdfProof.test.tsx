@@ -13,6 +13,9 @@ import { render, waitFor } from '@testing-library/react';
 
 const PAGE_TEXT = 'Justification stands at the very center of the gospel message.';
 
+// Mutable so a test can choose the page count (the window-policy test needs several pages).
+const mockState = { numPages: 1 };
+
 vi.mock('pdfjs-dist', () => {
   class FakeTextLayer {
     private container: HTMLElement;
@@ -38,7 +41,9 @@ vi.mock('pdfjs-dist', () => {
     getTextContent: () => Promise.resolve({ items: [{ str: PAGE_TEXT }] }),
   };
   const doc = {
-    numPages: 1,
+    get numPages() {
+      return mockState.numPages;
+    },
     getPage: () => Promise.resolve(page),
     destroy: () => Promise.resolve(),
   };
@@ -53,6 +58,7 @@ vi.mock('pdfjs-dist', () => {
 import { PdfProof } from './PdfProof';
 
 beforeEach(() => {
+  mockState.numPages = 1;
   // A container width so the fit-to-width scale is well-defined (jsdom reports 0 otherwise).
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 600 });
 });
@@ -78,5 +84,37 @@ describe('PdfProof — the PDF.js canvas surface', () => {
   it('renders nothing until it is given bytes (no crash on an empty proof)', () => {
     const { container } = render(<PdfProof bytes={null} />);
     expect(container.querySelector('.textLayer')).toBeNull();
+  });
+
+  it('renders only the visible window eagerly and defers the rest to scroll (window policy, D3)', async () => {
+    mockState.numPages = 8;
+    // A stub IntersectionObserver that RECORDS what is observed but never fires — so only the eager
+    // window paints, and the deferred pages are the ones handed to render-on-scroll.
+    const observed: Element[] = [];
+    class StubIO {
+      observe(el: Element) { observed.push(el); }
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('IntersectionObserver', StubIO as unknown as typeof IntersectionObserver);
+    try {
+      const { container } = render(<PdfProof bytes={new ArrayBuffer(16)} />);
+
+      // The eager window paints (visible page ± 1). It must be MORE than zero and FEWER than all 8 —
+      // a proof that the window is bounded, not "render everything".
+      await waitFor(() => {
+        const painted = container.querySelectorAll('.pdfPage .textLayer').length;
+        if (painted === 0) throw new Error('eager window not painted yet');
+      });
+      const slots = container.querySelectorAll('.pdfPage');
+      const painted = container.querySelectorAll('.pdfPage .textLayer').length;
+      expect(slots).toHaveLength(8);
+      expect(painted).toBeGreaterThan(0);
+      expect(painted).toBeLessThan(8);
+      // Every page NOT in the eager window was handed to the observer for render-on-scroll.
+      expect(painted + observed.length).toBe(8);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

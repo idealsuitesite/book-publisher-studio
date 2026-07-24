@@ -20,6 +20,13 @@ import './pdf-proof.css';
 
 type Pdfjs = typeof import('pdfjs-dist');
 
+// The eager render window (INCREMENTAL_RENDER_DR §D3): the visible page plus this many neighbours each
+// side are painted immediately; the rest render on scroll. A measured, revisable size — one neighbour
+// keeps a short scroll already drawn without eagerly painting a whole book.
+const WINDOW_NEIGHBOURS = 1;
+// Must match the `gap` between pages in pdf-proof.css (.pdfProofPages) so the visible-window maths lines up.
+const PAGE_GAP_PX = 16;
+
 // Load pdfjs and its worker once, lazily, on the client only (it touches DOM/canvas). The worker URL is
 // resolved through the bundler via `import.meta.url` — the standard bundler-friendly pdfjs pattern.
 let pdfjsPromise: Promise<Pdfjs> | null = null;
@@ -136,8 +143,21 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
         slot.replaceChildren(...(ctx ? [canvas, textLayerDiv] : [textLayerDiv]));
       };
 
-      // Lazy paint: a page renders as it nears view. rootMargin one screen out so scrolling stays ahead
-      // of the paint. Without IntersectionObserver (jsdom in tests), render every page synchronously.
+      // WINDOW POLICY (INCREMENTAL_RENDER_DR §D3): render the visible page ± a small neighbour window
+      // EAGERLY (so the first paint is instant and a short scroll is already drawn), then render-on-scroll
+      // for everything beyond. The window is spent by decision, not drift — a fixed, revisable size.
+      const pageStride = unscaled.height * scale + PAGE_GAP_PX;
+      const viewportH = scrollEl.clientHeight || pageStride;
+      const firstVisible = Math.max(0, Math.floor(previousScrollTop / pageStride));
+      const lastVisible = Math.min(slots.length - 1, Math.ceil((previousScrollTop + viewportH) / pageStride));
+      const eagerStart = Math.max(0, firstVisible - WINDOW_NEIGHBOURS);
+      const eagerEnd = Math.min(slots.length - 1, lastVisible + WINDOW_NEIGHBOURS);
+      for (let i = eagerStart; i <= eagerEnd && !isStale(); i++) await renderPage(i + 1, slots[i]);
+
+      // Render-on-scroll for the rest: a page paints as it nears view (rootMargin one screen of
+      // look-ahead so scrolling stays ahead of the paint). Without IntersectionObserver (jsdom in
+      // tests) the eager window above is the whole render — a book with more pages simply renders its
+      // in-view window, which is exactly what the policy asks.
       if (typeof IntersectionObserver !== 'undefined') {
         const io = new IntersectionObserver(
           (entries) => {
@@ -150,10 +170,10 @@ export function PdfProof({ bytes, refreshing = false, className = '', ariaLabel 
           },
           { root: scrollEl, rootMargin: '100% 0px' }
         );
-        slots.forEach((slot) => io.observe(slot));
+        slots.forEach((slot, i) => {
+          if (i < eagerStart || i > eagerEnd) io.observe(slot); // the eager window is already painted
+        });
         cleanups.push(() => io.disconnect());
-      } else {
-        for (let i = 0; i < slots.length && !isStale(); i++) await renderPage(i + 1, slots[i]);
       }
     })();
 

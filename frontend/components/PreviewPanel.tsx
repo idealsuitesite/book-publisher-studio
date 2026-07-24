@@ -35,8 +35,12 @@ interface ProofState {
   error: string | null;
 }
 
-/** Debounce before a settings change re-inks the proof. Long enough to absorb a click-flurry
- * through presets, short enough to feel alive. */
+/**
+ * Debounce before a change re-inks the proof — long enough to absorb a click-flurry through presets,
+ * short enough to feel alive. INCREMENTAL_RENDER_DR §D4 (V4): 500 ms is the measured-reasonable default
+ * and the ONE pure-feel knob of P1 — CONSIGNED REVISABLE at the founder taste-stop (he judges the felt
+ * cadence on the living studio; this number moves on his word, nothing else in P1 does).
+ */
 const REFRESH_DEBOUNCE_MS = 500;
 
 function countPdfPages(bytes: ArrayBuffer): number | null {
