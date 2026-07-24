@@ -1,6 +1,16 @@
 # INCREMENTAL_RENDER — candidate 1 (visible-region render) Design Review
 
-**Status: DR — AWAITING CTO APPROVAL (gate 2 / non-negotiable #4). No branch, no code.** The branch is
+**Status: BUILT on `feat/incremental-render`, FOUNDER TASTE-STOP = VALIDATED WITH ONE NAMED REGRESSION (fixed on-branch, commit 7), AWAITING THE CTO MERGE (2026-07-24).**
+
+**TASTE-STOP VERDICT (2026-07-24, founder Alexandre on the living studio @ `242e14a`).** VALIDATED: the new Proof surface — continuity of the gaze across a re-ink (scroll/zoom no longer reset) and selectable text — and the P2 "Make all" behaviour on screen. ONE REAL REGRESSION named: the native PDF viewer's ZOOM controls were gone and the PDF.js surface offered none — he actively uses zoom-out for screen captures. Ruled by the CTO: fixed ON-BRANCH before merge → **commit 7** adds minimal zoom to `PdfProof` (fit-width, +/−, a reduced capture view; `scale` is a PDF.js render parameter, so a zoom change re-renders the window at the new scale and restores the scroll anchor PROPORTIONALLY; the 500 ms debounce and the window policy are untouched; the standard text layer scales with the viewport so selection stays aligned). Gated: frontend 237/237, tsc + eslint + build clean, and a real-Chromium Playwright confirmation (zoom-out shrinks the canvas 500→375 for a capture view, zoom-in grows it past fit-width, fit-width resets, proportional scroll 240→180). **One EXPECTATION consigned, founder-confirmed: structure-editing FROM the Proof — the demand for criterion B (contextual editing) — is not P1's; it is consigned to the AUTHOR_EXPERIENCE chantier as a founder-confirmed requirement.**
+
+**COMMIT-7 FOLLOW-UP FIX (2026-07-24, before the founder's zoom re-check): fit-width was "static" on the real screen — a LIVE regression the Playwright harness missed.** Diagnosed in the real component (CTO directive): a zoomed page (wider than the box) propagated its width as **min-content UP the studio's flex chain** (the `max-w-2xl` Card, the `items-start` centre column — neither clips), inflating the scroll box's `clientWidth`, so fit-width recomputed from a stale, inflated width. Measured live: `clientWidth` crept 379 → 474 → 602 across zoom, and fit-width fit to 602 instead of 379. **Fix: `contain: inline-size` on `.pdfProofScroll`** (the box's width is computed from its parent, never its content — a wide page scrolls inside a STABLE box; `min-width:0` alone did NOT suffice) **+ a `fitNonce` so "Fit width" forces a re-measure even at 100%** (after a container resize). **Why the harness missed it:** the throwaway test wrapped `PdfProof` in a FIXED-width div, which pinned `clientWidth` — it measured canvas ratios, never `clientWidth` stability. Fixed the test to fail on the real defect: a committed **`frontend/scripts/verify-proof-zoom.mjs`** drives the REAL studio layout and asserts the scroll box holds its width across zoom and that fit-width returns the page to the true fit — confirmed it FAILS on the pre-fix code (box 379→602) and PASSES after; plus a jsdom guard for the fit re-measure. Frontend 238/238, tsc + eslint + build clean.
+
+With commit 7 (+ this fix) the taste-stop is satisfied pending the founder's brief zoom re-check; **the merge is the CTO's, on his word — nothing on `main` yet.**
+
+**Prior status (superseded by the verdict above): BUILT, JUDGED GREEN, AWAITING THE FOUNDER TASTE-STOP → then CTO merge (2026-07-24).** The six-commit sequence (§6) is complete and pushed on `feat/incremental-render`; `main` is untouched. The judge (§3) is green on every mechanical point — on the FOUNDER'S EDITED book 3 (`…d7bticjiw`, v34, 32 chapters, a5/classic/comfort, 445 pages — his real gesture, reconciled from the original `…cy7m12l0w` v22 copy the cadrage/DR had measured): engine **155 ms ≤ 300 ms** hot (region render 31 ms, paginate 122 ms the heavy term; full 650 ms → **4.2×**), page-region ≡ page-export on the three pages (faith-alone Novel drop-cap p23 + book-3 median 224 + book-3 continuation p4; DR-named p171 still clean and green), scroll preserved across a re-ink (jsdom + real-Chromium Playwright), a11y text layer selectable (asserted), backend 921 / frontend 234 / tsc / eslint / builds, and verify-real-* 4/4·16/16·4/4 on a throwaway server. **Point 6, the founder taste-stop on the living studio, is the founder's and is PENDING** — nothing ships to `main` before it. **CANDIDATE 3 stays consigned second-order (D5): the whole engine is under budget hot, so pagination — the heavy ~122 ms term — did NOT break the budget; the re-measure did not trip its trigger.** *(Original DR text below, unchanged; it was CTO-approved at gate 2 and the branch was created at that gate, as the preventive rule requires.)*
+
+**Prior status: DR — AWAITING CTO APPROVAL (gate 2 / non-negotiable #4). No branch, no code.** The branch is
 created at CTO validation of this DR (the preventive rule). P1 of the AUTHOR_EXPERIENCE Axis-7 sequence,
 after P2 (`BATCH_CONFIRM_LATENCY`, merged `712057e`).
 
@@ -96,9 +106,13 @@ pagination is the term breaking the budget on a real gesture. Not built now.
    (171) AND a continuation page (D1's split-tail case).
 3. **Scroll/zoom preserved across an edit** (D2's continuity criterion, proven in a real browser — the
    Playwright discipline of ADR-0053).
-4. **Invariants + full harnesses:** backend + frontend suites, tsc, eslint, builds, `verify-real-*`
+4. **Accessibility (commit-4 gate, CTO):** the PDF.js surface renders the standard **text layer** — the
+   page's text is **selectable / exposed to screen readers**, asserted by test. Canvas-only would render
+   the book mute to screen readers and text selection — serving author B by excluding some author B's.
+   The requirement carries a test, not only a sentence.
+5. **Invariants + full harnesses:** backend + frontend suites, tsc, eslint, builds, `verify-real-*`
    (throwaway server, zero trace, store baseline 8).
-5. **Founder taste-stop: YES** — the felt fluidity of the living studio is criterion A itself; the founder
+6. **Founder taste-stop: YES** — the felt fluidity of the living studio is criterion A itself; the founder
    judges on the screen, not on our numbers. His validation on the living studio is the last gate.
 
 ## §4 Scope boundaries
@@ -112,8 +126,23 @@ pagination is the term breaking the budget on a real gesture. Not built now.
 - **The `<embed>` ~26 ms carries an asterisk** (CTO): it is the `<embed>` load event, not necessarily the
   full progressive paint — the native viewer loads lazily, so the figure may under-state real paint. No
   verdict consequence (this term is not the bottleneck in either reading), but recorded honestly.
-- **n = 1 book** for the median/continuation judge (book 3). Faith-alone (structured, corpus) is available
-  as a second real book for the fidelity invariant if the CTO wants n = 2.
+- **n = 2 confirmed** (CTO): the fidelity judge runs on book 3 (median 171 + a continuation page — book 3
+  has the long split paragraphs) AND faith-alone (clean median + a Novel drop-cap page, crossing the
+  spike's hard-page requirement).
+
+## §5bis PDF.js feasibility spike — GREEN (2026-07-23, `INCREMENTAL_RENDER_SCOPE.md` will carry the run)
+**Verdict: GREEN — dependency feasible, locks at commit 3.** pdfjs-dist **6.1.200** (Mozilla, mature),
+loaded as ESM from the local build + worker in this env, painted the two HARD pages the CTO required
+(Decision 1): a book-3 **Gelasio** body region and a faith-alone chapter opening with the **Novel 2.5
+drop cap**. Both faithful — embedded Gelasio (serifs, citation italics), the drop cap at correct
+scale with the locked accent `#6E3B2F`, our running heads. Warm canvas **~70 ms/page** (one-time
+~105–132 ms worker init). **The tell that matters — font SUBSTITUTION — is closed** (a fallback font
+would show wrong serifs; it does not). **Disclosed limitation (CTO-accepted):** the side-by-side vs the
+NATIVE viewer was **not capturable** — the native PDF plugin surface does not composite for the
+screenshot tool; this is an **instrument limitation, not a fidelity signal.** Fidelity is established by
+(a) the substitution tell above, (b) the chantier's real guarantee — the byte-level invariant
+page-region ≡ page-export (stronger than a screenshot), and (c) the founder's final taste-stop on the
+living surface.
 
 ## §6 Proposed commit sequence (built only after approval; branch at the gate)
 1. **Backend — `renderPageRange` + the fidelity invariant.** Draw from the full `PaginatedBook`'s pages;
@@ -121,10 +150,11 @@ pagination is the term breaking the budget on a real gesture. Not built now.
    (the split-tail case). The load-bearing commit.
 2. **Backend — the region-render API** (a page-range export for a project), whitelisted + route tests in
    the same commit (the standing `setPartRole` lesson).
-3. **Frontend — the PDF.js feasibility spike** (spike-gated dependency lock: faithful paint of our real
-   PDF + a11y + perf in this install, ADR-0053 precedent). Lock the dependency only if green.
+3. **Frontend — lock the PDF.js dependency** (the feasibility spike is DONE and GREEN, §5bis; `npm i
+   --save pdfjs-dist@6.1.200` — the deliberate lock act, ADR-0053 precedent).
 4. **Frontend — the PDF.js canvas display** replacing the whole-`<embed>` reswap: incremental per-page
-   repaint, scroll/zoom preserved (proven in a real browser).
+   repaint, scroll/zoom preserved (proven in a real browser), **and the standard text layer** so the
+   page text is selectable / screen-reader-exposed (§3 judge point 4, asserted by test).
 5. **Frontend — window policy (D3) + V4 debounce (D4).**
 6. **The judge (§3) + docs reconciliation.** Engine ≤ 300 ms, page identity on both pages, scroll
    preserved, full harnesses — then the founder taste-stop on the living studio.

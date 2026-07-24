@@ -230,6 +230,91 @@ export function extractPdfText(buffer: Buffer): string {
     .join('');
 }
 
+/**
+ * Runs grouped by VISUAL page order (the `/Pages` `/Kids` array), 0-based — the instrument the
+ * INCREMENTAL_RENDER fidelity invariant needs to compare page N of a full export with a region
+ * render (`renderPageRange`). Page objects do NOT appear in visual order in the file, so ordering
+ * by `/Kids` (not by object-parse order) is what makes "page N" mean page N. Licensed by a positive
+ * control before the invariant relies on it (SOLO_RENDER_VERIFICATION in reverse): self-identity on
+ * a repeat extract, difference between two pages, and a known page's text matching the model.
+ */
+export function extractPdfRunsByPage(buffer: Buffer): PdfTextRun[][] {
+  const raw = buffer.toString('latin1');
+  const objects = parseObjects(raw);
+  const fontCache = new Map<number, FontInfo>();
+
+  // The page-tree root: /Type /Pages with an ordered /Kids array of page refs (PDFKit emits a flat
+  // tree — every kid is a /Page). Fall back to parse-order page objects only if no /Pages node.
+  let orderedBodies: string[] = [];
+  for (const [, body] of objects) {
+    if (!/\/Type\s*\/Pages\b/.test(body)) continue;
+    const kidsMatch = body.match(/\/Kids\s*\[([\s\S]*?)\]/);
+    if (!kidsMatch) continue;
+    const kidNums = [...kidsMatch[1].matchAll(/(\d+)\s+0\s+R/g)].map((m) => Number(m[1]));
+    orderedBodies = kidNums
+      .map((n) => objects.get(n))
+      .filter((b): b is string => !!b && /\/Type\s*\/Page\b/.test(b));
+    break;
+  }
+  if (orderedBodies.length === 0) {
+    orderedBodies = [...objects.values()].filter((b) => /\/Type\s*\/Page\b/.test(b));
+  }
+
+  return orderedBodies.map((body) => {
+    const fontResourceMap = parseFontResourceMap(resolveResourcesBody(objects, body));
+    const runs: PdfTextRun[] = [];
+    for (const content of resolveContentStreams(objects, body)) {
+      runs.push(...extractFromContentStream(content, fontResourceMap, objects, fontCache));
+    }
+    return runs;
+  });
+}
+
+/** The concatenated text of one visual page (0-based) — the per-page analogue of extractPdfText. */
+export function extractPdfPageText(buffer: Buffer, pageIndex: number): string {
+  const pages = extractPdfRunsByPage(buffer);
+  return (pages[pageIndex] ?? []).map((r) => r.text).join('');
+}
+
+/**
+ * A SUBSET-INVARIANT geometry+structure signature per visual page — the metric the INCREMENTAL_RENDER
+ * fidelity invariant needs. Two independent renders of the same page embed DIFFERENT font subsets, so
+ * the glyph CODES (and thus decoded text) differ between them — text is not comparable across renders.
+ * But the content stream's POSITIONING (Td/TD/Tm coordinates, TJ kerning) is subset-independent, and
+ * the same glyphs produce the same number of code bytes. This normalizes each page's content stream to
+ * exactly that invariant core: every glyph hex-string → its byte length (`#Ln`, so "same glyphs at the
+ * same widths" survives while the subset-specific codes drop out), font resource names → `/F` (subset
+ * ordering may assign different /Fn), whitespace collapsed. Identical page appearance ⇒ identical
+ * signature; different content or layout ⇒ different signature.
+ */
+export function extractPdfPageSignatures(buffer: Buffer): string[] {
+  const raw = buffer.toString('latin1');
+  const objects = parseObjects(raw);
+
+  let orderedBodies: string[] = [];
+  for (const [, body] of objects) {
+    if (!/\/Type\s*\/Pages\b/.test(body)) continue;
+    const kidsMatch = body.match(/\/Kids\s*\[([\s\S]*?)\]/);
+    if (!kidsMatch) continue;
+    orderedBodies = [...kidsMatch[1].matchAll(/(\d+)\s+0\s+R/g)]
+      .map((m) => objects.get(Number(m[1])))
+      .filter((b): b is string => !!b && /\/Type\s*\/Page\b/.test(b));
+    break;
+  }
+  if (orderedBodies.length === 0) {
+    orderedBodies = [...objects.values()].filter((b) => /\/Type\s*\/Page\b/.test(b));
+  }
+
+  return orderedBodies.map((body) =>
+    resolveContentStreams(objects, body)
+      .join('\n')
+      .replace(/<([0-9a-fA-F]*)>/g, (_m, hex: string) => `#L${hex.length}`) // glyph codes → glyph count
+      .replace(/\/F\d+/g, '/F') // subset-order-dependent font names → stable token
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
 /** Counts rendered pages by counting distinct page objects (`/MediaBox` appears once each). */
 export function countPdfPages(buffer: Buffer): number {
   const raw = buffer.toString('latin1');

@@ -4,6 +4,7 @@ import type { ProjectService } from '../../domain/services/ProjectService';
 import type { ProjectSummaryMapper } from '../../application/mappers/ProjectSummaryMapper';
 import type { GetProjectUseCase } from '../../application/use-cases/GetProjectUseCase';
 import type { ExportProjectUseCase, ProjectExportFormat } from '../../application/use-cases/ExportProjectUseCase';
+import type { RenderProjectRegionUseCase } from '../../application/use-cases/RenderProjectRegionUseCase';
 import type { PublishProjectUseCase } from '../../application/use-cases/PublishProjectUseCase';
 import type { PublishingReportMapper } from '../../application/mappers/PublishingReportMapper';
 import type { EditBookUseCase } from '../../application/use-cases/EditBookUseCase';
@@ -142,6 +143,7 @@ export class ProjectsController {
     private getProject: GetProjectUseCase,
     private projectService: ProjectService,
     private exportProject: ExportProjectUseCase,
+    private renderProjectRegion: RenderProjectRegionUseCase,
     private publishProject: PublishProjectUseCase,
     private publishingReportMapper: PublishingReportMapper,
     private editBook: EditBookUseCase,
@@ -345,6 +347,53 @@ export class ProjectsController {
       // never swallowed into a generic string the user cannot act on.
       console.error(`Export failed for project ${req.params.id}:`, error);
       res.status(500).json({ error: 'The document could not be generated', code: 'RENDER_FAILED' });
+    }
+  };
+
+  /**
+   * INCREMENTAL_RENDER (P1, commit 2) — the region-render endpoint. Renders only the visible page range
+   * of the project's stored book (criterion A / fluidity). `start`/`end` are 1-based domain page numbers;
+   * `total` is the full book's physical page count the caller holds from its initial full render.
+   *
+   * The query params are UNTRUSTED input and are validated here, not trusted — the standing route-
+   * validation discipline (the setPartRole lesson, ADR-0051 era): each must be a positive integer and
+   * `start <= end`, else 400. Out-of-range values are then CLAMPED to the book's real page count in the
+   * use case (the window legitimately runs past the ends near page 1 / the last page). The real domain
+   * page count and the clamped range are returned in headers so the caller can build its scroll window.
+   */
+  renderRegion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const start = Number(req.query.start);
+    const end = Number(req.query.end);
+    const total = Number(req.query.total);
+    const isPositiveInt = (n: number) => Number.isInteger(n) && n >= 1;
+    if (!isPositiveInt(start) || !isPositiveInt(end) || start > end) {
+      res.status(400).json({ error: 'start and end must be positive integers with start <= end', code: 'INVALID_RANGE' });
+      return;
+    }
+    if (!isPositiveInt(total)) {
+      res.status(400).json({ error: 'total must be a positive integer', code: 'INVALID_TOTAL' });
+      return;
+    }
+    try {
+      const result = await this.renderProjectRegion.execute(req.params.id, start, end, total);
+      if (!result) {
+        res.status(404).json({ error: 'Project not found', code: 'PROJECT_NOT_FOUND' });
+        return;
+      }
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('X-Total-Domain-Pages', String(result.totalDomainPages));
+      res.setHeader('X-Region-Start', String(result.startPage));
+      res.setHeader('X-Region-End', String(result.endPage));
+      // Let the browser read the range headers on a cross-origin fetch (the studio dev server origin).
+      res.setHeader('Access-Control-Expose-Headers', 'X-Total-Domain-Pages, X-Region-Start, X-Region-End');
+      res.status(200).send(result.pdf);
+    } catch (error) {
+      if (error instanceof UnknownThemeError || error instanceof UnknownLayoutError) {
+        next(error);
+        return;
+      }
+      console.error(`Region render failed for project ${req.params.id}:`, error);
+      res.status(500).json({ error: 'The region could not be generated', code: 'RENDER_FAILED' });
     }
   };
 

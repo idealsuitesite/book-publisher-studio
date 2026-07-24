@@ -1,6 +1,6 @@
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
-import { join } from 'node:path';
+import { resolveDatabasePath } from '../infrastructure/config/resolveDatabasePath';
 import { MammothParser } from '../infrastructure/parsers/MammothParser';
 import { HtmlNormalizer } from '../infrastructure/normalizers/HtmlNormalizer';
 import { ASTBuilder } from '../domain/services/ASTBuilder';
@@ -43,6 +43,7 @@ import { ProjectsController } from './controllers/ProjectsController';
 import { projectRoutes } from './routes/projects';
 import { GetProjectUseCase } from '../application/use-cases/GetProjectUseCase';
 import { ExportProjectUseCase } from '../application/use-cases/ExportProjectUseCase';
+import { RenderProjectRegionUseCase } from '../application/use-cases/RenderProjectRegionUseCase';
 import { PublishProjectUseCase } from '../application/use-cases/PublishProjectUseCase';
 
 export function createApp(): Express {
@@ -55,9 +56,11 @@ export function createApp(): Express {
   // Durable since Sprint 11 (PERSISTENCE.md, ADR-0048): SQLite on disk, so a restart is no
   // longer an act of data loss. Route tests get a fresh `:memory:` database per createApp() —
   // the same isolation the in-memory store gave them, from the real implementation.
-  const databasePath =
-    process.env.DATABASE_PATH ??
-    (process.env.NODE_ENV === 'test' ? ':memory:' : join(process.cwd(), 'data', 'studio.db'));
+  // STORE_DEFAULT_SAFE (CTO Ruling 1): default to an in-memory DB; the REAL store (`data/studio.db`) is
+  // reached ONLY via an explicit DATABASE_PATH opt-in, which the dev/production entrypoint (src/index.ts)
+  // sets. So a spike/debug/test helper that builds the app without opting in can never touch the founder
+  // store by omission — the class that produced the P1 `region`-project trace is closed at the source.
+  const databasePath = resolveDatabasePath(process.env);
   const projectRepository = new SqliteProjectRepository(databasePath);
   const projectService = new ProjectService();
 
@@ -111,6 +114,10 @@ export function createApp(): Express {
     // approximation — the same measured/fallback split LayoutEngine already lives by.
     new DOCXRenderer({ measurer })
   );
+  // One PDFRenderer instance, shared by the full-export path and the region-render path
+  // (INCREMENTAL_RENDER): they render the SAME PaginatedBook, so page-region ≡ page-export by
+  // construction. The instance also serves as the PageRangeRenderer port (PDFRenderer implements both).
+  const pdfRenderer = new PDFRenderer();
   const exportPdfUseCase = new ExportManuscriptUseCase(
     new MammothParser(),
     new HtmlNormalizer(),
@@ -118,7 +125,7 @@ export function createApp(): Express {
     new ThemeEngine(),
     new TypographyResolver(),
     layoutEngine,
-    new PDFRenderer()
+    pdfRenderer
   );
   const exportEpubUseCase = new ExportManuscriptUseCase(
     new MammothParser(),
@@ -169,6 +176,16 @@ export function createApp(): Express {
     new ExportProjectUseCase(
       projectRepository,
       { docx: exportDocxUseCase, pdf: exportPdfUseCase, epub: exportEpubUseCase },
+      new ManualLayoutSelector(),
+      projectService,
+      paginationCache
+    ),
+    // INCREMENTAL_RENDER (P1): region render reuses the PDF exporter's shared paginate tail and the
+    // same pdfRenderer (as the PageRangeRenderer port), so a region page is byte-identical to the export.
+    new RenderProjectRegionUseCase(
+      projectRepository,
+      exportPdfUseCase,
+      pdfRenderer,
       new ManualLayoutSelector(),
       projectService,
       paginationCache

@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import type { Renderer, RenderContext, RenderResult } from '../../domain/ports/Renderer';
+import type { PageRangeRenderer } from '../../domain/ports/PageRangeRenderer';
 import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
@@ -89,7 +90,29 @@ interface SplitPlan {
   continuations: Map<string, Page[]>;
 }
 
-export class PDFRenderer implements Renderer<Buffer> {
+/**
+ * INCREMENTAL_RENDER (P1, candidate 1): the window that turns the whole-book draw into a visible-region
+ * render. Threaded through the SAME renderContent/renderBlock walk (never a second walk — INCREMENTAL_
+ * RENDER_DR §D1), so per-block geometry is inherited, not imitated. `undefined` everywhere on the full
+ * render path ⇒ byte-identical to before (the parity locks guard this). While `!active`, drawing and
+ * planned breaks are suppressed; the walk reaches `startId`, draws through `endId`, then stops. The
+ * chrome (numbers, running heads) is fed the range's own domain Pages in `pageOwners`, so it is true by
+ * construction, not recomputed.
+ */
+interface RenderWindow {
+  startId: string;
+  endId: string;
+  // The region's 1-based domain page bounds. renderSplitRuns (INCREMENTAL_RENDER 1d) needs the numeric
+  // bounds — not just the boundary block ids — to know which pieces of a split paragraph fall inside the
+  // region: a split's continuations are consecutive pages, so a piece's page is read off `continuations`
+  // and compared to these. `startId`/`endId` gate the block walk; `startPage`/`endPage` gate a split.
+  startPage: number;
+  endPage: number;
+  active: boolean;
+  done: boolean;
+}
+
+export class PDFRenderer implements Renderer<Buffer>, PageRangeRenderer {
   // compress defaults to true for real output; tests pass false so the content stream stays
   // plain text and its rendered text can be extracted for assertions (see
   // test-utils/extractPdfText.ts - PDFKit encodes text as hex-string TJ/Tj operands, not the
@@ -141,41 +164,10 @@ export class PDFRenderer implements Renderer<Buffer> {
       );
       doc.on('error', (err: unknown) => reject(err instanceof Error ? err : new Error(String(err))));
 
-      // Maps a page-starting block's id to the domain Page it starts (blankPagesBefore, for
-      // Chapter.openingPageStyle, is 0/undefined on every page except a chapter start -
-      // LayoutEngine only computes it there).
-      const pageStarts = new Map<string, Page>();
-      for (const page of book.pages.slice(1)) {
-        // A continuation page's first block is the TAIL of a block split on the previous page
-        // (Phase B): the split rendering below produces that page break itself, so forcing one
-        // here would double it — and would break the block at its start instead of mid-text.
-        if (page.startsWithContinuation) continue;
-        const firstId = page.blocks[0];
-        if (firstId) pageStarts.set(firstId, page);
-      }
-
-      // Phase B split plan: per split block, the line counts of every non-final segment, and
-      // the domain Pages its continuations own (so running heads carry the right numbers).
-      const splitSegments = new Map<string, number[]>();
-      const continuationPages = new Map<string, Page[]>();
-      for (const page of book.pages) {
-        if (page.splitAfterLines) {
-          const lastId = page.blocks[page.blocks.length - 1];
-          if (lastId) {
-            const segs = splitSegments.get(lastId) ?? [];
-            segs.push(page.splitAfterLines);
-            splitSegments.set(lastId, segs);
-          }
-        }
-        if (page.startsWithContinuation) {
-          const firstId = page.blocks[0];
-          if (firstId) {
-            const conts = continuationPages.get(firstId) ?? [];
-            conts.push(page);
-            continuationPages.set(firstId, conts);
-          }
-        }
-      }
+      // The page-start and split-plan maps (extracted to buildPageMaps so the region renderer
+      // consumes the SAME maps — one truth, never a second copy that could drift, INCREMENTAL_RENDER
+      // §D1). Behaviour on this full path is byte-identical (the parity locks guard it).
+      const { pageStarts, splitSegments, continuationPages } = this.buildPageMaps(book);
 
       // Real-PDFKit-page-index -> owning domain Page, built up as addPage() actually happens
       // below (not assumed 1:1 with book.pages - both pagination-estimate drift, ADR-0013, and
@@ -273,6 +265,162 @@ export class PDFRenderer implements Renderer<Buffer> {
     });
   }
 
+  /**
+   * The page-start and split-plan maps, derived from the paginated book. Extracted so BOTH the full
+   * render and the region render (`renderPageRange`) consume the SAME maps — one truth, never a second
+   * copy that could drift (INCREMENTAL_RENDER_DR §D1). Pure; no drawing.
+   */
+  private buildPageMaps(book: PaginatedBook): {
+    pageStarts: Map<string, Page>;
+    splitSegments: Map<string, number[]>;
+    continuationPages: Map<string, Page[]>;
+  } {
+    // Maps a page-starting block's id to the domain Page it starts (blankPagesBefore, for
+    // Chapter.openingPageStyle, is 0/undefined on every page except a chapter start -
+    // LayoutEngine only computes it there).
+    const pageStarts = new Map<string, Page>();
+    for (const page of book.pages.slice(1)) {
+      // A continuation page's first block is the TAIL of a block split on the previous page
+      // (Phase B): the split rendering below produces that page break itself, so forcing one
+      // here would double it — and would break the block at its start instead of mid-text.
+      if (page.startsWithContinuation) continue;
+      const firstId = page.blocks[0];
+      if (firstId) pageStarts.set(firstId, page);
+    }
+    // Phase B split plan: per split block, the line counts of every non-final segment, and
+    // the domain Pages its continuations own (so running heads carry the right numbers).
+    const splitSegments = new Map<string, number[]>();
+    const continuationPages = new Map<string, Page[]>();
+    for (const page of book.pages) {
+      if (page.splitAfterLines) {
+        const lastId = page.blocks[page.blocks.length - 1];
+        if (lastId) {
+          const segs = splitSegments.get(lastId) ?? [];
+          segs.push(page.splitAfterLines);
+          splitSegments.set(lastId, segs);
+        }
+      }
+      if (page.startsWithContinuation) {
+        const firstId = page.blocks[0];
+        if (firstId) {
+          const conts = continuationPages.get(firstId) ?? [];
+          conts.push(page);
+          continuationPages.set(firstId, conts);
+        }
+      }
+    }
+    return { pageStarts, splitSegments, continuationPages };
+  }
+
+  /**
+   * INCREMENTAL_RENDER (P1, candidate 1, INCREMENTAL_RENDER_DR §D1): render ONLY the visible page range
+   * `[startPage, endPage]` (1-based domain page numbers) of an already-paginated book. It draws through
+   * the SAME renderContent/renderBlock walk as the full render, gated by a `RenderWindow`, and feeds
+   * `drawHeadersAndFooters` the range's own domain Pages — so page N in a region is page-for-page
+   * identical to page N of the full export (the fidelity invariant), at a fraction of the cost.
+   *
+   * `totalPages` is the full book's REAL page count (the caller holds it from a full render — the live
+   * studio renders the whole book once, then region-renders on edit). It is the "of TOTAL" denominator,
+   * so the footer reads "Page 171 of 156", not "of 2".
+   *
+   * Scope: the leading page may be mid-content (1b), a chapter/section OPENING (1c — its title block and,
+   * theme-permitting, its drop cap draw true, seeded on physical page 0), or a CONTINUATION split-tail
+   * (1d — renderSplitRuns advances silently through the shared cut implementation to the region's leading
+   * boundary and draws from there; a region that ends mid-split shows only its own lines). The invariant
+   * tests and guardrails pin exactly what is in scope; nothing speculative is built (YAGNI).
+   */
+  async renderPageRange(
+    book: PaginatedBook,
+    context: RenderContext,
+    startPage: number,
+    endPage: number,
+    totalPages: number
+  ): Promise<RenderResult<Buffer>> {
+    return new Promise((resolve, reject) => {
+      const { width, height, marginTop, marginBottom, marginLeft, marginRight } = book.pageLayout;
+      const doc = new PDFDocument({
+        size: [width, height],
+        margins: { top: marginTop, bottom: marginBottom, left: marginLeft, right: marginRight },
+        bufferPages: true,
+        compress: this.options.compress ?? true,
+        info: {
+          ...(context.metadata?.title ? { Title: context.metadata.title } : {}),
+          ...(context.metadata?.author ? { Author: context.metadata.author } : {}),
+        },
+      });
+      this.fonts.registerAll(doc);
+
+      // Reconciliation wrapper + pageOwners, the SAME mechanism as render() (ADR-0051). Declared
+      // before the listeners that close over them.
+      const reconciliation = { unplannedPageBreaks: 0, unplannedTitleBreaks: 0 };
+      const pageOwners: PageOwner[] = [];
+      const measured: { pageCount?: number } = {};
+      const origAddPage = doc.addPage.bind(doc);
+      (doc as unknown as { addPage: () => PDFKit.PDFDocument }).addPage = () => {
+        const marker = doc as unknown as { __plannedBreak?: boolean; __currentBlockId?: string };
+        const planned = marker.__plannedBreak === true;
+        marker.__plannedBreak = false;
+        if (!planned) {
+          reconciliation.unplannedPageBreaks += 1;
+          if (marker.__currentBlockId?.startsWith('title "')) reconciliation.unplannedTitleBreaks += 1;
+          pageOwners.push(pageOwners[pageOwners.length - 1] ?? 'blank');
+        }
+        return origAddPage();
+      };
+
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () =>
+        resolve({
+          output: Buffer.concat(chunks),
+          metrics: {
+            pageCount: measured.pageCount,
+            pageLayout: book.pageLayout,
+            unplannedPageBreaks: reconciliation.unplannedPageBreaks,
+            unplannedTitleBreaks: reconciliation.unplannedTitleBreaks,
+            degradedDropCaps: degradationTally(doc).degradedDropCaps,
+          },
+        })
+      );
+      doc.on('error', (err: unknown) => reject(err instanceof Error ? err : new Error(String(err))));
+
+      const { pageStarts, splitSegments, continuationPages } = this.buildPageMaps(book);
+      const startIdx = startPage - 1;
+      const endIdx = endPage - 1;
+      const startBlocks = book.pages[startIdx]?.blocks ?? [];
+      const endBlocks = book.pages[endIdx]?.blocks ?? [];
+      const window: RenderWindow = {
+        startId: startBlocks[0] ?? '',
+        endId: endBlocks[endBlocks.length - 1] ?? '',
+        startPage,
+        endPage,
+        active: false,
+        done: false,
+      };
+
+      // Physical page 0 (PDFKit's initial page) IS domain page `startPage`: seed pageOwners so the
+      // chrome numbers it truly. Front matter is skipped by construction (a region is body-only).
+      pageOwners.push(book.pages[startIdx]);
+
+      this.renderContent(
+        doc,
+        book.styledBook.book.mainContent,
+        book.styledBook.theme,
+        book.styledBook.blockStyles,
+        book.styledBook.blockTypography,
+        pageStarts,
+        pageOwners,
+        { segments: splitSegments, continuations: continuationPages },
+        true,
+        window
+      );
+
+      this.drawHeadersAndFooters(doc, book, pageOwners, totalPages);
+      measured.pageCount = doc.bufferedPageRange().count;
+      doc.end();
+    });
+  }
+
   // ADR-0019 finding 6: an earlier version drew headers/footers live via the 'pageAdded' event
   // while content was flowing, which caused two real bugs - (a) writing footer text below the
   // margin triggered PDFKit's own overflow-based auto-pagination from inside the handler that
@@ -319,9 +467,13 @@ export class PDFRenderer implements Renderer<Buffer> {
   // (pageOwners[i] === undefined, ADR-0013) there is no resolved Page to read a number from, so
   // the numerator falls back to the physical index too, same as every page did before this
   // commit - no regression for the drift case that finding 6C's own test already covers.
-  private drawHeadersAndFooters(doc: PDFKit.PDFDocument, book: PaginatedBook, pageOwners: PageOwner[]): void {
+  private drawHeadersAndFooters(doc: PDFKit.PDFDocument, book: PaginatedBook, pageOwners: PageOwner[], totalPages?: number): void {
     const runningHead = book.styledBook.theme.runningHead;
     const range = doc.bufferedPageRange();
+    // The "of TOTAL" denominator. Full render: the real buffered count (ADR-0019 finding 6C). Region
+    // render (INCREMENTAL_RENDER): the FULL book's real count passed in, so page N's footer reads
+    // "of <full total>" identically to the full export — not "of <region page count>".
+    const denominator = totalPages ?? range.count;
 
     // TABLE_DUPLICATION.md Défaut B: an unplanned (reconciliation) page copies the PREVIOUS
     // page's owner (PDFRenderer.ts, the addPage wrapper) — right for the running-head TITLE
@@ -368,7 +520,7 @@ export class PDFRenderer implements Renderer<Buffer> {
           // (ADR-0013) still fall back to the physical index.
           const displayNumber = owner?.number !== undefined ? owner.number + insertions : i + 1;
           doc.font(this.fonts.resolveDefault(false, false)).fontSize(runningHead.size ?? 9).fillColor('#000');
-          doc.text(`Page ${displayNumber} of ${range.count}`, margins.left, height - 50, {
+          doc.text(`Page ${displayNumber} of ${denominator}`, margins.left, height - 50, {
             width: contentWidth,
             align: 'center',
             lineBreak: false,
@@ -412,9 +564,11 @@ export class PDFRenderer implements Renderer<Buffer> {
     pageStarts: Map<string, Page>,
     pageOwners: PageOwner[],
     splits: SplitPlan,
-    isTopLevel: boolean
+    isTopLevel: boolean,
+    window?: RenderWindow
   ): void {
     for (const content of contents) {
+      if (window?.done) return; // the range is finished — draw nothing more
       const firstBlockId = content.content[0]?.id;
       // A blockless titled top-level chapter (the Part-opener shape) owns its planned page under
       // the CONTENT's own id — it has no block id the pageStarts protocol could key by
@@ -426,16 +580,40 @@ export class PDFRenderer implements Renderer<Buffer> {
       const ownerPage = isTopLevel && content.type === 'chapter' && startKey !== undefined ? pageStarts.get(startKey) : undefined;
       if (ownerPage && startKey !== undefined) pageStarts.delete(startKey);
 
+      // INCREMENTAL_RENDER: while BEFORE the range (window && !active), the chapter/section chrome —
+      // its blank pages, its opening break, its keep-with-next break, its title — is suppressed and
+      // no page is added, so pageOwners stays aligned with the pages that are actually emitted. The
+      // pageStarts entries are still consumed (deleted) above/below to keep the map's state consistent
+      // with the full walk. A mid-content range never draws a title here (its title is on an earlier page).
+      //
+      // INCREMENTAL_RENDER 1c — the region's LEADING page IS this content's opening. Its first block
+      // is `window.startId`, so activate the window HERE, before the chrome decisions, so the opening's
+      // TITLE (and, for a chapter, its subtitle) draws — page-for-page identical to the export's opening.
+      // The drop cap needs nothing special here: it is a property of the first paragraph and rides along
+      // through renderBlock (theme-conditional — Novel lights it, Classic doesn't). But the leading page
+      // is ALREADY seeded as physical page 0 in renderPageRange, so the blank pages and the opening/
+      // keep-with-next page BREAK are suppressed (drawing them would push the opening onto physical page
+      // 1+): the exact analogue of renderBlock consuming a mid-content leading block's page-start so no
+      // leading break fires. One walk, one path — chapter openings and section openings alike.
+      const isLeadingBoundary =
+        window !== undefined && !window.active && firstBlockId !== undefined && firstBlockId === window.startId;
+      if (isLeadingBoundary) window.active = true;
+      const drawingChrome = !window || window.active;
+      // Every opening WITHIN the range adds its own page; the range's leading opening does not (seeded).
+      const addingLeadingPages = drawingChrome && !isLeadingBoundary;
+
       // Blank pages (Chapter.openingPageStyle) are genuinely empty physical pages - each
       // addPage() here is immediately followed by another with nothing drawn in between,
       // then the real content page below starts normally.
-      for (let i = 0; i < (ownerPage?.blankPagesBefore ?? 0); i++) {
-        this.plannedAddPage(doc);
-        pageOwners.push('blank');
-      }
-      if (ownerPage) {
-        this.plannedAddPage(doc);
-        pageOwners.push(ownerPage);
+      if (addingLeadingPages) {
+        for (let i = 0; i < (ownerPage?.blankPagesBefore ?? 0); i++) {
+          this.plannedAddPage(doc);
+          pageOwners.push('blank');
+        }
+        if (ownerPage) {
+          this.plannedAddPage(doc);
+          pageOwners.push(ownerPage);
+        }
       }
       // Keep-with-next (ADR-0051): a non-chapter titled content whose first block begins a
       // planned page moved WITH its title — the model's flushBeforeTitleIfOrphaned invariant —
@@ -448,20 +626,26 @@ export class PDFRenderer implements Renderer<Buffer> {
         const sectionStart = pageStarts.get(keepWithNextKey);
         if (sectionStart) {
           pageStarts.delete(keepWithNextKey);
-          this.plannedAddPage(doc);
-          pageOwners.push(sectionStart);
+          if (addingLeadingPages) {
+            this.plannedAddPage(doc);
+            pageOwners.push(sectionStart);
+          }
         }
       }
-      this.renderTitle(doc, content, theme);
+      if (drawingChrome) this.renderTitle(doc, content, theme);
 
       for (const block of content.content) {
-        this.renderBlock(doc, block, theme, blockStyles[block.id], blockTypography, pageStarts, pageOwners, splits);
+        this.renderBlock(doc, block, theme, blockStyles[block.id], blockTypography, pageStarts, pageOwners, splits, window);
+        if (window && block.id === window.endId) {
+          window.done = true;
+          window.active = false;
+        }
       }
 
       if (content.type === 'chapter' && content.sections) {
-        this.renderContent(doc, content.sections, theme, blockStyles, blockTypography, pageStarts, pageOwners, splits, false);
+        this.renderContent(doc, content.sections, theme, blockStyles, blockTypography, pageStarts, pageOwners, splits, false, window);
       } else if (content.type === 'section' && content.subsections) {
-        this.renderContent(doc, content.subsections, theme, blockStyles, blockTypography, pageStarts, pageOwners, splits, false);
+        this.renderContent(doc, content.subsections, theme, blockStyles, blockTypography, pageStarts, pageOwners, splits, false, window);
       }
     }
   }
@@ -589,8 +773,22 @@ export class PDFRenderer implements Renderer<Buffer> {
     blockTypography: Record<string, ResolvedTypography> | undefined,
     pageStarts: Map<string, Page>,
     pageOwners: PageOwner[],
-    splits: SplitPlan
+    splits: SplitPlan,
+    window?: RenderWindow
   ): void {
+    // INCREMENTAL_RENDER window gate: before the range's first block, draw nothing and break nothing.
+    // At startId we are already on the region's first physical page, so consume this block's own
+    // page-start so the leading break below does NOT fire (the region begins at page top, not after a
+    // break). endId is closed by the caller AFTER this block draws.
+    if (window) {
+      if (window.done) return;
+      if (block.id === window.startId) {
+        window.active = true;
+        pageStarts.delete(block.id);
+      } else if (!window.active) {
+        return;
+      }
+    }
     (doc as unknown as { __currentBlockId?: string }).__currentBlockId = `${block.type} ${block.id}`;
     const ownerPage = pageStarts.get(block.id);
     if (ownerPage) {
@@ -632,7 +830,7 @@ export class PDFRenderer implements Renderer<Buffer> {
         }
         const segments = splits.segments.get(block.id);
         if (segments && !dropCap) {
-          this.renderSplitRuns(doc, runs, resolveBody, fontSize, color, options, segments, splits.continuations.get(block.id) ?? [], pageOwners);
+          this.renderSplitRuns(doc, runs, resolveBody, fontSize, color, options, segments, splits.continuations.get(block.id) ?? [], pageOwners, window);
           this.spendSpaceAfter(doc, spaceAfter);
           return;
         }
@@ -798,32 +996,69 @@ export class PDFRenderer implements Renderer<Buffer> {
     paragraphOptions: PDFKit.Mixins.TextOptions,
     segments: number[],
     continuations: Page[],
-    pageOwners: PageOwner[]
+    pageOwners: PageOwner[],
+    window?: RenderWindow
   ): void {
     const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     doc.font(resolveFont(false, false)).fontSize(fontSize);
     const lineHeight = doc.heightOfString('x', { width: 10_000 });
 
+    // INCREMENTAL_RENDER 1d — the split-tail factor. A split paragraph's continuations are always
+    // CONSECUTIVE pages (a paragraph cannot skip a page), so each drawn piece's page is read off
+    // `continuations`: piece 0 (the head on the block's own start page) sits on continuations[0].number-1,
+    // piece k≥1 on continuations[k-1].number, and the final remainder on continuations[last].number. When
+    // a region window is present, only the pieces whose page lies within [startPage, endPage] are drawn:
+    //   • a piece BEFORE the region is advanced SILENTLY through the SAME cut implementation below
+    //     (charsFittingBudget/splitRunsAt) — never a second resume logic — so `remaining` arrives at the
+    //     region's leading boundary exactly as the full render leaves it (the leading split-tail);
+    //   • a piece AFTER the region is not drawn and its leading break is not emitted — required for
+    //     page-region ≡ page-export, since the region's last page must show only the lines the export
+    //     shows there (the trailing boundary — correctness demands it, so it is handled, not deferred).
+    // No window ⇒ every piece is in range ⇒ byte-identical to the full render (the parity locks guard it).
+    const startPage = window?.startPage ?? Number.NEGATIVE_INFINITY;
+    const endPage = window?.endPage ?? Number.POSITIVE_INFINITY;
+    const piece0Page = continuations.length > 0 ? continuations[0].number - 1 : Number.NEGATIVE_INFINITY;
+
     let remaining = runs;
-    let continuationIndex = 0;
-    for (const lines of segments) {
+    for (let i = 0; i < segments.length; i++) {
       const plain = remaining.map((run) => run.text).join('');
       // Float-noise epsilon only. The previous half-line slack let a segment render up to
       // half a line taller than the model charged for it — at 149 splits per book, a steady
       // source of end-of-page overflows PDFKit resolved on its own (ADR-0051 census).
-      const budget = lines * lineHeight + 0.5;
+      const budget = segments[i] * lineHeight + 0.5;
       const cutAt = this.charsFittingBudget(doc, plain, budget, usableWidth);
-      if (cutAt <= 0 || cutAt >= plain.length) break; // drift guard: render the rest whole
+      const piecePage = i === 0 ? piece0Page : continuations[i - 1].number;
+
+      if (cutAt <= 0 || cutAt >= plain.length) {
+        // drift guard: the cut failed; the full render draws the rest whole at THIS piece's page.
+        // In a region, draw it only if that page is inside the region (else it belongs before/after).
+        if (piecePage >= startPage && piecePage <= endPage) {
+          this.renderRuns(doc, remaining, resolveFont, fontSize, color, paragraphOptions);
+        }
+        return;
+      }
 
       const [head, tail] = splitRunsAt(remaining, cutAt);
-      this.renderRuns(doc, head, resolveFont, fontSize, color, paragraphOptions);
-      this.plannedAddPage(doc);
-      pageOwners.push(continuations[continuationIndex]);
-      continuationIndex += 1;
+      const nextPage = continuations[i].number; // the page this piece would break TO (piece i+1)
+
+      if (piecePage >= startPage && piecePage <= endPage) {
+        this.renderRuns(doc, head, resolveFont, fontSize, color, paragraphOptions);
+        if (nextPage <= endPage) {
+          this.plannedAddPage(doc);
+          pageOwners.push(continuations[i]);
+        } else {
+          return; // the region ends on this page, mid-split: emit no break past endPage
+        }
+      }
+      // (a piece before the region: advance silently — no draw, no break)
       doc.font(resolveFont(false, false)).fontSize(fontSize);
       remaining = tail;
     }
-    this.renderRuns(doc, remaining, resolveFont, fontSize, color, paragraphOptions);
+    // The final remainder — drawn only if its page is within the region.
+    const finalPage = continuations.length > 0 ? continuations[continuations.length - 1].number : piece0Page;
+    if (finalPage >= startPage && finalPage <= endPage) {
+      this.renderRuns(doc, remaining, resolveFont, fontSize, color, paragraphOptions);
+    }
   }
 
   /**
