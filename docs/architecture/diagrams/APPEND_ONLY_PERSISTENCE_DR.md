@@ -255,7 +255,12 @@ The engraved sequence ran end to end; **B is code-complete and green on `feat/ap
   publish 4/4. Real store verified post-judge: 9 projects, `user_version=2`, 4 milestones, untouched by
   the harness run.
 
-**NEXT: the CTO's word on merging `feat/append-only-persistence` back → AUTHOR_EXPERIENCE M3 resumes** (D2
-dedication+preface, D5 theme thumbnails/separators, D6 title surface — founder taste-stops). D (version-log
-cap) stays deferred; the felt O(v) tax B removed was the reason to consider pulling it forward, and it is
-gone.
+**DONE: merged into `feat/author-experience` @ `3da856d` (`--no-ff`), post-merge gate green** (backend
+945/945, frontend 248/248, tsc + eslint + both builds clean, harnesses 4/4·16/16·4/4 on a throwaway server,
+zero trace, real store untouched). **Standing rule (schema/code divergence):** the store is v2, `main` is
+v1-era → studio activation only from `feat/author-experience` until the arc merges to `main` (the flip is
+entangled with M0–M2 in the branch history; a persistence-only merge to `main` is not possible). Backup:
+`backend/data/backups/pre-append-only-persistence-v1-20260724T185236Z/` (sha256-verified; retention rule in
+its `BACKUP_README.txt`). **NEXT: AUTHOR_EXPERIENCE M3 resumes** (D2 dedication+preface, D5 theme
+thumbnails/separators, D6 title surface — founder taste-stops). D (version-log cap) stays deferred; the felt
+O(v) tax that argued for pulling it forward is gone.
