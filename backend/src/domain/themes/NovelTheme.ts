@@ -59,5 +59,8 @@ export const NovelTheme: Theme = {
     // Rule-only callouts (CTO sub-decision 3): printed novels are overwhelmingly B&W — the
     // Classic logic, with the rule inked in Novel's warm accent.
     callout: { tint: 'none' },
+    // D5 (M3-C8): Novel's scene break is a centered `* * *` — literary and warm; a founder taste-stop
+    // at C9 (the graphic language is chosen on a rendered page).
+    separator: { style: 'asterisks' },
   },
 };

@@ -54,6 +54,21 @@ export interface CalloutPresentation {
   tint: 'none' | 'accent';
 }
 
+/**
+ * The theme-declared scene-break SEPARATOR (AUTHOR_EXPERIENCE D5, M3-C8): "a theme that does not control
+ * its separators is not a complete system." Until now the `Divider` block's separator was **hardcoded
+ * per-renderer AND divergent** — PDF and DOCX drew `* * *`, EPUB drew `<hr>` — and the typed
+ * `Book.Divider.style` was read by **no** renderer (dead). The theme now owns the graphic language,
+ * rendered **consistently in all three formats**; an explicit per-block `Divider.style` still wins as an
+ * author override (falling back to the theme, then to `'asterisks'` for a theme that declares none).
+ *  - `'rule'`      — a short centered horizontal rule (Classic).
+ *  - `'asterisks'` — a centered `* * *` (Modern).
+ *  - `'space'`     — blank vertical space, no glyph.
+ */
+export interface SeparatorPresentation {
+  style: 'rule' | 'asterisks' | 'space';
+}
+
 export interface Theme {
   name: string;
   fonts: {
@@ -97,6 +112,9 @@ export interface Theme {
   presentation?: {
     dropCap?: DropCapPresentation;
     callout?: CalloutPresentation;
+    // The scene-break separator's graphic language (D5, M3-C8). Additive/optional — a theme that
+    // declares none renders `* * *` (the prior PDF/DOCX default), now consistent across all formats.
+    separator?: SeparatorPresentation;
   };
 }
 

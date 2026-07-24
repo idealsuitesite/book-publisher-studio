@@ -14,6 +14,7 @@ import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { dropCapScaleOf } from '../../domain/services/dropCapMetrics';
 import { CHAPTER_SUBTITLE_RATIO } from '../../domain/services/titleMetrics';
 import { CALLOUT_GAP_PT, CALLOUT_PAD_V_PT, CALLOUT_RULE_PT, calloutRuleColorOf, calloutTintOf } from '../../domain/services/calloutMetrics';
+import { resolveSeparatorStyle } from '../../domain/services/separatorPresentation';
 
 type EpubFn = (options: EpubOptions, content: EpubChapter[]) => Promise<Buffer>;
 
@@ -125,7 +126,7 @@ export class EPUBRenderer implements Renderer<Buffer> {
       const frontMatter = this.buildFrontMatterChapters(domainBook.frontMatter);
       const chapters = [
         ...frontMatter,
-        ...domainBook.mainContent.map((content) => this.buildChapter(content, blockTypography, tmpDir)),
+        ...domainBook.mainContent.map((content) => this.buildChapter(content, blockTypography, theme, tmpDir)),
       ];
 
       // FOUNDER_TRAVERSAL defect 3 (+ CTO EPUB-500 review): the MODEL stays language-unknown when
@@ -241,9 +242,9 @@ export class EPUBRenderer implements Renderer<Buffer> {
     return chapters;
   }
 
-  private buildChapter(content: Content, blockTypography: Record<string, ResolvedTypography> | undefined, tmpDir: string): EpubChapter {
+  private buildChapter(content: Content, blockTypography: Record<string, ResolvedTypography> | undefined, theme: Theme, tmpDir: string): EpubChapter {
     const parts: string[] = [];
-    this.renderContentInto(content, blockTypography, parts, tmpDir);
+    this.renderContentInto(content, blockTypography, parts, theme, tmpDir);
     // An untitled top-level Section (the ASTBuilder "preamble" — content that preceded the first
     // heading, ASTBuilder.ts:100) gets NO navigation entry (FOUNDER_TRAVERSAL_3 A4). We do NOT
     // fabricate a label: "Untitled" was a software-invented placeholder reaching the author's EPUB
@@ -261,6 +262,7 @@ export class EPUBRenderer implements Renderer<Buffer> {
     content: Content,
     blockTypography: Record<string, ResolvedTypography> | undefined,
     parts: string[],
+    theme: Theme,
     tmpDir: string
   ): void {
     if (content.title) {
@@ -274,16 +276,16 @@ export class EPUBRenderer implements Renderer<Buffer> {
     }
 
     for (const block of content.content) {
-      parts.push(this.renderBlock(block, blockTypography, tmpDir));
+      parts.push(this.renderBlock(block, blockTypography, theme, tmpDir));
     }
 
     const nested = content.type === 'chapter' ? content.sections : content.subsections;
     if (nested) {
-      for (const child of nested) this.renderContentInto(child, blockTypography, parts, tmpDir);
+      for (const child of nested) this.renderContentInto(child, blockTypography, parts, theme, tmpDir);
     }
   }
 
-  private renderBlock(block: Block, blockTypography: Record<string, ResolvedTypography> | undefined, tmpDir: string): string {
+  private renderBlock(block: Block, blockTypography: Record<string, ResolvedTypography> | undefined, theme: Theme, tmpDir: string): string {
     switch (block.type) {
       case 'heading': {
         const level = Math.min(6, Math.max(1, block.level));
@@ -344,8 +346,15 @@ export class EPUBRenderer implements Renderer<Buffer> {
         // systems honor and others ignore entirely.
         return '<div style="page-break-before: always;"></div>';
 
-      case 'divider':
-        return '<hr />';
+      case 'divider': {
+        // The theme owns the scene-break graphic language (AUTHOR_EXPERIENCE D5, M3-C8). Before this,
+        // EPUB ALWAYS drew `<hr>` while PDF/DOCX drew `* * *` — divergent; now `<hr>` renders only when
+        // the theme's separator is a rule, matching the other formats.
+        const sep = resolveSeparatorStyle(block, theme);
+        if (sep === 'rule') return '<hr />';
+        if (sep === 'space') return '<div style="height:1.5em"></div>';
+        return '<p style="text-align:center">* * *</p>';
+      }
 
       default: {
         const _exhaustive: never = block;

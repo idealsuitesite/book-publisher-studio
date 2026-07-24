@@ -31,6 +31,7 @@ import { listItemTypographyKey } from '../../shared/utils/typographyKeys';
 import { runsOrPlainFallback } from '../../shared/utils/typographyRuns';
 import { dropCapLetterSizePt, dropCapScaleOf } from '../../domain/services/dropCapMetrics';
 import { CALLOUT_GAP_PT, CALLOUT_RULE_PT, calloutRuleColorOf, calloutTintOf } from '../../domain/services/calloutMetrics';
+import { resolveSeparatorStyle } from '../../domain/services/separatorPresentation';
 import { CHAPTER_SUBTITLE_RATIO } from '../../domain/services/titleMetrics';
 import type { TextMeasurer } from '../../domain/ports/TextMeasurer';
 import { withNativeDropCapFrame } from './docxDropCapFrame';
@@ -682,8 +683,19 @@ export class DOCXRenderer implements Renderer<Buffer> {
       case 'page-break':
         return [new Paragraph({ pageBreakBefore: true, text: '' })];
 
-      case 'divider':
-        return [new Paragraph({ pageBreakBefore, text: '* * *', alignment: 'center' })];
+      case 'divider': {
+        // The theme owns the scene-break graphic language (AUTHOR_EXPERIENCE D5, M3-C8) — consistent
+        // with PDF/EPUB now (before: DOCX drew `* * *`, EPUB drew `<hr>` — divergent).
+        const sep = resolveSeparatorStyle(block, theme);
+        if (sep === 'rule') {
+          return [new Paragraph({ pageBreakBefore, alignment: AlignmentType.CENTER,
+            border: { bottom: { style: BorderStyle.SINGLE, size: 6, space: 1, color: 'auto' } }, text: '' })];
+        }
+        if (sep === 'space') {
+          return [new Paragraph({ pageBreakBefore, text: '' })];
+        }
+        return [new Paragraph({ pageBreakBefore, text: '* * *', alignment: AlignmentType.CENTER })];
+      }
 
       default: {
         const _exhaustive: never = block;

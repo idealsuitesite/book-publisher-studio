@@ -51,6 +51,8 @@ export const ModernTheme: Theme = {
     // identity, recorded in the review, not a bug). Tint = accent mixed toward paper
     // (calloutTintOf), so an accentOverride re-inks the chrome too.
     callout: { tint: 'accent' },
+    // D5 (M3-C8): Modern's scene break is a centered `* * *` — the contemporary trade convention.
+    separator: { style: 'asterisks' },
   },
   runningHead: {
     show: true,

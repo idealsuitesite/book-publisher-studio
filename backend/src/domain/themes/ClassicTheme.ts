@@ -44,6 +44,8 @@ export const ClassicTheme: Theme = {
     // B&W, and a printed tint becomes a grey slab; Classic stays sober and print-safe. The
     // rule renders in Classic's accent (#000000 — a plain black rule).
     callout: { tint: 'none' },
+    // D5 (M3-C8): Classic's scene break is a quiet centered RULE — the sober, traditional book form.
+    separator: { style: 'rule' },
   },
   // Matches today's pre-Sprint-6 PDF running-head/footer defaults (top running head, "Page N
   // of TOTAL" footer, size-9 default font) minus the hardcoded 'Book Publisher Studio' literal

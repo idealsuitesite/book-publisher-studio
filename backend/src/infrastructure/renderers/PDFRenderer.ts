@@ -19,6 +19,7 @@ import { PdfFontRegistry } from '../fonts/PdfFontRegistry';
 import { renderedImageSize } from '../../domain/services/renderedImageSize';
 import { dropCapGeometry, dropCapScaleOf, type DropCapGeometry } from '../../domain/services/dropCapMetrics';
 import { CALLOUT_PAD_V_PT, CALLOUT_RULE_PT, calloutRuleColorOf, calloutTextIndentPt, calloutTintOf } from '../../domain/services/calloutMetrics';
+import { resolveSeparatorStyle } from '../../domain/services/separatorPresentation';
 import { CHAPTER_SUBTITLE_RATIO } from '../../domain/services/titleMetrics';
 import { assertPlausibleCapHeight } from '../fonts/PdfKitTextMeasurer';
 
@@ -948,9 +949,28 @@ export class PDFRenderer implements Renderer<Buffer>, PageRangeRenderer {
         this.plannedAddPage(doc);
         return;
 
-      case 'divider':
-        doc.font(this.fonts.resolveBody(theme, false, false)).fontSize(fontSize).fillColor(color).text('* * *', { align: 'center' });
+      case 'divider': {
+        // The theme owns the scene-break graphic language (AUTHOR_EXPERIENCE D5, M3-C8). EVERY style
+        // consumes exactly ONE line — LayoutEngine charges a divider `measurer.lineHeight` regardless of
+        // style — so pagination (and the ADR-0051 parity locks) is unchanged; only the glyph differs.
+        const sep = resolveSeparatorStyle(block, theme);
+        doc.font(this.fonts.resolveBody(theme, false, false)).fontSize(fontSize).fillColor(color);
+        if (sep === 'asterisks') {
+          doc.text('* * *', { align: 'center' });
+        } else {
+          const lineH = doc.heightOfString('x', { width: 10_000 });
+          const yTop = doc.y;
+          if (sep === 'rule') {
+            const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+            const w = usableWidth * 0.28;
+            const x0 = doc.page.margins.left + (usableWidth - w) / 2;
+            const yMid = yTop + lineH / 2;
+            doc.moveTo(x0, yMid).lineTo(x0 + w, yMid).lineWidth(0.6).strokeColor(color).stroke();
+          }
+          doc.y = yTop + lineH; // 'rule' and 'space' consume one line, style-independent
+        }
         return;
+      }
 
       default: {
         const _exhaustive: never = block;
