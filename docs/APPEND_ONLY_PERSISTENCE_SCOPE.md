@@ -1,7 +1,9 @@
 # APPEND_ONLY_PERSISTENCE — cadrage (measured, stopped at findings)
 
-**Status:** CTO-RULED → **the B Design Review is WRITTEN** (`APPEND_ONLY_PERSISTENCE_DR.md`), awaiting the
-CTO's gate. A bounded interlude before AUTHOR_EXPERIENCE M3 (M3 resumes on B's green judge).
+**Status:** **B DR GATED (CTO, 2026-07-24) — building on `feat/append-only-persistence`** (record
+correction + 3 amendments folded: explicit `appendVersion` seam + idempotency-under-retry; migration
+backfills historical milestones; a read-path positive control; the founder ruled option 3, no open
+question). A bounded interlude before AUTHOR_EXPERIENCE M3 (M3 resumes on B's green judge).
 
 > **CTO RULING (2026-07-24).** **Scope: B now, contractually complete; D deferred, never folded into B.**
 > B fixes O(v) in both directions and returns the gesture to the engine (~171 ms) without discarding
