@@ -457,9 +457,10 @@ real use: (1) the single write path holds live, (2) the never-a-false-N honesty 
 
 ### Milestone 3 — Compose and surfaces (the founder taste-stops land here)
 
-**PROGRESS (2026-07-25): C6 + C7 DONE + gated green.** C8–C10 remain; the M3 INPUTS below fold into them. Resume at C8.
+**PROGRESS (2026-07-25): C6 + C7 + C8 DONE + gated green.** C9–C10 remain; the M3 INPUTS below fold into them. Resume at C9 (the first founder taste-stop).
 > - **C6 (`c4b4318`)** — D2 dedication + preface composed + tri-format rendered.
 > - **C7 (`4bb7f79`)** — the D2 add-front-matter affordance (verified live: a composed preface surfaces in the skeleton + renders in the Proof, 31→32 pages) + the two P1-defects: **typed human errors** (`lib/structure-errors.ts`, one author-language sentence per transport code, never the raw string; `ApiErrorCode` reconciled with the routes' real codes — #7) and the **visible promote-undo** (an undo bar at the gesture's result; the newest version is the pre-edit snapshot, O(1) after the flip). Frontend 255/255, tsc + eslint clean, backend tsc clean.
+> - **C8 (`416119a`)** — D5 the scene-break **separator becomes a theme value**, rendered consistently tri-format (`Theme.presentation.separator`; Classic rule, Modern/Novel asterisks; the ONE `resolveSeparatorStyle`). Fixes real dead/divergent code (`Divider.style` was read by no renderer; PDF/DOCX drew `* * *`, EPUB always `<hr>`). **Parity held with NO re-lock** — every style consumes exactly one `line` (what LayoutEngine charges), so pagination is unchanged; only the glyph differs. **#7 finding:** the chapter opening is already theme-controlled via `DropCapPresentation`; the opening difference is the drop cap + the title treatment (C10/D6), so C8 added the missing separator and did NOT invent a redundant opening field. Backend 965/965, tsc + eslint clean, verify-real-export 16/16.
 
 | # | Commit | Judge / verification | Taste-stop |
 |---|---|---|---|
