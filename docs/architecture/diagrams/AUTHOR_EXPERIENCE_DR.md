@@ -363,6 +363,28 @@ Four refinements the dependencies (or the "never-broken" rule) demand:
 4. **D2's backend is dependency-independent** and *could* move to M0 to de-risk tri-format early; kept in
    M3 adjacent to its UI for "one commit, one intent" unless the CTO prefers the early de-risk.
 
+**CTO GATE — GRANTED on this §8 (2026-07-24).** Verdicts on the four named divergences, then two folded
+conditions:
+- **Divergence 1 (shell split C2–C3): ACCEPTED.** A three-panel shell in one commit carries two intentions;
+  the read-studio milestone is coherent as M1.
+- **Divergence 2 (D8 designed-in from M1, gentle-collapse wired late): ACCEPTED — better than the expected
+  order.** Confirm-not-retype and computed numbers are properties of the skeleton's grammar, not features to
+  add; only the collapse-offer UI is late-bindable. **Requirement folded in: M1's judge asserts the
+  designed-in properties — no title-retype path exists, no authorable number — so they are locked before the
+  wiring commit (C13), not at it.**
+- **Divergence 3 (re-home before remove): ACCEPTED without reservation.** C11 lands the functions in their
+  new homes; C12 removes the old stations only after the new surface carries them — the migration pattern
+  that never strands the founder.
+- **Divergence 4 (D2 backend placement): KEEP IN M3.** The de-risk argument is real but weak — tri-format
+  render is well-trodden (three renderers, the pattern proven from title/copyright pages), not novel risk.
+  One-commit-one-intent adjacent to its UI wins. A tri-format surprise in the C6 commit is a **self-stop
+  case (a)** (premise contradicted by measurement), not a reason to have built it early on spec.
+
+**Two folded gate conditions (written into the milestones below):**
+- **(1)** The M4 felt-A live stop content is **pre-agreed here, not improvised at M4** — the checklist is at
+  C15 (from the founder's own history; his session, his books, no script beyond the list).
+- **(2)** M4 carries a **rollback line** for C12 (removing working stations) — stated at C12.
+
 **Every render / pagination / model touch verifies on a REAL manuscript** (corpus `faith-alone`; the
 founder books via read-only probe, never committed — `PRIVATE_MANUSCRIPT_FIXTURES`). Standing rules apply
 throughout: ADR-0001 (Book immutable), `CHAPTER_TITLE_PRESENTATION` (number is a datum), the
@@ -380,7 +402,7 @@ changes no studio behaviour.*
 ### Milestone 1 — The workspace reads (frontend; new workspace coexists with the old stations)
 | # | Commit | Judge / verification | Taste-stop |
 |---|---|---|---|
-| C2 | **The workspace shell + left skeleton + centre document (READ/navigate).** Renders `projectEditorialSkeleton` (left) and the selected object's content (centre), read-only. A new primary view; old stations intact. | Renders a real book's skeleton + document; frontend suite; axe (a11y); Visible-Increment (a human sees it). Live on `faith-alone`. | — |
+| C2 | **The workspace shell + left skeleton + centre document (READ/navigate).** Renders `projectEditorialSkeleton` (left) and the selected object's content (centre), read-only. A new primary view; old stations intact. | Renders a real book's skeleton + document; frontend suite; axe (a11y); Visible-Increment (a human sees it). **Divergence-2 lock (CTO condition): the judge asserts the designed-in D8 properties — the skeleton exposes NO title-retype path and NO authorable chapter number (the number is a computed datum, `CHAPTER_TITLE_PRESENTATION`)** — so these grammar properties are locked here in M1, before C13's collapse wiring. Live on `faith-alone`. | — |
 | C3 | **The right Proof panel, permanent** — reuse `PdfProof` + the existing FULL render (region wiring is C5). The Proof leaves the stack (Principle 3, placement half). | Proof renders in-panel; scroll/zoom (P1) intact; frontend suite. Live. | — |
 
 *M1 ships a working three-panel studio you can read and navigate; editing still available via the old
@@ -410,10 +432,10 @@ taste-stops are taken on the living studio. Still a working studio with the old 
 | # | Commit | Judge / verification | Taste-stop |
 |---|---|---|---|
 | C11 | **D7 re-home — metadata beside the skeleton; findings IN CONTEXT** on their object (the `MISSING_AUTHOR`-on-Title-Page pattern), dissolving `Ready for Print`'s two jobs into the workspace. | A real finding appears on the right object; the metadata inputs edit the book; frontend suite. Real fixture. | — |
-| C12 | **D7 remove — the old Structure station + the Proof-in-the-stack** (now fully in the workspace); the workspace is the primary surface. | The studio works with the old stations gone; nothing a station did is unreachable (the §7/§4 re-homing realised). | — |
+| C12 | **D7 remove — the old Structure station + the Proof-in-the-stack** (now fully in the workspace); the workspace is the primary surface. | The studio works with the old stations gone; nothing a station did is unreachable (the §7/§4 re-homing realised). **Rollback line (CTO condition 2):** C12 is the only commit that removes working stations. If the C15 felt-A founder stop fails after removal, the revert path is **`git revert` of C12 alone** — restoring the old stations while the workspace (C2–C11, C13–C14) persists alongside them, back to the M1 coexistence state; the founder is never stranded. (Designed now; the day it is needed is the wrong day to design it.) | — |
 | C13 | **D8 — the gentle-collapse wiring.** An empty editorial object is surfaced incomplete (built since M1) and offers **collapse via the existing cleanup suggester** — led away, never blocked. | The founder's empty-`INTRODUCTION` case (read-only probe) surfaces incomplete + offers collapse; a synthetic empty-chapter CI test. | — |
 | C14 | **Navigation — open directly into the workspace; Overview REMOVED, 7 → 4 stations**, its facts re-homed per the §4 table (word count → header, etc.). | A fresh open lands in the workspace; the re-homing table realised; frontend suite; axe. | — |
-| C15 | **The chantier judge + docs reconciliation.** Full suites, tsc, eslint, builds, `verify-real-*` on a throwaway server (zero trace, store restored). | All green; headers reconciled to CLOSED. | **Founder: the felt-A live taste-stop on the finished studio** — the whole edit→see loop, the criterion he can only judge alive (as P1). |
+| C15 | **The chantier judge + docs reconciliation.** Full suites, tsc, eslint, builds, `verify-real-*` on a throwaway server (zero trace, store restored). | All green; headers reconciled to CLOSED. | **Founder: the felt-A live taste-stop on the finished studio** — the whole edit→see loop, the criterion he can only judge alive (as P1). **Checklist pre-agreed (CTO condition 1), his session, his books, no script beyond the list:** (1) import a raw manuscript; (2) three-gesture skeleton — the raw manuscript scaffolds into a confirmable editorial skeleton in three gestures; (3) contextual edit from the centre document; (4) watch the region re-ink with the gaze kept (criterion A, P1's engine through the UI); (5) the "≈" provisional total resolving to a crisp N; (6) add a dedication (D2 compose); (7) export and open the file (the fidelity end-stop — the product is the file). |
 
 *M4 ships the finished single studio; the felt-A founder stop is the closing gate before merge.*
 
