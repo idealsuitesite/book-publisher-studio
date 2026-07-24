@@ -47,6 +47,28 @@ chapter count by breaking canonical-title recognition. Version-log growth from t
 snapshot-per-gesture machinery is the accepted cost of live verification; a mutated FINAL STATE
 is not. Verify the final state matches the found state before closing the session.
 
+## Shell cleanup safety — never `rm` with an unverified expansion (CTO rule, 2026-07-24)
+
+A cleanup command must not build its target from an **unverified command substitution or variable**.
+`rm -f "$(cat somefile)"*` is the trap: when the substitution comes back EMPTY (file missing,
+command failed, or — because each tool-call shell is fresh — a var/temp-file from a prior call did
+not survive), `""*` collapses to a bare `*`, and `rm -f *` deletes everything in the **current
+directory**. This is a whole class of shell accident, not a one-off. The precedent that made this a
+rule: during the INCREMENTAL_RENDER P1 merge, a harness-cleanup `rm` whose `$(cat …)` returned empty
+ran as `rm -f *` while the shell was `cd`'d into `backend/` and deleted its four root config files
+(recovered from HEAD — but it nearly cost more than restorable files).
+
+**The rule, mechanically:**
+1. **Never `rm` with an unverified expansion.** Store the path in a variable, prove it non-empty and
+   sane, and target it explicitly: `[ -n "$p" ] && rm -f -- "$p"` (the `--` stops option injection; a
+   guarded, quoted, single target — no trailing `*` glued to a substitution).
+2. **Harness / temp cleanups use absolute paths under `/tmp`** (or the OS temp dir), **never a
+   relative glob, and never run from the repository working directory.** If a cleanup must run in the
+   repo tree, name the exact files — do not glob.
+3. Each Bash tool call is a fresh shell: re-derive or re-read any path; never assume a variable or a
+   temp file written by a previous call still exists.
+4. After any bulk delete, run `git status` immediately; treat an unexpected deletion as stop-and-recover.
+
 ## Server verification (never assume the port)
 
 Before any real export/import verification against a running server:
