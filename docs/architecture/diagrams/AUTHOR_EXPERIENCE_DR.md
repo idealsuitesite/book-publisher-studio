@@ -478,6 +478,15 @@ taste-stops are taken on the living studio. Still a working studio with the old 
 
 *M4 ships the finished single studio; the felt-A founder stop is the closing gate before merge.*
 
+> **M4 also carries the product-name rename to `Unveil`** (founder decision 2026-07-24, recorded in
+> `AUTHOR_EXPERIENCE.md` §PN) — the studio is baptized when it becomes one. **Scope: display-name
+> surfaces ONLY** (workspace header, browser-tab title, user-visible package *display* names, and any
+> export-metadata product stamp — do a **read-only check of what the renderers stamp at M4**, not before).
+> Repo paths / package identifiers / internal `book-publisher-*` names are OUT of scope. The rename commit
+> is **additionally gated on the founder's own trademark/domain confirmation** — it does not ship on my
+> word alone. A dedicated M4 commit alongside C14 (the navigation/open-into-workspace change), not folded
+> into it.
+
 **Branch:** created at the CTO's gate on this §8 (the preventive rule — the branch point IS the gate).
 **Milestone re-verification:** at each milestone boundary the full gate runs (both suites, tsc, eslint,
 builds, `verify-real-*` zero-trace) so a milestone is never merged half-working. **~15 commits, 4
