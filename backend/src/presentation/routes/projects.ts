@@ -20,6 +20,9 @@ export function projectRoutes(controller: ProjectsController): Router {
   // POST rather than GET for export: it renders on the server (real work, ADR-0041's measured
   // 598ms) and mirrors the existing manuscript export route's verb.
   router.post('/:id/export', controller.export);
+  // INCREMENTAL_RENDER (P1): render only the visible page range for the living Proof — GET (a read of
+  // the stored book, no mutation), the range in the query string. See ProjectsController.renderRegion.
+  router.get('/:id/region', controller.renderRegion);
   router.post('/:id/publish', controller.publish);
   // One generic, typed mutation command (STRUCTURE_EDITING.md Q4) — not a route per verb.
   router.post('/:id/structure', express.json(), controller.editStructure);

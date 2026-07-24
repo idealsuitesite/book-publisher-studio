@@ -67,6 +67,26 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
     paginationCache?: PaginationCache,
     typographyOverride?: TypographyOverride
   ): Promise<Buffer> {
+    const paginated = this.paginate(book, themeName, pageLayout, accentOverride, paginationCache, typographyOverride);
+    // Metrics are discarded here on purpose: the export path has no validator to feed, and an
+    // unused field is what the handbook's port-vs-class rule exists to prevent (ADR-0045).
+    return (await this.renderer.render(paginated, { language: book.metadata.language })).output;
+  }
+
+  /**
+   * The theme → typography → layout tail, shared by the full render (`renderBook`) and the region
+   * render (INCREMENTAL_RENDER — `RenderProjectRegionUseCase` region-renders the SAME `PaginatedBook`,
+   * so a region page is fed the identical per-page inputs the full export uses; that is the fidelity
+   * invariant, made free by not paginating a different book). Pure: no drawing, no I/O.
+   */
+  paginate(
+    book: Book,
+    themeName: string,
+    pageLayout: PageLayout,
+    accentOverride?: string,
+    paginationCache?: PaginationCache,
+    typographyOverride?: TypographyOverride
+  ): PaginatedBook {
     // resolveTheme applies the optional per-project overrides over the named theme, in the ONE
     // shared seam (MINI_DR_PER_THEME_ACCENT / MINI_DR_TYPOGRAPHY_TUNING). No overrides -> the
     // named theme, unchanged.
@@ -84,13 +104,9 @@ export class ExportManuscriptUseCase implements UseCase<ExportRequest, Buffer> {
     // accent (only book content, theme and layout move geometry); reusing the cached geometry with
     // the fresh `typeset` is what applies the new colour without re-flowing. Absent cache (the
     // raw-bytes /export route) -> paginate every time, unchanged.
-    const paginated: PaginatedBook = paginationCache
+    return paginationCache
       ? this.paginateCached(paginationCache, book, themeName, pageLayout, typeset, typographyOverride)
       : this.layoutEngine.paginate(typeset, pageLayout);
-
-    // Metrics are discarded here on purpose: the export path has no validator to feed, and an
-    // unused field is what the handbook's port-vs-class rule exists to prevent (ADR-0045).
-    return (await this.renderer.render(paginated, { language: book.metadata.language })).output;
   }
 
   private paginateCached(

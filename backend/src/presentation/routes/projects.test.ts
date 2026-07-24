@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app';
 import { buildTestDocxBuffer } from '../../test-utils/buildTestDocx';
+import { countPdfPages } from '../../test-utils/extractPdfText';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
@@ -717,5 +718,88 @@ describe('GET /api/projects/:id/cleanup-suggestions — STRUCTURE_CLEANUP read-o
     const res = await request(createApp()).get('/api/projects/nope/cleanup-suggestions');
     expect(res.status).toBe(404);
     expect(res.body.code).toBe('PROJECT_NOT_FOUND');
+  });
+});
+
+describe('GET /api/projects/:id/region — INCREMENTAL_RENDER region render (P1 commit 2)', () => {
+  const importMultiPage = async (app: ReturnType<typeof createApp>) => {
+    // Enough prose to paginate to several pages, so a real multi-page region can be requested.
+    const paragraphs = Array.from({ length: 80 }, (_, i) =>
+      `Paragraph ${i + 1}. ` + 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '.repeat(3)
+    );
+    const buffer = await buildTestDocxBuffer({ heading: 'Chapter One', paragraphs });
+    const imported = await request(app)
+      .post('/api/manuscripts/import')
+      .attach('file', buffer, { filename: 'region.docx', contentType: DOCX_MIME });
+    return imported.body.projectId as string;
+  };
+
+  const getRegionPdf = (app: ReturnType<typeof createApp>, id: string, query: string) =>
+    request(app)
+      .get(`/api/projects/${id}/region?${query}`)
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks: Buffer[] = [];
+        r.on('data', (c: Buffer) => chunks.push(c));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+
+  it('renders a valid page range as a PDF, reporting the domain page count and clamped range', async () => {
+    const app = createApp();
+    const id = await importMultiPage(app);
+
+    const res = await getRegionPdf(app, id, 'start=1&end=2&total=9');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('application/pdf');
+    expect((res.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+    const totalDomain = Number(res.headers['x-total-domain-pages']);
+    expect(totalDomain).toBeGreaterThanOrEqual(2); // the fixture paginates to several pages
+    // GUARDRAIL through the HTTP path: the region is exactly the (clamped) requested width.
+    const start = Number(res.headers['x-region-start']);
+    const end = Number(res.headers['x-region-end']);
+    expect(countPdfPages(res.body as Buffer)).toBe(end - start + 1);
+  });
+
+  it('clamps a range that runs past the last page instead of failing', async () => {
+    const app = createApp();
+    const id = await importMultiPage(app);
+
+    const res = await getRegionPdf(app, id, 'start=1&end=9999&total=9');
+
+    expect(res.status).toBe(200);
+    const totalDomain = Number(res.headers['x-total-domain-pages']);
+    expect(Number(res.headers['x-region-end'])).toBe(totalDomain); // clamped to the real last page
+    expect(countPdfPages(res.body as Buffer)).toBe(totalDomain);
+  });
+
+  // NOTE: page-region ≡ page-export FIDELITY is proven in renderPageRange.fidelity.test.ts, which
+  // renders with `compress: false` so the content streams can be extracted and compared. This route
+  // exercises the PRODUCTION renderer (compressed output), where text/signature extraction does not
+  // apply — so the HTTP-level tests assert the CONTRACT (status, headers, page count, clamping,
+  // validation), not byte fidelity. One layer, one job.
+
+  it('rejects an invalid range with 400', async () => {
+    const app = createApp();
+    const id = await importMultiPage(app);
+
+    expect((await request(app).get(`/api/projects/${id}/region?start=3&end=1&total=9`)).status).toBe(400);
+    expect((await request(app).get(`/api/projects/${id}/region?start=0&end=2&total=9`)).status).toBe(400);
+    expect((await request(app).get(`/api/projects/${id}/region?start=1.5&end=2&total=9`)).status).toBe(400);
+    expect((await request(app).get(`/api/projects/${id}/region?end=2&total=9`)).status).toBe(400);
+  });
+
+  it('rejects a missing or invalid total with 400', async () => {
+    const app = createApp();
+    const id = await importMultiPage(app);
+
+    expect((await request(app).get(`/api/projects/${id}/region?start=1&end=2`)).status).toBe(400);
+    expect((await request(app).get(`/api/projects/${id}/region?start=1&end=2&total=0`)).status).toBe(400);
+  });
+
+  it('returns 404 for an unknown project', async () => {
+    const app = createApp();
+    const res = await request(app).get('/api/projects/does-not-exist/region?start=1&end=1&total=1');
+    expect(res.status).toBe(404);
   });
 });

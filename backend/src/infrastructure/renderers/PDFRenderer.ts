@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import type { Renderer, RenderContext, RenderResult } from '../../domain/ports/Renderer';
+import type { PageRangeRenderer } from '../../domain/ports/PageRangeRenderer';
 import type { PaginatedBook, Page } from '../../domain/models/PaginatedBook';
 import type { ResolvedBlockStyle, Theme } from '../../domain/models/Theme';
 import type { ResolvedTypography, TypeRun } from '../../domain/models/ResolvedTypography';
@@ -111,7 +112,7 @@ interface RenderWindow {
   done: boolean;
 }
 
-export class PDFRenderer implements Renderer<Buffer> {
+export class PDFRenderer implements Renderer<Buffer>, PageRangeRenderer {
   // compress defaults to true for real output; tests pass false so the content stream stays
   // plain text and its rendered text can be extracted for assertions (see
   // test-utils/extractPdfText.ts - PDFKit encodes text as hex-string TJ/Tj operands, not the

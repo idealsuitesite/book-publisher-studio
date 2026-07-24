@@ -43,6 +43,7 @@ import { ProjectsController } from './controllers/ProjectsController';
 import { projectRoutes } from './routes/projects';
 import { GetProjectUseCase } from '../application/use-cases/GetProjectUseCase';
 import { ExportProjectUseCase } from '../application/use-cases/ExportProjectUseCase';
+import { RenderProjectRegionUseCase } from '../application/use-cases/RenderProjectRegionUseCase';
 import { PublishProjectUseCase } from '../application/use-cases/PublishProjectUseCase';
 
 export function createApp(): Express {
@@ -111,6 +112,10 @@ export function createApp(): Express {
     // approximation — the same measured/fallback split LayoutEngine already lives by.
     new DOCXRenderer({ measurer })
   );
+  // One PDFRenderer instance, shared by the full-export path and the region-render path
+  // (INCREMENTAL_RENDER): they render the SAME PaginatedBook, so page-region ≡ page-export by
+  // construction. The instance also serves as the PageRangeRenderer port (PDFRenderer implements both).
+  const pdfRenderer = new PDFRenderer();
   const exportPdfUseCase = new ExportManuscriptUseCase(
     new MammothParser(),
     new HtmlNormalizer(),
@@ -118,7 +123,7 @@ export function createApp(): Express {
     new ThemeEngine(),
     new TypographyResolver(),
     layoutEngine,
-    new PDFRenderer()
+    pdfRenderer
   );
   const exportEpubUseCase = new ExportManuscriptUseCase(
     new MammothParser(),
@@ -169,6 +174,16 @@ export function createApp(): Express {
     new ExportProjectUseCase(
       projectRepository,
       { docx: exportDocxUseCase, pdf: exportPdfUseCase, epub: exportEpubUseCase },
+      new ManualLayoutSelector(),
+      projectService,
+      paginationCache
+    ),
+    // INCREMENTAL_RENDER (P1): region render reuses the PDF exporter's shared paginate tail and the
+    // same pdfRenderer (as the PageRangeRenderer port), so a region page is byte-identical to the export.
+    new RenderProjectRegionUseCase(
+      projectRepository,
+      exportPdfUseCase,
+      pdfRenderer,
       new ManualLayoutSelector(),
       projectService,
       paginationCache
