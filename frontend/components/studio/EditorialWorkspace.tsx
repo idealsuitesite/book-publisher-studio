@@ -109,7 +109,11 @@ export function EditorialWorkspace({
         if (mutation.type === 'restoreVersion') {
           setLastChange(null); // the author just returned — no change to offer returning from
         } else {
-          // The snapshot-before-edit is the newest version; restoring it returns the author here.
+          // The newest version is the PRE-edit snapshot, so restoring it returns the author to exactly
+          // where they were. This is correct ONLY because of Q2's snapshot-before-edit discipline
+          // (`EditBookUseCase`: every edit takes a "before X" snapshot of the pre-edit state, which
+          // `ProjectService.snapshot` appends as the newest version). If that labeling/ordering ever
+          // changes, this affordance breaks SILENTLY — the coupling is deliberate, not incidental.
           const newest = updated.versions[updated.versions.length - 1];
           setLastChange(newest ? { versionId: newest.id, label: changeLabel(mutation) } : null);
         }

@@ -517,3 +517,12 @@ The founder ran his first real session on the migrated v2 store (studio activate
 **Milestone re-verification:** at each milestone boundary the full gate runs (both suites, tsc, eslint,
 builds, `verify-real-*` zero-trace) so a milestone is never merged half-working. **~15 commits, 4
 milestones, each a working studio.** **Nothing is coded before the CTO gates §8.**
+
+**OWED at the M3 boundary gate (CTO, 2026-07-25) — a Playwright pass over the C7 surfaces.** The C7
+browser verification confirmed rendering + the live result (a composed preface in the skeleton, the Proof
+31→32) but NOT the untested inch: the real click on the add-form's **Add** firing the real dispatch, the
+**undo bar** appearing after a versioning edit and its click restoring, and a **typed error** rendering on
+a forced failure. The MCP browser pane fought coordinate/React-synthetic-event compositing (the P1 lesson:
+the MCP pane doesn't composite while Playwright headless does), so these three interaction paths get a
+real-Chromium **Playwright** pass at the M3 boundary — where the milestone's real-browser judge already
+lives — not a per-commit re-litigation of C7.
