@@ -245,6 +245,13 @@ The station set today: Overview · Structure · Ready-for-Print · Layout · Pro
 **Each page one object; each path legible.** The mockups prove "distributed but not scattered."
 
 ## §5 The mockups to produce (the founder's gate) — what each must demonstrate against A–D
+
+**PRODUCED (2026-07-24): `mockups/author-experience-mockups.html`** — the six mockups below, built in the
+studio's own palette (both themes) with real corpus content (*Faith Alone*), each carrying the three CTO
+gate additions (finding-in-context on the Title-Page object; the provisional-total costume as founder
+options; the D8 empty-chapter case as its own image). Assembled for the founder's judgment via the CTO;
+**construction is not scoped until his validation on the captures.**
+
 Nothing is built before the founder validates these on captures. **A note on honesty first: a still
 capture cannot prove criterion A (fluidity) — motion and milliseconds are not visible in an image.** So
 no mockup *claims* felt speed from a picture; the A-facing mockup shows the **mechanism** that produces

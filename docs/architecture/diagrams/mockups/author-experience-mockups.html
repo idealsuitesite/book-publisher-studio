@@ -1,0 +1,555 @@
+<style>
+  /* AUTHOR_EXPERIENCE — the six mockups for the founder's gate (AUTHOR_EXPERIENCE_DR.md §5).
+     Palette + dark theme are the STUDIO'S OWN tokens (frontend/app/globals.css), applied, not invented.
+     UI = system sans; the BOOK VOICE = Georgia serif (mirrors the real Inter + Gelasio split). */
+  :root {
+    --desk: #efece4; --panel: #fbfaf7; --raised: #ffffff; --sunk: #f6f4ef;
+    --ink: #211d19; --muted: #686056; --faint: #9a9186;
+    --border: #e7e2d9; --border-strong: #211d19;
+    --accent: #1d4e68; --accent-ink: #f6f4ef; --accent-soft: #e4edf1;
+    --brick: #a83a32; --amber: #9a6210; --leaf: #2e6b4f;
+    --brick-soft: #f4e3e1; --amber-soft: #f3ead9;
+    --board: #e6e2d8; --card: #fbfaf7;
+    --shadow: 0 1px 2px rgb(33 29 25 / .06), 0 8px 24px rgb(33 29 25 / .07);
+    --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --book: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --r: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --desk: #141210; --panel: #201d1a; --raised: #282420; --sunk: #1b1815;
+      --ink: #ece8e1; --muted: #b0a698; --faint: #8a8072;
+      --border: #3a342e; --border-strong: #ece8e1;
+      --accent: #7faecb; --accent-ink: #141210; --accent-soft: #22333d;
+      --brick: #e08b83; --amber: #d6a24e; --leaf: #79b394;
+      --brick-soft: #3a2622; --amber-soft: #362a18;
+      --board: #100e0c; --card: #201d1a;
+      --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 8px 24px rgb(0 0 0 / .35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --desk: #141210; --panel: #201d1a; --raised: #282420; --sunk: #1b1815;
+    --ink: #ece8e1; --muted: #b0a698; --faint: #8a8072;
+    --border: #3a342e; --border-strong: #ece8e1;
+    --accent: #7faecb; --accent-ink: #141210; --accent-soft: #22333d;
+    --brick: #e08b83; --amber: #d6a24e; --leaf: #79b394;
+    --brick-soft: #3a2622; --amber-soft: #362a18; --board: #100e0c; --card: #201d1a;
+    --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 8px 24px rgb(0 0 0 / .35);
+  }
+  :root[data-theme="light"] {
+    --desk: #efece4; --panel: #fbfaf7; --raised: #ffffff; --sunk: #f6f4ef;
+    --ink: #211d19; --muted: #686056; --faint: #9a9186;
+    --border: #e7e2d9; --border-strong: #211d19;
+    --accent: #1d4e68; --accent-ink: #f6f4ef; --accent-soft: #e4edf1;
+    --brick: #a83a32; --amber: #9a6210; --leaf: #2e6b4f;
+    --brick-soft: #f4e3e1; --amber-soft: #f3ead9; --board: #e6e2d8; --card: #fbfaf7;
+    --shadow: 0 1px 2px rgb(33 29 25 / .06), 0 8px 24px rgb(33 29 25 / .07);
+  }
+
+  * { box-sizing: border-box; }
+  .aeboard { background: var(--board); color: var(--ink); font-family: var(--ui); line-height: 1.5;
+    padding: 40px clamp(16px, 4vw, 56px); max-width: 1180px; margin: 0 auto; }
+  .aeboard h1 { font-size: 1.9rem; font-weight: 620; letter-spacing: -.01em; margin: 0 0 6px; text-wrap: balance; }
+  .aeboard .lede { color: var(--muted); max-width: 68ch; margin: 0 0 8px; }
+  .aeboard .meta { color: var(--faint); font-size: .82rem; margin: 0 0 28px; }
+  .aeboard a { color: var(--accent); }
+
+  /* the annotation frame around each mockup */
+  .mk { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow); margin: 0 0 34px; overflow: hidden; }
+  .mk > header { padding: 16px 20px 14px; border-bottom: 1px solid var(--border); display: flex;
+    flex-wrap: wrap; align-items: baseline; gap: 8px 14px; }
+  .mk .num { font-variant-numeric: tabular-nums; font-weight: 680; color: var(--accent);
+    font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+  .mk .title { font-weight: 640; font-size: 1.12rem; margin-right: auto; }
+  .chip { font-size: .68rem; font-weight: 640; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .chip.crit { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .mk .demo { padding: 12px 20px 0; color: var(--muted); font-size: .9rem; }
+  .mk .demo b { color: var(--ink); font-weight: 600; }
+  .mk .stage { padding: 18px 20px 22px; }
+  .removals { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 20px 18px; }
+  .removals .rm { font-size: .72rem; color: var(--muted); background: var(--sunk);
+    border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; }
+  .removals .rm b { color: var(--ink); font-weight: 600; }
+
+  /* --- a studio "screen": top bar + optional nav rail + panels --- */
+  .screen { background: var(--desk); border: 1px solid var(--border); border-radius: var(--r);
+    overflow: hidden; }
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: var(--panel);
+    border-bottom: 1px solid var(--border); font-size: .82rem; }
+  .topbar .book { font-weight: 620; }
+  .topbar .status { color: var(--leaf); font-size: .72rem; margin-left: auto; display: inline-flex;
+    align-items: center; gap: 5px; }
+  .topbar .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--leaf); }
+  .rail { display: flex; gap: 4px; padding: 7px 12px; background: var(--panel);
+    border-bottom: 1px solid var(--border); font-size: .78rem; flex-wrap: wrap; }
+  .rail .tab { padding: 4px 10px; border-radius: 7px; color: var(--muted); }
+  .rail .tab.on { background: var(--accent-soft); color: var(--accent); font-weight: 620; }
+  .rail .tab.gone { color: var(--faint); text-decoration: line-through; opacity: .55; }
+
+  .cols { display: grid; gap: 1px; background: var(--border); }
+  .c3 { grid-template-columns: 1.05fr 1.5fr 1.25fr; }
+  .col { background: var(--panel); padding: 14px; min-width: 0; }
+  .col.doc { background: var(--sunk); }
+  .colhead { font-size: .68rem; letter-spacing: .09em; text-transform: uppercase; color: var(--faint);
+    margin: 0 0 10px; font-weight: 640; }
+
+  /* skeleton (left) */
+  .sk { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+  .sk li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px;
+    font-size: .84rem; }
+  .sk li.sel { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+  .sk .kind { font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--faint);
+    border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; flex: none; }
+  .sk .kind.part { color: var(--accent); border-color: var(--accent); }
+  .sk .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sk .num { color: var(--faint); font-variant-numeric: tabular-nums; font-size: .74rem; flex: none; }
+  .sk .flag { margin-left: auto; font-size: .64rem; font-weight: 640; padding: 1px 6px; border-radius: 999px; flex: none; }
+  .flag.warn { background: var(--brick-soft); color: var(--brick); }
+  .flag.todo { background: var(--amber-soft); color: var(--amber); }
+  .sk .conf { margin-left: auto; font-size: .64rem; color: var(--accent); border: 1px solid var(--accent);
+    border-radius: 999px; padding: 1px 7px; flex: none; }
+  .sk .incomplete { border: 1px dashed var(--amber); background: var(--amber-soft); }
+
+  .metabox { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 12px; }
+  .metabox .field { display: flex; justify-content: space-between; gap: 8px; font-size: .8rem; padding: 4px 0; }
+  .metabox .field .lab { color: var(--muted); }
+  .metabox .field .val { color: var(--ink); }
+  .metabox .field .missing { color: var(--brick); font-weight: 600; }
+
+  /* document centre */
+  .docnum { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--accent);
+    font-weight: 660; }
+  .doctitle { font-family: var(--book); font-size: 1.5rem; line-height: 1.2; margin: 4px 0 2px;
+    color: var(--ink); border-bottom: 2px solid transparent; }
+  .doctitle.editing { border-bottom: 2px solid var(--accent); background: var(--raised); border-radius: 4px; padding: 2px 6px; }
+  .docsub { font-family: var(--book); font-style: italic; color: var(--muted); font-size: 1rem; margin-bottom: 12px; }
+  .prose { font-family: var(--book); font-size: .92rem; line-height: 1.6; color: var(--ink); }
+  .prose p { margin: 0 0 10px; }
+  .prose .dropcap::first-letter { font-size: 3em; float: left; line-height: .8; padding: 4px 8px 0 0; color: var(--accent); font-weight: 600; }
+  .sel-highlight { background: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent); border-radius: 3px; }
+
+  /* convert menu */
+  .menu { position: relative; margin-top: 10px; }
+  .menu .pop { background: var(--raised); border: 1px solid var(--border); border-radius: 9px;
+    box-shadow: var(--shadow); width: 230px; overflow: hidden; }
+  .menu .pop .mh { font-size: .66rem; letter-spacing: .08em; text-transform: uppercase; color: var(--faint);
+    padding: 8px 12px 4px; }
+  .menu .pop button { display: flex; width: 100%; text-align: left; gap: 8px; padding: 7px 12px;
+    background: none; border: 0; color: var(--ink); font: inherit; font-size: .84rem; cursor: pointer; }
+  .menu .pop button:hover, .menu .pop button.hi { background: var(--accent-soft); color: var(--accent); }
+  .menu .pop button:disabled { color: var(--faint); }
+  .menu .pop .div { height: 1px; background: var(--border); margin: 4px 0; }
+
+  /* proof (right) */
+  .proof { background: var(--sunk); }
+  .proof .pane { background: var(--desk); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px; height: 300px; overflow: hidden; position: relative; }
+  .page { background: var(--raised); border: 1px solid var(--border); box-shadow: 0 1px 3px rgb(0 0 0 /.08);
+    padding: 16px 18px; font-family: var(--book); font-size: .62rem; line-height: 1.55; color: var(--ink);
+    margin: 0 auto; width: 78%; }
+  .page .pt { font-size: 1.05rem; color: var(--accent); text-align: center; margin: 6px 0 10px; }
+  .page .ptnum { text-align: center; font-family: var(--ui); font-size: .5rem; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+  .page p { margin: 0 0 6px; }
+  .footer-num { text-align: center; font-family: var(--ui); font-size: .5rem; color: var(--muted); margin-top: 8px; }
+  .footer-num .prov { color: var(--faint); }
+  .zoombar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: .72rem; color: var(--muted); }
+  .zoombar button { border: 1px solid var(--border); background: var(--panel); border-radius: 6px;
+    width: 24px; height: 22px; color: var(--ink); cursor: pointer; }
+  .zoombar .lvl { font-variant-numeric: tabular-nums; min-width: 40px; text-align: center; }
+
+  .pairgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .frame { border: 1px solid var(--border); border-radius: var(--r); background: var(--desk); overflow: hidden; }
+  .frame .cap { font-size: .72rem; color: var(--muted); padding: 7px 10px; background: var(--panel);
+    border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+  .frame .cap b { color: var(--ink); }
+  .measure { display: inline-flex; gap: 6px; align-items: center; font-variant-numeric: tabular-nums;
+    color: var(--leaf); font-weight: 640; }
+
+  .options { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .opt { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--sunk);
+    font-size: .78rem; }
+  .opt .k { font-size: .62rem; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); display: block; margin-bottom: 3px; }
+  .opt .n { color: var(--muted); }
+  .opt .n.dim { opacity: .45; }
+  .picknote { font-size: .74rem; color: var(--faint); margin-top: 8px; }
+
+  /* add-a-type */
+  .additype { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .addcol .step { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; font-size: .84rem; }
+  .addcol .step .n { flex: none; width: 18px; height: 18px; border-radius: 999px; background: var(--accent);
+    color: var(--accent-ink); font-size: .64rem; display: grid; place-items: center; font-weight: 700; margin-top: 2px; }
+  .triformat { display: flex; gap: 8px; }
+  .triformat .fmt { flex: 1; border: 1px solid var(--border); border-radius: 8px; background: var(--raised); overflow: hidden; }
+  .triformat .fmt .fh { font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; color: var(--faint);
+    padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  .triformat .fmt .body { font-family: var(--book); font-size: .58rem; padding: 8px; color: var(--ink); text-align: center; }
+  .triformat .fmt .body .ded { font-style: italic; }
+
+  /* theme thumbnails */
+  .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .thumb { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; background: var(--raised); }
+  .thumb.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .thumb .pg { padding: 14px 14px 18px; height: 168px; font-family: var(--book); }
+  .thumb .nm { font-size: .74rem; padding: 7px 10px; border-top: 1px solid var(--border); color: var(--muted);
+    display: flex; justify-content: space-between; }
+  .thumb .nm b { color: var(--ink); font-weight: 600; }
+  .t-open { font-size: .5rem; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); text-align: center; }
+  .t-title-1 { text-align: center; margin-top: 26px; }
+  .t-title-1 .cn { font-size: .5rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  .t-title-1 .tt { font-size: .95rem; }
+  .t-title-2 .tt { font-size: 1.15rem; text-align: center; margin-top: 34px; }
+  .t-title-3 .tt { font-size: 1.4rem; margin-top: 30px; font-weight: 600; }
+  .thumb .ln { border-bottom: 1px solid var(--ink); opacity: .5; margin: 8px 0; }
+  .thumb .aster { text-align: center; color: var(--faint); letter-spacing: .3em; }
+  .titletreat { display: flex; gap: 8px; margin-top: 12px; }
+  .tre { flex: 1; border: 1px dashed var(--border); border-radius: 8px; padding: 8px; text-align: center; font-family: var(--book); }
+  .tre .lbl { font-family: var(--ui); font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+
+  /* nav map */
+  .navmap { display: flex; flex-direction: column; gap: 14px; }
+  .navrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .node { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; background: var(--raised);
+    min-width: 150px; }
+  .node.primary { border-color: var(--accent); background: var(--accent-soft); }
+  .node .nt { font-weight: 620; font-size: .9rem; }
+  .node .no { font-size: .72rem; color: var(--muted); }
+  .node.gone { opacity: .5; text-decoration: line-through; background: var(--sunk); }
+  .arrow { color: var(--faint); font-size: 1.1rem; }
+  .navnote { font-size: .78rem; color: var(--muted); margin-top: 6px; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: .78rem; color: var(--muted); margin: 0 0 26px; }
+  .legend .sw { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .box { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border); }
+</style>
+
+<div class="aeboard">
+  <h1>AUTHOR_EXPERIENCE — the six mockups</h1>
+  <p class="lede">The studio redesigned for Author B: a typed editorial skeleton on the left, the
+    editable document in the centre, the living Proof on the right. Six frames for the founder's gate —
+    each shows one thing he can judge on the still. Real content throughout (the corpus book
+    <em>Faith Alone</em>).</p>
+  <p class="meta">Design Review: <b>AUTHOR_EXPERIENCE_DR.md</b> §5 · criteria A fluidity · B contextual
+    editing · C preview always visible · D impression of simplicity · Toggle this page's theme to see
+    both. Nothing is built — these are for validation on captures.</p>
+  <div class="legend">
+    <span class="sw"><span class="box" style="background:var(--accent-soft);border-color:var(--accent)"></span> selected / active</span>
+    <span class="sw"><span class="box" style="background:var(--brick-soft);border-color:var(--brick)"></span> finding in context</span>
+    <span class="sw"><span class="box" style="background:var(--amber-soft);border-color:var(--amber)"></span> incomplete / gentle nudge</span>
+  </div>
+
+  <!-- ============ MOCKUP 1 ============ -->
+  <section class="mk">
+    <header>
+      <span class="num">Mockup 1</span>
+      <span class="title">The three-panel workspace</span>
+      <span class="chip crit">D simplicity</span><span class="chip crit">B editing</span>
+    </header>
+    <p class="demo">One calm surface: the skeleton (left), a chapter open in the document (centre), the
+      living Proof (right), the <b>“Convert to…”</b> menu on the centre selection. It also shows the
+      <b>Ready-for-Print split made concrete</b> — the <b>Author-missing finding sits ON the Title Page
+      object</b>, and the metadata inputs live beside the skeleton, the two homes that station splits into.</p>
+    <div class="stage">
+      <div class="screen">
+        <div class="topbar"><span class="book">Faith Alone</span><span style="color:var(--muted);font-size:.74rem">· KDP 6×9 · Classic</span><span class="status"><span class="dot"></span>Saved</span></div>
+        <div class="cols c3">
+          <div class="col">
+            <p class="colhead">Editorial skeleton</p>
+            <ul class="sk">
+              <li><span class="kind">Front</span><span class="nm">Title Page</span><span class="flag warn">Author missing</span></li>
+              <li><span class="kind">Front</span><span class="nm">Copyright</span></li>
+              <li><span class="kind">Front</span><span class="nm">Table of Contents</span></li>
+              <li class="sel"><span class="num">1</span><span class="nm">What Is Faith?</span></li>
+              <li><span class="num">2</span><span class="nm">Justified by Faith Alone</span></li>
+              <li><span class="num">3</span><span class="nm">The Failure of the Law</span></li>
+              <li><span class="num">4</span><span class="nm">Peace with God</span></li>
+              <li><span class="num">5</span><span class="nm">Fully Accepted in Christ</span></li>
+              <li><span class="kind">Back</span><span class="nm">About the Author</span></li>
+            </ul>
+            <div class="metabox">
+              <p class="colhead">Book details</p>
+              <div class="field"><span class="lab">Author</span><span class="val missing">— required —</span></div>
+              <div class="field"><span class="lab">Language</span><span class="val">English</span></div>
+              <div class="field"><span class="lab">ISBN</span><span class="val">not set</span></div>
+            </div>
+          </div>
+          <div class="col doc">
+            <p class="colhead">Document</p>
+            <div class="docnum">Chapter 1</div>
+            <div class="doctitle">What Is Faith?</div>
+            <div class="prose">
+              <p class="dropcap"><span class="sel-highlight">Faith is not a leap in the dark.</span> It is
+                the confidence that rests on what God has already said and done — a trust with an object,
+                not a feeling without one.</p>
+              <p>Throughout Scripture, faith is the hand that receives; it adds nothing to the gift and
+                takes nothing from the Giver.</p>
+              <div class="menu">
+                <div class="pop">
+                  <div class="mh">Convert selection to…</div>
+                  <button class="hi">▸ Chapter</button>
+                  <button>▸ Section of this chapter</button>
+                  <button>▸ Subtitle</button>
+                  <div class="div"></div>
+                  <button>Rename…</button>
+                  <button>Set placement (front / back)</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col proof">
+            <p class="colhead">Proof — live</p>
+            <div class="zoombar"><button>−</button><span class="lvl">100%</span><button>+</button><span>Fit</span></div>
+            <div class="pane">
+              <div class="page">
+                <div class="ptnum">Chapter One</div>
+                <div class="pt">What Is Faith?</div>
+                <p>Faith is not a leap in the dark. It is the confidence that rests on what God has
+                  already said and done — a trust with an object, not a feeling without one.</p>
+                <p>Throughout Scripture, faith is the hand that receives; it adds nothing to the gift.</p>
+                <div class="footer-num">Page 7 of 156</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="removals">
+      <span class="rm"><b>Ready for Print</b> station → dissolved: metadata beside skeleton, finding on the object</span>
+      <span class="rm"><b>Structure list</b> → is now the skeleton</span>
+      <span class="rm"><b>Proposal strip</b> → confirm on the row</span>
+    </div>
+  </section>
+
+  <!-- ============ MOCKUP 2 ============ -->
+  <section class="mk">
+    <header>
+      <span class="num">Mockup 2</span>
+      <span class="title">The edit → re-ink loop</span>
+      <span class="chip crit">A mechanism</span><span class="chip crit">C preview</span>
+    </header>
+    <p class="demo">A still cannot prove fluidity — so this shows the <b>mechanism</b>: the same page
+      before and after an edit, the region re-inked <b>in place</b>, scroll position identical, with the
+      <b>measured</b> engine figure. Felt speed is judged on the living studio, not here.</p>
+    <div class="stage">
+      <div class="pairgrid">
+        <div class="frame">
+          <div class="cap"><span>Before — reading here</span><b>scrollTop 240</b></div>
+          <div class="col proof" style="padding:12px">
+            <div class="pane" style="height:230px">
+              <div class="page" style="width:88%">
+                <div class="pt" style="font-size:.9rem">Justified by Faith Alone</div>
+                <p>Justification is God's verdict, not a slow moral climb. It is pronounced once, whole,
+                  over the one who trusts — a legal peace that condemnation cannot reopen.</p>
+                <p>The righteousness that answers the law is not ours by degrees; it is Christ's, credited
+                  in full.</p>
+                <div class="footer-num">Page 23 of 156</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="frame">
+          <div class="cap"><span>After the edit — <b>gaze kept</b></span><b>scrollTop 240</b></div>
+          <div class="col proof" style="padding:12px">
+            <div class="pane" style="height:230px">
+              <div class="page" style="width:88%">
+                <div class="pt" style="font-size:.9rem">Justified by Faith Alone</div>
+                <p><span class="sel-highlight">Justification is God's settled verdict</span>, not a slow
+                  moral climb. It is pronounced once, whole, over the one who trusts — a peace that
+                  condemnation cannot reopen.</p>
+                <p>The righteousness that answers the law is not ours by degrees; it is Christ's, credited
+                  in full.</p>
+                <div class="footer-num">Page 23 of <span class="prov">≈ 156 · updating…</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p style="margin:14px 0 0;font-size:.86rem;color:var(--muted)">
+        <span class="measure">◷ edit → visible 155 ms</span> &nbsp;·&nbsp; region render 31 ms &nbsp;·&nbsp;
+        vs full render 650 ms (4.2×), measured on book 3. Only the touched page repainted; the rest of the
+        Proof untouched.</p>
+      <p style="margin:16px 0 4px;font-size:.8rem;font-weight:640;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)">The provisional-total costume — for the founder to pick</p>
+      <div class="options">
+        <div class="opt"><span class="k">Option A · dimmed</span><span>Page 23 of <span class="n dim">156</span></span></div>
+        <div class="opt"><span class="k">Option B · approx</span><span>Page 23 of <span class="n">≈ 156</span></span></div>
+        <div class="opt"><span class="k">Option C · labelled</span><span>Page 23 of <span class="n">156 · updating…</span></span></div>
+      </div>
+      <p class="picknote">The DR imposes the <b>state</b> (never a confidently-wrong total between edit and
+        re-sync); the costume is the founder's choice. The per-page “Page 23” is always exact — it comes
+        from the region render; only the whole-book total is provisional.</p>
+    </div>
+    <div class="removals"><span class="rm"><b>Whole-book re-render per change</b> → region re-ink (P1 engine, now wired)</span></div>
+  </section>
+
+  <!-- ============ MOCKUP 3 ============ -->
+  <section class="mk">
+    <header>
+      <span class="num">Mockup 3</span>
+      <span class="title">Populated on import — the entry door &amp; the D8 case</span>
+      <span class="chip crit">D simplicity</span><span class="chip">differentiator</span><span class="chip">D8</span>
+    </header>
+    <p class="demo">Our difference: a raw DOCX arrives and the skeleton is <b>already filled</b> by the three
+      suggesters — no styled Word file required. And it shows the founder's own accident made
+      <b>impossible by gentleness</b>: an <b>empty chapter is surfaced as incomplete with a gentle collapse
+      offer</b> (led away, never blocked), the title is one he <b>confirms</b> not retypes, numbers are
+      computed so no gap can be authored.</p>
+    <div class="stage">
+      <div class="screen">
+        <div class="topbar"><span class="book">Imported: raw-manuscript.docx</span><span style="color:var(--muted);font-size:.74rem">· 0 headings styled → skeleton found</span><span class="status"><span class="dot"></span>18 objects</span></div>
+        <div class="cols" style="grid-template-columns:1.1fr 1fr">
+          <div class="col">
+            <p class="colhead">Skeleton — populated by the suggesters on import</p>
+            <ul class="sk">
+              <li class="incomplete"><span class="kind">Front</span><span class="nm">Untitled opening (755 words)</span><span class="conf">Name it →</span></li>
+              <li class="incomplete"><span class="num">—</span><span class="nm">INTRODUCTION</span><span class="flag todo">empty · collapse?</span></li>
+              <li><span class="num">1</span><span class="nm">What Is Faith?</span><span class="conf">Confirm</span></li>
+              <li><span class="num">2</span><span class="nm">Justified by Faith Alone</span><span class="conf">Confirm</span></li>
+              <li><span class="num">3</span><span class="nm">The Failure of the Law</span><span class="conf">Confirm</span></li>
+              <li><span class="num">4</span><span class="nm">Peace with God</span><span class="conf">Confirm</span></li>
+              <li><span class="num">5</span><span class="nm">Fully Accepted in Christ</span><span class="conf">Confirm</span></li>
+            </ul>
+          </div>
+          <div class="col doc">
+            <p class="colhead">The gentle nudge (D8)</p>
+            <div style="border:1px dashed var(--amber);background:var(--amber-soft);border-radius:9px;padding:12px;font-size:.84rem">
+              <div style="font-weight:640;margin-bottom:6px;color:var(--amber)">“INTRODUCTION” has no text of its own</div>
+              <p style="margin:0 0 10px;color:var(--muted)">It would print as a page with only a heading. Collapse
+                it into the section that follows?</p>
+              <div style="display:flex;gap:8px">
+                <button style="background:var(--accent);color:var(--accent-ink);border:0;border-radius:7px;padding:6px 12px;font:inherit;font-size:.8rem;font-weight:620;cursor:pointer">Collapse it</button>
+                <button style="background:none;border:1px solid var(--border);border-radius:7px;padding:6px 12px;font:inherit;font-size:.8rem;color:var(--muted);cursor:pointer">Keep as a chapter</button>
+              </div>
+            </div>
+            <p style="font-size:.78rem;color:var(--muted);margin-top:12px">The title on each row is the line the
+              author already wrote — he <b>confirms</b>, never retypes. Chapter numbers are computed by
+              position: he cannot author a gap.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="removals">
+      <span class="rm"><b>Empty chapter</b> → surfaced + gentle collapse (not blocked)</span>
+      <span class="rm"><b>Sentence-as-title</b> → the software brings the title, author confirms</span>
+      <span class="rm"><b>Number gaps</b> → computed, unauthorable</span>
+    </div>
+  </section>
+
+  <!-- ============ MOCKUP 4 ============ -->
+  <section class="mk">
+    <header>
+      <span class="num">Mockup 4</span>
+      <span class="title">Add a type — dedication &amp; preface</span>
+      <span class="chip crit">B editing</span><span class="chip">D2 v1</span>
+    </header>
+    <p class="demo">The dead field filled end to end: an <b>add</b> gesture, the composed section, and its
+      <b>tri-format</b> render. v1 is dedication + preface (the rest follow the same proven pattern). A type
+      that is added must <b>compose AND render</b> — or it re-creates the dead field it was meant to fill.</p>
+    <div class="stage">
+      <div class="additype">
+        <div class="addcol">
+          <p class="colhead">Add to the skeleton</p>
+          <div class="step"><span class="n">1</span><span>From the skeleton, <b>+ Add front-matter…</b> → Dedication</span></div>
+          <div class="step"><span class="n">2</span><span>Type the words — one short line, centred by the theme</span></div>
+          <div class="step"><span class="n">3</span><span>It takes its place in the skeleton, before the TOC</span></div>
+          <div style="border:1px solid var(--border);border-radius:9px;background:var(--raised);padding:10px;margin-top:6px">
+            <ul class="sk" style="gap:2px">
+              <li><span class="kind">Front</span><span class="nm">Title Page</span></li>
+              <li><span class="kind">Front</span><span class="nm">Copyright</span></li>
+              <li class="sel"><span class="kind">Front</span><span class="nm">Dedication</span><span class="conf">new</span></li>
+              <li><span class="kind">Front</span><span class="nm">Table of Contents</span></li>
+            </ul>
+          </div>
+        </div>
+        <div class="addcol">
+          <p class="colhead">Composes AND renders — tri-format</p>
+          <div class="triformat">
+            <div class="fmt"><div class="fh">PDF</div><div class="body"><div class="ded">For those who<br>still hope.</div></div></div>
+            <div class="fmt"><div class="fh">DOCX</div><div class="body"><div class="ded">For those who<br>still hope.</div></div></div>
+            <div class="fmt"><div class="fh">EPUB</div><div class="body"><div class="ded">For those who<br>still hope.</div></div></div>
+          </div>
+          <p style="font-size:.78rem;color:var(--muted);margin-top:12px">One narrow Insert-shaped op
+            (<b>addFrontMatterSection</b>) — composition, not the arbitrary content-creation that
+            <b>INSERT_ELEMENTS</b> defers to its own chantier.</p>
+        </div>
+      </div>
+    </div>
+    <div class="removals"><span class="rm"><b>“Add a preface” with no path</b> → a real path, composed + rendered</span></div>
+  </section>
+
+  <!-- ============ MOCKUP 5 ============ -->
+  <section class="mk">
+    <header>
+      <span class="num">Mockup 5</span>
+      <span class="title">Choose the book's look on a real page</span>
+      <span class="chip crit">D simplicity</span><span class="chip">D5 · taste-stop</span>
+    </header>
+    <p class="demo">The author picks a <b>graphic language on a rendered page</b>, not a name from a list.
+      In the same movement, the <b>separator</b> and the <b>chapter opening</b> become theme-controlled — a
+      theme that doesn't control its separators is not a complete system. The three title treatments are a
+      theme choice. <b>All of this is the founder's taste-stop.</b></p>
+    <div class="stage">
+      <p class="colhead">Themes as rendered pages</p>
+      <div class="thumbs">
+        <div class="thumb sel">
+          <div class="pg"><div class="t-open">Chapter One</div><div class="t-title-1"><div class="cn">Chapter 1</div><div class="tt" style="font-family:var(--book)">What Is Faith?</div></div><div class="ln"></div><div style="font-size:.5rem;color:var(--muted);font-family:var(--book)">Faith is not a leap in the dark…</div></div>
+          <div class="nm"><b>Classic</b><span>serif · rule</span></div>
+        </div>
+        <div class="thumb">
+          <div class="pg"><div class="t-title-2"><div class="tt" style="font-family:var(--book)">What Is Faith?</div></div><div class="aster">✳ ✳ ✳</div><div style="font-size:.5rem;color:var(--muted);font-family:var(--book)">Faith is not a leap in the dark…</div></div>
+          <div class="nm"><b>Modern</b><span>title only · asterisks</span></div>
+        </div>
+        <div class="thumb">
+          <div class="pg"><div class="t-title-3"><div class="tt" style="font-family:var(--book);color:var(--accent)">What Is Faith?</div></div><div style="font-size:.5rem;color:var(--muted);font-family:var(--book);margin-top:8px"><span style="font-size:2.4em;float:left;line-height:.7;color:var(--accent);padding-right:3px">F</span>aith is not a leap in the dark…</div></div>
+          <div class="nm"><b>Novel</b><span>large name · drop cap</span></div>
+        </div>
+      </div>
+      <p style="margin:16px 0 4px;font-size:.8rem;font-weight:640;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)">Title treatment (a theme value, CHAPTER_TITLE_PRESENTATION — the number is a datum, never text)</p>
+      <div class="titletreat">
+        <div class="tre"><div class="lbl">1 · number then title</div><div style="font-size:.55rem;color:var(--accent)">CHAPTER 1</div><div style="font-size:.85rem">What Is Faith?</div></div>
+        <div class="tre"><div class="lbl">2 · title only</div><div style="font-size:1rem">What Is Faith?</div></div>
+        <div class="tre"><div class="lbl">3 · large name</div><div style="font-size:1.2rem;font-weight:600">What Is Faith?</div></div>
+      </div>
+    </div>
+    <div class="removals"><span class="rm"><b>Theme chosen by name</b> → chosen on a rendered page</span><span class="rm"><b>Large Layout blocks</b> → a compact chooser</span></div>
+  </section>
+
+  <!-- ============ MOCKUP 6 ============ -->
+  <section class="mk">
+    <header>
+      <span class="num">Mockup 6</span>
+      <span class="title">The navigation — distributed, not scattered</span>
+      <span class="chip crit">D simplicity</span><span class="chip">Principle 4</span>
+    </header>
+    <p class="demo">The station set after the merges: one primary workspace absorbs three old stations,
+      the rest are legible destinations. Each page has <b>one clear object</b>; every path is short.</p>
+    <div class="stage">
+      <div class="navmap">
+        <div class="navrow">
+          <div class="node primary"><div class="nt">Workspace</div><div class="no">skeleton · document · Proof</div></div>
+          <span class="arrow">→</span>
+          <div class="node"><div class="nt">Look</div><div class="no">theme &amp; format (compact)</div></div>
+          <span class="arrow">→</span>
+          <div class="node"><div class="nt">Editions</div><div class="no">PDF · EPUB · DOCX · publish</div></div>
+          <span class="arrow">→</span>
+          <div class="node"><div class="nt">History</div><div class="no">versions · undo</div></div>
+        </div>
+        <p class="navnote">Absorbed into the Workspace: <b>Structure</b> (it <em>is</em> the skeleton),
+          the <b>Proof</b> (now the right panel, permanent), and <b>Ready for Print</b> (metadata beside
+          the skeleton, findings in context). <b>Overview</b> — kept or opened-into is the founder's call.</p>
+        <div class="navrow" style="margin-top:4px">
+          <div class="node gone"><div class="nt">Structure</div></div>
+          <div class="node gone"><div class="nt">Proof (stacked)</div></div>
+          <div class="node gone"><div class="nt">Ready for Print</div></div>
+          <div class="node gone"><div class="nt">Overview?</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="removals"><span class="rm">7 stations → <b>4</b>, no function lost (each re-homed)</span></div>
+  </section>
+
+  <p class="meta" style="margin-top:8px">Each frame answers one criterion on the still; criterion A's felt
+    speed is the founder's live taste-stop, as it was for P1. On his validation, construction is scoped —
+    not before.</p>
+</div>
