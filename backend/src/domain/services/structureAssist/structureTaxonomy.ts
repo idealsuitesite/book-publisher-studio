@@ -15,6 +15,13 @@
 
 export type MarkerKind = 'editorial' | 'numbered-chapter';
 
+/**
+ * Editorial placement of a canonical part (MINI_DR_EDITORIAL_PARTS / MINI_DR_EDITORIAL_PLACEMENT):
+ * where the part conventionally renders — before the chapters ('front') or after them ('back').
+ * This is the category CONVENTION; an author's explicit `role` tag overrides it (`setPartRole`).
+ */
+export type EditorialPlacement = 'front' | 'back';
+
 export interface StructureMarker {
   /** 'editorial' (a canonical part name) or 'numbered-chapter' (CHAPTER n / spelled). */
   kind: MarkerKind;
@@ -24,33 +31,58 @@ export interface StructureMarker {
   label: string;
 }
 
+/** A recognised editorial category: its stable key, display label, and conventional placement. */
+export interface EditorialCategory {
+  key: string;
+  label: string;
+  placement: EditorialPlacement;
+}
+
 /**
  * Canonical editorial names, EN + FR, lowercased — the union matched as a leading segment (the
  * MINI_DR_EDITORIAL_PARTS list, kept in lock-step). A body paragraph whose leading segment equals
- * one of these exactly is a strong, author-declared structural signal.
+ * one of these exactly is a strong, author-declared structural signal. `placement` mirrors the
+ * frontend `editorialParts.ts` list (front-matter then back-matter) — the two copies are the
+ * duplication AUTHOR_EXPERIENCE_DR §3/§4 names for unification; this Domain copy is the one the
+ * editorial-skeleton projection reads (D1).
  */
-const EDITORIAL_NAMES: { key: string; label: string; names: string[] }[] = [
-  { key: 'dedication', label: 'Dedication', names: ['dedication', 'dédicace'] },
-  { key: 'epigraph', label: 'Epigraph', names: ['epigraph', 'épigraphe'] },
-  { key: 'foreword', label: 'Foreword', names: ['foreword', 'avant-propos'] },
-  { key: 'preface', label: 'Preface', names: ['preface', 'préface'] },
-  { key: 'prologue', label: 'Prologue', names: ['prologue'] },
-  { key: 'introduction', label: 'Introduction', names: ['introduction'] },
-  { key: 'acknowledgments', label: 'Acknowledgments', names: ['acknowledgments', 'acknowledgements', 'remerciements'] },
-  { key: 'conclusion', label: 'Conclusion', names: ['conclusion'] },
-  { key: 'epilogue', label: 'Epilogue', names: ['epilogue', 'épilogue'] },
-  { key: 'afterword', label: 'Afterword', names: ['afterword', 'postface'] },
-  { key: 'appendix', label: 'Appendix', names: ['appendix', 'appendices', 'annexe', 'annexes'] },
-  { key: 'bibliography', label: 'Bibliography', names: ['bibliography', 'references', 'bibliographie', 'références'] },
-  { key: 'glossary', label: 'Glossary', names: ['glossary', 'glossaire'] },
-  { key: 'index', label: 'Index', names: ['index'] },
-  { key: 'notes', label: 'Notes', names: ['notes'] },
-  { key: 'colophon', label: 'Colophon', names: ['colophon'] },
-  { key: 'about', label: 'About the Author', names: ['about the author', "à propos de l'auteur"] },
+const EDITORIAL_NAMES: { key: string; label: string; placement: EditorialPlacement; names: string[] }[] = [
+  { key: 'dedication', label: 'Dedication', placement: 'front', names: ['dedication', 'dédicace'] },
+  { key: 'epigraph', label: 'Epigraph', placement: 'front', names: ['epigraph', 'épigraphe'] },
+  { key: 'foreword', label: 'Foreword', placement: 'front', names: ['foreword', 'avant-propos'] },
+  { key: 'preface', label: 'Preface', placement: 'front', names: ['preface', 'préface'] },
+  { key: 'prologue', label: 'Prologue', placement: 'front', names: ['prologue'] },
+  { key: 'introduction', label: 'Introduction', placement: 'front', names: ['introduction'] },
+  { key: 'acknowledgments', label: 'Acknowledgments', placement: 'front', names: ['acknowledgments', 'acknowledgements', 'remerciements'] },
+  { key: 'conclusion', label: 'Conclusion', placement: 'back', names: ['conclusion'] },
+  { key: 'epilogue', label: 'Epilogue', placement: 'back', names: ['epilogue', 'épilogue'] },
+  { key: 'afterword', label: 'Afterword', placement: 'back', names: ['afterword', 'postface'] },
+  { key: 'appendix', label: 'Appendix', placement: 'back', names: ['appendix', 'appendices', 'annexe', 'annexes'] },
+  { key: 'bibliography', label: 'Bibliography', placement: 'back', names: ['bibliography', 'references', 'bibliographie', 'références'] },
+  { key: 'glossary', label: 'Glossary', placement: 'back', names: ['glossary', 'glossaire'] },
+  { key: 'index', label: 'Index', placement: 'back', names: ['index'] },
+  { key: 'notes', label: 'Notes', placement: 'back', names: ['notes'] },
+  { key: 'colophon', label: 'Colophon', placement: 'back', names: ['colophon'] },
+  { key: 'about', label: 'About the Author', placement: 'back', names: ['about the author', "à propos de l'auteur"] },
 ];
 
-const EDITORIAL_BY_NAME = new Map<string, { key: string; label: string }>();
-for (const cat of EDITORIAL_NAMES) for (const name of cat.names) EDITORIAL_BY_NAME.set(name, { key: cat.key, label: cat.label });
+const EDITORIAL_BY_NAME = new Map<string, EditorialCategory>();
+for (const cat of EDITORIAL_NAMES) for (const name of cat.names) EDITORIAL_BY_NAME.set(name, { key: cat.key, label: cat.label, placement: cat.placement });
+
+/**
+ * The editorial category a TOP-LEVEL part's title names, or undefined if the title is an ordinary
+ * chapter (MINI_DR_EDITORIAL_PARTS, the exact-leading-segment safeguard). "Conclusion: Nothing but
+ * Faith" → conclusion/back; "Chapter One: What Is Faith?" and "Introduction to Quantum Fields" → not
+ * editorial (the segment is the whole title, never a bare canonical name). Same match logic as
+ * `classifyMarker`'s editorial branch, exposed as the category (with its placement) the skeleton
+ * projection needs.
+ */
+export function classifyEditorialTitle(title: string | undefined): EditorialCategory | undefined {
+  if (!title) return undefined;
+  const segment = leadingSegment(title.trim());
+  if (!segment) return undefined;
+  return EDITORIAL_BY_NAME.get(segment);
+}
 
 // Numbered-chapter markers, EN + FR (D3, narrow): the word that precedes a number, spelled or digit.
 const CHAPTER_WORDS = ['chapter', 'chapitre'];
