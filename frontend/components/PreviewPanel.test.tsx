@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+
+// The PDF.js surface is exercised in PdfProof.test.tsx (it loads pdfjs, which does not render in jsdom).
+// Here it is stubbed to a marker so these tests stay about the panel's LIVING LOOP — exporter cadence,
+// page count, error recovery — not PDF painting.
+vi.mock('./PdfProof', () => ({
+  PdfProof: ({ bytes }: { bytes: ArrayBuffer | null }) => (
+    <div data-testid="pdf-proof" data-has-bytes={bytes ? 'yes' : 'no'} />
+  ),
+}));
+
 import { PreviewPanel } from './PreviewPanel';
 
 const exporter = vi.fn<() => Promise<Blob>>();

@@ -1,0 +1,86 @@
+/*
+ * INCREMENTAL_RENDER (P1, commit 4) — styles for the PDF.js canvas Proof surface.
+ *
+ * The `.textLayer` rules are the ESSENTIAL subset of pdfjs-dist/web/pdf_viewer.css needed for a
+ * SELECTABLE, screen-reader-exposed text layer laid transparently over the canvas (we inline them
+ * rather than import the full viewer CSS, which also pulls annotation/xfa styles and image assets we
+ * do not use). pdfjs's TextLayer + setLayerDimensions position each span and set --total-scale-factor;
+ * these rules make the spans transparent, absolutely positioned, and user-selectable.
+ */
+
+.pdfProofScroll {
+  overflow: auto;
+  /* The app owns the scroll container, so an edit repaints canvases in place without the
+     scroll/zoom reset the whole-<embed> reswap caused (DR §D2, continuity of the gaze). */
+}
+
+.pdfProofPages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.pdfPage {
+  position: relative;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+}
+
+.pdfCanvas {
+  display: block;
+}
+
+.textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.textLayer {
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer .markedContent {
+  display: contents;
+}
+
+.textLayer br::selection {
+  background: transparent;
+}
+
+.textLayer ::selection {
+  background: rgb(0 100 255 / 0.25);
+}

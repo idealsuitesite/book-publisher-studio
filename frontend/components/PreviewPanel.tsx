@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Card } from '@/components/ui';
 import { ApiError } from '@/lib/api-client';
+import { PdfProof } from '@/components/PdfProof';
 
 /**
  * The living Proof (PRODUCT_EXPERIENCE §4.5, CTO: "le bouton disparaît"). The proof exists
@@ -28,7 +29,7 @@ interface PreviewPanelProps {
 }
 
 interface ProofState {
-  blobUrl: string | null;
+  bytes: ArrayBuffer | null;
   pageCount: number | null;
   refreshing: boolean;
   error: string | null;
@@ -45,16 +46,9 @@ function countPdfPages(bytes: ArrayBuffer): number | null {
 }
 
 export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, onGenerated, onPageCount }: PreviewPanelProps) {
-  const [state, setState] = useState<ProofState>({ blobUrl: null, pageCount: null, refreshing: true, error: null });
+  const [state, setState] = useState<ProofState>({ bytes: null, pageCount: null, refreshing: true, error: null });
   const [retry, setRetry] = useState(0);
-  const blobUrlRef = useRef<string | null>(null);
   const runIdRef = useRef(0);
-
-  useEffect(() => {
-    return () => {
-      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-    };
-  }, []);
 
   // The living loop: mount → proof; settingsKey change → debounce → proof. A run that finishes
   // after a newer one started is discarded (runId guard) — the proof never goes backwards.
@@ -70,10 +64,7 @@ export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, o
           if (runIdRef.current !== runId) return;
           const bytes = await blob.arrayBuffer();
           const pageCount = countPdfPages(bytes);
-          if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-          const blobUrl = URL.createObjectURL(blob);
-          blobUrlRef.current = blobUrl;
-          setState({ blobUrl, pageCount, refreshing: false, error: null });
+          setState({ bytes, pageCount, refreshing: false, error: null });
           onGenerated?.();
           onPageCount?.(pageCount);
         } catch (error) {
@@ -104,7 +95,7 @@ export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, o
         <h3 className="text-lg font-semibold text-app-text">Proof</h3>
         {/* No Generate button - the proof is alive. This line narrates its state instead. */}
         <span className="text-xs text-app-text-muted" aria-live="polite">
-          {state.refreshing ? 'Re-inking…' : state.blobUrl ? 'Up to date' : ''}
+          {state.refreshing ? 'Re-inking…' : state.bytes ? 'Up to date' : ''}
         </span>
       </div>
 
@@ -134,17 +125,15 @@ export function PreviewPanel({ exporter, settingsKey, layoutLabel, themeLabel, o
         </p>
       )}
 
-      {state.blobUrl && (
-        <embed
-          data-baseline-mask
-          src={state.blobUrl}
-          type="application/pdf"
-          className={`h-[500px] w-full rounded-lg border border-app-border transition-opacity duration-[var(--motion-view)] ${
-            state.refreshing ? 'opacity-40' : 'opacity-100'
-          }`}
+      {state.bytes && (
+        <PdfProof
+          bytes={state.bytes}
+          refreshing={state.refreshing}
+          ariaLabel="Book proof preview"
+          className="h-[500px] w-full rounded-lg border border-app-border bg-app-surface-2"
         />
       )}
-      {!state.blobUrl && state.refreshing && (
+      {!state.bytes && state.refreshing && (
         <div className="flex h-[500px] w-full items-center justify-center rounded-lg border border-app-border bg-app-surface-2">
           <p className="animate-pulse text-sm text-app-text-muted">Setting the first proof…</p>
         </div>
